@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api, devLinkSecret, onUnauthorized } from '../api/client';
 import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
 import Layout from './Layout';
+import { SelectedBotProvider } from './SelectedBotContext';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 import { desktopBridge } from '../platform/native-bridge';
@@ -130,12 +131,14 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <SelectedBotProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </SelectedBotProvider>
   );
 }

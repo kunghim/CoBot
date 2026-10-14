@@ -1,12 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import type { Event, Settings, SettingsPatch, Snapshot, Status } from './types';
+import type {
+  Approval,
+  Bot,
+  ConversationResult,
+  CreateTeamResult,
+  EngineStatus,
+  Event,
+  ModelListResult,
+  RoleListResult,
+  SendMessageResult,
+  Settings,
+  SettingsPatch,
+  Snapshot,
+  Status,
+  TeamListResult,
+} from './types';
 import { api, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
   status: ['status'] as const,
   settings: ['settings'] as const,
   snapshot: ['snapshot'] as const,
+  teams: ['teams'] as const,
+  roles: ['roles'] as const,
+  engine: ['engine'] as const,
+  models: ['models'] as const,
+  messages: (botId: string) => ['messages', botId] as const,
+  approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
 };
 
 export function useStatus() {
@@ -112,4 +133,149 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
   }, [enabled, onEvent]);
 }
 
-export type { Snapshot, Status, Settings, SettingsPatch, Event };
+// ---------------------------------------------------------------------------
+// M2: teams, conversations, approvals, engine, models
+// ---------------------------------------------------------------------------
+
+/** GET /teams: teams with their members, refreshed by the SSE invalidation. */
+export function useTeams(enabled = true) {
+  return useQuery({ queryKey: queryKeys.teams, queryFn: api.listTeams, enabled });
+}
+
+export function useCreateTeam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; directory: string; initialRoleIds: string[] }) => api.createTeam(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      void qc.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+
+export function useRoles(enabled = true) {
+  return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
+}
+
+/** GET /bots/{id}/messages: one conversation plus queue depth and run state. */
+export function useConversation(botId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.messages(botId ?? ''),
+    queryFn: () => api.listMessages(botId as string),
+    enabled: botId !== null,
+  });
+}
+
+export function useSendMessage(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) => api.sendMessage(botId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+export function useCancelMessage(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.cancelMessage(messageId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+    },
+  });
+}
+
+export function useInterruptRun(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.interruptRun(runId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+/** GET /approvals?teamId&state: pending cards or decided history. */
+export function useApprovals(teamId: string | null, state: 'pending' | 'history', enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.approvals(teamId ?? '', state),
+    queryFn: () => api.listApprovals({ teamId: teamId as string, state }),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+export function useDecideApproval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ approvalId, optionId, expectedRevision }: { approvalId: string; optionId: string; expectedRevision: number }) =>
+      api.decideApproval(approvalId, { optionId, expectedRevision }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['approvals'] });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+/** GET /engine: the real engine projection; the snapshot copy is only a
+ * cheap cached hint. */
+export function useEngine(enabled = true) {
+  return useQuery({ queryKey: queryKeys.engine, queryFn: api.getEngine, enabled, staleTime: 0 });
+}
+
+export function useEngineLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.engineLogin(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.engine });
+    },
+  });
+}
+
+export function useEngineLoginCancel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.engineLoginCancel(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.engine });
+    },
+  });
+}
+
+export function useEngineLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.engineLogout(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.engine });
+    },
+  });
+}
+
+/** GET /models: only meaningful while the engine is ready; the endpoint
+ * spawns the control server, so callers enable it conditionally. */
+export function useEngineModels(enabled: boolean) {
+  return useQuery({ queryKey: queryKeys.models, queryFn: api.listModels, enabled });
+}
+
+export type {
+  Approval,
+  Bot,
+  ConversationResult,
+  CreateTeamResult,
+  EngineStatus,
+  Event,
+  ModelListResult,
+  RoleListResult,
+  SendMessageResult,
+  Snapshot,
+  Status,
+  Settings,
+  SettingsPatch,
+  TeamListResult,
+};

@@ -11,10 +11,10 @@
 /frontend/coverage/
 /frontend/playwright-report/
 /frontend/test-results/
-/coverage/
-/coverage.out
-/playwright-report/
-/test-results/
+coverage/
+coverage.out
+playwright-report/
+test-results/
 *.tsbuildinfo
 
 # 本机配置、运行数据与日志

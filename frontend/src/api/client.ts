@@ -147,7 +147,52 @@ export const api = {
     }
     return result;
   },
-  logout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
+  logout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {}),
+
+  // Teams, roles and members (M2).
+  listTeams: () => request<import('./types').TeamListResult>('GET', '/api/v1/teams'),
+  createTeam: (body: { name: string; directory: string; initialRoleIds: string[] }) =>
+    request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
+  getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
+  addBot: (teamId: string, roleId: string) =>
+    request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
+  listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),
+
+  // Conversations and runs (M2).
+  listMessages: (botId: string, params?: { before?: string; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.before) query.set('before', params.before);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const suffix = query.toString();
+    return request<import('./types').ConversationResult>(
+      'GET',
+      `/api/v1/bots/${botId}/messages${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+  sendMessage: (botId: string, text: string) =>
+    request<import('./types').SendMessageResult>('POST', `/api/v1/bots/${botId}/messages`, { text }),
+  cancelMessage: (messageId: string) =>
+    request<import('./types').Message>('POST', `/api/v1/messages/${messageId}/cancel`, {}),
+  interruptRun: (runId: string) =>
+    request<import('./types').InterruptRunResult>('POST', `/api/v1/runs/${runId}/interrupt`, {}),
+
+  // Approvals (M2).
+  listApprovals: (params: { teamId: string; state?: 'pending' | 'history'; requesterBotId?: string; limit?: number }) => {
+    const query = new URLSearchParams({ teamId: params.teamId });
+    if (params.state) query.set('state', params.state);
+    if (params.requesterBotId) query.set('requesterBotId', params.requesterBotId);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    return request<import('./types').ApprovalListResult>('GET', `/api/v1/approvals?${query.toString()}`);
+  },
+  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number }) =>
+    request<import('./types').Approval>('POST', `/api/v1/approvals/${approvalId}/decisions`, body),
+
+  // Engine account and models (M2).
+  getEngine: () => request<import('./types').EngineStatus>('GET', '/api/v1/engine'),
+  engineLogin: () => request<{ loginStarted: boolean }>('POST', '/api/v1/auth/login', {}),
+  engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
+  engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
+  listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 };
 
 import { desktopBridge } from '../platform/native-bridge';

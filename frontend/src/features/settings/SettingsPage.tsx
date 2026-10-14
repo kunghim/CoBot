@@ -1,40 +1,101 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStatus, useUpdateSettings } from '../../api/queries';
-import { useSettings } from '../../api/queries';
-import { api, ApiError } from '../../api/client';
-import type { SettingsPatch } from '../../api/types';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  queryKeys,
+  useEngine,
+  useEngineLogin,
+  useEngineLoginCancel,
+  useEngineLogout,
+  useEngineModels,
+  useSettings,
+  useStatus,
+  useUpdateSettings,
+} from '../../api/queries';
+import { api } from '../../api/client';
+import type { EngineModel, SettingsPatch } from '../../api/types';
+import { apiErrorMessage, errorMessage } from '../../i18n/errors';
+
+type Feedback = 'idle' | 'saved' | 'failed';
 
 /**
  * SettingsPage edits persisted business settings through the API. Every
- * control maps to a real stored value; nothing here is a placeholder. Engine
- * models and login flows extend this page in the engine milestone.
+ * control maps to a real stored value; the engine section reads the live
+ * GET /engine projection, drives the official Codex login flow (polling
+ * every 3s for up to 2 minutes) and patches the default/eval models from the
+ * engine-provided model list.
  */
 export default function SettingsPage() {
   const { t } = useTranslation();
   const status = useStatus();
   const settings = useSettings(true);
   const update = useUpdateSettings();
+  const queryClient = useQueryClient();
+
+  const engine = useEngine();
+  const login = useEngineLogin();
+  const loginCancel = useEngineLoginCancel();
+  const logout = useEngineLogout();
+  const models = useEngineModels(engine.data?.status === 'ready');
 
   const [language, setLanguage] = useState('zh-CN');
   const [enginePath, setEnginePath] = useState('');
+  const [defaultModel, setDefaultModel] = useState('');
+  const [evalModel, setEvalModel] = useState('');
   const [memberLimit, setMemberLimit] = useState(6);
   const [chainLimit, setChainLimit] = useState(6);
   const [budgetScope, setBudgetScope] = useState('');
   const [budgetTokens, setBudgetTokens] = useState(0);
-  const [feedback, setFeedback] = useState<'idle' | 'saved' | 'failed'>('idle');
+  const [feedback, setFeedback] = useState<Feedback>('idle');
   const [errorKey, setErrorKey] = useState<string>('');
+  const [modelFeedback, setModelFeedback] = useState<Feedback>('idle');
+  const [modelErrorText, setModelErrorText] = useState('');
+
+  const [loginPending, setLoginPending] = useState(false);
+  const [loginTimedOut, setLoginTimedOut] = useState(false);
+  const [engineActionError, setEngineActionError] = useState('');
 
   useEffect(() => {
     const s = settings.data;
     if (!s) return;
     setLanguage(s.language);
     setEnginePath(s.enginePath);
+    setDefaultModel(s.defaultModel);
+    setEvalModel(s.evalModel);
     setMemberLimit(s.memberLimit);
     setChainLimit(s.chainLimit);
     setBudgetScope(s.budgetScope);
     setBudgetTokens(s.budgetTokens);
   }, [settings.data]);
+
+  // Keep the latest refetch function in a ref so the polling interval does
+  // not restart on every render.
+  const refetchEngine = useRef(engine.refetch);
+  refetchEngine.current = engine.refetch;
+
+  // Poll GET /engine every 3s while a login is pending, at most 2 minutes.
+  useEffect(() => {
+    if (!loginPending) return;
+    const deadline = Date.now() + 120_000;
+    const interval = window.setInterval(() => {
+      if (Date.now() >= deadline) {
+        setLoginPending(false);
+        setLoginTimedOut(true);
+        return;
+      }
+      void refetchEngine.current();
+    }, 3_000);
+    return () => window.clearInterval(interval);
+  }, [loginPending]);
+
+  // The engine reports loggedIn only after the real handshake; that ends
+  // the pending state without any optimistic guessing.
+  useEffect(() => {
+    if (engine.data?.loggedIn) {
+      setLoginPending(false);
+      setLoginTimedOut(false);
+    }
+  }, [engine.data?.loggedIn]);
 
   if (settings.isPending) {
     return <div className="p-8 text-sm text-neutral-500">{t('status.loading')}</div>;
@@ -58,16 +119,88 @@ export default function SettingsPage() {
         onSuccess: () => {
           setFeedback('saved');
           setErrorKey('');
+          // A saved engine path must be re-probed before the status is
+          // trusted again; the models list belongs to the same probe.
+          void queryClient.invalidateQueries({ queryKey: queryKeys.engine });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.models });
         },
         onError: (err) => {
           setFeedback('failed');
-          setErrorKey(err instanceof ApiError ? err.messageKey : 'error.internal');
+          setErrorKey(apiErrorMessage(t, err));
         },
       },
     );
   };
 
-  const engine = status.data?.engine;
+  const changeModel = (field: 'defaultModel' | 'evalModel', value: string) => {
+    if (field === 'defaultModel') setDefaultModel(value);
+    else setEvalModel(value);
+    const patch: SettingsPatch = field === 'defaultModel' ? { defaultModel: value } : { evalModel: value };
+    setModelFeedback('idle');
+    setModelErrorText('');
+    update.mutate(
+      { patch, expectedRevision: settings.data?.revision },
+      {
+        onSuccess: () => setModelFeedback('saved'),
+        onError: (err) => {
+          setModelFeedback('failed');
+          setModelErrorText(apiErrorMessage(t, err));
+        },
+      },
+    );
+  };
+
+  const startLogin = () => {
+    setEngineActionError('');
+    login.mutate(undefined, {
+      onSuccess: () => {
+        setLoginPending(true);
+        setLoginTimedOut(false);
+      },
+      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
+    });
+  };
+
+  const cancelLogin = () => {
+    setEngineActionError('');
+    loginCancel.mutate(undefined, {
+      onSuccess: () => {
+        setLoginPending(false);
+        void refetchEngine.current();
+      },
+      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
+    });
+  };
+
+  const engineLogout = () => {
+    setEngineActionError('');
+    logout.mutate(undefined, {
+      onSuccess: () => {
+        setLoginPending(false);
+        void refetchEngine.current();
+      },
+      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
+    });
+  };
+
+  const engineInfo = engine.data;
+  const engineStatusText = !engineInfo
+    ? t('status.loading')
+    : engineInfo.status === 'ready'
+      ? t('settings.engineReady')
+      : engineInfo.status === 'error'
+        ? t('settings.engineError')
+        : engineInfo.status === 'starting'
+          ? t('settings.engineStarting')
+          : t('settings.engineNotConfigured');
+  const loggedIn = engineInfo?.loggedIn ?? false;
+
+  const modelOptions = (current: string): EngineModel[] => {
+    const list = models.data?.models ?? [];
+    const known = new Set(list.map((entry) => entry.slug ?? entry.id ?? ''));
+    if (current !== '' && !known.has(current)) return [{ slug: current, displayName: current }, ...list];
+    return list;
+  };
 
   return (
     <div className="h-full overflow-y-auto p-8">
@@ -107,12 +240,72 @@ export default function SettingsPage() {
           <h2 id="settings-engine" className="text-sm font-semibold">
             {t('settings.engine')}
           </h2>
-          <p className="mt-2 text-sm text-neutral-500">
-            {t('settings.engineStatus')}:{' '}
-            {engine?.status === 'ready' ? t('settings.engineReady') : engine?.status === 'error' ? t('settings.engineError') : t('settings.engineNotConfigured')}
-            {engine?.version ? ` (${engine.version})` : ''}
+          <p className="mt-2 text-sm text-neutral-500" role="status">
+            {t('settings.engineStatus')}: {engineStatusText}
+            {engineInfo?.version ? ` (${engineInfo.version})` : ''} ·{' '}
+            {loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}
           </p>
-          <label className="mt-3 block text-sm">
+          {engineInfo?.binaryPath && (
+            <p className="mt-1 break-all font-mono text-xs text-neutral-400">
+              {t('settings.engineBinary')}: {engineInfo.binaryPath}
+              {engineInfo.protocol ? ` · ${t('settings.engineProtocol')}: ${engineInfo.protocol}` : ''}
+            </p>
+          )}
+          {engineInfo?.errorKey && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errorMessage(t, engineInfo.errorKey)}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {!loggedIn && engineInfo?.status === 'ready' && !loginPending && (
+              <button
+                type="button"
+                onClick={startLogin}
+                disabled={login.isPending}
+                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+              >
+                {t('engine.login')}
+              </button>
+            )}
+            {loginPending && (
+              <>
+                <span className="text-sm text-neutral-500" role="status">
+                  {t('engine.waitingLogin')}
+                </span>
+                <button
+                  type="button"
+                  onClick={cancelLogin}
+                  disabled={loginCancel.isPending}
+                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  {t('engine.cancelLogin')}
+                </button>
+              </>
+            )}
+            {loggedIn && (
+              <button
+                type="button"
+                onClick={engineLogout}
+                disabled={logout.isPending}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                {t('engine.logout')}
+              </button>
+            )}
+          </div>
+          {loginTimedOut && (
+            <p className="mt-2 text-sm text-amber-600" role="alert">
+              {t('engine.loginTimeout')}
+            </p>
+          )}
+          {engineActionError && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {engineActionError}
+            </p>
+          )}
+
+          <label className="mt-4 block text-sm">
             <span className="text-neutral-500">{t('settings.enginePath')}</span>
             <input
               value={enginePath}
@@ -122,6 +315,59 @@ export default function SettingsPage() {
             />
             <span className="mt-1 block text-xs text-neutral-400">{t('settings.enginePathHint')}</span>
           </label>
+
+          {models.data && (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="text-neutral-500">{t('settings.defaultModel')}</span>
+                <select
+                  value={defaultModel}
+                  onChange={(e) => changeModel('defaultModel', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
+                >
+                  <option value="">{t('settings.modelUnset')}</option>
+                  {modelOptions(defaultModel).map((model) => {
+                    const value = model.slug ?? model.id ?? '';
+                    if (value === '') return null;
+                    return (
+                      <option key={value} value={value}>
+                        {model.displayName ?? value}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-500">{t('settings.evalModel')}</span>
+                <select
+                  value={evalModel}
+                  onChange={(e) => changeModel('evalModel', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
+                >
+                  <option value="">{t('settings.modelUnset')}</option>
+                  {modelOptions(evalModel).map((model) => {
+                    const value = model.slug ?? model.id ?? '';
+                    if (value === '') return null;
+                    return (
+                      <option key={value} value={value}>
+                        {model.displayName ?? value}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              {modelFeedback === 'saved' && (
+                <p className="text-sm text-green-600 sm:col-span-2" role="status">
+                  {t('settings.modelChanged')}
+                </p>
+              )}
+              {modelFeedback === 'failed' && (
+                <p className="text-sm text-red-600 sm:col-span-2" role="alert">
+                  {modelErrorText}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section aria-labelledby="settings-limits" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
@@ -193,7 +439,7 @@ export default function SettingsPage() {
           )}
           {feedback === 'failed' && (
             <span className="text-sm text-red-600" role="alert">
-              {t('settings.saveFailed')}: {t(errorKey || 'error.internal', errorKey)}
+              {t('settings.saveFailed')}: {errorKey}
             </span>
           )}
         </div>
