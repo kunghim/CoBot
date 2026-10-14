@@ -6,7 +6,7 @@
 
 # 产品构建与依赖（源码、迁移、角色、生成API类型仍应提交）
 /internal/webui/dist/
-/frontend/node_modules/
+node_modules/
 /frontend/wailsjs/
 /frontend/coverage/
 /frontend/playwright-report/
