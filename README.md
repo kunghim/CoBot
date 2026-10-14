@@ -2,9 +2,44 @@
 
 开源、本地运行的多 Agent 协作应用：CoBot 组织角色、任务、沟通与审批，业务操作交给外部 Agent。首版先做编程，目标是用 CoBot 开发 CoBot，后续面向办公、学习、创作等场景。
 
-**当前阶段：首版实施方案已整理，尚未实现产品。** 文档更新为 2026-10-15；需求仍可继续讨论，文档不代表功能已经实现。编码智能体从首版开发方案及两份配套文档开始。
+**当前阶段：M1 可运行骨架已落地**（Go 核心 + 本机 Web + 桌面薄壳代码）；M2～M5（真实引擎接入、团队/任务/审批闭环、控制与可靠性、完整验收）按 [首版开发方案](docs/首版开发方案.md) 继续交付。本轮交付以 Web 真实验收、自审及独立代码审查通过为完成标准；桌面薄壳代码保留，Windows/macOS 原生运行和打包可以待测，不冒充已通过。
 
-本轮开发交付以Web真实验收、自审及独立代码审查通过为完成标准；桌面薄壳代码保留，Windows/macOS原生运行和打包可以待测，不阻塞此轮Goal，也不冒充已通过。
+## 快速开始（开发者）
+
+前置：Go 1.25+、Node.js 24+（npm 11+）。最终用户运行 `cobot` 单文件即可，不需要 Node/Go/数据库服务器。
+
+```bash
+# 首次：安装前端依赖并生成接口类型（OpenAPI → TS + Go DTO）
+npm ci --prefix frontend
+./scripts/generate.sh          # Windows: powershell -File scripts/generate.ps1
+
+# 开发循环：启动 Go 核心(development profile) + Vite，退出时回收进程
+./scripts/dev.sh               # Windows: powershell -File scripts/dev.ps1
+# 打开终端输出的一次性链接（60 秒、单次有效）；丢失后再次运行 cobot serve 会打印新链接
+
+# 全量检查：格式/静态分析、契约生成差异、前端类型与单测、Go 构建与测试
+./scripts/check.sh             # Windows: powershell -File scripts/check.ps1
+
+# 构建发行物（输出到 .tmp/dist，附 sha256）
+./scripts/build.sh --target server    # 独立 cobot 可执行文件（内嵌前端/迁移/角色）
+./scripts/build.sh --target desktop   # Wails 桌面壳 + 同版本辅助 cobot（需 wails v2.15.0 CLI）
+```
+
+独立运行核心（不依赖脚本）：
+
+```bash
+go build -o .tmp/bin/cobot ./cmd/cobot
+.tmp/bin/cobot serve --profile development            # 默认开发 profile，数据在 ~/.cobot-dev
+.tmp/bin/cobot serve --profile production             # 生产 profile，数据在 ~/.cobot
+.tmp/bin/cobot serve --data-root <path>               # 显式数据根（测试用临时目录）
+# 同 profile 重复启动不会开第二个调度器：报告已运行实例并打印新的授权链接
+```
+
+测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
+
+## 工程版本
+
+Go 1.25、React 18 + TypeScript + Vite 6、TanStack Query、Tailwind CSS 4、i18next（zh-CN/en）、SQLite（modernc）+ goose、Wails v2.15.0、HTTP JSON + fetch SSE。生成工具锁定：oapi-codegen v2.4.1、openapi-typescript 7.13.0（`scripts/generate.*`，禁止浮动 latest）。
 
 ## 阅读入口
 
@@ -17,6 +52,7 @@
 | [需求文档](docs/需求文档.md) | 当前产品共识、功能范围、使用流程、验收条件与未决问题 |
 | [界面布局](docs/界面布局.md) | 首页导航、团队列表、会话、成员工作面板和审批交互 |
 | [接入基线](docs/接入基线.md) | 已处理前提、版本证据摘要及私有状态/Windows沙箱边界，无需历史归档 |
+| [M1验收记录](docs/M1验收记录.md) | M1 阶段实现范围、命令、验收子项状态与已知问题 |
 | [接入实验程序](experiments/app-server/README.md) | 无第三方依赖的复跑程序，不是 CoBot 产品服务 |
 
 ## 文档约定
@@ -30,4 +66,6 @@
 
 `docs`根目录保存可交付的当前文档。其子目录统一英文且不提交Git：`archive/`为历史草案/决策/调研，`prototypes/`为本机原型，`validation/`为原始验收证据；`references/`仅作本机材料区。新clone没有这些目录也可以依据根文档开发。旧已提交资料可从Git历史检索；不以整理为由清理外部项目、原生会话或用户文件。
 
-首版采用 Go、共享 React/TypeScript 前端、Wails v2、SQLite/goose 和 HTTP/fetch SSE，支持 Windows/macOS 客户端及本机 Web；具体实施见开发方案，许可证公开发布前由用户确定。不建设云端业务。生产根 `~/.cobot`、开发根 `~/.cobot-dev`；团队仍必选工作目录，全员可见，目录内 `.cobot` 保存识别与交互资源，沿用 Git 本地排除、不自动提交。当前只有接入实验，没有产品服务，不把原型或模拟 MCP 当产品。已处理接入前提不再重复验证；证据记录对应机器、版本与范围，产品功能随实际开发验收。
+## 运行边界
+
+仅绑定 loopback，不建设云端业务。生产根 `~/.cobot`、开发根 `~/.cobot-dev`，互不串库；团队仍必选工作目录，全员可见，目录内 `.cobot` 保存识别与交互资源，沿用 Git 本地排除、不自动提交。页面授权为一次性启动链接（60 秒、单次）兑换 HttpOnly 会话；桌面经原生桥取得一次性秘密并使用内存 Bearer。已处理的接入前提不再重复验证；证据记录对应机器、版本与范围，产品功能随实际开发验收。许可证公开发布前由用户确定。

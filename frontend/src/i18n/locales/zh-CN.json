@@ -1,0 +1,64 @@
+{
+  "app": { "title": "CoBot" },
+  "nav": {
+    "home": "首页",
+    "settings": "设置",
+    "toggleTeamList": "收起/展开团队列表",
+    "toggleWorkPanel": "收起/展开工作面板"
+  },
+  "home": {
+    "welcome": "欢迎使用 CoBot",
+    "noTeams": "还没有团队。创建团队后，队长与成员会在这里协作。",
+    "selectBot": "从左侧选择一个成员开始对话"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "engine": "Codex 引擎",
+    "enginePath": "Codex 可执行文件路径",
+    "enginePathHint": "留空则使用 PATH 中的 codex",
+    "engineStatus": "引擎状态",
+    "engineNotConfigured": "未检测到已配置的引擎",
+    "engineReady": "引擎可用",
+    "engineError": "引擎不可用",
+    "defaultModel": "默认模型",
+    "evalModel": "评估模型",
+    "memberLimit": "成员上限（含队长）",
+    "chainLimit": "协作链唤醒上限",
+    "budget": "预算",
+    "budgetScope": "预算范围",
+    "budgetNone": "不限制",
+    "budgetBot": "按成员",
+    "budgetTeam": "按团队",
+    "budgetTokens": "Token 上限",
+    "profile": "运行环境",
+    "profileDevelopment": "开发",
+    "profileProduction": "生产",
+    "dataRoot": "数据目录",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "logout": "退出登录"
+  },
+  "auth": {
+    "authorizing": "正在授权…",
+    "unauthorizedTitle": "需要授权",
+    "unauthorizedBody": "页面会话不存在或已过期。请在终端重新运行 cobot serve（同 profile 会打印新的 60 秒一次性链接），或使用桌面端打开。",
+    "retry": "重试"
+  },
+  "status": {
+    "idle": "空闲",
+    "loading": "加载中…",
+    "error": "加载失败"
+  },
+  "errors": {
+    "error.internal": "内部错误，请查看服务日志",
+    "error.unauthorized.bad_bootstrap": "启动链接无效或已使用",
+    "error.unauthorized.session_expired": "页面会话已过期，请重新授权",
+    "error.forbidden.csrf": "请求校验失败，请刷新页面重试",
+    "error.settings.revision_conflict": "设置已被其他入口修改，请刷新后重试",
+    "error.settings.unsupported_language": "不支持的语言",
+    "error.invalid_cursor": "无效的事件游标",
+    "error.dev_link_failed": "开发链接获取失败"
+  }
+}

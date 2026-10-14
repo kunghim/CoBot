@@ -1,0 +1,64 @@
+{
+  "app": { "title": "CoBot" },
+  "nav": {
+    "home": "Home",
+    "settings": "Settings",
+    "toggleTeamList": "Collapse/expand team list",
+    "toggleWorkPanel": "Collapse/expand work panel"
+  },
+  "home": {
+    "welcome": "Welcome to CoBot",
+    "noTeams": "No teams yet. Create one and the leader and members will collaborate here.",
+    "selectBot": "Pick a member on the left to start a conversation"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "engine": "Codex engine",
+    "enginePath": "Codex executable path",
+    "enginePathHint": "Leave empty to use `codex` from PATH",
+    "engineStatus": "Engine status",
+    "engineNotConfigured": "No configured engine detected",
+    "engineReady": "Engine ready",
+    "engineError": "Engine unavailable",
+    "defaultModel": "Default model",
+    "evalModel": "Evaluation model",
+    "memberLimit": "Member limit (incl. leader)",
+    "chainLimit": "Collaboration chain wake limit",
+    "budget": "Budget",
+    "budgetScope": "Budget scope",
+    "budgetNone": "Unlimited",
+    "budgetBot": "Per member",
+    "budgetTeam": "Per team",
+    "budgetTokens": "Token limit",
+    "profile": "Profile",
+    "profileDevelopment": "Development",
+    "profileProduction": "Production",
+    "dataRoot": "Data root",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed",
+    "logout": "Sign out"
+  },
+  "auth": {
+    "authorizing": "Authorizing…",
+    "unauthorizedTitle": "Authorization required",
+    "unauthorizedBody": "This page session does not exist or has expired. Re-run `cobot serve` in a terminal (a running instance prints a fresh 60-second one-time link), or open the desktop app.",
+    "retry": "Retry"
+  },
+  "status": {
+    "idle": "Idle",
+    "loading": "Loading…",
+    "error": "Failed to load"
+  },
+  "errors": {
+    "error.internal": "Internal error; check the service log",
+    "error.unauthorized.bad_bootstrap": "Startup link invalid or already used",
+    "error.unauthorized.session_expired": "Page session expired; authorize again",
+    "error.forbidden.csrf": "Request check failed; refresh the page",
+    "error.settings.revision_conflict": "Settings changed elsewhere; refresh and retry",
+    "error.settings.unsupported_language": "Unsupported language",
+    "error.invalid_cursor": "Invalid event cursor",
+    "error.dev_link_failed": "Failed to obtain the dev link"
+  }
+}

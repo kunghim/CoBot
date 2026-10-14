@@ -1,0 +1,302 @@
+openapi: 3.0.3
+info:
+  title: CoBot local API
+  version: "0.1.0"
+  description: >
+    Public wire contract of the loopback CoBot core. Success responses are
+    {data, requestId}; errors are {error:{code,messageKey,params}, requestId}.
+    Bot-scoped MCP traffic uses separate /internal/v1 routes and is not part
+    of this document.
+servers:
+  - url: http://127.0.0.1:0
+paths:
+  /api/v1/status:
+    get:
+      operationId: getStatus
+      summary: Environment, capability and authorization status (anonymous readable)
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Status"
+  /api/v1/session/bootstrap:
+    post:
+      operationId: exchangeBootstrap
+      summary: Exchange a one-time startup secret for a page session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, secret]
+              properties:
+                requestId: { type: string, format: uuid }
+                secret: { type: string }
+      responses:
+        "200":
+          description: Session established (sets HttpOnly session + CSRF cookies)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BootstrapResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      summary: End the current page session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          loggedOut: { type: boolean }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings:
+    get:
+      operationId: getSettings
+      summary: Business settings of this profile
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateSettings
+      summary: Update business settings with optimistic concurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, patch]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+                patch:
+                  $ref: "#/components/schemas/SettingsPatch"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/snapshot:
+    get:
+      operationId: getSnapshot
+      summary: Consistent read of visible entities plus the event cursor
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Snapshot"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      summary: Durable event stream (fetch SSE) after a cursor
+      parameters:
+        - name: after
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: teamId
+          in: query
+          schema: { type: string }
+        - name: botId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: text/event-stream of cobot.event frames
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401":
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    Envelope:
+      type: object
+      required: [data, requestId]
+      properties:
+        data: {}
+        requestId: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error, requestId]
+      properties:
+        error:
+          type: object
+          required: [code, messageKey]
+          properties:
+            code:
+              type: string
+              enum:
+                - invalid_request
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - idempotency_conflict
+                - revision_conflict
+                - capability_missing
+                - engine_unavailable
+                - internal
+            messageKey: { type: string }
+            params:
+              type: object
+              additionalProperties: true
+        requestId: { type: string }
+    EngineStatus:
+      type: object
+      required: [status, loggedIn]
+      properties:
+        status:
+          type: string
+          enum: [not_configured, ready, error, starting]
+        binaryPath: { type: string }
+        version: { type: string }
+        protocol: { type: string }
+        loggedIn: { type: boolean }
+        capabilities:
+          type: array
+          items: { type: string }
+        errorKey: { type: string }
+    Status:
+      type: object
+      required:
+        [product, version, profile, environment, dataRoot, endpoint, instanceId, serviceEpoch, startedAt, authorized, engine]
+      properties:
+        product: { type: string }
+        version: { type: string }
+        profile: { type: string, enum: [development, production] }
+        environment: { type: string, enum: [development, production] }
+        dataRoot: { type: string }
+        endpoint: { type: string }
+        instanceId: { type: string }
+        serviceEpoch: { type: string }
+        startedAt: { type: string, format: date-time }
+        authorized: { type: boolean }
+        engine: { $ref: "#/components/schemas/EngineStatus" }
+    BootstrapResult:
+      type: object
+      required: [sessionExpiresAt, userId]
+      properties:
+        sessionExpiresAt: { type: string, format: date-time }
+        userId: { type: string }
+        bearerToken:
+          type: string
+          description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
+        bearerExpiresAt: { type: string, format: date-time }
+    Settings:
+      type: object
+      required:
+        [revision, language, defaultModel, evalModel, memberLimit, chainLimit, budgetScope, budgetTokens, enginePath]
+      properties:
+        revision: { type: integer, format: int64 }
+        language: { type: string, enum: [zh-CN, en] }
+        defaultModel: { type: string }
+        evalModel: { type: string }
+        memberLimit: { type: integer }
+        chainLimit: { type: integer }
+        budgetScope: { type: string, enum: ["", bot, team] }
+        budgetTokens: { type: integer, format: int64 }
+        enginePath: { type: string }
+    SettingsPatch:
+      type: object
+      properties:
+        language: { type: string, enum: [zh-CN, en] }
+        defaultModel: { type: string }
+        evalModel: { type: string }
+        memberLimit: { type: integer }
+        chainLimit: { type: integer }
+        budgetScope: { type: string, enum: ["", bot, team] }
+        budgetTokens: { type: integer, format: int64 }
+        enginePath: { type: string }
+    Snapshot:
+      type: object
+      required: [seq, instanceId, settings, teams]
+      properties:
+        seq: { type: integer, format: int64 }
+        instanceId: { type: string }
+        settings: { $ref: "#/components/schemas/Settings" }
+        teams:
+          type: array
+          items: { type: object, additionalProperties: true }
+    Event:
+      type: object
+      required: [seq, id, instanceId, type, teamId, botId, resourceId, revision, payload, createdAt]
+      properties:
+        seq: { type: integer, format: int64 }
+        id: { type: string }
+        instanceId: { type: string }
+        type: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        resourceId: { type: string }
+        revision: { type: integer, format: int64 }
+        payload: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }

@@ -1,0 +1,63 @@
+name: ci
+
+# Pure test/build workflow: no accounts, no release secrets. The R/P
+# acceptance categories (real Codex, native installs) run separately and are
+# never implied by this workflow.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web-core:
+    name: web/shared core (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Generate contracts and check drift
+        run: |
+          ./scripts/generate.sh
+          git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated
+      - name: Go vet and build
+        run: |
+          go vet ./...
+          go build ./...
+      - name: Go tests (unit + integration, temp data roots only)
+        run: go test ./internal/... ./tests/...
+      - name: Frontend typecheck, unit tests and build
+        run: |
+          npm run typecheck --prefix frontend
+          npm test --prefix frontend
+          npm run build --prefix frontend
+      - name: Rebuild with embedded assets
+        run: go build ./...
+
+  desktop-static:
+    name: desktop shell static compile (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Build embedded assets
+        run: npm run build --prefix frontend
+      - name: Compile desktop shell with desktop tag (static check only)
+        run: go build -tags desktop ./cmd/cobot-desktop
