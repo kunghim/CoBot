@@ -19,6 +19,8 @@ import (
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/config"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
@@ -56,11 +58,12 @@ type Core struct {
 	// serve command prints it as a fragment link. It expires in 60 seconds.
 	StartupBootstrap string
 
-	listener net.Listener
-	server   *http.Server
-	api      *apihttp.Server
-	lock     *platform.Lock
-	closeLog func() error
+	listener  net.Listener
+	server    *http.Server
+	api       *apihttp.Server
+	lock      *platform.Lock
+	closeLog  func() error
+	scheduler *app.Scheduler
 }
 
 // Start brings up the core: lock, storage, migrations, HTTP listener.
@@ -170,6 +173,41 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		Logger:       logger,
 	}
 
+	// Engine composition: production uses the real Codex adapter; tests
+	// replace the factories through the App fields before Start.
+	newServer := func(cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
+		settings, err := application.GetSettings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		binary, err := codex.Locate(settings.EnginePath)
+		if err != nil {
+			return nil, err
+		}
+		return codex.Start(ctx, codex.ServerOptions{
+			Binary:    binary,
+			Cwd:       cwd,
+			Env:       codex.EngineEnv(paths),
+			Client:    codex.ClientInfo{Name: "cobot", Title: "CoBot", Version: opts.Version},
+			Callbacks: callbacks,
+			Logger:    logger,
+		})
+	}
+	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
+		return newServer(spec.Cwd, spec.Callbacks)
+	})
+	application.Scheduler = scheduler
+	application.ControlFactory = func(cwd string) (*codex.Server, error) {
+		return newServer(cwd, engine.Callbacks{
+			OnNotification: func(n engine.Notification) {
+				if n.Method == "account/updated" || n.Method == "account/login/completed" {
+					application.EngineStatusInvalidated()
+				}
+			},
+		})
+	}
+	scheduler.Start()
+
 	issuer := auth.NewBootstrapIssuer(auth.DefaultBootstrapTTL)
 	sessions := auth.NewSessionStore(auth.DefaultSessionTTL)
 	bearer := auth.NewBearerStore(auth.DefaultBearerTTL)
@@ -221,6 +259,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		api:              apiServer,
 		lock:             lock,
 		closeLog:         closeLog,
+		scheduler:        scheduler,
 	}
 
 	go func() {
@@ -250,6 +289,17 @@ func (c *Core) SetEngineStatus(p apihttp.EngineStatusProvider) {
 // touches resources of another instance.
 func (c *Core) Shutdown(ctx context.Context) error {
 	var errs []error
+	// Order: stop dispatch and engines first, then HTTP, then storage.
+	if c.scheduler != nil {
+		if err := c.scheduler.Stop(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("scheduler shutdown: %w", err))
+		}
+	}
+	if c.App != nil {
+		if err := c.App.ShutdownControl(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("control server shutdown: %w", err))
+		}
+	}
 	if c.server != nil {
 		if err := c.server.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("http shutdown: %w", err))

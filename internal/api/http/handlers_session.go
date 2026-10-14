@@ -66,7 +66,7 @@ type logoutResponse struct {
 	LoggedOut bool `json:"loggedOut"`
 }
 
-func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSessionLogout(w http.ResponseWriter, r *http.Request) {
 	p, ok := requireUser(w, r)
 	if !ok {
 		return

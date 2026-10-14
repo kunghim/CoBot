@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -27,14 +30,41 @@ type App struct {
 	ServiceEpoch string
 	Version      string
 	Logger       *slog.Logger
+
+	// Scheduler dispatches queued deliveries to team app-servers; it is
+	// assigned during composition so tests can inject a fake factory.
+	Scheduler *Scheduler
+
+	engineStatusMu    sync.Mutex
+	engineStatusCache *EngineStatusInfo
+
+	engineControlMu sync.Mutex
+	engineControl   *controlServer
+	// ControlFactory starts the profile-wide account/model app-server; it is
+	// injected during composition so tests can substitute a fake.
+	ControlFactory func(cwd string) (*codex.Server, error)
+}
+
+// EngineStatusInfo is the cached non-secret engine projection.
+type EngineStatusInfo struct {
+	Status       string    `json:"status"`
+	BinaryPath   string    `json:"binaryPath,omitempty"`
+	Version      string    `json:"version,omitempty"`
+	Protocol     string    `json:"protocol,omitempty"`
+	LoggedIn     bool      `json:"loggedIn"`
+	AuthMode     string    `json:"authMode,omitempty"`
+	Capabilities []string  `json:"capabilities,omitempty"`
+	ErrorKey     string    `json:"errorKey,omitempty"`
+	CheckedAt    time.Time `json:"checkedAt"`
 }
 
 // Snapshot is the consistent read clients take before applying events.
 type Snapshot struct {
-	Seq      int64             `json:"seq"`
-	Instance string            `json:"instanceId"`
-	Settings domain.Settings   `json:"settings"`
-	Teams    []json.RawMessage `json:"teams"`
+	Seq      int64            `json:"seq"`
+	Instance string           `json:"instanceId"`
+	Settings domain.Settings  `json:"settings"`
+	Teams    []TeamWithBots   `json:"teams"`
+	Engine   EngineStatusInfo `json:"engine"`
 }
 
 // GetSettings returns the current business settings.
@@ -65,9 +95,8 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 	return saved, nil
 }
 
-// Snapshot returns entities plus the global cursor in one read. The first
-// version exposes settings and an empty team list; later milestones append
-// projections here without changing the envelope.
+// Snapshot returns entities plus the global cursor in one read. The engine
+// field is the cached projection; the dedicated /engine endpoint probes.
 func (a *App) Snapshot(ctx context.Context, principal auth.Principal) (Snapshot, error) {
 	if principal.Kind != auth.KindUser {
 		return Snapshot{}, domain.Forbidden("error.forbidden.user_only", nil)
@@ -80,11 +109,16 @@ func (a *App) Snapshot(ctx context.Context, principal auth.Principal) (Snapshot,
 	if err != nil {
 		return Snapshot{}, err
 	}
+	teams, err := a.ListTeams(ctx, principal)
+	if err != nil {
+		return Snapshot{}, err
+	}
 	return Snapshot{
 		Seq:      seq,
 		Instance: a.InstanceID,
 		Settings: settings,
-		Teams:    []json.RawMessage{},
+		Teams:    teams,
+		Engine:   a.EngineStatusCached(),
 	}, nil
 }
 

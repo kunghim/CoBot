@@ -1,0 +1,523 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/kunghim/CoBot/internal/domain"
+)
+
+func jsonMarshal(v any) ([]byte, error)      { return json.Marshal(v) }
+func jsonUnmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
+
+// ---- messages ----
+
+// InsertMessage writes a message; when requestID is non-empty the unique
+// index enforces one message per (team, requestId).
+func InsertMessage(ctx context.Context, tx *sql.Tx, msg domain.Message) error {
+	created := msg.CreatedAt.UTC()
+	if created.IsZero() {
+		created = time.Now().UTC()
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO messages (id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		msg.ID, msg.TeamID, msg.BotID, msg.Kind, string(msg.Blocks), msg.RequestID, msg.DeliveryStatus, msg.RunID, created.Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("insert message: %w", err)
+	}
+	return nil
+}
+
+// GetMessage reads one message.
+func GetMessage(ctx context.Context, q Queryer, id string) (domain.Message, error) {
+	var m domain.Message
+	var blocks, created string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
+		FROM messages WHERE id = ?`, id).
+		Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Message{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Message{}, fmt.Errorf("get message: %w", err)
+	}
+	m.Blocks = []byte(blocks)
+	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	return m, nil
+}
+
+// FindMessageByRequestID returns the message stored for an idempotent retry.
+func FindMessageByRequestID(ctx context.Context, q Queryer, teamID, requestID string) (domain.Message, error) {
+	if requestID == "" {
+		return domain.Message{}, ErrNotFound
+	}
+	var m domain.Message
+	var blocks, created string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
+		FROM messages WHERE team_id = ? AND request_id = ?`, teamID, requestID).
+		Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Message{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Message{}, err
+	}
+	m.Blocks = []byte(blocks)
+	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	return m, nil
+}
+
+// ListMessages pages one bot conversation, newest last.
+func ListMessages(ctx context.Context, q Queryer, botID string, before string, limit int) ([]domain.Message, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	query := `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
+		FROM messages WHERE bot_id = ?`
+	args := []any{botID}
+	if before != "" {
+		query += ` AND created_at < ?`
+		args = append(args, before)
+	}
+	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := q.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list messages: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Message
+	for rows.Next() {
+		var m domain.Message
+		var blocks, created string
+		if err := rows.Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created); err != nil {
+			return nil, err
+		}
+		m.Blocks = []byte(blocks)
+		m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+		out = append(out, m)
+	}
+	// Reverse to chronological order for the client.
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, rows.Err()
+}
+
+// SetMessageDeliveryStatus updates the delivery projection of a user message.
+func SetMessageDeliveryStatus(ctx context.Context, tx *sql.Tx, messageID, status string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE id = ?`, status, messageID); err != nil {
+		return fmt.Errorf("update message delivery: %w", err)
+	}
+	return nil
+}
+
+// ---- deliveries ----
+
+// DeliveryRecord is the dispatch row.
+type DeliveryRecord struct {
+	ID          string
+	MessageID   string
+	TeamID      string
+	TargetBotID string
+	Status      string
+	DispatchKey string
+	CreatedAt   time.Time
+}
+
+// InsertDeliveryRow writes a delivery row.
+func InsertDeliveryRow(ctx context.Context, tx *sql.Tx, record DeliveryRecord) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := tx.ExecContext(ctx, `INSERT INTO deliveries (id, message_id, team_id, target_bot_id, status, dispatch_key, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		record.ID, record.MessageID, record.TeamID, record.TargetBotID, record.Status, record.DispatchKey, now, now)
+	if err != nil {
+		return fmt.Errorf("insert delivery: %w", err)
+	}
+	return nil
+}
+
+// ListQueuedDeliveries returns the FIFO queue of one bot.
+func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit int) ([]DeliveryRecord, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := q.QueryContext(ctx, `SELECT id, message_id, team_id, target_bot_id, status, dispatch_key, created_at
+		FROM deliveries WHERE target_bot_id = ? AND status = ? ORDER BY created_at ASC, id ASC LIMIT ?`,
+		botID, domain.DeliveryQueued, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DeliveryRecord
+	for rows.Next() {
+		var r DeliveryRecord
+		var created string
+		if err := rows.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &created); err != nil {
+			return nil, err
+		}
+		r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// SetDeliveryStatus transitions one delivery with optimistic state check.
+func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?`,
+		status, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
+		return fmt.Errorf("update delivery: %w", err)
+	}
+	return nil
+}
+
+// GetDelivery reads one delivery.
+func GetDelivery(ctx context.Context, q Queryer, id string) (DeliveryRecord, error) {
+	var r DeliveryRecord
+	var created string
+	err := q.QueryRowContext(ctx, `SELECT id, message_id, team_id, target_bot_id, status, dispatch_key, created_at
+		FROM deliveries WHERE id = ?`, id).Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DeliveryRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return DeliveryRecord{}, err
+	}
+	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	return r, nil
+}
+
+// CountQueuedDeliveries counts a bot's queued items (busy indicator).
+func CountQueuedDeliveries(ctx context.Context, q Queryer, botID string) (int, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status = ?`,
+		botID, domain.DeliveryQueued).Scan(&n)
+	return n, err
+}
+
+// ---- runs ----
+
+// InsertRun creates a run row.
+func InsertRun(ctx context.Context, tx *sql.Tx, run domain.Run) error {
+	started := run.StartedAt.UTC().Format(time.RFC3339Nano)
+	_, err := tx.ExecContext(ctx, `INSERT INTO runs (id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		run.ID, run.TeamID, run.BotID, run.ProviderSessionID, run.ProviderTurnID, run.EngineEpoch, run.Status, run.ErrorKey, started)
+	if err != nil {
+		return fmt.Errorf("insert run: %w", err)
+	}
+	return nil
+}
+
+// UpdateRunStatus persists a run lifecycle transition.
+func UpdateRunStatus(ctx context.Context, tx *sql.Tx, runID, status, providerTurnID, errorKey string, ended bool) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if ended {
+		_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = COALESCE(NULLIF(?, ''), provider_turn_id), error_key = ?, ended_at = ? WHERE id = ?`,
+			status, providerTurnID, errorKey, now, runID)
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = COALESCE(NULLIF(?, ''), provider_turn_id) WHERE id = ?`,
+		status, providerTurnID, runID)
+	return err
+}
+
+// GetRun reads one run.
+func GetRun(ctx context.Context, q Queryer, id string) (domain.Run, error) {
+	var r domain.Run
+	var started, ended string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
+		FROM runs WHERE id = ?`, id).
+		Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Run{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Run{}, err
+	}
+	r.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+	r.EndedAt, _ = time.Parse(time.RFC3339Nano, ended)
+	return r, nil
+}
+
+// FindActiveRun returns the bot's non-terminal run, if any.
+func FindActiveRun(ctx context.Context, q Queryer, botID string) (domain.Run, error) {
+	var r domain.Run
+	var started, ended string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
+		FROM runs WHERE bot_id = ? AND status IN (?, ?, ?, ?, ?) ORDER BY started_at DESC LIMIT 1`,
+		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown).
+		Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Run{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Run{}, err
+	}
+	r.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+	r.EndedAt, _ = time.Parse(time.RFC3339Nano, ended)
+	return r, nil
+}
+
+// ---- approvals ----
+
+// InsertApproval stores a pending approval request.
+func InsertApproval(ctx context.Context, tx *sql.Tx, a domain.Approval) error {
+	options, err := jsonMarshal(a.Options)
+	if err != nil {
+		return err
+	}
+	created := a.CreatedAt.UTC().Format(time.RFC3339Nano)
+	_, err = tx.ExecContext(ctx, `INSERT INTO approvals (id, team_id, requester_bot_id, run_id, engine_request_id, engine_epoch, type, method, summary, reason, options, request_state, created_at, revision)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.TeamID, a.RequesterBotID, a.RunID, string(a.EngineRequestID), a.EngineEpoch, a.Type, a.Method, a.Summary, a.Reason, string(options), domain.ApprovalStatePending, created, a.Revision)
+	if err != nil {
+		return fmt.Errorf("insert approval: %w", err)
+	}
+	return nil
+}
+
+// GetApproval reads one approval with its decision and response state.
+func GetApproval(ctx context.Context, q Queryer, id string) (domain.Approval, error) {
+	var a domain.Approval
+	var options, engineReqID, created string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, requester_bot_id, run_id, engine_request_id, engine_epoch, type, method, summary, reason, options, request_state, created_at, revision
+		FROM approvals WHERE id = ?`, id).
+		Scan(&a.ID, &a.TeamID, &a.RequesterBotID, &a.RunID, &engineReqID, &a.EngineEpoch, &a.Type, &a.Method, &a.Summary, &a.Reason, &options, &a.RequestState, &created, &a.Revision)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Approval{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Approval{}, err
+	}
+	a.EngineRequestID = []byte(engineReqID)
+	a.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	if err := jsonUnmarshal([]byte(options), &a.Options); err != nil {
+		return domain.Approval{}, err
+	}
+	var decision domain.ApprovalDecision
+	var decidedAt string
+	err = q.QueryRowContext(ctx, `SELECT option_id, comment, actor, decided_at FROM approval_decisions WHERE approval_id = ?`, id).
+		Scan(&decision.OptionID, &decision.Comment, &decision.Actor, &decidedAt)
+	if err == nil {
+		decision.DecidedAt, _ = time.Parse(time.RFC3339Nano, decidedAt)
+		a.Decision = &decision
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return domain.Approval{}, err
+	}
+	var responseState string
+	err = q.QueryRowContext(ctx, `SELECT state FROM approval_responses WHERE approval_id = ?`, id).Scan(&responseState)
+	if err == nil {
+		a.ResponseState = responseState
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return domain.Approval{}, err
+	}
+	return a, nil
+}
+
+// ListApprovals pages approvals of a team filtered by state, newest first.
+func ListApprovals(ctx context.Context, q Queryer, teamID, requestState string, limit int) ([]domain.Approval, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	query := `SELECT id FROM approvals WHERE team_id = ?`
+	args := []any{teamID}
+	if requestState != "" {
+		query += ` AND request_state = ?`
+		args = append(args, requestState)
+	}
+	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := q.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	out := make([]domain.Approval, 0, len(ids))
+	for _, id := range ids {
+		a, err := GetApproval(ctx, q, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+// CountPendingApprovals counts pending cards of a scope.
+func CountPendingApprovals(ctx context.Context, q Queryer, teamID, botID string) (int, error) {
+	query := `SELECT COUNT(*) FROM approvals WHERE team_id = ? AND request_state = ?`
+	args := []any{teamID, domain.ApprovalStatePending}
+	if botID != "" {
+		query += ` AND requester_bot_id = ?`
+		args = append(args, botID)
+	}
+	var n int
+	err := q.QueryRowContext(ctx, query, args...).Scan(&n)
+	return n, err
+}
+
+// DecideApproval atomically records the decision, marks the request decided
+// and queues the engine response. expectedRevision drives CAS.
+func DecideApproval(ctx context.Context, db *sql.DB, approvalID, optionID, comment, actor string, expectedRevision int64) (domain.Approval, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Approval{}, err
+	}
+	defer tx.Rollback()
+	approval, err := GetApproval(ctx, tx, approvalID)
+	if err != nil {
+		return domain.Approval{}, err
+	}
+	if approval.RequestState != domain.ApprovalStatePending {
+		return domain.Approval{}, domain.Conflict("error.approval.already_decided", map[string]any{"state": approval.RequestState})
+	}
+	if expectedRevision > 0 && approval.Revision != expectedRevision {
+		return domain.Approval{}, domain.RevisionConflict("error.approval.revision_conflict", map[string]any{"expected": expectedRevision, "actual": approval.Revision})
+	}
+	valid := false
+	for _, opt := range approval.Options {
+		if opt.ID == optionID {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return domain.Approval{}, domain.InvalidRequest("error.approval.unknown_option", map[string]any{"optionId": optionID})
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_decisions (approval_id, option_id, comment, actor, decided_at) VALUES (?, ?, ?, ?, ?)`,
+		approvalID, optionID, comment, actor, now); err != nil {
+		return domain.Approval{}, err
+	}
+	// The decision and the engine response are separate facts: the request
+	// becomes decided here; response delivery is tracked in approval_responses.
+	if _, err := tx.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE id = ?`,
+		domain.ApprovalStateDecided, approvalID); err != nil {
+		return domain.Approval{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO approval_responses (approval_id, state, detail, updated_at) VALUES (?, ?, '', ?)`,
+		approvalID, domain.ResponseQueued, now); err != nil {
+		return domain.Approval{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Approval{}, err
+	}
+	return GetApproval(ctx, db, approvalID)
+}
+
+// SetApprovalResponseState updates the response delivery projection.
+func SetApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state, detail string) error {
+	_, err := db.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = ?, updated_at = ? WHERE approval_id = ?`,
+		state, detail, time.Now().UTC().Format(time.RFC3339Nano), approvalID)
+	return err
+}
+
+// InvalidateApprovalsOfEpoch marks undecided requests of a dead connection as
+// invalidated; decided history is preserved untouched.
+func InvalidateApprovalsOfEpoch(ctx context.Context, db *sql.DB, epoch string) (int64, error) {
+	res, err := db.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1
+		WHERE engine_epoch = ? AND request_state = ?`,
+		domain.ApprovalStateInvalidated, epoch, domain.ApprovalStatePending)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// ---- idempotency ----
+
+// LookupIdempotency returns the stored response for a key, if any.
+func LookupIdempotency(ctx context.Context, q Queryer, scope, principal, key, requestHash string) (string, bool, error) {
+	var storedHash, response string
+	err := q.QueryRowContext(ctx, `SELECT request_hash, response FROM idempotency WHERE scope = ? AND principal = ? AND key = ?`,
+		scope, principal, key).Scan(&storedHash, &response)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if storedHash != requestHash {
+		return "", false, domain.IdempotencyConflict("error.idempotency.reused_key", map[string]any{"key": key})
+	}
+	return response, true, nil
+}
+
+// SaveIdempotency records a completed write for replay.
+func SaveIdempotency(ctx context.Context, tx *sql.Tx, scope, principal, key, requestHash, response string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO idempotency (scope, principal, key, request_hash, response, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		scope, principal, key, requestHash, response, time.Now().UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("save idempotency: %w", err)
+	}
+	return nil
+}
+
+// FindBotByThread resolves the bot owning a provider thread.
+func FindBotByThread(ctx context.Context, q Queryer, threadID string) (string, error) {
+	var botID string
+	err := q.QueryRowContext(ctx, `SELECT bot_id FROM provider_sessions WHERE provider_thread_id = ?`, threadID).Scan(&botID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return botID, err
+}
+
+// ListActiveRunsByTeam returns every non-terminal run of a team.
+func ListActiveRunsByTeam(ctx context.Context, q Queryer, teamID string) ([]domain.Run, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
+		FROM runs WHERE team_id = ? AND status IN (?, ?, ?, ?, ?)`,
+		teamID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Run
+	for rows.Next() {
+		var r domain.Run
+		var started, ended string
+		if err := rows.Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended); err != nil {
+			return nil, err
+		}
+		r.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+		r.EndedAt, _ = time.Parse(time.RFC3339Nano, ended)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ListDeliveriesByMessage returns every delivery row of one message.
+func ListDeliveriesByMessage(ctx context.Context, q Queryer, messageID string) ([]DeliveryRecord, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id, message_id, team_id, target_bot_id, status, dispatch_key, created_at
+		FROM deliveries WHERE message_id = ? ORDER BY created_at ASC`, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DeliveryRecord
+	for rows.Next() {
+		var r DeliveryRecord
+		var created string
+		if err := rows.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &created); err != nil {
+			return nil, err
+		}
+		r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

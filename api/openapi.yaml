@@ -56,26 +56,6 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
-  /api/v1/auth/logout:
-    post:
-      operationId: logout
-      summary: End the current page session
-      responses:
-        "200":
-          description: Logged out
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          loggedOut: { type: boolean }
-        "401":
-          $ref: "#/components/responses/Error"
   /api/v1/settings:
     get:
       operationId: getSettings
@@ -168,6 +148,401 @@ paths:
             text/event-stream:
               schema: { type: string }
         "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/engine:
+    get:
+      operationId: getEngine
+      summary: Non-secret Codex engine status for this profile
+      responses:
+        "200":
+          description: Engine status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/EngineStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/login:
+    post:
+      operationId: engineLogin
+      summary: Start the official Codex login flow (engine auth, not page bootstrap)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Login flow started; completion arrives via events
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/login/cancel:
+    post:
+      operationId: engineLoginCancel
+      summary: Cancel a pending Codex login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Login cancelled
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/logout:
+    post:
+      operationId: engineLogout
+      summary: End the engine (Codex) session for this profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Engine session ended
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/models:
+    get:
+      operationId: listModels
+      summary: Engine-provided model list (non-secret)
+      responses:
+        "200":
+          description: Models
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          models:
+                            type: array
+                            items:
+                              type: object
+                              additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/session/logout:
+    post:
+      operationId: sessionLogout
+      summary: End the current page session
+      responses:
+        "200":
+          description: Logged out
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/roles:
+    get:
+      operationId: listRoles
+      summary: Built-in role library
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                nameKey: { type: string }
+                                name: { type: string }
+                                contentVersion: { type: string }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams:
+    get:
+      operationId: listTeams
+      summary: Teams with their members
+      responses:
+        "200":
+          description: Teams
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/TeamWithBots"
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createTeam
+      summary: Create a team bound to one working directory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, name, directory]
+              properties:
+                requestId: { type: string, format: uuid }
+                name: { type: string }
+                directory: { type: string }
+                initialRoleIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Team created (staged, then activated)
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}:
+    get:
+      operationId: getTeam
+      summary: One team with members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/TeamWithBots" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/bots:
+    post:
+      operationId: addBot
+      summary: Add one member of an existing role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, roleId]
+              properties:
+                requestId: { type: string, format: uuid }
+                roleId: { type: string }
+      responses:
+        "201":
+          description: Member added
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/directory/rebuild-marker:
+    post:
+      operationId: rebuildTeamMarker
+      summary: Recreate the .cobot identification marker and report losses
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Marker rebuilt
+  /api/v1/bots/{id}/messages:
+    get:
+      operationId: listMessages
+      summary: Conversation history of one bot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: before
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Messages plus queue state
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: sendMessage
+      summary: Send a user message (persisted and queued; answered with 202)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "202":
+          description: Message persisted and queued
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/messages/{id}/cancel:
+    post:
+      operationId: cancelMessage
+      summary: Cancel a queued (not yet dispatched) user message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Message cancelled
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/runs/{id}/interrupt:
+    post:
+      operationId: interruptRun
+      summary: Request an engine-side stop of one run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Interrupt requested; final state arrives via events
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/approvals:
+    get:
+      operationId: listApprovals
+      summary: Pending cards (oldest first) or decided history
+      parameters:
+        - name: teamId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, history] }
+        - name: requesterBotId
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Approvals
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/approvals/{id}/decisions:
+    post:
+      operationId: decideApproval
+      summary: Decide once (CAS); response delivery is tracked separately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, optionId]
+              properties:
+                requestId: { type: string, format: uuid }
+                optionId: { type: string }
+                comment: { type: string }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Decided approval (with responseState)
+        "409":
           $ref: "#/components/responses/Error"
 components:
   responses:
@@ -286,6 +661,81 @@ components:
         teams:
           type: array
           items: { type: object, additionalProperties: true }
+    Team:
+      type: object
+      required: [id, name, profileInstanceId, leaderId, status, revision]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        profileInstanceId: { type: string }
+        leaderId: { type: string }
+        directory: { type: string }
+        status:
+          type: string
+          enum: [creating, active, archived, deleted, directory_missing, error]
+        statusDetail: { type: string }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Bot:
+      type: object
+      required: [id, teamId, name, roleId, isLeader, status, revision]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        name: { type: string }
+        roleId: { type: string }
+        roleVersion: { type: string }
+        isLeader: { type: boolean }
+        status:
+          type: string
+          enum: [idle, queued, working, waiting_approval, waiting_input, interrupted, unknown]
+        currentRunId: { type: string }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+    TeamWithBots:
+      type: object
+      required: [team, bots]
+      properties:
+        team: { $ref: "#/components/schemas/Team" }
+        bots:
+          type: array
+          items: { $ref: "#/components/schemas/Bot" }
+    ApprovalOption:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        messageKey: { type: string }
+        text: { type: string }
+    ApprovalDecision:
+      type: object
+      required: [optionId, actor, decidedAt]
+      properties:
+        optionId: { type: string }
+        comment: { type: string }
+        actor: { type: string }
+        decidedAt: { type: string, format: date-time }
+    Approval:
+      type: object
+      required: [id, teamId, requesterBotId, type, summary, options, requestState, revision, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        requesterBotId: { type: string }
+        runId: { type: string }
+        type: { type: string, enum: [native_tool, collaboration, recruitment, recovery, merge] }
+        method: { type: string }
+        summary: { type: string }
+        reason: { type: string }
+        options:
+          type: array
+          items: { $ref: "#/components/schemas/ApprovalOption" }
+        requestState: { type: string, enum: [pending, decided, invalidated] }
+        decision: { $ref: "#/components/schemas/ApprovalDecision" }
+        responseState: { type: string, enum: [queued, sent, confirmed, unknown, expired] }
+        createdAt: { type: string, format: date-time }
+        revision: { type: integer, format: int64 }
     Event:
       type: object
       required: [seq, id, instanceId, type, teamId, botId, resourceId, revision, payload, createdAt]

@@ -1,0 +1,65 @@
+package http
+
+import (
+	"net/http"
+	"strconv"
+
+	"github.com/kunghim/CoBot/internal/domain"
+)
+
+func (s *Server) handleListApprovals(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	teamID := r.URL.Query().Get("teamId")
+	if teamID == "" {
+		writeError(w, r, domain.InvalidRequest("error.approval.team_required", nil))
+		return
+	}
+	state := r.URL.Query().Get("state") // pending | history
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	var (
+		items any
+		err   error
+	)
+	if state == "history" {
+		items, err = s.App.ApprovalHistory(r.Context(), principal, teamID, limit)
+	} else {
+		items, err = s.App.PendingApprovals(r.Context(), principal, teamID, r.URL.Query().Get("requesterBotId"))
+	}
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"items": items, "nextCursor": ""})
+}
+
+type decideApprovalRequest struct {
+	RequestID        string `json:"requestId"`
+	OptionID         string `json:"optionId"`
+	Comment          string `json:"comment"`
+	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+}
+
+func (s *Server) handleDecideApproval(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req decideApprovalRequest
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	var expected int64
+	if req.ExpectedRevision != nil {
+		expected = *req.ExpectedRevision
+	}
+	approval, err := s.App.DecideApproval(r.Context(), principal, r.PathValue("id"), req.OptionID, req.Comment, expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, approval)
+}

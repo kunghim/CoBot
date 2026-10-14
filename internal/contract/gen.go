@@ -9,6 +9,17 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for BotStatus.
+const (
+	Idle            BotStatus = "idle"
+	Interrupted     BotStatus = "interrupted"
+	Queued          BotStatus = "queued"
+	Unknown         BotStatus = "unknown"
+	WaitingApproval BotStatus = "waiting_approval"
+	WaitingInput    BotStatus = "waiting_input"
+	Working         BotStatus = "working"
+)
+
 // Defines values for EngineStatusStatus.
 const (
 	EngineStatusStatusError         EngineStatusStatus = "error"
@@ -69,6 +80,22 @@ const (
 	StatusProfileProduction  StatusProfile = "production"
 )
 
+// Defines values for TeamStatus.
+const (
+	TeamStatusActive           TeamStatus = "active"
+	TeamStatusArchived         TeamStatus = "archived"
+	TeamStatusCreating         TeamStatus = "creating"
+	TeamStatusDeleted          TeamStatus = "deleted"
+	TeamStatusDirectoryMissing TeamStatus = "directory_missing"
+	TeamStatusError            TeamStatus = "error"
+)
+
+// Defines values for ListApprovalsParamsState.
+const (
+	History ListApprovalsParamsState = "history"
+	Pending ListApprovalsParamsState = "pending"
+)
+
 // BootstrapResult defines model for BootstrapResult.
 type BootstrapResult struct {
 	BearerExpiresAt *time.Time `json:"bearerExpiresAt,omitempty"`
@@ -78,6 +105,23 @@ type BootstrapResult struct {
 	SessionExpiresAt time.Time `json:"sessionExpiresAt"`
 	UserId           string    `json:"userId"`
 }
+
+// Bot defines model for Bot.
+type Bot struct {
+	CreatedAt    *time.Time `json:"createdAt,omitempty"`
+	CurrentRunId *string    `json:"currentRunId,omitempty"`
+	Id           string     `json:"id"`
+	IsLeader     bool       `json:"isLeader"`
+	Name         string     `json:"name"`
+	Revision     int64      `json:"revision"`
+	RoleId       string     `json:"roleId"`
+	RoleVersion  *string    `json:"roleVersion,omitempty"`
+	Status       BotStatus  `json:"status"`
+	TeamId       string     `json:"teamId"`
+}
+
+// BotStatus defines model for Bot.Status.
+type BotStatus string
 
 // EngineStatus defines model for EngineStatus.
 type EngineStatus struct {
@@ -178,14 +222,93 @@ type StatusEnvironment string
 // StatusProfile defines model for Status.Profile.
 type StatusProfile string
 
+// Team defines model for Team.
+type Team struct {
+	CreatedAt         *time.Time `json:"createdAt,omitempty"`
+	Directory         *string    `json:"directory,omitempty"`
+	Id                string     `json:"id"`
+	LeaderId          string     `json:"leaderId"`
+	Name              string     `json:"name"`
+	ProfileInstanceId string     `json:"profileInstanceId"`
+	Revision          int64      `json:"revision"`
+	Status            TeamStatus `json:"status"`
+	StatusDetail      *string    `json:"statusDetail,omitempty"`
+	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
+}
+
+// TeamStatus defines model for Team.Status.
+type TeamStatus string
+
+// TeamWithBots defines model for TeamWithBots.
+type TeamWithBots struct {
+	Bots []Bot `json:"bots"`
+	Team Team  `json:"team"`
+}
+
 // Error defines model for Error.
 type Error = ErrorEnvelope
+
+// ListApprovalsParams defines parameters for ListApprovals.
+type ListApprovalsParams struct {
+	TeamId         string                    `form:"teamId" json:"teamId"`
+	State          *ListApprovalsParamsState `form:"state,omitempty" json:"state,omitempty"`
+	RequesterBotId *string                   `form:"requesterBotId,omitempty" json:"requesterBotId,omitempty"`
+	Limit          *int                      `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListApprovalsParamsState defines parameters for ListApprovals.
+type ListApprovalsParamsState string
+
+// DecideApprovalJSONBody defines parameters for DecideApproval.
+type DecideApprovalJSONBody struct {
+	Comment          *string            `json:"comment,omitempty"`
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	OptionId         string             `json:"optionId"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// EngineLoginJSONBody defines parameters for EngineLogin.
+type EngineLoginJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// EngineLoginCancelJSONBody defines parameters for EngineLoginCancel.
+type EngineLoginCancelJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// EngineLogoutJSONBody defines parameters for EngineLogout.
+type EngineLogoutJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ListMessagesParams defines parameters for ListMessages.
+type ListMessagesParams struct {
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// SendMessageJSONBody defines parameters for SendMessage.
+type SendMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
+}
 
 // StreamEventsParams defines parameters for StreamEvents.
 type StreamEventsParams struct {
 	After  *int64  `form:"after,omitempty" json:"after,omitempty"`
 	TeamId *string `form:"teamId,omitempty" json:"teamId,omitempty"`
 	BotId  *string `form:"botId,omitempty" json:"botId,omitempty"`
+}
+
+// CancelMessageJSONBody defines parameters for CancelMessage.
+type CancelMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// InterruptRunJSONBody defines parameters for InterruptRun.
+type InterruptRunJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ExchangeBootstrapJSONBody defines parameters for ExchangeBootstrap.
@@ -201,8 +324,57 @@ type UpdateSettingsJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// CreateTeamJSONBody defines parameters for CreateTeam.
+type CreateTeamJSONBody struct {
+	Directory      string             `json:"directory"`
+	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
+	Name           string             `json:"name"`
+	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// AddBotJSONBody defines parameters for AddBot.
+type AddBotJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	RoleId    string             `json:"roleId"`
+}
+
+// RebuildTeamMarkerJSONBody defines parameters for RebuildTeamMarker.
+type RebuildTeamMarkerJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// DecideApprovalJSONRequestBody defines body for DecideApproval for application/json ContentType.
+type DecideApprovalJSONRequestBody DecideApprovalJSONBody
+
+// EngineLoginJSONRequestBody defines body for EngineLogin for application/json ContentType.
+type EngineLoginJSONRequestBody EngineLoginJSONBody
+
+// EngineLoginCancelJSONRequestBody defines body for EngineLoginCancel for application/json ContentType.
+type EngineLoginCancelJSONRequestBody EngineLoginCancelJSONBody
+
+// EngineLogoutJSONRequestBody defines body for EngineLogout for application/json ContentType.
+type EngineLogoutJSONRequestBody EngineLogoutJSONBody
+
+// SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
+type SendMessageJSONRequestBody SendMessageJSONBody
+
+// CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
+type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// InterruptRunJSONRequestBody defines body for InterruptRun for application/json ContentType.
+type InterruptRunJSONRequestBody InterruptRunJSONBody
+
 // ExchangeBootstrapJSONRequestBody defines body for ExchangeBootstrap for application/json ContentType.
 type ExchangeBootstrapJSONRequestBody ExchangeBootstrapJSONBody
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
+
+// CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
+type CreateTeamJSONRequestBody CreateTeamJSONBody
+
+// AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
+type AddBotJSONRequestBody AddBotJSONBody
+
+// RebuildTeamMarkerJSONRequestBody defines body for RebuildTeamMarker for application/json ContentType.
+type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody

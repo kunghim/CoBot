@@ -55,8 +55,12 @@ func TestUpgradeTakesBackupAndPreservesData(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Simulate an old library already running version 1 with business data.
-	m1, err := NewMigrator(db)
+	// Simulate an old library running only the first schema version, with
+	// business data present before the upgrade.
+	onlyV1 := testutil.NewMapFS(map[string]string{
+		"00001_initial.sql": string(readMigration(t, "00001_initial.sql")),
+	})
+	m1, err := NewMigratorWithFS(db, onlyV1)
 	if err != nil {
 		t.Fatal(err)
 	}

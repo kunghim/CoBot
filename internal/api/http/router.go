@@ -37,12 +37,38 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/v1/status", s.handleStatus)
 	mux.HandleFunc("POST /api/v1/session/bootstrap", s.handleSessionBootstrap)
-	mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
+	mux.HandleFunc("POST /api/v1/session/logout", s.handleSessionLogout)
 	mux.HandleFunc("GET /api/v1/settings", s.handleGetSettings)
 	mux.HandleFunc("PATCH /api/v1/settings", s.handlePatchSettings)
 	mux.HandleFunc("GET /api/v1/snapshot", s.handleSnapshot)
 	mux.HandleFunc("GET /api/v1/events", s.handleEvents)
 	mux.HandleFunc("POST /internal/v1/session/link", s.handleInternalLink)
+
+	// Engine (Codex) surface: status, official login, models.
+	mux.HandleFunc("GET /api/v1/engine", s.handleEngine)
+	mux.HandleFunc("POST /api/v1/auth/login", s.handleEngineLogin)
+	mux.HandleFunc("POST /api/v1/auth/login/cancel", s.handleEngineLoginCancel)
+	mux.HandleFunc("POST /api/v1/auth/logout", s.handleEngineLogout)
+	mux.HandleFunc("GET /api/v1/models", s.handleModels)
+
+	// Teams, roles and members.
+	mux.HandleFunc("GET /api/v1/teams", s.handleListTeams)
+	mux.HandleFunc("POST /api/v1/teams", s.handleCreateTeam)
+	mux.HandleFunc("GET /api/v1/teams/{id}", s.handleGetTeam)
+	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)
+	mux.HandleFunc("POST /api/v1/teams/{id}/retry", s.handleRetryTeam)
+	mux.HandleFunc("POST /api/v1/teams/{id}/directory/rebuild-marker", s.handleRebuildMarker)
+	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
+
+	// Conversations and runs.
+	mux.HandleFunc("GET /api/v1/bots/{id}/messages", s.handleListMessages)
+	mux.HandleFunc("POST /api/v1/bots/{id}/messages", s.handleSendMessage)
+	mux.HandleFunc("POST /api/v1/messages/{id}/cancel", s.handleCancelMessage)
+	mux.HandleFunc("POST /api/v1/runs/{id}/interrupt", s.handleInterruptRun)
+
+	// Approvals.
+	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
+	mux.HandleFunc("POST /api/v1/approvals/{id}/decisions", s.handleDecideApproval)
 
 	// SPA fallback: any non-/api path renders the frontend entry, which then
 	// routes client-side. Business requests never touch the asset handler.
