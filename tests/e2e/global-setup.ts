@@ -43,6 +43,14 @@ export default async function globalSetup(): Promise<void> {
   rmSync(profileRoot, { recursive: true, force: true });
   mkdirSync(profileRoot, { recursive: true });
 
+  // Set every control var the core and its engine children read *before*
+  // spawn: a child process captures the parent environment at spawn time, so
+  // assigning FAKE_CONTROL afterwards leaves the engine polling a path the
+  // core never saw.
+  const fakeControl = join(root, '.tmp', 'test-runs', runId, 'fake-mode');
+  process.env.FAKE_CONTROL = fakeControl;
+  process.env.COBOT_E2E_FAKE_CONTROL = fakeControl;
+
   const child = spawn(exe('cobot'), ['serve', '--data-root', profileRoot, '--listen', `127.0.0.1:${port}`], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -107,12 +115,6 @@ export default async function globalSetup(): Promise<void> {
   process.env.COBOT_E2E_ROOT = join(root, '.tmp', 'test-runs', runId);
   process.env.COBOT_E2E_TEAM_DIR = teamDir;
   process.env.COBOT_E2E_FAKE_ENGINE = exe('fake-codex');
-  // The engine inherits the core's environment and polls FAKE_CONTROL before
-  // each turn; specs switch behavior by rewriting that same file through the
-  // COBOT_E2E_ alias so the helper and the engine agree on one path.
-  const fakeControl = join(root, '.tmp', 'test-runs', runId, 'fake-mode');
-  process.env.FAKE_CONTROL = fakeControl;
-  process.env.COBOT_E2E_FAKE_CONTROL = fakeControl;
   process.env.COBOT_E2E_CORE_PID = String(child.pid ?? '');
   // Keep a handle for teardown through the environment (same process tree).
   (globalThis as any).__cobotE2EChild = child;

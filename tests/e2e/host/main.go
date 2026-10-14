@@ -6,9 +6,12 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -38,13 +41,22 @@ var (
 
 	pendingMu sync.Mutex
 	pending   = map[string]chan string{}
+
+	once sync.Once
+	wd   string
 )
 
 // activeMode returns the mode for the current turn. FAKE_MODE sets the start
 // default; a control file lets a test switch a running engine per turn without
 // restarting the core. The control file wins while it exists.
+//
+// The path is team-scoped (FAKE_CONTROL plus a hash of the process cwd, which
+// is the team directory) because every team gets its own app-server and the
+// specs run several teams against one core. A single shared file would leak
+// one team's mode into another team's turn.
 func activeMode() string {
-	if b, err := os.ReadFile(controlPath()); err == nil {
+	cp := controlPath()
+	if b, err := os.ReadFile(cp); err == nil {
 		if m := strings.TrimSpace(string(b)); m != "" {
 			return m
 		}
@@ -55,11 +67,45 @@ func activeMode() string {
 	return mode
 }
 
-// controlPath is where a test drops the next mode. FAKE_CONTROL must point at
-// it explicitly; with no control file the engine stays in its default mode, so
-// a run can never inherit a stale mode from an earlier test.
+// controlPath is where a test drops the next mode. FAKE_CONTROL names a
+// directory; the per-team file inside it is keyed by the process cwd, which is
+// the team working directory the core gave this app-server. An empty value
+// keeps the engine in its default mode so a run can never inherit a stale
+// mode from an earlier test.
+//
+// The key normalizes separators and case so it matches what a spec computes
+// from the directory string it typed into the create dialog, even though
+// Windows reports the working directory in its own casing.
 func controlPath() string {
-	return os.Getenv("FAKE_CONTROL")
+	base := os.Getenv("FAKE_CONTROL")
+	if base == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(normalizePath(cwd())))
+	return filepath.Join(base, fmt.Sprintf("mode-%x", sum[:8]))
+}
+
+// normalizePath folds a path to the form both sides hash: forward slashes,
+// lowercased on Windows, no trailing separator.
+func normalizePath(p string) string {
+	p = strings.ReplaceAll(p, `\`, "/")
+	if runtime.GOOS == "windows" {
+		p = strings.ToLower(p)
+	}
+	return strings.TrimRight(p, "/")
+}
+
+// cwd is resolved once so the key stays stable even if the process later
+// changes its working directory.
+func cwd() string {
+	once.Do(func() {
+		resolved, err := os.Getwd()
+		if err != nil {
+			resolved = ""
+		}
+		wd = resolved
+	})
+	return wd
 }
 
 func send(msg message) {

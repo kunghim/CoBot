@@ -22,24 +22,32 @@ test('native tool approval appears, decides, engine resumes', async ({ page, con
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   await expect(page.getByText('审批团队').first()).toBeVisible({ timeout: 15000 });
 
-  await page.getByRole('button', { name: /队长/ }).first().click();
+  // Symmetric with the flow spec: pick the one visible leader so the specs do
+  // not depend on execution order once more teams exist on the page.
+  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  await expect(leaders).toHaveCount(1, { timeout: 15000 });
+  await leaders.first().click();
 
   // The engine switches to approval mode only for this turn, so the product
-  // surfaces the card instead of the engine silently completing.
-  setEngineMode('approve');
+  // surfaces the card instead of the engine silently completing. Keyed by this
+  // team's directory so the flow spec's team keeps its own default mode.
+  setEngineMode('approve', teamDir);
 
   await page.locator('textarea').first().fill('请执行一条命令');
   await page.locator('textarea').first().press('Enter');
 
-  // The approval card must appear with a real command summary.
-  await expect(page.getByText(/审批|approval/i).first()).toBeVisible({ timeout: 20000 });
-  await expect(page.getByText(/Write-Host|pwsh/).first()).toBeVisible({ timeout: 20000 });
+  // The pending card is the <section> above the composer; scope every
+  // assertion to it. The work panel legitimately keeps this command in the
+  // approval history, so a whole-page text lookup would match both.
+  const card = page.locator('section').filter({ hasText: 'pwsh' }).first();
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await expect(card).toContainText('Write-Host', { timeout: 20000 });
 
-  // Decide once; the card must disappear and the engine must resume.
+  // Decide once; the pending card must disappear and the engine must resume.
   await page.getByRole('button', { name: /允许|approve|allow/i }).first().click();
-  await expect(page.getByText(/Write-Host|pwsh/).first()).toBeHidden({ timeout: 20000 });
+  await expect(card).toBeHidden({ timeout: 20000 });
 
-  // Leave the shared engine back in its default so a later spec never blocks
+  // Leave this team's engine back in its default so a later spec never blocks
   // on an approval nobody answers.
-  setEngineMode('reply');
+  setEngineMode('reply', teamDir);
 });

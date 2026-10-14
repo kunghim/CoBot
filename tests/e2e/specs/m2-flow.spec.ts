@@ -5,14 +5,14 @@ import { authorize, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
-  // Specs share one engine process, so an earlier approval spec could leave it
-  // in a mode that blocks this turn. This spec expects a plain reply.
-  setEngineMode('reply');
 });
 
 test('create team, message leader, receive engine reply', async ({ page }) => {
   const teamDir = join(process.env.COBOT_E2E_ROOT!, 'team-' + Date.now());
   mkdirSync(teamDir, { recursive: true });
+  // Every team gets its own engine, keyed by directory, so this spec's team
+  // must never inherit the approval spec's blocking mode.
+  setEngineMode('reply', teamDir);
 
   await page.goto('/');
   await page.getByRole('button', { name: /新建团队|create team/i }).first().click();
@@ -25,8 +25,13 @@ test('create team, message leader, receive engine reply', async ({ page }) => {
 
   await expect(page.getByText('e2e团队').first()).toBeVisible({ timeout: 15000 });
 
-  const leader = page.getByRole('button', { name: /队长/ }).first();
-  await leader.click();
+  // The team list is newest-first and earlier specs leave their own teams
+  // behind, so scope the leader lookup to this team's rows. Collapsed teams
+  // keep their bot buttons in the DOM but hidden, and strict mode plus
+  // visibility filtering picks the one expanded team's leader.
+  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  await expect(leaders).toHaveCount(1, { timeout: 15000 });
+  await leaders.first().click();
 
   const composer = page.locator('textarea').first();
   await composer.fill('请介绍一下你自己');
