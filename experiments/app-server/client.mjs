@@ -6,7 +6,8 @@ export class Client extends EventEmitter {
   constructor({ cwd, binary = process.env.CODEX_BIN || 'codex', args = [] }) {
     super();
     this.nextId = 1; this.pending = new Map(); this.events = [];
-    this.child = spawn(binary, ['app-server', '--stdio', ...args], { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const sandboxArgs = process.env.SPIKE_PREFER_MXC === '1' ? ['-c', 'features.prefer_mxc=true'] : [];
+    this.child = spawn(binary, ['app-server', '--stdio', ...sandboxArgs, ...args], { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.stderr = '';
     this.child.stderr.on('data', b => { this.stderr += b.toString(); });
     this.child.on('error', e => this.fail(e));

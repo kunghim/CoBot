@@ -6,7 +6,7 @@ import { Client, messageText, nativeItems } from './client.mjs';
 
 const root = path.resolve(process.env.SPIKE_OUTPUT || '.tmp/app-server-spike/run-' + Date.now());
 fs.mkdirSync(root, { recursive: true });
-const report = { startedAt: new Date().toISOString(), node: process.version, cases: [], requests: [] };
+const report = { startedAt: new Date().toISOString(), node: process.version, preferMxc: process.env.SPIKE_PREFER_MXC === '1', cases: [], requests: [] };
 const clients = [];
 const save = () => fs.writeFileSync(path.join(root, 'report.json'), JSON.stringify(report, null, 2));
 const log = (...a) => console.log(...a);

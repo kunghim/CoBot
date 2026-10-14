@@ -5,7 +5,7 @@ import { Client, nativeItems, messageText } from './client.mjs';
 const root = path.resolve(process.env.SPIKE_OUTPUT || '.tmp/app-server-spike/approval-' + Date.now());
 fs.mkdirSync(root, { recursive: true });
 const c = new Client({ cwd: root });
-const report = { startedAt: new Date().toISOString(), cases: [] };
+const report = { startedAt: new Date().toISOString(), preferMxc: process.env.SPIKE_PREFER_MXC === '1', cases: [] };
 let current;
 c.on('request', async m => {
   const p = m.params || {}, command = p.command || '';
