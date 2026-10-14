@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { Client } from './client.mjs';
+// The legacy branch can reprovision shared Windows users/firewall state, even
+// without a model turn. Preserve it for diagnosis, but never run it by default.
+if (!process.argv.includes('--allow-legacy-setup')) {
+  console.error('Stopped: legacy sandbox comparison may change machine-wide sandbox setup. Use windows-coexistence.mjs for the bounded MXC check; --allow-legacy-setup is reserved for explicitly authorized legacy repair.');
+  process.exit(2);
+}
 const root = path.resolve('.tmp/app-server-spike/shell-diagnostic-' + Date.now());
 fs.mkdirSync(root, { recursive: true });
 const report = { startedAt: new Date().toISOString(), cases: [] };

@@ -21,13 +21,30 @@ node experiments/app-server/approvals.mjs
 本机 0.161.0 的旧 elevated 路径在当前会话启动链内失败。使用已验证的临时 MXC 优先配置复跑：
 
 ```powershell
-node experiments/app-server/shell-diagnostic.mjs
 $env:SPIKE_PREFER_MXC = '1'
 node experiments/app-server/run.mjs
 node experiments/app-server/approvals.mjs
 ```
 
-SPIKE_PREFER_MXC 只让实验客户端为子进程传入 features.prefer_mxc=true，不改全局配置。shell-diagnostic 明确覆盖该环境开关，分别测试 false/true；它不启动模型轮次，并检查测试根外写入被拒绝。若 pwsh 不在 PATH，可用当前进程的 SPIKE_PWSH 指定已安装的真实可执行文件。prefer_mxc 在本版为 under development；不能静默回退成全权限模式。
+SPIKE_PREFER_MXC 只让实验客户端为子进程传入 features.prefer_mxc=true，不改全局配置。若 pwsh 不在 PATH，可用当前进程的 SPIKE_PWSH 指定已安装的真实可执行文件。prefer_mxc 在本版为 under development；偏好开关本身不能保证不会回退到旧沙箱。
+
+**旧实验的执行结果仅对应当时版本，不应直接作为当前 Windows 环境的启动方式。** `shell-diagnostic.mjs` 的 false 分支会触发旧 elevated 初始化，可能重配共享 Windows 账号和防火墙；不调用模型、使用私有 CODEX_HOME 都不能保证没有系统副作用。该程序默认退出，只有明确授权诊断旧沙箱时才使用 `--allow-legacy-setup`。
+
+## Windows 恢复后的共存复验
+
+先完成日常桌面客户端重启验收，再运行本项。结果及范围见 [恢复与共存记录](../../docs/验证/2026-10-14-Windows恢复与共存验证.md)。
+
+```powershell
+# CODEX_BIN 必须显式指向已经验证的真实可执行文件，不能使用 mise shim。
+$env:CODEX_BIN = '<当前已验证的 codex.exe 真实路径>'
+node experiments/app-server/windows-coexistence.mjs
+```
+
+该程序在本机桌面自带的 0.162.0-alpha.17.2 上验证。它显式设置 `windows.sandbox="mxc"`，不回退旧沙箱；运行前需要确认指定版本支持该设置。两个私有目录实例与日常目录实例并存，直接使用 `command/exec` 验证文件读写、目录外写入拒绝、正常退出和进程重启。无模型 turn、无登录调用、不读取凭据值，不创建 thread。证据保存在忽略目录内。
+
+每个私有实例的启动 cwd 固定为自身工作目录；workspaceWrite 的默认可写范围包含服务启动 cwd，不能把实例启动在更宽的公共目录后，只靠单次请求的 cwd 来缩小边界。私有状态目录也不等于操作系统资源隔离。
+
+## 原有接入实验的执行范围
 
 运行真实轮次会使用现有模型账号与额度，继承当前配置的模型和提供方。测试只生成 `.tmp/app-server-spike/` 中的工作目录、标记文件和报告；Codex 自己正常持久化这些新测试 thread。不访问已有工作会话，不安装组件，不切换登录，不修改 hook 信任或沙箱 ACL。
 
@@ -38,7 +55,8 @@ SPIKE_PREFER_MXC 只让实验客户端为子进程传入 features.prefer_mxc=tru
 | `run.mjs` | 并行原生读写/命令、正常 resume、两个 thread 的独立 MCP 配置及模拟回执 |
 | `approvals.mjs` | 原生命令/文件审批，各一次批准与拒绝；回复前延迟半秒并检查文件不存在 |
 | `inspect.mjs` | 仅读取显式测试目录关联的 thread，帮助保存失败工具项的证据 |
-| `shell-diagnostic.mjs` | 不调用模型，直接对比旧配置与临时 MXC 优先配置、检查目录外写入拒绝 |
+| `shell-diagnostic.mjs` | 默认阻止运行；旧沙箱对比可能触发系统初始化，仅保留供明确授权的诊断 |
+| `windows-coexistence.mjs` | 固定真实二进制与 MXC；私有实例及日常实例命令并存、写入边界、退出和重启 |
 
 `run.mjs` 和 `approvals.mjs` 每次创建新目录。可以用 `SPIKE_OUTPUT` 指定一个尚未使用的本地输出目录。失败返回非零退出码；不要把没有产物的 `turn/completed` 当成测试成功。
 
@@ -63,7 +81,7 @@ node experiments/app-server/inspect.mjs .tmp/app-server-spike/<本次approval目
 
 ## 实验边界
 
-- 稳定协议字段取自本机 `0.161.0` 生成的 JSON Schema；未开启 experimentalApi。
+- 原接入程序的稳定字段取自本机 `0.161.0` schema；共存复验核对了当前 `0.162.0-alpha.17.2` schema。会话隔离实验单独开启 experimentalApi，见上文边界。
 - 全部实验使用 `read-only` 或 `workspace-write`，审批路由为 `user`；不使用全权限或绕过沙箱参数。
 - 模型只操作生成的测试文件。审批程序按预期 request/thread/cwd/目标约束决定，其他请求拒绝；批准仅限创建固定无害标记文件，不保存常驻授权规则。
 - 模拟 MCP 是独立 stdio 连接；caller 来自宿主配置的启动参数，工具输入没有 sender。它只记录并返回回执，不实现真正消息送达、唤醒、团队权限或数据库。
