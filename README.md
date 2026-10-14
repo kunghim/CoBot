@@ -53,6 +53,7 @@ Go 1.25、React 18 + TypeScript + Vite 6、TanStack Query、Tailwind CSS 4、i18
 | [界面布局](docs/界面布局.md) | 首页导航、团队列表、会话、成员工作面板和审批交互 |
 | [接入基线](docs/接入基线.md) | 已处理前提、版本证据摘要及私有状态/Windows沙箱边界，无需历史归档 |
 | [M1验收记录](docs/M1验收记录.md) | M1 阶段实现范围、命令、验收子项状态与已知问题 |
+| [M2验收记录](docs/M2验收记录.md) | M2 阶段团队/引擎执行/审批的实现范围、命令、验收子项状态与本阶段修复的缺陷 |
 | [接入实验程序](experiments/app-server/README.md) | 无第三方依赖的复跑程序，不是 CoBot 产品服务 |
 
 ## 文档约定
