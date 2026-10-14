@@ -3,11 +3,11 @@ import { createInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
 
 export class Client extends EventEmitter {
-  constructor({ cwd, binary = process.env.CODEX_BIN || 'codex', args = [] }) {
+  constructor({ cwd, binary = process.env.CODEX_BIN || 'codex', args = [], env = process.env }) {
     super();
     this.nextId = 1; this.pending = new Map(); this.events = [];
-    const sandboxArgs = process.env.SPIKE_PREFER_MXC === '1' ? ['-c', 'features.prefer_mxc=true'] : [];
-    this.child = spawn(binary, ['app-server', '--stdio', ...sandboxArgs, ...args], { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const sandboxArgs = env.SPIKE_PREFER_MXC === '1' ? ['-c', 'features.prefer_mxc=true'] : [];
+    this.child = spawn(binary, ['app-server', '--stdio', ...sandboxArgs, ...args], { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.stderr = '';
     this.child.stderr.on('data', b => { this.stderr += b.toString(); });
     this.child.on('error', e => this.fail(e));

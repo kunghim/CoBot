@@ -42,6 +42,18 @@ SPIKE_PREFER_MXC 只让实验客户端为子进程传入 features.prefer_mxc=tru
 
 `run.mjs` 和 `approvals.mjs` 每次创建新目录。可以用 `SPIKE_OUTPUT` 指定一个尚未使用的本地输出目录。失败返回非零退出码；不要把没有产物的 `turn/completed` 当成测试成功。
 
+## 会话隔离实验
+
+使用独立的 `CODEX_HOME`、`CODEX_SQLITE_HOME` 和 `sqlite_home`，分别验证开发/生产的真实对话、跨进程恢复及原生会话列表隔离，结果见[会话隔离验证](../../docs/验证/2026-10-14-会话隔离验证.md)。实验客户端支持为子进程单独传入 `env`，不修改当前进程或用户的全局环境变量。
+
+```powershell
+node experiments/app-server/home-isolation.mjs --experimental-token-reuse
+```
+
+**显式选择的受控实验，不是首版登录实现。** 本机 0.161.0 将 `chatgptAuthTokens` 标为内部、不稳定接口；本程序通过实验能力开关验证内存复用，不以它作为产品依赖。需要已有文件式 ChatGPT 登录及有效 token，会运行四个短对话 turn、消耗现有额度。凭据只在内存和本机管道中使用，不复制/链接 `auth.json`，不落入参数、报告或日志；原生客户端数据目录只用于读取账号、非秘密配置及检查，没有创建新的 thread。
+
+隔离目录在忽略的 `.tmp/app-server-spike/home-isolation-*/` 内，不创建正式的 `~/.cobot`、`~/.cobot-dev`。官方浏览器登录只验证生成与取消入口，没有打开登录页面或完成新授权。当前测试不涵盖 token 过期/刷新、系统钥匙串或所有平台；无该显式参数时程序不执行实验。
+
 诊断某次实验，例如：
 
 ```powershell
