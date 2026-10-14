@@ -1,1 +1,39 @@
 .tmp/
+.idea/
+
+# 本机历史文档，不随仓库交付
+/docs/archive/
+
+# 产品构建与依赖（源码、迁移、角色、生成API类型仍应提交）
+/internal/webui/dist/
+/frontend/node_modules/
+/frontend/wailsjs/
+/frontend/coverage/
+/frontend/playwright-report/
+/frontend/test-results/
+/coverage/
+/coverage.out
+/playwright-report/
+/test-results/
+*.tsbuildinfo
+
+# 本机配置、运行数据与日志
+/.cobot/
+/.cobot-dev/
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/auth.json
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+
+# 操作系统缓存
+.DS_Store
+Thumbs.db
+Desktop.ini
