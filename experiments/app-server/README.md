@@ -1,8 +1,10 @@
 # app-server 开发前接入验证
 
+> 这是保留源码的历史实验，不是编码必读或前置步骤。旧报告已移入本机 docs/archive/validation 且不提交 Git；可交付结论见[接入基线](../../docs/接入基线.md)。不要默认运行模型实验或旧沙箱诊断。
+
 这是协议实验程序，不是 CoBot 产品、开发框架选型或完整多 bot 调度器。使用 Node 内置模块，无第三方包，无安装步骤。
 
-目标是验证四件事：基本接入、多 bot 独立运行、MCP 结构化调用、原生审批。首轮结果见 [接入记录](../../docs/验证/2026-10-14-app-server接入.md)，当前通过范围见 [Windows shell 复验](../../docs/验证/2026-10-14-Windows-shell复验.md)。
+目标是验证四件事：基本接入、多 bot 独立运行、MCP 结构化调用、原生审批。首轮结果见 [接入基线与历史范围](../../docs/接入基线.md)，当前通过范围见 [接入基线与历史范围](../../docs/接入基线.md)。
 
 ## 执行
 
@@ -32,7 +34,7 @@ SPIKE_PREFER_MXC 只让实验客户端为子进程传入 features.prefer_mxc=tru
 
 ## Windows 恢复后的共存复验
 
-先完成日常桌面客户端重启验收，再运行本项。结果及范围见 [恢复与共存记录](../../docs/验证/2026-10-14-Windows恢复与共存验证.md)。
+先完成日常桌面客户端重启验收，再运行本项。结果及范围见 [接入基线与历史范围](../../docs/接入基线.md)。
 
 ```powershell
 # CODEX_BIN 必须显式指向已经验证的真实可执行文件，不能使用 mise shim。
@@ -62,7 +64,7 @@ node experiments/app-server/windows-coexistence.mjs
 
 ## 会话隔离实验
 
-使用独立的 `CODEX_HOME`、`CODEX_SQLITE_HOME` 和 `sqlite_home`，分别验证开发/生产的真实对话、跨进程恢复及原生会话列表隔离，结果见[会话隔离验证](../../docs/验证/2026-10-14-会话隔离验证.md)。实验客户端支持为子进程单独传入 `env`，不修改当前进程或用户的全局环境变量。
+使用独立的 `CODEX_HOME`、`CODEX_SQLITE_HOME` 和 `sqlite_home`，分别验证开发/生产的真实对话、跨进程恢复及原生会话列表隔离，结果见[接入基线与历史范围](../../docs/接入基线.md)。实验客户端支持为子进程单独传入 `env`，不修改当前进程或用户的全局环境变量。
 
 ```powershell
 node experiments/app-server/home-isolation.mjs --experimental-token-reuse
@@ -88,4 +90,4 @@ node experiments/app-server/inspect.mjs .tmp/app-server-spike/<本次approval目
 - 默认用户配置中的 `node_repl`、`rea` MCP 在测试 thread 局部禁用；其他环境可能有额外配置，需要在实际运行前检查。继承的 hook 不在本实验中修改。
 - 对话并发/cwd 返回值正确，只证明线程路由与配置，不能代替文件边界或恶意越权测试。
 - 正常 resume 不证明崩溃恢复；文件审批不代表网络授权或“总是允许这个 bot”已经验证。
-- 测试报告与 schema 留在忽略的 `.tmp/`；正式结论保存在 `docs/验证/`，不提交凭据或本机路径快照。
+- 原始报告与schema留在 `.tmp/` 或docs/validation，均不提交；需要交付的脱敏结论保存为docs根Markdown，不提交凭据或本机路径快照。
