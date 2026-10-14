@@ -468,10 +468,12 @@ func SaveIdempotency(ctx context.Context, tx *sql.Tx, scope, principal, key, req
 	return nil
 }
 
-// FindBotByThread resolves the bot owning a provider thread.
-func FindBotByThread(ctx context.Context, q Queryer, threadID string) (string, error) {
+// FindBotByThread resolves the bot owning a provider thread. Thread ids are
+// only unique inside one engine: the engine epoch is part of the key, so two
+// app-servers that hand out the same thread id cannot collide.
+func FindBotByThread(ctx context.Context, q Queryer, epoch, threadID string) (string, error) {
 	var botID string
-	err := q.QueryRowContext(ctx, `SELECT bot_id FROM provider_sessions WHERE provider_thread_id = ?`, threadID).Scan(&botID)
+	err := q.QueryRowContext(ctx, `SELECT bot_id FROM provider_sessions WHERE provider_thread_id = ? AND engine_epoch = ?`, threadID, epoch).Scan(&botID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}

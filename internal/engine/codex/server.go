@@ -353,7 +353,9 @@ func isExitError(err error) bool {
 }
 
 // stderrLog feeds engine stderr into the product log without touching the
-// protocol stream; lines are emitted at debug level with a fixed prefix.
+// protocol stream. Lines are emitted at warn level: the engine writes its
+// diagnostics to stderr, and hiding them below the default info threshold
+// means a failing engine leaves no trace in the product log.
 type stderrLog struct {
 	logger *slog.Logger
 	mu     sync.Mutex
@@ -380,7 +382,7 @@ func (w *stderrLog) Write(p []byte) (int, error) {
 		if len(w.buf) > 8*1024 {
 			w.buf = w.buf[len(w.buf)-8*1024:]
 		}
-		w.logger.Debug("codex stderr", "line", line)
+		w.logger.Warn("codex stderr", "line", line)
 	}
 	return len(p), nil
 }

@@ -21,7 +21,8 @@ func (s *Scheduler) onNotification(teamID string, n engine.Notification) {
 	switch n.Method {
 	case "item/completed":
 		if n.ItemType == "agentMessage" && n.TurnID != "" {
-			if runID := s.findRunByTurn(ctx, n.ThreadID, n.TurnID); runID != "" {
+			epoch := s.engineEpoch(teamID)
+			if runID := s.findRunByTurn(ctx, epoch, n.ThreadID, n.TurnID); runID != "" {
 				if rt := s.runtime(teamID); rt != nil {
 					rt.mu.Lock()
 					buf := rt.buffer[runID]
@@ -43,8 +44,18 @@ func (s *Scheduler) onNotification(teamID string, n engine.Notification) {
 	}
 }
 
-func (s *Scheduler) findRunByTurn(ctx context.Context, threadID, turnID string) string {
-	botID, err := s.app.botByThread(ctx, threadID)
+// engineEpoch identifies the app-server lifetime that emitted an event.
+// Provider thread ids are only unique inside one engine, so every lookup that
+// resolves an event back to a bot must be scoped by it.
+func (s *Scheduler) engineEpoch(teamID string) string {
+	if rt := s.runtime(teamID); rt != nil && rt.server != nil {
+		return rt.server.Epoch()
+	}
+	return ""
+}
+
+func (s *Scheduler) findRunByTurn(ctx context.Context, epoch, threadID, turnID string) string {
+	botID, err := s.app.botByThread(ctx, epoch, threadID)
 	if err != nil {
 		return ""
 	}
@@ -61,16 +72,18 @@ func (s *Scheduler) findRunByTurn(ctx context.Context, threadID, turnID string) 
 // finishRun maps turn/completed onto run status, persists the merged
 // assistant text and re-opens the bot for the next queued delivery.
 func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notification) {
-	botID, err := s.app.botByThread(ctx, n.ThreadID)
+	botID, err := s.app.botByThread(ctx, s.engineEpoch(teamID), n.ThreadID)
 	if err != nil {
 		s.logger.Warn("turn completion for unknown thread", "threadId", n.ThreadID)
 		return
 	}
 	run, err := sqlite.FindActiveRun(ctx, s.app.DB, botID)
 	if err != nil {
+		s.logger.Warn("turn completion without active run", "threadId", n.ThreadID, "turnId", n.TurnID)
 		return
 	}
 	if n.TurnID != "" && run.ProviderTurnID != "" && run.ProviderTurnID != n.TurnID {
+		s.logger.Warn("ignoring stale turn completion", "threadId", n.ThreadID, "turnId", n.TurnID, "runTurnId", run.ProviderTurnID)
 		return // stale completion of an interrupted predecessor
 	}
 
@@ -145,7 +158,7 @@ func joinTexts(parts []string) string {
 func (s *Scheduler) onApproval(teamID string, req engine.ApprovalRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	botID, err := s.app.botByThread(ctx, req.ThreadID)
+	botID, err := s.app.botByThread(ctx, s.engineEpoch(teamID), req.ThreadID)
 	if err != nil {
 		s.logger.Error("approval for unknown thread", "threadId", req.ThreadID, "method", req.Method)
 		// Cannot route: decline explicitly rather than hang the engine.
@@ -318,8 +331,8 @@ func (a *App) InterruptRun(ctx context.Context, runID string) (string, error) {
 	return run.ID, nil
 }
 
-func (a *App) botByThread(ctx context.Context, threadID string) (string, error) {
-	return sqlite.FindBotByThread(ctx, a.DB, threadID)
+func (a *App) botByThread(ctx context.Context, epoch, threadID string) (string, error) {
+	return sqlite.FindBotByThread(ctx, a.DB, epoch, threadID)
 }
 
 // EngineStatusInvalidated drops the cached engine projection (login changes).
