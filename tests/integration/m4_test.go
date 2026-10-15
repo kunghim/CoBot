@@ -164,6 +164,7 @@ func TestUserMessageOpensNewChainWithoutClearingOld(t *testing.T) {
 	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(captain.ID, team.ID), member.ID, "唤醒", "", "req-w1"); err != nil {
 		t.Fatalf("bot send: %v", err)
 	}
+	waitUntil(t, 5*time.Second, "bot-caused wake claimed", func() bool { return len(fake.Turns()) == 2 })
 
 	// A second user message while the first chain still has a wake in
 	// flight: new chain, old chain untouched.

@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -92,7 +91,8 @@ func (s *Server) handleRetryTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID        string `json:"requestId"`
+		ExpectedRevision int64  `json:"expectedRevision"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
@@ -112,7 +112,8 @@ func (s *Server) handleRebuildMarker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID        string `json:"requestId"`
+		ExpectedRevision int64  `json:"expectedRevision"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
@@ -229,10 +230,7 @@ func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var expected int64
-	if raw := r.URL.Query().Get("expectedRevision"); raw != "" {
-		expected, _ = strconv.ParseInt(raw, 10, 64)
-	}
+	expected := principal.Write.ExpectedRevision
 	team, err := s.App.DeleteTeam(r.Context(), principal, r.PathValue("id"), expected)
 	if err != nil {
 		writeError(w, r, err)
@@ -247,10 +245,7 @@ func (s *Server) handleDeleteBot(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var expected int64
-	if raw := r.URL.Query().Get("expectedRevision"); raw != "" {
-		expected, _ = strconv.ParseInt(raw, 10, 64)
-	}
+	expected := principal.Write.ExpectedRevision
 	bot, err := s.App.DeleteBot(r.Context(), principal, r.PathValue("id"), expected)
 	if err != nil {
 		writeError(w, r, err)

@@ -1,15 +1,20 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 )
@@ -77,7 +82,7 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 		}
 		if r.Method == http.MethodOptions {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-Id, X-Instance-Secret, Last-Event-ID")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-Id, X-Instance-Secret, Last-Event-ID, Idempotency-Key, If-Match")
 			w.Header().Set("Access-Control-Max-Age", "600")
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -115,6 +120,97 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 				writeError(w, r, domain.Forbidden("error.forbidden.csrf", nil))
 				return
 			}
+		}
+		if isStateChanging(r.Method) && principal.Kind == auth.KindUser && strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/v1/directories/check" {
+			raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+			if err != nil {
+				writeError(w, r, domain.InvalidRequest("error.invalid_json", nil))
+				return
+			}
+			var body map[string]any
+			if len(raw) == 0 && r.Method == http.MethodDelete {
+				raw = []byte(`{}`)
+			}
+			if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+				writeError(w, r, domain.InvalidRequest("error.invalid_json", nil))
+				return
+			}
+			key, isString := body["requestId"].(string)
+			if _, present := body["requestId"]; present && !isString {
+				writeError(w, r, domain.InvalidRequest("error.idempotency.required", nil))
+				return
+			}
+			if header := r.Header.Get("Idempotency-Key"); header != "" {
+				if key != "" && key != header {
+					writeError(w, r, domain.InvalidRequest("error.idempotency.header_conflict", nil))
+					return
+				}
+				if r.Method == http.MethodDelete {
+					key = header
+					body["requestId"] = header
+				}
+			}
+			if header := r.Header.Get("If-Match"); header != "" {
+				version, err := strconv.ParseInt(strings.Trim(header, "\""), 10, 64)
+				if err != nil || version < 1 {
+					writeError(w, r, domain.InvalidRequest("error.revision.required", nil))
+					return
+				}
+				if value, ok := body["expectedRevision"]; ok && value != float64(version) {
+					writeError(w, r, domain.InvalidRequest("error.revision.header_conflict", nil))
+					return
+				}
+				body["expectedRevision"] = version
+			}
+			needsRevision := r.Method == http.MethodPatch ||
+				(r.Method == http.MethodDelete && !strings.Contains(r.URL.Path, "/memories/")) ||
+				strings.HasSuffix(r.URL.Path, "/decisions") || strings.HasSuffix(r.URL.Path, "/confirm") ||
+				strings.HasSuffix(r.URL.Path, "/archive") || strings.HasSuffix(r.URL.Path, "/restore") ||
+				strings.HasSuffix(r.URL.Path, "/directory/rebind") || strings.HasSuffix(r.URL.Path, "/retry") ||
+				strings.HasSuffix(r.URL.Path, "/directory/rebuild-marker") ||
+				strings.HasSuffix(r.URL.Path, "/answers") || strings.Contains(r.URL.Path, "/questions/") ||
+				(strings.Contains(r.URL.Path, "/transfers/") && strings.HasSuffix(r.URL.Path, "/accept"))
+			revision, hasRevision := body["expectedRevision"].(float64)
+			if value, ok := body["expectedRevision"].(int64); ok {
+				revision, hasRevision = float64(value), true
+			}
+			if (needsRevision && !hasRevision) || (hasRevision && (revision < 1 || revision != float64(int64(revision)))) {
+				writeError(w, r, domain.InvalidRequest("error.revision.required", nil))
+				return
+			}
+			if r.Method == http.MethodDelete {
+				if r.Header.Get("Idempotency-Key") == "" || (needsRevision && r.Header.Get("If-Match") == "") {
+					writeError(w, r, domain.InvalidRequest("error.revision.required", nil))
+					return
+				}
+				if legacy := r.URL.Query().Get("expectedRevision"); legacy != "" && legacy != strconv.FormatInt(int64(revision), 10) {
+					writeError(w, r, domain.InvalidRequest("error.revision.header_conflict", nil))
+					return
+				}
+			}
+			if strings.TrimSpace(key) == "" || len(key) > 128 {
+				writeError(w, r, domain.InvalidRequest("error.idempotency.required", nil))
+				return
+			}
+			raw, err = json.Marshal(body)
+			if err != nil {
+				writeError(w, r, domain.InvalidRequest("error.invalid_json", nil))
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(raw))
+			scope := r.Method + " " + r.URL.Path
+			if mux, ok := next.(*http.ServeMux); ok {
+				_, scope = mux.Handler(r)
+			}
+			principal, err = app.WithWriteRequest(principal, "http."+scope, key, map[string]any{"path": r.URL.Path, "query": r.URL.Query(), "body": body})
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			if hasRevision {
+				principal.Write.ExpectedRevision = int64(revision)
+			}
+			r = r.WithContext(context.WithValue(r.Context(), ctxPrincipal, principal))
 		}
 
 		next.ServeHTTP(w, r)

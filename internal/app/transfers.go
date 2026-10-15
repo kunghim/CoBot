@@ -12,6 +12,14 @@ import (
 // OfferTransfer starts a two-phase hand-over. The owner is unchanged until
 // the target accepts, so a task never has zero or two owners.
 func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskID, toBotID, note string) (domain.Transfer, error) {
+	cached, unlock, writeErr := beginWrite[domain.Transfer](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Transfer{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	task, err := sqlite.GetTask(ctx, a.DB, taskID)
 	if err != nil {
 		return domain.Transfer{}, sqlite.NormalizeError(err)
@@ -42,6 +50,19 @@ func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskI
 		return domain.Transfer{}, err
 	}
 	defer tx.Rollback()
+	fresh, err := sqlite.GetTask(ctx, tx, taskID)
+	if err != nil {
+		return domain.Transfer{}, err
+	}
+	if fresh.OwnerID != task.OwnerID || fresh.Revision != task.Revision {
+		return domain.Transfer{}, domain.Conflict("error.transfer.task_changed", nil)
+	}
+	if fresh.Status == domain.TaskDone || fresh.Status == domain.TaskCancelled {
+		return domain.Transfer{}, domain.Conflict("error.task.terminal", nil)
+	}
+	if err := a.assertSameTeamOwner(ctx, tx, task.TeamID, toBotID); err != nil {
+		return domain.Transfer{}, err
+	}
 	// Only one live offer per task, so an old offer can never be accepted
 	// after the owner has moved on. Checked inside the insert transaction
 	// (backstopped by a partial unique index) so two concurrent offers
@@ -61,6 +82,13 @@ func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskI
 		}
 		return domain.Transfer{}, err
 	}
+	transfer, err = sqlite.GetTransfer(ctx, tx, transfer.ID)
+	if err != nil {
+		return domain.Transfer{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, transfer); err != nil {
+		return domain.Transfer{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return domain.Transfer{}, err
 	}
@@ -73,6 +101,14 @@ func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskI
 // to the target, the old owner's undelivered assignment is cancelled and the
 // new owner receives exactly one.
 func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, transferID string) (domain.Task, error) {
+	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Task{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	transfer, err := sqlite.GetTransfer(ctx, a.DB, transferID)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
@@ -112,6 +148,23 @@ func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, tran
 		return domain.Task{}, err
 	}
 	defer tx.Rollback()
+	fresh, err := sqlite.GetTask(ctx, tx, transfer.TaskID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if fresh.Revision != transfer.TaskRevision || fresh.OwnerID != transfer.FromBotID || fresh.Status == domain.TaskDone || fresh.Status == domain.TaskCancelled {
+		return domain.Task{}, domain.Conflict("error.transfer.task_changed", nil)
+	}
+	if principal.Write != nil && principal.Write.ExpectedRevision > 0 && fresh.Revision != principal.Write.ExpectedRevision {
+		return domain.Task{}, domain.RevisionConflict("error.task.revision_conflict", nil)
+	}
+	if err := a.assertSameTeamOwner(ctx, tx, fresh.TeamID, transfer.ToBotID); err != nil {
+		return domain.Task{}, err
+	}
+	if err := assertOwnerRunEndedOn(ctx, tx, fresh.OwnerID, fresh.ID); err != nil {
+		return domain.Task{}, err
+	}
+	task = fresh
 	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferOffered, domain.TransferAccepted); err != nil {
 		return domain.Task{}, err
 	}
@@ -134,6 +187,13 @@ func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, tran
 		return domain.Task{}, err
 	}
 	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID); err != nil {
+		return domain.Task{}, err
+	}
+	task, err = sqlite.GetTask(ctx, tx, task.ID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, task); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -162,6 +222,15 @@ func (a *App) staleTransfer(ctx context.Context, transfer domain.Transfer) error
 
 // CancelTransfer withdraws a live offer.
 func (a *App) CancelTransfer(ctx context.Context, principal auth.Principal, transferID string) (domain.Transfer, error) {
+	cached, unlock, writeErr := beginWrite[domain.Transfer](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Transfer{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	transfer, err := sqlite.GetTransfer(ctx, a.DB, transferID)
 	if err != nil {
 		return domain.Transfer{}, sqlite.NormalizeError(err)
@@ -184,6 +253,13 @@ func (a *App) CancelTransfer(ctx context.Context, principal auth.Principal, tran
 	}
 	defer tx.Rollback()
 	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferOffered, domain.TransferCancelled); err != nil {
+		return domain.Transfer{}, err
+	}
+	transfer, err = sqlite.GetTransfer(ctx, tx, transferID)
+	if err != nil {
+		return domain.Transfer{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, transfer); err != nil {
 		return domain.Transfer{}, err
 	}
 	if err := tx.Commit(); err != nil {

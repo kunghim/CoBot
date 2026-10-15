@@ -44,6 +44,14 @@ func looksSecret(body string) bool {
 // secret guard refuse rather than silently mangle: a half-remembered method
 // or a stored credential is worse than none.
 func (a *App) RememberMemory(ctx context.Context, principal auth.Principal, body, sourceTaskID string) (domain.Memory, error) {
+	cached, unlock, writeErr := beginWrite[domain.Memory](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Memory{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindBot {
 		return domain.Memory{}, domain.Forbidden("error.forbidden.bot_only", nil)
 	}
@@ -65,7 +73,7 @@ func (a *App) RememberMemory(ctx context.Context, principal auth.Principal, body
 	}
 	mem := domain.Memory{
 		ID: domain.NewID(), TeamID: bot.TeamID, BotID: bot.ID, Body: text,
-		SourceTaskID: sourceTaskID, NormKey: domain.NormalizeMemoryBody(text),
+		SourceTaskID: sourceTaskID, SourceRunID: principal.RunID, NormKey: domain.NormalizeMemoryBody(text),
 		CreatedAt: time.Now().UTC(),
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -77,6 +85,9 @@ func (a *App) RememberMemory(ctx context.Context, principal auth.Principal, body
 		if isUniqueViolation(err) {
 			return domain.Memory{}, domain.Conflict(domain.ErrorMemoryDuplicate, map[string]any{"body": text})
 		}
+		return domain.Memory{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, mem); err != nil {
 		return domain.Memory{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -179,6 +190,15 @@ func teamOfMemoryTarget(ctx context.Context, a *App, botID string) string {
 // DeleteMemory tombstones one memory. The row survives so its dedupe key
 // keeps blocking the same fact from being recreated automatically (G04).
 func (a *App) DeleteMemory(ctx context.Context, principal auth.Principal, memoryID string) error {
+	cached, unlock, writeErr := beginWrite[bool](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return writeErr
+	}
+	if cached != nil {
+		return nil
+	}
+
 	mem, err := sqlite.GetMemory(ctx, a.DB, memoryID)
 	if err != nil {
 		return sqlite.NormalizeError(err)
@@ -199,6 +219,9 @@ func (a *App) DeleteMemory(ctx context.Context, principal auth.Principal, memory
 	defer tx.Rollback()
 	if err := sqlite.TombstoneMemory(ctx, tx, memoryID); err != nil {
 		return sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, true); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err

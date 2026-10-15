@@ -29,6 +29,15 @@ func openWorkError(scope string, c sqlite.OpenWorkCounts) error {
 
 // PatchTeamName renames a team (user only) with optimistic revision.
 func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamID, name string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -39,9 +48,20 @@ func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamI
 	if _, _, err := sqlite.GetTeam(ctx, a.DB, teamID); err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
-	team, err := sqlite.UpdateTeamName(ctx, a.DB, teamID, trimmed, expectedRevision)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	team, err := sqlite.UpdateTeamNameTx(ctx, tx, teamID, trimmed, expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
 	}
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
 	a.Hub.Publish()
@@ -54,6 +74,15 @@ func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamI
 // with running executions, pending approvals or in-flight hand-overs, so an
 // archive never freezes a decision someone is waiting on.
 func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -64,10 +93,7 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if team.Status == domain.TeamStatusDeleted {
 		return domain.Team{}, domain.NotFound("error.not_found", nil)
 	}
-	if team.Status == domain.TeamStatusArchived {
-		return team, nil // idempotent: the requested state already holds
-	}
-	if team.Status != domain.TeamStatusActive {
+	if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusArchived {
 		return domain.Team{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
 	}
 	work, err := sqlite.TeamOpenWork(ctx, a.DB, teamID)
@@ -93,6 +119,9 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
+	if err := a.saveWriteResult(ctx, tx, principal, archived); err != nil {
+		return domain.Team{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
@@ -104,6 +133,15 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 // RestoreTeam re-activates an archived team and re-wakes the queued work the
 // archive held back.
 func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -111,15 +149,23 @@ func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
-	if team.Status == domain.TeamStatusActive {
-		return team, nil
-	}
-	if team.Status != domain.TeamStatusArchived {
+	if team.Status != domain.TeamStatusArchived && team.Status != domain.TeamStatusActive {
 		return domain.Team{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
 	}
-	restored, err := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusActive, "", expectedRevision)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	restored, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusActive, "", expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, restored); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
 	}
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamRestored, TeamID: teamID, ResourceID: teamID, Revision: restored.Revision})
 	a.Hub.Publish()
@@ -132,6 +178,15 @@ func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID 
 // user's files (including the marker) are never deleted. Queued deliveries
 // are cancelled because their team is going away; their rows stay too.
 func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -183,6 +238,9 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
+	if err := a.saveWriteResult(ctx, tx, principal, deleted); err != nil {
+		return domain.Team{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
@@ -202,6 +260,15 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 // tombstoned for audit, its bridge credentials are revoked, and undelivered
 // messages to it are cancelled; history stays (B08).
 func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID string, expectedRevision int64) (domain.Bot, error) {
+	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Bot{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Bot{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -236,6 +303,9 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 	}
 	if err := sqlite.SoftDeleteBot(ctx, tx, botID, expectedRevision); err != nil {
 		return domain.Bot{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, bot); err != nil {
+		return domain.Bot{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Bot{}, err

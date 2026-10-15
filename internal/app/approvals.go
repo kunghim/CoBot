@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
-	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -69,134 +67,20 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	if principal.Kind != auth.KindUser {
 		return domain.Approval{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	// An option this build deliberately no longer expresses (the disabled
-	// acceptForSession on a pre-upgrade card) cannot be answered: refuse
-	// BEFORE the CAS so the card keeps its state and nothing pretends a
-	// reply was sent (review B).
-	if optionID == "acceptForSession" {
-		pre, gerr := sqlite.GetApproval(ctx, a.DB, approvalID)
-		if gerr == nil && pre.Type == domain.ApprovalNativeTool {
-			return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", map[string]any{"optionId": optionID})
-		}
-	}
-	// Verify before consuming the decision: an unproven old execution must
-	// leave a pending, retryable card and a locked bot.
-	verifiedRecoveryStatus := ""
-	if pre, err := sqlite.GetApproval(ctx, a.DB, approvalID); err == nil && pre.Type == domain.ApprovalRecovery {
-		verifiedRecoveryStatus, err = a.verifyRecoveryTurn(ctx, pre)
-		if err != nil {
-			return domain.Approval{}, err
-		}
-	}
-	approval, err := sqlite.DecideApproval(ctx, a.DB, approvalID, optionID, comment, principal.UserID, expectedRevision)
+	card, err := sqlite.GetApproval(ctx, a.DB, approvalID)
 	if err != nil {
 		return domain.Approval{}, sqlite.NormalizeError(err)
 	}
-
-	response, err := engineResponseFor(approval.Type, approval.Method, optionID)
-	if err != nil {
-		// Recorded decision stands; nothing engine-bound to deliver.
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseExpired, "not_engine_bound")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
+	switch card.Type {
+	case domain.ApprovalMerge, domain.ApprovalRecruitment:
+		return a.decideProductApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
+	case domain.ApprovalNativeTool:
+		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
+	case domain.ApprovalChain, domain.ApprovalRecovery:
+		return a.decideControlApproval(ctx, principal, card, optionID, comment, expectedRevision)
+	default:
+		return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", nil)
 	}
-
-	// A chain confirmation has a product side effect: continue grants exactly
-	// this chain one more wake when it was over limit, stop cancels this
-	// chain's undelivered work and interrupts its executions. Neither one
-	// talks to an engine.
-	if approval.Type == domain.ApprovalChain {
-		if err := a.ApplyChainDecision(ctx, approval, optionID); err != nil {
-			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "chain_decision_failed")
-			a.publishApprovalUpdated(ctx, approval)
-			return domain.Approval{}, err
-		}
-		outcome := "chain_continued"
-		if optionID == domain.ChainOptionStop {
-			outcome = "chain_stopped"
-		}
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, outcome)
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
-	}
-	// A recovery card decides what happens to an execution that ended with
-	// a previous process: confirm it ended, then continue, requeue, or
-	// cancel the triggering delivery. No engine is attached to answer (H05).
-	if approval.Type == domain.ApprovalRecovery {
-		if err := a.applyVerifiedRecoveryDecision(ctx, approval, optionID, verifiedRecoveryStatus); err != nil {
-			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "recovery_decision_failed")
-			a.publishApprovalUpdated(ctx, approval)
-			return domain.Approval{}, err
-		}
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, "recovery_resolved")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
-	}
-	// A recruitment approval has a product side effect instead of an engine
-	// reply: only an approval creates the member, so a rejected or expired
-	// request never leaves a runnable bot behind.
-	if approval.Type == domain.ApprovalRecruitment && optionID == "approve" {
-		roleID := ""
-		_ = json.Unmarshal(approval.EngineRequestID, &roleID)
-		if _, addErr := a.AddBot(ctx, principal, approval.TeamID, roleID); addErr != nil {
-			// The decision stays recorded; the failure is reported honestly.
-			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "recruitment_failed")
-			a.publishApprovalUpdated(ctx, approval)
-			return domain.Approval{}, addErr
-		}
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, "member_added")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
-	}
-	if response == nil {
-		// Non-engine cards (merge, recruitment rejection) have no protocol
-		// reply to deliver.
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseExpired, "not_engine_bound")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
-	}
-
-	rt := a.Scheduler.runtime(approval.TeamID)
-	if rt == nil {
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "team_server_not_running")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approvalID)
-	}
-	// A restarted connection must never answer old request ids (F04).
-	if approval.EngineEpoch != "" && rt.server.Epoch() != approval.EngineEpoch {
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseExpired, "engine_epoch_changed")
-		a.publishApprovalUpdated(ctx, approval)
-		return sqlite.GetApproval(ctx, a.DB, approval.ID)
-	}
-
-	replyCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	if err := rt.server.ReplyApproval(replyCtx, approval.EngineRequestID, response); err != nil {
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "reply_failed")
-	} else {
-		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, "")
-	}
-	a.publishApprovalUpdated(ctx, approval)
-
-	// The engine resumes the run by itself after a reply; bot status returns
-	// to working until turn/completed says otherwise.
-	if approval.RunID != "" {
-		if run, err := sqlite.GetRun(ctx, a.DB, approval.RunID); err == nil && run.Status == domain.RunWaitingApproval {
-			tx, txErr := a.DB.BeginTx(ctx, nil)
-			if txErr == nil {
-				if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, run.ProviderTurnID, run.EngineEpoch, "", false); err == nil {
-					if err := sqlite.SetBotRunState(ctx, tx, approval.RequesterBotID, domain.BotStatusWorking, run.ID); err == nil {
-						_ = tx.Commit()
-					} else {
-						tx.Rollback()
-					}
-				} else {
-					tx.Rollback()
-				}
-			}
-		}
-	}
-	return sqlite.GetApproval(ctx, a.DB, approvalID)
 }
 
 func (a *App) publishApprovalUpdated(ctx context.Context, approval domain.Approval) {
@@ -216,13 +100,18 @@ func engineResponseFor(approvalType, method, optionID string) (map[string]any, e
 	case "item/permissions/requestApproval":
 		// Only the deny shape is verified on the target version; a grant
 		// response cannot be expressed accurately, so it is not offered.
+		if optionID != "deny" {
+			return nil, domain.Conflict("error.approval.option_unavailable", nil)
+		}
 		return map[string]any{"permissions": map[string]any{}}, nil
-	default:
+	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval":
 		switch optionID {
 		case "accept", "decline":
 			return map[string]any{"decision": optionID}, nil
 		default:
-			return nil, nil
+			return nil, domain.Conflict("error.approval.option_unavailable", nil)
 		}
+	default:
+		return nil, domain.Conflict("error.approval.option_unavailable", nil)
 	}
 }

@@ -220,10 +220,8 @@ func CancelChainDeliveries(ctx context.Context, tx *sql.Tx, chainID string) (int
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
-	now := time.Now().UTC().Format(time.RFC3339Nano)
 	for _, item := range items {
-		if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?`,
-			domain.DeliveryCancelled, now, item.deliveryID); err != nil {
+		if err := SetDeliveryStatus(ctx, tx, item.deliveryID, domain.DeliveryCancelled); err != nil {
 			return 0, err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE id = ?`,

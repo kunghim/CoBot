@@ -17,6 +17,14 @@ import (
 // queued: accepted only ever means the fact is persisted, never that the
 // target ran. The target's busy queue is respected — nothing interrupts.
 func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error) {
+	cached, unlock, writeErr := beginWrite[map[string]any](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return nil, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindBot {
 		return nil, domain.Forbidden("error.forbidden.bot_only", nil)
 	}
@@ -114,6 +122,14 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 			return nil, err
 		}
 	}
+	queued, err := sqlite.CountQueuedDeliveries(ctx, tx, target.ID)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{"status": "accepted", "messageId": message.ID, "queuedAhead": queued}
+	if err := a.saveWriteResult(ctx, tx, principal, result); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -122,8 +138,7 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	if a.Scheduler != nil {
 		a.Scheduler.Wake(target.ID)
 	}
-	queued, _ := sqlite.CountQueuedDeliveries(ctx, a.DB, target.ID)
-	return map[string]any{"status": "accepted", "messageId": message.ID, "queuedAhead": queued}, nil
+	return result, nil
 }
 
 // BotOf resolves a live member row; the dispatcher uses it to prove a bridge
@@ -178,6 +193,14 @@ func (a *App) ListCollaboration(ctx context.Context, principal auth.Principal, p
 // RequestMember asks the user to add a member of a given role. It creates a
 // recruitment approval; no runnable bot exists before the user approves.
 func (a *App) RequestMember(ctx context.Context, principal auth.Principal, roleID, reason string) (domain.Approval, error) {
+	cached, unlock, writeErr := beginWrite[domain.Approval](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Approval{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindBot {
 		return domain.Approval{}, domain.Forbidden("error.forbidden.bot_only", nil)
 	}
@@ -216,97 +239,17 @@ func (a *App) RequestMember(ctx context.Context, principal auth.Principal, roleI
 	if err := sqlite.InsertApproval(ctx, tx, approval); err != nil {
 		return domain.Approval{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Approval{}, err
-	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: teamID, BotID: principal.BotID, ResourceID: approval.ID})
-	a.Hub.Publish()
-	return approval, nil
-}
-
-// SubmitMergeRequest asks the user to authorise a merge. The card binds the
-// exact candidate version, the target and the execution directory; the
-// product never runs Git itself, and an authorised agent performs the merge.
-func (a *App) SubmitMergeRequest(ctx context.Context, principal auth.Principal, taskID, candidateRef, targetRef, executionDirectory string, evidenceIDs []string) (domain.Approval, error) {
-	if principal.Kind != auth.KindBot {
-		return domain.Approval{}, domain.Forbidden("error.forbidden.bot_only", nil)
-	}
-	task, err := sqlite.GetTask(ctx, a.DB, taskID)
-	if err != nil {
-		return domain.Approval{}, sqlite.NormalizeError(err)
-	}
-	// Only the owner or the captain may request the merge of their work.
-	isLeader, err := a.isLeaderOf(ctx, task.TeamID, principal.BotID)
-	if err != nil {
-		return domain.Approval{}, sqlite.NormalizeError(err)
-	}
-	if !isLeader && principal.BotID != task.OwnerID {
-		return domain.Approval{}, domain.Forbidden("error.merge.requester_only", nil)
-	}
-	if strings.TrimSpace(candidateRef) == "" {
-		return domain.Approval{}, domain.InvalidRequest("error.merge.candidate_required", nil)
-	}
-	if strings.TrimSpace(targetRef) == "" {
-		return domain.Approval{}, domain.InvalidRequest("error.merge.target_required", nil)
-	}
-	if len(evidenceIDs) > 0 {
-		have, err := sqlite.ListEvidence(ctx, a.DB, task.ID)
-		if err != nil {
-			return domain.Approval{}, err
-		}
-		known := map[string]bool{}
-		for _, e := range have {
-			known[e.ID] = true
-		}
-		for _, id := range evidenceIDs {
-			if !known[id] {
-				return domain.Approval{}, domain.InvalidRequest("error.task.evidence_unknown", map[string]any{"evidenceId": id})
-			}
-		}
-	} else if ok, err := sqlite.HasEvidence(ctx, a.DB, task.ID); err != nil {
-		return domain.Approval{}, err
-	} else if !ok {
-		// A merge without any evidence can never be verified afterwards.
-		return domain.Approval{}, domain.InvalidRequest("error.merge.needs_evidence", nil)
-	}
-
-	bindings := map[string]any{
-		"taskId": task.ID, "candidateRef": candidateRef, "targetRef": targetRef,
-		"executionDirectory": executionDirectory, "evidenceIds": evidenceIDs,
-	}
-	bound, err := json.Marshal(bindings)
+	approval, err = sqlite.GetApproval(ctx, tx, approval.ID)
 	if err != nil {
 		return domain.Approval{}, err
 	}
-	// The summary is an i18n key (never prose in one language); the reason
-	// carries only neutral technical values so the candidate stays visible
-	// without storing translatable sentences (review A).
-	reason := "candidate=" + candidateRef + " target=" + targetRef
-	if executionDirectory != "" {
-		reason += " dir=" + executionDirectory
-	}
-	approval := domain.Approval{
-		ID: domain.NewID(), TeamID: task.TeamID, RequesterBotID: principal.BotID,
-		RunID: "", EngineRequestID: bound, Type: domain.ApprovalMerge,
-		Summary: "approval.card.merge", Reason: reason,
-		Options: []domain.ApprovalOption{
-			{ID: "approve", MessageKey: "approval.option.merge.approve"},
-			{ID: "reject", MessageKey: "approval.option.merge.reject"},
-		},
-		Revision: 1,
-	}
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Approval{}, err
-	}
-	defer tx.Rollback()
-	if err := sqlite.InsertApproval(ctx, tx, approval); err != nil {
+	if err := a.saveWriteResult(ctx, tx, principal, approval); err != nil {
 		return domain.Approval{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Approval{}, err
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: approval.ID})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: teamID, BotID: principal.BotID, ResourceID: approval.ID})
 	a.Hub.Publish()
 	return approval, nil
 }

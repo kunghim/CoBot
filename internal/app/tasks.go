@@ -82,6 +82,21 @@ func (a *App) validateDependencies(ctx context.Context, q sqlite.Queryer, taskID
 // ready, one assignment delivery. captainOnly distinguishes the bot tool from
 // the user path.
 func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in CreateTaskInput) (domain.Task, error) {
+	if principal.Write == nil && in.RequestID != "" {
+		var err error
+		principal, err = WithWriteRequest(principal, "task.create", in.RequestID, in)
+		if err != nil {
+			return domain.Task{}, err
+		}
+	}
+	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Task{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	team, _, err := sqlite.GetTeam(ctx, a.DB, in.TeamID)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
@@ -142,6 +157,16 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 		return domain.Task{}, err
 	}
 	defer tx.Rollback()
+	freshTeam, _, err := sqlite.GetTeam(ctx, tx, in.TeamID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if freshTeam.Status != domain.TeamStatusActive {
+		return domain.Task{}, domain.Conflict("error.team.not_active", nil)
+	}
+	if err := a.assertSameTeamOwner(ctx, tx, in.TeamID, in.OwnerID); err != nil {
+		return domain.Task{}, err
+	}
 	if err := a.validateDependencies(ctx, tx, task.ID, in.TeamID, in.DependencyIDs); err != nil {
 		return domain.Task{}, err
 	}
@@ -163,7 +188,18 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, ""); err != nil {
+	chainID := ""
+	if principal.Kind == auth.KindBot {
+		chainID = chainOfRunLocked(ctx, tx, principal.BotID)
+	}
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID); err != nil {
+		return domain.Task{}, err
+	}
+	task, err = sqlite.GetTask(ctx, tx, task.ID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, task); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -229,6 +265,14 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 // the caller must be the captain or the user, and a bot owner's active run on
 // the task must have ended.
 func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, newOwnerID string, expectedRevision int64) (domain.Task, error) {
+	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Task{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	task, err := sqlite.GetTask(ctx, a.DB, taskID)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
@@ -252,13 +296,7 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	if task.Status == domain.TaskDone || task.Status == domain.TaskCancelled {
 		return domain.Task{}, domain.Conflict("error.task.terminal", nil)
 	}
-	if task.OwnerID == newOwnerID {
-		return task, nil
-	}
 	if err := a.assertSameTeamOwner(ctx, a.DB, task.TeamID, newOwnerID); err != nil {
-		return domain.Task{}, err
-	}
-	if err := a.assertOwnerRunEnded(ctx, task.OwnerID, task.ID); err != nil {
 		return domain.Task{}, err
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -275,6 +313,25 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	if expectedRevision > 0 && fresh.Revision != expectedRevision {
 		return domain.Task{}, domain.RevisionConflict("error.task.revision_conflict", map[string]any{"expected": expectedRevision, "actual": fresh.Revision})
 	}
+	if fresh.OwnerID == newOwnerID {
+		if err := a.saveWriteResult(ctx, tx, principal, fresh); err != nil {
+			return domain.Task{}, err
+		}
+		if err := tx.Commit(); err != nil {
+			return domain.Task{}, err
+		}
+		return fresh, nil
+	}
+	if fresh.Status == domain.TaskDone || fresh.Status == domain.TaskCancelled {
+		return domain.Task{}, domain.Conflict("error.task.terminal", nil)
+	}
+	if err := a.assertSameTeamOwner(ctx, tx, fresh.TeamID, newOwnerID); err != nil {
+		return domain.Task{}, err
+	}
+	if err := assertOwnerRunEndedOn(ctx, tx, fresh.OwnerID, fresh.ID); err != nil {
+		return domain.Task{}, err
+	}
+	task = fresh
 	// Cancel the old owner's undelivered assignment, then give the new owner
 	// exactly one.
 	if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, fresh.OwnerID); err != nil {
@@ -290,6 +347,13 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 		return domain.Task{}, err
 	}
 	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, ""); err != nil {
+		return domain.Task{}, err
+	}
+	task, err = sqlite.GetTask(ctx, tx, task.ID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, task); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -326,7 +390,11 @@ func (a *App) cancelUndeliveriesForTaskLocked(ctx context.Context, tx *sql.Tx, t
 // assertOwnerRunEnded refuses to move a task whose current owner may still
 // be writing files for it.
 func (a *App) assertOwnerRunEnded(ctx context.Context, ownerID, taskID string) error {
-	run, err := sqlite.FindActiveRun(ctx, a.DB, ownerID)
+	return assertOwnerRunEndedOn(ctx, a.DB, ownerID, taskID)
+}
+
+func assertOwnerRunEndedOn(ctx context.Context, q sqlite.Queryer, ownerID, taskID string) error {
+	run, err := sqlite.FindActiveRun(ctx, q, ownerID)
 	if err != nil {
 		if errors.Is(err, sqlite.ErrNotFound) {
 			return nil
@@ -344,6 +412,22 @@ func (a *App) assertOwnerRunEnded(ctx context.Context, ownerID, taskID string) e
 // done requires evidence, review requires evidence, and only the owner moves
 // doing/review; captain or user may cancel.
 func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64) (domain.Task, error) {
+	return a.updateTaskStatus(ctx, principal, taskID, status, blockedReason, expectedRevision, nil, false)
+}
+
+func (a *App) ReportCompletion(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error) {
+	return a.updateTaskStatus(ctx, principal, taskID, domain.TaskReview, "", expectedRevision, evidenceIDs, true)
+}
+
+func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64, evidenceIDs []string, requireEvidenceIDs bool) (domain.Task, error) {
+	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Task{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Task{}, err
@@ -370,6 +454,24 @@ func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, ta
 		if !has {
 			return domain.Task{}, domain.InvalidRequest("error.task.review_needs_evidence", nil)
 		}
+		if requireEvidenceIDs {
+			if len(evidenceIDs) == 0 {
+				return domain.Task{}, domain.InvalidRequest("error.task.review_needs_evidence", nil)
+			}
+			evidence, err := sqlite.ListEvidence(ctx, tx, task.ID)
+			if err != nil {
+				return domain.Task{}, err
+			}
+			have := map[string]bool{}
+			for _, item := range evidence {
+				have[item.ID] = true
+			}
+			for _, id := range evidenceIDs {
+				if !have[id] {
+					return domain.Task{}, domain.InvalidRequest("error.task.evidence_unknown", map[string]any{"evidenceId": id})
+				}
+			}
+		}
 	}
 	updated, err := sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, status, blockedReason, expectedRevision)
 	if err != nil {
@@ -379,6 +481,9 @@ func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, ta
 		if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, ""); err != nil {
 			return domain.Task{}, err
 		}
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
+		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Task{}, err
@@ -434,6 +539,14 @@ func (a *App) authorizeTaskWrite(ctx context.Context, q sqlite.Queryer, principa
 // SubmitEvidence records a proof reference for a task; the owner or the
 // captain may submit.
 func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string, candidateRef, testResult, reviewResult string) (domain.Evidence, error) {
+	cached, unlock, writeErr := beginWrite[domain.Evidence](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Evidence{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	task, err := sqlite.GetTask(ctx, a.DB, taskID)
 	if err != nil {
 		return domain.Evidence{}, sqlite.NormalizeError(err)
@@ -466,7 +579,21 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 		return domain.Evidence{}, err
 	}
 	defer tx.Rollback()
+	fresh, err := sqlite.GetTask(ctx, tx, taskID)
+	if err != nil {
+		return domain.Evidence{}, err
+	}
+	if principal.Kind == auth.KindBot && (fresh.OwnerID != principal.BotID || fresh.TeamID != principal.TeamID) {
+		return domain.Evidence{}, domain.Forbidden("error.task.owner_only", nil)
+	}
+	if fresh.Status == domain.TaskCancelled || fresh.Status == domain.TaskDone {
+		return domain.Evidence{}, domain.Conflict("error.task.terminal", nil)
+	}
+	evidence.CreatedAt = time.Now().UTC()
 	if err := sqlite.InsertEvidence(ctx, tx, evidence); err != nil {
+		return domain.Evidence{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, evidence); err != nil {
 		return domain.Evidence{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -480,6 +607,14 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 // ConfirmTask moves a task to done; the captain or the user confirms against
 // matching evidence. A chat message never does this by itself.
 func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error) {
+	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Task{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Task{}, err
@@ -530,6 +665,9 @@ func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID 
 	}
 	activated, err := a.activateDependentDeliveriesLocked(ctx, tx, task.ID)
 	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {

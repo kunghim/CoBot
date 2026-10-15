@@ -11,10 +11,14 @@ import (
 // ValidateToolRun requires an exact host-bound live execution. A surviving
 // bridge from an ended/unknown predecessor must never write as a later run.
 func (a *App) ValidateToolRun(ctx context.Context, principal auth.Principal) error {
+	return a.validateToolRunOn(ctx, a.DB, principal)
+}
+
+func (a *App) validateToolRunOn(ctx context.Context, q sqlite.Queryer, principal auth.Principal) error {
 	if principal.Kind != auth.KindBot || principal.RunID == "" {
 		return domain.Forbidden("error.tool.no_active_run", nil)
 	}
-	run, err := sqlite.FindActiveRun(ctx, a.DB, principal.BotID)
+	run, err := sqlite.FindActiveRun(ctx, q, principal.BotID)
 	if err != nil || run.ID != principal.RunID || run.TeamID != principal.TeamID || run.EngineEpoch == "" || run.EngineEpoch != a.EngineEpochOfTeam(principal.TeamID) {
 		return domain.Forbidden("error.tool.no_active_run", nil)
 	}

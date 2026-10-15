@@ -22,7 +22,9 @@ func (h *m2Harness) userPost(t *testing.T, path string, body map[string]any) (in
 	if body == nil {
 		body = map[string]any{}
 	}
-	body["requestId"] = "req-post-" + time.Now().Format("150405.000000000")
+	if _, ok := body["requestId"]; !ok {
+		body["requestId"] = "req-post-" + time.Now().Format("150405.000000000")
+	}
 	raw, _ := json.Marshal(body)
 	req, err := http.NewRequest(http.MethodPost, h.api.URL+path, bytes.NewReader(raw))
 	if err != nil {
@@ -82,6 +84,7 @@ func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 		t.Fatalf("memories = %d, want 1", len(listed))
 	}
 	req, _ := http.NewRequest(http.MethodDelete, h.api.URL+"/api/v1/bots/"+member.ID+"/memories/"+mem.ID, nil)
+	req.Header.Set("Idempotency-Key", "delete-memory")
 	req.Header.Set("Authorization", "Bearer "+h.bearer)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -171,7 +174,7 @@ func TestWebSurfaceDirectoriesAndRebind(t *testing.T) {
 	if err := os.MkdirAll(newDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	status, payload = h.userPost(t, "/api/v1/teams/"+team.ID+"/directory/rebind", map[string]any{"directory": newDir})
+	status, payload = h.userPost(t, "/api/v1/teams/"+team.ID+"/directory/rebind", map[string]any{"directory": newDir, "expectedRevision": team.Revision})
 	if status != http.StatusOK {
 		t.Fatalf("rebind status = %d body=%v", status, payload)
 	}

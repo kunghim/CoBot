@@ -84,10 +84,10 @@ func (s *Server) handleInterruptRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	runID, err := s.App.InterruptRun(r.Context(), r.PathValue("id"))
+	result, err := s.App.RequestInterrupt(r.Context(), principal, r.PathValue("id"))
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeData(w, r, http.StatusAccepted, map[string]any{"runId": runID, "interruptRequested": true})
+	writeData(w, r, http.StatusAccepted, result)
 }

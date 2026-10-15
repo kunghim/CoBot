@@ -21,6 +21,14 @@ type AskUserInput struct {
 // AskUser records a question awaiting the user. It never blocks the tool
 // caller: the bot receives a waiting item and is expected to end its turn.
 func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserInput) (domain.Question, error) {
+	cached, unlock, writeErr := beginWrite[domain.Question](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Question{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindBot {
 		return domain.Question{}, domain.Forbidden("error.forbidden.bot_only", nil)
 	}
@@ -45,7 +53,7 @@ func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserI
 	}
 	item := domain.Question{
 		ID: domain.NewID(), TeamID: bot.TeamID, RequesterBotID: principal.BotID,
-		TaskID: in.TaskID, Question: question, Options: in.Options,
+		TaskID: in.TaskID, RunID: principal.RunID, Question: question, Options: in.Options,
 		Status: domain.QuestionOpen, Revision: 1,
 	}
 	if item.Options == nil {
@@ -62,6 +70,13 @@ func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserI
 	if err := sqlite.InsertQuestion(ctx, tx, item); err != nil {
 		return domain.Question{}, err
 	}
+	item, err = sqlite.GetQuestion(ctx, tx, item.ID)
+	if err != nil {
+		return domain.Question{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, item); err != nil {
+		return domain.Question{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return domain.Question{}, err
 	}
@@ -74,6 +89,14 @@ func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserI
 // requesting bot in the same transaction, so the question and its message can
 // never diverge. An answer is input, never a security authorization.
 func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, questionID, answerText string, expectedRevision int64) (domain.Question, error) {
+	cached, unlock, writeErr := beginWrite[domain.Question](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Question{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindUser {
 		return domain.Question{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -132,6 +155,9 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 			return domain.Question{}, err
 		}
 	}
+	if err := a.saveWriteResult(ctx, tx, principal, answered); err != nil {
+		return domain.Question{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return domain.Question{}, err
 	}
@@ -152,6 +178,14 @@ func (a *App) ListQuestions(ctx context.Context, principal auth.Principal, teamI
 
 // CancelQuestion withdraws a still-open question.
 func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, questionID string, expectedRevision int64) (domain.Question, error) {
+	cached, unlock, writeErr := beginWrite[domain.Question](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Question{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	question, err := sqlite.GetQuestion(ctx, a.DB, questionID)
 	if err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
@@ -178,6 +212,13 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	defer tx.Rollback()
 	if _, err := sqlite.CancelQuestionRow(ctx, tx, questionID, expectedRevision); err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
+	}
+	cancelled, err := sqlite.GetQuestion(ctx, tx, questionID)
+	if err != nil {
+		return domain.Question{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, cancelled); err != nil {
+		return domain.Question{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Question{}, err

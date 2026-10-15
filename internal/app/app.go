@@ -34,6 +34,8 @@ type App struct {
 	ServiceEpoch string
 	Version      string
 	Logger       *slog.Logger
+	writeLocksMu sync.Mutex
+	writeLocks   map[string]*writeLock
 
 	// Scheduler dispatches queued deliveries to team app-servers; it is
 	// assigned during composition so tests can inject a fake factory.
@@ -96,12 +98,32 @@ func (a *App) GetSettings(ctx context.Context) (domain.Settings, error) {
 // UpdateSettings validates, stores and records a settings change. Only the
 // local user may change settings; bot principals are rejected server-side.
 func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patch domain.SettingsPatch, expectedRevision int64) (domain.Settings, error) {
+	cached, unlock, writeErr := beginWrite[domain.Settings](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Settings{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Settings{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	saved, err := sqlite.UpdateSettings(ctx, a.DB, patch, expectedRevision)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Settings{}, err
+	}
+	defer tx.Rollback()
+	saved, err := sqlite.UpdateSettingsTx(ctx, tx, patch, expectedRevision)
 	if err != nil {
 		return domain.Settings{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, saved); err != nil {
+		return domain.Settings{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Settings{}, err
 	}
 	if err := a.recordEvent(ctx, domain.Event{
 		Type:       domain.EventSettingsUpdated,

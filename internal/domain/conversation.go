@@ -137,22 +137,35 @@ type ApprovalOption struct {
 
 // Approval is one user decision request.
 type Approval struct {
-	ID              string            `json:"id"`
-	TeamID          string            `json:"teamId"`
-	RequesterBotID  string            `json:"requesterBotId"`
-	RunID           string            `json:"runId,omitempty"`
-	EngineRequestID json.RawMessage   `json:"-"`
-	EngineEpoch     string            `json:"-"`
-	Type            string            `json:"type"`
-	Method          string            `json:"method,omitempty"`
-	Summary         string            `json:"summary"`
-	Reason          string            `json:"reason,omitempty"`
-	Options         []ApprovalOption  `json:"options"`
-	RequestState    string            `json:"requestState"`
-	Decision        *ApprovalDecision `json:"decision,omitempty"`
-	ResponseState   string            `json:"responseState,omitempty"`
-	CreatedAt       time.Time         `json:"createdAt"`
-	Revision        int64             `json:"revision"`
+	ID              string                `json:"id"`
+	TeamID          string                `json:"teamId"`
+	RequesterBotID  string                `json:"requesterBotId"`
+	RunID           string                `json:"runId,omitempty"`
+	EngineRequestID json.RawMessage       `json:"-"`
+	EngineEpoch     string                `json:"-"`
+	Type            string                `json:"type"`
+	Method          string                `json:"method,omitempty"`
+	Summary         string                `json:"summary"`
+	Reason          string                `json:"reason,omitempty"`
+	Options         []ApprovalOption      `json:"options"`
+	Details         *MergeApprovalDetails `json:"details,omitempty"`
+	RequestState    string                `json:"requestState"`
+	Decision        *ApprovalDecision     `json:"decision,omitempty"`
+	ResponseState   string                `json:"responseState,omitempty"`
+	CreatedAt       time.Time             `json:"createdAt"`
+	Revision        int64                 `json:"revision"`
+}
+
+// MergeApprovalDetails is a safe, immutable snapshot of the facts the user
+// is authorizing. Reports remain attributed Agent evidence, not host tests.
+type MergeApprovalDetails struct {
+	TaskID             string     `json:"taskId"`
+	TaskRevision       int64      `json:"taskRevision"`
+	CandidateRef       string     `json:"candidateRef"`
+	TargetRef          string     `json:"targetRef"`
+	ExecutionDirectory string     `json:"executionDirectory"`
+	EvidenceIDs        []string   `json:"evidenceIds"`
+	Evidence           []Evidence `json:"evidence"`
 }
 
 // ApprovalDecision is the user's recorded choice.

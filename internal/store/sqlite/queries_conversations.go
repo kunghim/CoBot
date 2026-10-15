@@ -258,7 +258,40 @@ func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error
 		status, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
 		return fmt.Errorf("update delivery: %w", err)
 	}
+	response := ""
+	switch status {
+	case domain.DeliveryQueued:
+		response = domain.ResponseQueued
+	case domain.DeliveryAccepted:
+		response = domain.ResponseSent
+	case domain.DeliveryUnknown:
+		response = domain.ResponseUnknown
+	case domain.DeliveryCancelled:
+		response = domain.ResponseExpired
+	}
+	if response != "" {
+		_, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, updated_at = ? WHERE delivery_id = ? AND NOT (state = ? AND ? = ?)`, response, time.Now().UTC().Format(time.RFC3339Nano), id, domain.ResponseSent, response, domain.ResponseUnknown)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func BindApprovalDelivery(ctx context.Context, tx *sql.Tx, approvalID, deliveryID string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE approval_responses SET delivery_id = ?, state = ?, detail = '', updated_at = ? WHERE approval_id = ?`, deliveryID, domain.ResponseQueued, time.Now().UTC().Format(time.RFC3339Nano), approvalID)
+	return err
+}
+
+func ApprovalOfDelivery(ctx context.Context, q Queryer, deliveryID string) (domain.Approval, error) {
+	var id string
+	if err := q.QueryRowContext(ctx, `SELECT approval_id FROM approval_responses WHERE delivery_id = ?`, deliveryID).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Approval{}, ErrNotFound
+		}
+		return domain.Approval{}, err
+	}
+	return GetApproval(ctx, q, id)
 }
 
 // GetDelivery reads one delivery.
@@ -380,6 +413,12 @@ func InsertApproval(ctx context.Context, tx *sql.Tx, a domain.Approval) error {
 		state = domain.ApprovalStatePending
 	}
 	created := a.CreatedAt.UTC().Format(time.RFC3339Nano)
+	if a.CreatedAt.IsZero() {
+		created = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+	if a.Revision < 1 {
+		a.Revision = 1
+	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO approvals (id, team_id, requester_bot_id, run_id, engine_request_id, engine_epoch, type, method, summary, reason, options, request_state, created_at, revision)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, a.TeamID, a.RequesterBotID, a.RunID, string(a.EngineRequestID), a.EngineEpoch, a.Type, a.Method, a.Summary, a.Reason, string(options), state, created, a.Revision)
@@ -403,6 +442,12 @@ func GetApproval(ctx context.Context, q Queryer, id string) (domain.Approval, er
 		return domain.Approval{}, err
 	}
 	a.EngineRequestID = []byte(engineReqID)
+	if a.Type == domain.ApprovalMerge {
+		var details domain.MergeApprovalDetails
+		if json.Unmarshal(a.EngineRequestID, &details) == nil {
+			a.Details = &details
+		}
+	}
 	a.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	if err := jsonUnmarshal([]byte(options), &a.Options); err != nil {
 		return domain.Approval{}, err
@@ -486,6 +531,17 @@ func DecideApproval(ctx context.Context, db *sql.DB, approvalID, optionID, comme
 		return domain.Approval{}, err
 	}
 	defer tx.Rollback()
+	approval, err := DecideApprovalTx(ctx, tx, approvalID, optionID, comment, actor, expectedRevision)
+	if err != nil {
+		return domain.Approval{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Approval{}, err
+	}
+	return approval, nil
+}
+
+func DecideApprovalTx(ctx context.Context, tx *sql.Tx, approvalID, optionID, comment, actor string, expectedRevision int64) (domain.Approval, error) {
 	approval, err := GetApproval(ctx, tx, approvalID)
 	if err != nil {
 		return domain.Approval{}, err
@@ -521,14 +577,11 @@ func DecideApproval(ctx context.Context, db *sql.DB, approvalID, optionID, comme
 		approvalID, domain.ResponseQueued, now); err != nil {
 		return domain.Approval{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Approval{}, err
-	}
-	return GetApproval(ctx, db, approvalID)
+	return GetApproval(ctx, tx, approvalID)
 }
 
 // SetApprovalResponseState updates the response delivery projection.
-func SetApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state, detail string) error {
+func SetApprovalResponseState(ctx context.Context, db Queryer, approvalID, state, detail string) error {
 	_, err := db.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = ?, updated_at = ? WHERE approval_id = ?`,
 		state, detail, time.Now().UTC().Format(time.RFC3339Nano), approvalID)
 	return err
@@ -537,7 +590,7 @@ func SetApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state
 // EnsureApprovalResponseState records a response outcome even when no
 // response row was ever created (an approval invalidated at startup never
 // had a decision to seed one).
-func EnsureApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state, detail string) error {
+func EnsureApprovalResponseState(ctx context.Context, db Queryer, approvalID, state, detail string) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO approval_responses (approval_id, state, detail, updated_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(approval_id) DO UPDATE SET state = excluded.state, detail = excluded.detail, updated_at = excluded.updated_at`,

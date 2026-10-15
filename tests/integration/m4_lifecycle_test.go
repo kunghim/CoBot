@@ -142,6 +142,15 @@ func TestTeamArchiveRestoreDeleteGateOnWork(t *testing.T) {
 		t.Fatalf("reject: %v", err)
 	}
 
+	// Recruitment rejection is a real result delivered to its requester.
+	waitUntil(t, 5*time.Second, "rejection feedback", func() bool { return len(fake.Turns()) == 1 })
+	feedback := fake.Turns()[0]
+	fake.EmitTurnCompleted(feedback.ThreadID, feedback.TurnID, "completed", "feedback received")
+	waitUntil(t, 5*time.Second, "feedback run ended", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return errors.Is(err, sqlite.ErrNotFound)
+	})
+
 	// An unfinished task may exist (it survives the archive) but must block
 	// deletion later; its assignment turn must be over before archiving.
 	if _, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
@@ -149,8 +158,8 @@ func TestTeamArchiveRestoreDeleteGateOnWork(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "owner assignment turn", func() bool { return len(fake.Turns()) >= 1 })
-	fake.EmitTurnCompleted(fake.Turns()[0].ThreadID, fake.Turns()[0].TurnID, "completed", "收到")
+	waitUntil(t, 5*time.Second, "owner assignment turn", func() bool { return len(fake.Turns()) >= 2 })
+	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "收到")
 	waitUntil(t, 5*time.Second, "owner run ended", func() bool {
 		_, err := sqlite.FindActiveRun(ctx, h.app.DB, owner.ID)
 		return errors.Is(err, sqlite.ErrNotFound)
@@ -161,11 +170,11 @@ func TestTeamArchiveRestoreDeleteGateOnWork(t *testing.T) {
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "正在忙"}); err != nil {
 		t.Fatalf("busy msg: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "captain turn", func() bool { return len(fake.Turns()) >= 2 })
+	waitUntil(t, 5*time.Second, "captain turn", func() bool { return len(fake.Turns()) >= 3 })
 	if _, err := h.app.ArchiveTeam(ctx, h.user, team.ID, 0); err == nil {
 		t.Fatal("archive while a run is active must be refused")
 	}
-	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "好了")
+	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "completed", "好了")
 	waitUntil(t, 5*time.Second, "captain run ended", func() bool {
 		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
 		return errors.Is(err, sqlite.ErrNotFound)

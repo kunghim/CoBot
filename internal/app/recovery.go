@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -62,6 +63,11 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
+	// A staged filesystem preparation that lost its owner is retryable;
+	// replaying the original request returns the same reserved team.
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = 'resource_preparation_interrupted', revision = revision + 1 WHERE status = ?`, domain.TeamStatusError, domain.TeamStatusCreating); err != nil {
+		return err
+	}
 	for _, run := range runs {
 		// Keep the dead connection's turn id and epoch: they document which
 		// engine the run belonged to, which is exactly what "unknown after
@@ -116,6 +122,14 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 			return err
 		}
 		approvalIDs = append(approvalIDs, approval.ID)
+	}
+	// Decisions survive restart; an unsent native reply cannot be delivered
+	// on a different connection. Product feedback keeps its durable outbox.
+	if _, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = 'engine_epoch_changed' WHERE state = ? AND delivery_id = '' AND approval_id IN (SELECT id FROM approvals WHERE type = ?)`, domain.ResponseUnknown, domain.ResponseQueued, domain.ApprovalNativeTool); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = 'execution_outcome_unknown' WHERE state = ? AND delivery_id IN (SELECT id FROM deliveries WHERE status = ?)`, domain.ResponseUnknown, domain.ResponseQueued, domain.DeliveryUnknown); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err
@@ -174,6 +188,13 @@ func (a *App) replayStuckChainDecisions(ctx context.Context) error {
 		return err
 	}
 	for _, chain := range chains {
+		pending, err := pendingChainDecisionExists(ctx, a.DB, chain.TeamID, chain.ID)
+		if err != nil {
+			return err
+		}
+		if pending {
+			continue
+		}
 		cards, err := sqlite.ListApprovals(ctx, a.DB, chain.TeamID, domain.ApprovalStateDecided, 100)
 		if err != nil {
 			return err
@@ -183,7 +204,7 @@ func (a *App) replayStuckChainDecisions(ctx context.Context) error {
 				continue
 			}
 			var binding chainApprovalBinding
-			if json.Unmarshal(card.EngineRequestID, &binding) != nil || binding.ChainID != chain.ID {
+			if json.Unmarshal(card.EngineRequestID, &binding) != nil || binding.ChainID != chain.ID || (binding.ChainEpoch != 0 && binding.ChainEpoch != chain.Epoch) {
 				continue
 			}
 			a.Logger.Warn("replaying a chain decision whose side effect was interrupted", "chainId", chain.ID, "option", card.Decision.OptionID)
@@ -252,35 +273,55 @@ func (a *App) verifyRecoveryTurn(ctx context.Context, approval domain.Approval) 
 }
 
 func (a *App) applyVerifiedRecoveryDecision(ctx context.Context, approval domain.Approval, optionID, terminalStatus string) error {
-	var binding recoveryBinding
-	if err := json.Unmarshal(approval.EngineRequestID, &binding); err != nil || binding.RunID == "" {
-		return domain.InvalidRequest("error.recovery.binding_missing", nil)
-	}
-	if optionID != domain.RecoveryOptionContinue && optionID != domain.RecoveryOptionRerun && optionID != domain.RecoveryOptionAbandon {
-		return domain.InvalidRequest("error.approval.unknown_option", map[string]any{"optionId": optionID})
-	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	run, err := a.applyVerifiedRecoveryDecisionLocked(ctx, tx, approval, optionID, terminalStatus)
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	a.finishRecoveryDecision(ctx, run)
+	return nil
+}
+
+func (a *App) applyVerifiedRecoveryDecisionLocked(ctx context.Context, tx *sql.Tx, approval domain.Approval, optionID, terminalStatus string) (domain.Run, error) {
+	switch terminalStatus {
+	case domain.RunCompleted, domain.RunFailed, domain.RunInterrupted:
+	default:
+		return domain.Run{}, domain.Conflict("error.recovery.end_unverified", nil)
+	}
+	var binding recoveryBinding
+	if err := json.Unmarshal(approval.EngineRequestID, &binding); err != nil || binding.RunID == "" {
+		return domain.Run{}, domain.InvalidRequest("error.recovery.binding_missing", nil)
+	}
+	if optionID != domain.RecoveryOptionContinue && optionID != domain.RecoveryOptionRerun && optionID != domain.RecoveryOptionAbandon {
+		return domain.Run{}, domain.InvalidRequest("error.approval.unknown_option", map[string]any{"optionId": optionID})
+	}
 	run, err := sqlite.GetRun(ctx, tx, binding.RunID)
 	if err != nil {
-		return sqlite.NormalizeError(err)
+		return domain.Run{}, sqlite.NormalizeError(err)
 	}
-	if run.Status != domain.RunUnknown {
-		return domain.Conflict("error.recovery.not_unknown", map[string]any{"status": run.Status})
+	if run.TeamID != approval.TeamID || run.BotID != approval.RequesterBotID || run.Status != domain.RunUnknown {
+		return domain.Run{}, domain.Conflict("error.recovery.not_unknown", map[string]any{"status": run.Status})
 	}
 	// Confirming the old execution ended is the precondition for any of the
 	// three choices; without it nothing may rerun (H05).
 	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, terminalStatus,
 		run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", true); err != nil {
-		return err
+		return domain.Run{}, err
 	}
 	if binding.DeliveryID != "" {
 		delivery, err := sqlite.GetDelivery(ctx, tx, binding.DeliveryID)
 		if err != nil {
-			return sqlite.NormalizeError(err)
+			return domain.Run{}, sqlite.NormalizeError(err)
+		}
+		if delivery.RunID != run.ID || delivery.TargetBotID != run.BotID {
+			return domain.Run{}, domain.Conflict("error.recovery.binding_missing", nil)
 		}
 		switch optionID {
 		case domain.RecoveryOptionRerun:
@@ -291,21 +332,21 @@ func (a *App) applyVerifiedRecoveryDecision(ctx context.Context, approval domain
 			if delivery.Status != domain.DeliveryUnknown &&
 				delivery.Status != domain.DeliveryDispatching &&
 				delivery.Status != domain.DeliveryAccepted {
-				return domain.Conflict("error.recovery.delivery_not_rerunnable", map[string]any{"status": delivery.Status})
+				return domain.Run{}, domain.Conflict("error.recovery.delivery_not_rerunnable", map[string]any{"status": delivery.Status})
 			}
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryQueued); err != nil {
-				return err
+				return domain.Run{}, err
 			}
 			if err := sqlite.SetMessageDeliveryStatus(ctx, tx, delivery.MessageID, domain.DeliveryQueued); err != nil {
-				return err
+				return domain.Run{}, err
 			}
 		case domain.RecoveryOptionAbandon:
-			if delivery.Status == domain.DeliveryUnknown || delivery.Status == domain.DeliveryDispatching || delivery.Status == domain.DeliveryQueued {
+			if delivery.Status == domain.DeliveryUnknown || delivery.Status == domain.DeliveryDispatching || delivery.Status == domain.DeliveryQueued || delivery.Status == domain.DeliveryAccepted {
 				if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
-					return err
+					return domain.Run{}, err
 				}
 				if err := sqlite.SetMessageDeliveryStatus(ctx, tx, delivery.MessageID, domain.DeliveryCancelled); err != nil {
-					return err
+					return domain.Run{}, err
 				}
 			}
 		case domain.RecoveryOptionContinue:
@@ -319,17 +360,15 @@ func (a *App) applyVerifiedRecoveryDecision(ctx context.Context, approval domain
 		nextStatus = domain.BotStatusQueued
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, run.BotID, nextStatus, ""); err != nil {
-		return err
+		return domain.Run{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
+	return run, nil
+}
+
+func (a *App) finishRecoveryDecision(ctx context.Context, run domain.Run) {
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: run.TeamID, BotID: run.BotID, ResourceID: run.ID})
 	a.Hub.Publish()
 	if a.Scheduler != nil {
-		// Rerun reclaims the requeued delivery; continue/abandon free the
-		// queue for whatever waited behind the locked bot.
 		a.Scheduler.Wake(run.BotID)
 	}
-	return nil
 }

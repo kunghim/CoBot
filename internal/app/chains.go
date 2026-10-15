@@ -24,6 +24,7 @@ type chainApprovalBinding struct {
 	DeliveryID string `json:"deliveryId"`
 	BotID      string `json:"botId"`
 	OverLimit  bool   `json:"overLimit"`
+	ChainEpoch int64  `json:"chainEpoch,omitempty"`
 }
 
 // openChainLocked starts a new causal chain with the current settings
@@ -212,7 +213,7 @@ func (a *App) requestChainDecision(ctx context.Context, tx *sql.Tx, chain domain
 		reason = "over_limit"
 	}
 	binding, err := json.Marshal(chainApprovalBinding{
-		ChainID: chain.ID, DeliveryID: delivery.ID, BotID: delivery.TargetBotID, OverLimit: overLimit,
+		ChainID: chain.ID, DeliveryID: delivery.ID, BotID: delivery.TargetBotID, OverLimit: overLimit, ChainEpoch: chain.Epoch,
 	})
 	if err != nil {
 		return nil, err
@@ -241,80 +242,114 @@ func (a *App) requestChainDecision(ctx context.Context, tx *sql.Tx, chain domain
 // counts the bound delivery's wake and returns the chain to active; stop
 // cancels the chain's undelivered work and interrupts its executions.
 func (a *App) ApplyChainDecision(ctx context.Context, approval domain.Approval, optionID string) error {
-	var binding chainApprovalBinding
-	if err := json.Unmarshal(approval.EngineRequestID, &binding); err != nil || binding.ChainID == "" {
-		return domain.InvalidRequest("error.chain.binding_missing", nil)
-	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	effect, err := a.applyChainDecisionLocked(ctx, tx, approval, optionID)
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	a.finishChainDecision(ctx, effect)
+	return nil
+}
+
+type chainDecisionEffect struct {
+	chain     domain.Chain
+	wakeBotID string
+	accepted  []sqlite.DeliveryRecord
+}
+
+func (a *App) applyChainDecisionLocked(ctx context.Context, tx *sql.Tx, approval domain.Approval, optionID string) (effect chainDecisionEffect, err error) {
+	var binding chainApprovalBinding
+	if json.Unmarshal(approval.EngineRequestID, &binding) != nil || binding.ChainID == "" {
+		return effect, domain.InvalidRequest("error.chain.binding_missing", nil)
+	}
 	chain, err := sqlite.GetChain(ctx, tx, binding.ChainID)
 	if err != nil {
-		return sqlite.NormalizeError(err)
+		return effect, sqlite.NormalizeError(err)
 	}
-	var accepted []sqlite.DeliveryRecord
+	effect.chain = chain
+	if chain.TeamID != approval.TeamID || chain.Status != domain.ChainAwaitingApproval || (binding.ChainEpoch != 0 && binding.ChainEpoch != chain.Epoch) {
+		return effect, domain.Conflict("error.chain.decision_stale", nil)
+	}
+	delivery, err := sqlite.GetDelivery(ctx, tx, binding.DeliveryID)
+	if err != nil {
+		return effect, sqlite.NormalizeError(err)
+	}
+	if delivery.ChainID != chain.ID || delivery.TargetBotID != binding.BotID || delivery.Status != domain.DeliveryQueued {
+		return effect, domain.Conflict("error.chain.decision_stale", nil)
+	}
+	counted, err := sqlite.ChainWakeCounted(ctx, tx, chain.ID, binding.DeliveryID)
+	if err != nil {
+		return effect, err
+	}
+	if counted {
+		return effect, domain.Conflict("error.chain.decision_stale", nil)
+	}
 	switch optionID {
 	case domain.ChainOptionContinue:
 		if err := sqlite.BumpChainEpoch(ctx, tx, chain.ID); err != nil {
-			return err
+			return effect, err
 		}
 		if binding.OverLimit {
 			// The user granted exactly one more wake; the model never
 			// extends its own budget.
 			if err := sqlite.GrantChainWake(ctx, tx, binding.ChainID); err != nil {
-				return err
+				return effect, err
 			}
 		}
 		counted, err := sqlite.CountChainWake(ctx, tx, chain.ID, binding.DeliveryID, binding.DeliveryID, binding.BotID)
 		if err != nil {
-			return err
+			return effect, err
 		}
 		if counted {
 			if err := sqlite.IncrementChainWake(ctx, tx, chain.ID); err != nil {
-				return err
+				return effect, err
 			}
 		}
 		if err := sqlite.SetChainStatus(ctx, tx, chain.ID, domain.ChainActive, ""); err != nil {
-			return err
+			return effect, err
 		}
+		effect.wakeBotID = binding.BotID
 	case domain.ChainOptionStop:
 		if err := sqlite.SetChainStatus(ctx, tx, chain.ID, domain.ChainStopped, "user_stopped"); err != nil {
-			return err
+			return effect, err
 		}
 		if _, err := sqlite.CancelChainDeliveries(ctx, tx, chain.ID); err != nil {
-			return err
+			return effect, err
 		}
 		var err error
-		accepted, err = sqlite.ActiveChainDeliveries(ctx, tx, chain.ID)
+		effect.accepted, err = sqlite.ActiveChainDeliveries(ctx, tx, chain.ID)
 		if err != nil {
-			return err
+			return effect, err
 		}
 	default:
-		return domain.InvalidRequest("error.approval.unknown_option", nil)
+		return effect, domain.InvalidRequest("error.approval.unknown_option", nil)
 	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
+	return effect, nil
+}
+
+func (a *App) finishChainDecision(ctx context.Context, effect chainDecisionEffect) {
+	chain := effect.chain
 	a.recordEvent(ctx, domain.Event{Type: domain.EventChainUpdated, TeamID: chain.TeamID, ResourceID: chain.ID})
 	a.Hub.Publish()
-	if optionID == domain.ChainOptionStop {
-		// Interruption happens outside the transaction: it talks to engines.
-		for _, delivery := range accepted {
-			if delivery.RunID == "" {
-				continue
-			}
-			if _, err := a.InterruptRun(ctx, delivery.RunID); err != nil {
-				a.Logger.Warn("stop chain: interrupt failed", "chainId", chain.ID, "runId", delivery.RunID, "error", err)
-			}
+	// Interruption happens outside the transaction: it talks to engines.
+	for _, delivery := range effect.accepted {
+		if delivery.RunID == "" {
+			continue
 		}
-		return nil
+		if _, err := a.InterruptRun(ctx, delivery.RunID); err != nil {
+			a.Logger.Warn("stop chain: interrupt failed", "chainId", chain.ID, "runId", delivery.RunID, "error", err)
+		}
 	}
-	if a.Scheduler != nil && binding.BotID != "" {
-		a.Scheduler.Wake(binding.BotID)
+	if a.Scheduler != nil && effect.wakeBotID != "" {
+		a.Scheduler.Wake(effect.wakeBotID)
 	}
-	return nil
 }
 
 // chainOfRunLocked reports the causal chain of the run currently executing a

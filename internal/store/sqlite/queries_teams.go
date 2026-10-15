@@ -171,6 +171,13 @@ func InsertBot(ctx context.Context, db *sql.DB, bot domain.Bot) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := InsertBotTx(ctx, tx, bot); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func InsertBotTx(ctx context.Context, tx *sql.Tx, bot domain.Bot) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if err := insertBotRow(ctx, tx, bot, now); err != nil {
 		return err
@@ -178,7 +185,7 @@ func InsertBot(ctx context.Context, db *sql.DB, bot domain.Bot) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE teams SET revision = revision + 1, updated_at = ? WHERE id = ?`, now, bot.TeamID); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, revision, created_at`
@@ -316,7 +323,8 @@ func SetTeamStatusTx(ctx context.Context, tx *sql.Tx, teamID, status, detail str
 		status, detail, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
 		return domain.Team{}, err
 	}
-	return GetTeamByID(ctx, tx, teamID)
+	team, _, err := GetTeam(ctx, tx, teamID)
+	return team, err
 }
 
 // UnbindTeamDirectory removes the directory binding rows of a team being
@@ -413,6 +421,17 @@ func UpdateTeamName(ctx context.Context, db *sql.DB, teamID, name string, expect
 		return domain.Team{}, err
 	}
 	defer tx.Rollback()
+	team, err := UpdateTeamNameTx(ctx, tx, teamID, name, expectedRevision)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	return team, nil
+}
+
+func UpdateTeamNameTx(ctx context.Context, tx *sql.Tx, teamID, name string, expectedRevision int64) (domain.Team, error) {
 	var revision int64
 	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -427,10 +446,8 @@ func UpdateTeamName(ctx context.Context, db *sql.DB, teamID, name string, expect
 	if _, err := tx.ExecContext(ctx, `UPDATE teams SET name = ?, revision = revision + 1, updated_at = ? WHERE id = ?`, name, now, teamID); err != nil {
 		return domain.Team{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Team{}, err
-	}
-	return GetTeamByID(ctx, db, teamID)
+	team, _, err := GetTeam(ctx, tx, teamID)
+	return team, err
 }
 
 // GetTeamByID reads the team row without its directory join.

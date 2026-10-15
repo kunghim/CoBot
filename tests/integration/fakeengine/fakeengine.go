@@ -24,16 +24,17 @@ type Server struct {
 	callbacks engine.Callbacks
 
 	// Scripted behavior.
-	BeforeStartTurn func() error
-	StartTurnErr    error
-	ReplyErr        error
-	ResumeErr       error
-	TurnFacts       map[string]string // exact thread/turn -> scripted native fact
-	threads         map[string]bool
-	startedTurns    []StartedTurn
-	interrupted     []string
-	replied         []Reply
-	ShutdownCalls   int
+	BeforeStartTurn   func() error
+	StartTurnErr      error
+	ReplyErr          error
+	BeforeReplyReturn func()
+	ResumeErr         error
+	TurnFacts         map[string]string // exact thread/turn -> scripted native fact
+	threads           map[string]bool
+	startedTurns      []StartedTurn
+	interrupted       []string
+	replied           []Reply
+	ShutdownCalls     int
 }
 
 func (s *Server) SetTurnFact(threadID, turnID, status string) {
@@ -128,11 +129,16 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 // "decision kept, response unknown" path (F03) is exercised for real.
 func (s *Server) ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.ReplyErr != nil {
+		s.mu.Unlock()
 		return s.ReplyErr
 	}
 	s.replied = append(s.replied, Reply{RequestID: requestID, Response: response})
+	hook := s.BeforeReplyReturn
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	return nil
 }
 

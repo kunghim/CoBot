@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/platform"
-	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -45,6 +43,15 @@ func (a *App) ListAuthorizations() []auth.PublicBinding {
 // RevokeAuthorization invalidates every live credential of one member. The
 // bridge holding one of them fails its next call with an unknown token.
 func (a *App) RevokeAuthorization(ctx context.Context, principal auth.Principal, botID string) error {
+	cached, unlock, writeErr := beginWrite[bool](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return writeErr
+	}
+	if cached != nil {
+		return nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -53,6 +60,17 @@ func (a *App) RevokeAuthorization(ctx context.Context, principal auth.Principal,
 	}
 	if a.CollaborationTokens == nil {
 		return nil
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := a.saveWriteResult(ctx, tx, principal, true); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	a.CollaborationTokens.RevokeOfBot(botID)
 	a.recordEvent(ctx, domain.Event{Type: "authorization.revoked", BotID: botID, ResourceID: botID})
@@ -154,6 +172,16 @@ func (a *App) ListDirectoryChildren(ctx context.Context, principal auth.Principa
 // and updates the binding atomically. The old directory keeps its marker and
 // files: nothing is deleted on a move (B04/B09).
 func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal, teamID, raw string, adoptMarker bool, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		team, _, err := sqlite.GetTeam(ctx, a.DB, cached.ID)
+		return team, err
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -201,6 +229,13 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 			a.Scheduler.mu.Unlock()
 		}
 	}
+	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
+		return domain.Team{}, merr
+	} else if present && (marker.InstanceID != a.InstanceID || marker.TeamID != teamID) && !adoptMarker {
+		return domain.Team{}, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
+			"instanceId": marker.InstanceID, "directory": canon.Display,
+		})
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Team{}, err
@@ -220,29 +255,25 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
 		})
 	}
-	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
-		return domain.Team{}, merr
-	} else if present && marker.InstanceID != a.InstanceID && !adoptMarker {
-		return domain.Team{}, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
-			"instanceId": marker.InstanceID, "directory": canon.Display,
-		})
-	}
-	// The marker for the new folder is written before the binding moves, so
-	// a failure leaves the team exactly where it was.
-	if err := roles.EnsureProfileCopy(a.Paths.RolesDir()); err != nil {
-		return domain.Team{}, err
-	}
-	if err := a.writeTeamMarker(team, canon); err != nil {
-		return domain.Team{}, err
-	}
 	if err := sqlite.UpdateDirectoryBinding(ctx, tx, teamID, canon.Display, canon.Key); err != nil {
 		return domain.Team{}, err
 	}
-	updated, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusActive, "", expectedRevision)
+	updated, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusCreating, "", expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
+	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
+		return domain.Team{}, err
+	}
 	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
+		_, _ = sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusError, "resource_preparation_failed", 0)
+		return domain.Team{}, domain.Conflict("error.team.prepare_failed", nil)
+	}
+	updated, err = sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusActive, "", 0)
+	if err != nil {
 		return domain.Team{}, err
 	}
 	// Reachability is verified after the binding moved and the transaction
@@ -268,30 +299,4 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 	}
 	a.Hub.Publish()
 	return updated, nil
-}
-
-// writeTeamMarker stamps the identification marker for a team in its new
-// folder; context/resources subdirs are created so a fresh folder is usable.
-func (a *App) writeTeamMarker(team domain.Team, canon platform.CanonicalDir) error {
-	cobotDir := filepath.Join(canon.Display, ".cobot")
-	if err := os.MkdirAll(cobotDir, 0o755); err != nil {
-		return err
-	}
-	marker := TeamMarker{
-		SchemaVersion: 1, InstanceID: a.InstanceID, Profile: string(a.Paths.Environment),
-		TeamID: team.ID, Directory: canon.Display,
-	}
-	data, err := json.Marshal(marker)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(cobotDir, "team.json"), append(data, '\n'), 0o644); err != nil {
-		return err
-	}
-	for _, sub := range []string{"context", "resources"} {
-		if err := os.MkdirAll(filepath.Join(cobotDir, sub), 0o755); err != nil {
-			return err
-		}
-	}
-	return nil
 }

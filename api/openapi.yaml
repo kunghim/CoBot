@@ -98,7 +98,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, patch]
+              required: [requestId, patch, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 expectedRevision: { type: integer, format: int64 }
@@ -442,7 +442,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, name]
+              required: [requestId, name, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 name: { type: string }
@@ -468,14 +468,18 @@ paths:
         - SessionCookie: []
       summary: Soft-delete an archived team with no unfinished work; user files are never touched
       parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
         - name: id
           in: path
           required: true
           schema: { type: string }
-        - name: expectedRevision
-          in: query
-          required: false
-          schema: { type: integer, format: int64 }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
       responses:
         "200":
           description: Deleted team
@@ -506,9 +510,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
       responses:
         "200":
           description: Retried team
@@ -541,7 +546,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 expectedRevision: { type: integer, format: int64 }
@@ -577,7 +582,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 expectedRevision: { type: integer, format: int64 }
@@ -603,14 +608,18 @@ paths:
         - SessionCookie: []
       summary: Tombstone a member with no unfinished work; history is kept
       parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
         - name: id
           in: path
           required: true
           schema: { type: string }
-        - name: expectedRevision
-          in: query
-          required: false
-          schema: { type: integer, format: int64 }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
       responses:
         "200":
           description: Deleted member
@@ -675,9 +684,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
       responses:
         "200":
           description: Marker rebuilt
@@ -849,7 +859,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, optionId]
+              required: [requestId, optionId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 optionId: { type: string }
@@ -1037,7 +1047,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 evidenceIds:
@@ -1101,9 +1111,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
       responses:
         "200":
           description: Transferred task
@@ -1240,7 +1251,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 expectedRevision: { type: integer, format: int64 }
@@ -1362,6 +1373,10 @@ paths:
         - SessionCookie: []
       summary: Tombstone one memory; the same fact is never recreated automatically
       parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
         - name: id
           in: path
           required: true
@@ -1470,7 +1485,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, directory]
+              required: [requestId, directory, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 directory: { type: string }
@@ -1660,7 +1675,7 @@ components:
         title: { type: string }
         description: { type: string }
         acceptanceCriteria: { type: string }
-        status: { type: string, enum: [todo, doing, review, done, cancelled] }
+        status: { type: string, enum: [todo, doing, review, cancelled] }
         blockedReason: { type: string }
         dependencyIds:
           type: array
@@ -1745,7 +1760,7 @@ components:
         createdAt: { type: string, format: date-time }
     CreateTaskRequest:
       type: object
-      required: [requestId, title, ownerId]
+      required: [requestId, title, ownerId, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         title: { type: string }
@@ -1758,7 +1773,7 @@ components:
           items: { type: string }
     PatchTaskRequest:
       type: object
-      required: [requestId]
+      required: [requestId, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         status: { type: string, enum: [todo, doing, review, done, cancelled] }
@@ -1767,7 +1782,7 @@ components:
         expectedRevision: { type: integer, format: int64 }
     SubmitEvidenceRequest:
       type: object
-      required: [requestId, summary]
+      required: [requestId, summary, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         summary: { type: string }
@@ -1779,21 +1794,21 @@ components:
         reviewResult: { type: string }
     OfferTransferRequest:
       type: object
-      required: [requestId, toBotId]
+      required: [requestId, toBotId, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         toBotId: { type: string }
         note: { type: string }
     AnswerQuestionRequest:
       type: object
-      required: [requestId, answerText]
+      required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         answerText: { type: string }
         expectedRevision: { type: integer, format: int64 }
     CollaborationRequest:
       type: object
-      required: [requestId, tool]
+      required: [requestId, tool, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
         tool:
@@ -1817,13 +1832,13 @@ components:
             params: { type: object, additionalProperties: true }
     Envelope:
       type: object
-      required: [data, requestId]
+      required: [data, requestId, expectedRevision]
       properties:
         data: {}
         requestId: { type: string }
     ErrorEnvelope:
       type: object
-      required: [error, requestId]
+      required: [error, requestId, expectedRevision]
       properties:
         error:
           type: object
@@ -2000,18 +2015,34 @@ components:
         teamId: { type: string }
         requesterBotId: { type: string }
         runId: { type: string }
-        type: { type: string, enum: [native_tool, collaboration, recruitment, recovery, merge] }
+        type: { type: string, enum: [native_tool, collaboration, recruitment, recovery, merge, chain] }
         method: { type: string }
         summary: { type: string }
         reason: { type: string }
         options:
           type: array
           items: { $ref: "#/components/schemas/ApprovalOption" }
+        details: { $ref: "#/components/schemas/MergeApprovalDetails" }
         requestState: { type: string, enum: [pending, decided, invalidated] }
         decision: { $ref: "#/components/schemas/ApprovalDecision" }
         responseState: { type: string, enum: [queued, sent, confirmed, unknown, expired] }
         createdAt: { type: string, format: date-time }
         revision: { type: integer, format: int64 }
+    MergeApprovalDetails:
+      type: object
+      required: [taskId, taskRevision, candidateRef, targetRef, executionDirectory, evidenceIds, evidence]
+      properties:
+        taskId: { type: string }
+        taskRevision: { type: integer, format: int64 }
+        candidateRef: { type: string }
+        targetRef: { type: string }
+        executionDirectory: { type: string }
+        evidenceIds:
+          type: array
+          items: { type: string }
+        evidence:
+          type: array
+          items: { $ref: "#/components/schemas/Evidence" }
     Event:
       type: object
       required: [seq, id, instanceId, type, teamId, botId, resourceId, revision, payload, createdAt]

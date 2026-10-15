@@ -806,7 +806,7 @@ export interface components {
             description?: string;
             acceptanceCriteria?: string;
             /** @enum {string} */
-            status: "todo" | "doing" | "review" | "done" | "cancelled";
+            status: "todo" | "doing" | "review" | "cancelled";
             blockedReason?: string;
             dependencyIds?: string[];
             /** Format: int64 */
@@ -907,7 +907,7 @@ export interface components {
             blockedReason?: string;
             ownerId?: string;
             /** Format: int64 */
-            expectedRevision?: number;
+            expectedRevision: number;
         };
         SubmitEvidenceRequest: {
             /** Format: uuid */
@@ -929,7 +929,7 @@ export interface components {
             requestId: string;
             answerText: string;
             /** Format: int64 */
-            expectedRevision?: number;
+            expectedRevision: number;
         };
         CollaborationRequest: {
             /** Format: uuid */
@@ -1110,11 +1110,12 @@ export interface components {
             requesterBotId: string;
             runId?: string;
             /** @enum {string} */
-            type: "native_tool" | "collaboration" | "recruitment" | "recovery" | "merge";
+            type: "native_tool" | "collaboration" | "recruitment" | "recovery" | "merge" | "chain";
             method?: string;
             summary: string;
             reason?: string;
             options: components["schemas"]["ApprovalOption"][];
+            details?: components["schemas"]["MergeApprovalDetails"];
             /** @enum {string} */
             requestState: "pending" | "decided" | "invalidated";
             decision?: components["schemas"]["ApprovalDecision"];
@@ -1124,6 +1125,16 @@ export interface components {
             createdAt: string;
             /** Format: int64 */
             revision: number;
+        };
+        MergeApprovalDetails: {
+            taskId: string;
+            /** Format: int64 */
+            taskRevision: number;
+            candidateRef: string;
+            targetRef: string;
+            executionDirectory: string;
+            evidenceIds: string[];
+            evidence: components["schemas"]["Evidence"][];
         };
         Event: {
             /** Format: int64 */
@@ -1251,7 +1262,7 @@ export interface operations {
                     /** Format: uuid */
                     requestId: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                     patch: components["schemas"]["SettingsPatch"];
                 };
             };
@@ -1590,10 +1601,11 @@ export interface operations {
     };
     deleteTeam: {
         parameters: {
-            query?: {
-                expectedRevision?: number;
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "If-Match": number;
             };
-            header?: never;
             path: {
                 id: string;
             };
@@ -1631,7 +1643,7 @@ export interface operations {
                     requestId: string;
                     name: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -1665,6 +1677,8 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
                 };
             };
         };
@@ -1699,7 +1713,7 @@ export interface operations {
                     /** Format: uuid */
                     requestId: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -1734,7 +1748,7 @@ export interface operations {
                     /** Format: uuid */
                     requestId: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -1756,10 +1770,11 @@ export interface operations {
     };
     deleteBot: {
         parameters: {
-            query?: {
-                expectedRevision?: number;
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "If-Match": number;
             };
-            header?: never;
             path: {
                 id: string;
             };
@@ -1825,6 +1840,8 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
                 };
             };
         };
@@ -1996,7 +2013,7 @@ export interface operations {
                     optionId: string;
                     comment?: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -2171,7 +2188,7 @@ export interface operations {
                     requestId: string;
                     evidenceIds?: string[];
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -2229,6 +2246,8 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
                 };
             };
         };
@@ -2352,7 +2371,7 @@ export interface operations {
                     /** Format: uuid */
                     requestId: string;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };
@@ -2461,7 +2480,9 @@ export interface operations {
     deleteMemory: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
                 memoryId: string;
@@ -2569,7 +2590,7 @@ export interface operations {
                     directory: string;
                     adoptMarker?: boolean;
                     /** Format: int64 */
-                    expectedRevision?: number;
+                    expectedRevision: number;
                 };
             };
         };

@@ -202,7 +202,8 @@ func (s *Server) handleAcceptTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID        string `json:"requestId"`
+		ExpectedRevision int64  `json:"expectedRevision"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)

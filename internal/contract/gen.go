@@ -34,6 +34,7 @@ const (
 
 // Defines values for ApprovalType.
 const (
+	ApprovalTypeChain         ApprovalType = "chain"
 	ApprovalTypeCollaboration ApprovalType = "collaboration"
 	ApprovalTypeMerge         ApprovalType = "merge"
 	ApprovalTypeNativeTool    ApprovalType = "native_tool"
@@ -168,7 +169,6 @@ const (
 const (
 	TaskStatusCancelled TaskStatus = "cancelled"
 	TaskStatusDoing     TaskStatus = "doing"
-	TaskStatusDone      TaskStatus = "done"
 	TaskStatusReview    TaskStatus = "review"
 	TaskStatusTodo      TaskStatus = "todo"
 )
@@ -217,7 +217,7 @@ const (
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
 	AnswerText       string             `json:"answerText"`
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -225,6 +225,7 @@ type AnswerQuestionRequest struct {
 type Approval struct {
 	CreatedAt      time.Time              `json:"createdAt"`
 	Decision       *ApprovalDecision      `json:"decision,omitempty"`
+	Details        *MergeApprovalDetails  `json:"details,omitempty"`
 	Id             string                 `json:"id"`
 	Method         *string                `json:"method,omitempty"`
 	Options        []ApprovalOption       `json:"options"`
@@ -402,6 +403,17 @@ type Memory struct {
 	TeamId       string    `json:"teamId"`
 }
 
+// MergeApprovalDetails defines model for MergeApprovalDetails.
+type MergeApprovalDetails struct {
+	CandidateRef       string     `json:"candidateRef"`
+	Evidence           []Evidence `json:"evidence"`
+	EvidenceIds        []string   `json:"evidenceIds"`
+	ExecutionDirectory string     `json:"executionDirectory"`
+	TargetRef          string     `json:"targetRef"`
+	TaskId             string     `json:"taskId"`
+	TaskRevision       int64      `json:"taskRevision"`
+}
+
 // Message defines model for Message.
 type Message struct {
 	Blocks         []map[string]interface{} `json:"blocks"`
@@ -429,7 +441,7 @@ type OfferTransferRequest struct {
 // PatchTaskRequest defines model for PatchTaskRequest.
 type PatchTaskRequest struct {
 	BlockedReason    *string                 `json:"blockedReason,omitempty"`
-	ExpectedRevision *int64                  `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64                   `json:"expectedRevision"`
 	OwnerId          *string                 `json:"ownerId,omitempty"`
 	RequestId        openapi_types.UUID      `json:"requestId"`
 	Status           *PatchTaskRequestStatus `json:"status,omitempty"`
@@ -628,7 +640,7 @@ type ListApprovalsParamsState string
 // DecideApprovalJSONBody defines parameters for DecideApproval.
 type DecideApprovalJSONBody struct {
 	Comment          *string            `json:"comment,omitempty"`
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	OptionId         string             `json:"optionId"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
@@ -655,7 +667,8 @@ type RevokeAuthorizationJSONBody struct {
 
 // DeleteBotParams defines parameters for DeleteBot.
 type DeleteBotParams struct {
-	ExpectedRevision *int64 `form:"expectedRevision,omitempty" json:"expectedRevision,omitempty"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+	IfMatch        int64  `json:"If-Match"`
 }
 
 // ListCollaborationParams defines parameters for ListCollaboration.
@@ -666,6 +679,11 @@ type ListCollaborationParams struct {
 // ListMemoriesParams defines parameters for ListMemories.
 type ListMemoriesParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// DeleteMemoryParams defines parameters for DeleteMemory.
+type DeleteMemoryParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
 // ListMessagesParams defines parameters for ListMessages.
@@ -715,7 +733,7 @@ type ListQuestionsParamsStatus string
 
 // CancelQuestionJSONBody defines parameters for CancelQuestion.
 type CancelQuestionJSONBody struct {
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -732,7 +750,7 @@ type ExchangeBootstrapJSONBody struct {
 
 // UpdateSettingsJSONBody defines parameters for UpdateSettings.
 type UpdateSettingsJSONBody struct {
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	Patch            SettingsPatch      `json:"patch"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
@@ -740,7 +758,7 @@ type UpdateSettingsJSONBody struct {
 // ConfirmTaskJSONBody defines parameters for ConfirmTask.
 type ConfirmTaskJSONBody struct {
 	EvidenceIds      *[]string          `json:"evidenceIds,omitempty"`
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -756,12 +774,13 @@ type CreateTeamJSONBody struct {
 
 // DeleteTeamParams defines parameters for DeleteTeam.
 type DeleteTeamParams struct {
-	ExpectedRevision *int64 `form:"expectedRevision,omitempty" json:"expectedRevision,omitempty"`
+	IdempotencyKey string `json:"Idempotency-Key"`
+	IfMatch        int64  `json:"If-Match"`
 }
 
 // PatchTeamJSONBody defines parameters for PatchTeam.
 type PatchTeamJSONBody struct {
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	Name             string             `json:"name"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
@@ -773,7 +792,7 @@ type ListActivityParams struct {
 
 // ArchiveTeamJSONBody defines parameters for ArchiveTeam.
 type ArchiveTeamJSONBody struct {
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -787,24 +806,26 @@ type AddBotJSONBody struct {
 type RebindDirectoryJSONBody struct {
 	AdoptMarker      *bool              `json:"adoptMarker,omitempty"`
 	Directory        string             `json:"directory"`
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // RebuildTeamMarkerJSONBody defines parameters for RebuildTeamMarker.
 type RebuildTeamMarkerJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
+	ExpectedRevision int64              `json:"expectedRevision"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
 type RestoreTeamJSONBody struct {
-	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // RetryTeamJSONBody defines parameters for RetryTeam.
 type RetryTeamJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
+	ExpectedRevision int64              `json:"expectedRevision"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // ListTasksParams defines parameters for ListTasks.
@@ -815,7 +836,8 @@ type ListTasksParams struct {
 
 // AcceptTaskTransferJSONBody defines parameters for AcceptTaskTransfer.
 type AcceptTaskTransferJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
+	ExpectedRevision int64              `json:"expectedRevision"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // CancelTaskTransferJSONBody defines parameters for CancelTaskTransfer.

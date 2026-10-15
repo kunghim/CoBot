@@ -44,6 +44,27 @@ type TeamMarker struct {
 // directory marker; a preparation failure flips the team to error (retryable)
 // and never deletes the user's directory contents.
 func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in CreateTeamInput) (domain.Team, []domain.Bot, error) {
+	if principal.Write == nil && in.RequestID != "" {
+		var err error
+		principal, err = WithWriteRequest(principal, "team.create", in.RequestID, in)
+		if err != nil {
+			return domain.Team{}, nil, err
+		}
+	}
+	cached, unlock, writeErr := beginWrite[TeamWithBots](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, nil, writeErr
+	}
+	if cached != nil {
+		team, _, err := sqlite.GetTeam(ctx, a.DB, cached.Team.ID)
+		if err != nil {
+			return domain.Team{}, nil, err
+		}
+		bots, err := sqlite.ListBots(ctx, a.DB, team.ID)
+		return team, bots, err
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -70,12 +91,27 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 		return domain.Team{}, nil, domain.InvalidRequest("error.team.directory_reserved", map[string]any{"reserved": reserved})
 	}
 
+	// A marker in an unbound directory claims the folder for some team —
+	// this profile's deleted one, a moved original, or a copy (B04). Never
+	// adopt it silently: only an explicit adoptMarker overwrites it.
+	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
+		return domain.Team{}, nil, merr
+	} else if present && !in.AdoptMarker {
+		return domain.Team{}, nil, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
+			"instanceId": marker.InstanceID, "directory": canon.Display,
+		})
+	}
+
 	// Uniqueness and nesting run inside the transaction's read phase.
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Team{}, nil, err
 	}
 	defer tx.Rollback()
+	settings, err = sqlite.GetSettings(ctx, tx)
+	if err != nil {
+		return domain.Team{}, nil, err
+	}
 
 	if existing, err := sqlite.FindActiveTeamByDirectoryKey(ctx, tx, canon.Key); err == nil {
 		return domain.Team{}, nil, domain.Conflict("error.team.directory_bound", map[string]any{
@@ -89,17 +125,6 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	} else if conflict != nil {
 		return domain.Team{}, nil, domain.Conflict("error.team.directory_nested", map[string]any{
 			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
-		})
-	}
-
-	// A marker in an unbound directory claims the folder for some team —
-	// this profile's deleted one, a moved original, or a copy (B04). Never
-	// adopt it silently: only an explicit adoptMarker overwrites it.
-	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
-		return domain.Team{}, nil, merr
-	} else if present && !in.AdoptMarker {
-		return domain.Team{}, nil, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
-			"instanceId": marker.InstanceID, "directory": canon.Display,
 		})
 	}
 
@@ -149,6 +174,13 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 		if isUniqueViolation(err) {
 			return domain.Team{}, nil, domain.Conflict("error.team.directory_bound_race", nil)
 		}
+		return domain.Team{}, nil, err
+	}
+	reserved, _, err := sqlite.GetTeam(ctx, tx, team.ID)
+	if err != nil {
+		return domain.Team{}, nil, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, TeamWithBots{Team: reserved, Bots: bots}); err != nil {
 		return domain.Team{}, nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -263,6 +295,16 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 // error state (B06): no half-created bots are duplicated and the reservation
 // is reused.
 func (a *App) RetryTeamCreation(ctx context.Context, principal auth.Principal, teamID string) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		team, _, err := sqlite.GetTeam(ctx, a.DB, cached.ID)
+		return team, err
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -277,7 +319,27 @@ func (a *App) RetryTeamCreation(ctx context.Context, principal auth.Principal, t
 	if err != nil {
 		return domain.Team{}, domain.InvalidRequest("error.team.directory_invalid", nil)
 	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	expected := team.Revision
+	if principal.Write != nil && principal.Write.ExpectedRevision > 0 {
+		expected = principal.Write.ExpectedRevision
+	}
+	reserved, err := sqlite.SetTeamStatusTx(ctx, tx, team.ID, domain.TeamStatusCreating, "", expected)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, reserved); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
 	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
+		_, _ = sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusError, "resource_preparation_failed", 0)
 		return domain.Team{}, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
 	}
 	activated, err := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusActive, "", 0)
@@ -292,6 +354,15 @@ func (a *App) RetryTeamCreation(ctx context.Context, principal auth.Principal, t
 // RebuildMarker recreates the identification marker after the user deleted
 // .cobot, reporting (never deleting) lost resources.
 func (a *App) RebuildMarker(ctx context.Context, principal auth.Principal, teamID string) (map[string]any, error) {
+	cached, unlock, writeErr := beginWrite[map[string]any](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return nil, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -314,10 +385,33 @@ func (a *App) RebuildMarker(ctx context.Context, principal auth.Principal, teamI
 			}
 		}
 	}
+	intent := map[string]any{"rebuilt": false, "resourcesLost": lostResources, "state": "unknown"}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	fresh, _, err := sqlite.GetTeam(ctx, tx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	if principal.Write != nil && principal.Write.ExpectedRevision > 0 && fresh.Revision != principal.Write.ExpectedRevision {
+		return nil, domain.RevisionConflict("error.team.revision_conflict", nil)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, intent); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
 		return nil, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
 	}
-	return map[string]any{"rebuilt": true, "resourcesLost": lostResources}, nil
+	result := map[string]any{"rebuilt": true, "resourcesLost": lostResources, "state": "completed"}
+	if err := a.finishWriteIntent(ctx, principal, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // AddBot appends one member of an existing role to an active team; the user
@@ -326,18 +420,50 @@ func (a *App) AddBot(ctx context.Context, principal auth.Principal, teamID, role
 	if principal.Kind != auth.KindUser {
 		return domain.Bot{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	team, _, err := sqlite.GetTeam(ctx, a.DB, teamID)
+	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Bot{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Bot{}, err
+	}
+	defer tx.Rollback()
+	bot, err := a.addBotLocked(ctx, tx, teamID, roleID)
+	if err != nil {
+		return domain.Bot{}, err
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, bot); err != nil {
+		return domain.Bot{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Bot{}, err
+	}
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventBotAdded, TeamID: teamID, BotID: bot.ID, ResourceID: bot.ID})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID})
+	a.Hub.Publish()
+	return bot, nil
+}
+
+// Recruitment decisions and manual creation share the same transactional
+// member-limit/name/role checks; neither can bypass the other's insert.
+func (a *App) addBotLocked(ctx context.Context, tx *sql.Tx, teamID, roleID string) (domain.Bot, error) {
+	team, _, err := sqlite.GetTeam(ctx, tx, teamID)
 	if err != nil {
 		return domain.Bot{}, sqlite.NormalizeError(err)
 	}
 	if team.Status != domain.TeamStatusActive {
 		return domain.Bot{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
 	}
-	settings, err := a.GetSettings(ctx)
+	settings, err := sqlite.GetSettings(ctx, tx)
 	if err != nil {
 		return domain.Bot{}, err
 	}
-	bots, err := sqlite.ListBots(ctx, a.DB, teamID)
+	bots, err := sqlite.ListBots(ctx, tx, teamID)
 	if err != nil {
 		return domain.Bot{}, err
 	}
@@ -352,17 +478,11 @@ func (a *App) AddBot(ctx context.Context, principal auth.Principal, teamID, role
 	for _, b := range bots {
 		seen[b.Name]++
 	}
-	bot := domain.Bot{
-		ID: domain.NewID(), TeamID: teamID, Name: uniqueBotName(role.Name, seen),
-		RoleID: role.ID, RoleVersion: role.ContentVersion,
-	}
-	if err := sqlite.InsertBot(ctx, a.DB, bot); err != nil {
+	bot := domain.Bot{ID: domain.NewID(), TeamID: teamID, Name: uniqueBotName(role.Name, seen), RoleID: role.ID, RoleVersion: role.ContentVersion}
+	if err := sqlite.InsertBotTx(ctx, tx, bot); err != nil {
 		return domain.Bot{}, err
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventBotAdded, TeamID: teamID, BotID: bot.ID, ResourceID: bot.ID})
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID})
-	a.Hub.Publish()
-	return bot, nil
+	return sqlite.GetBot(ctx, tx, bot.ID)
 }
 
 // ListTeams projects the user-visible teams with their members.

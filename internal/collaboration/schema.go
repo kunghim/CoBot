@@ -72,6 +72,7 @@ func toolSchema(name string) json.RawMessage {
 		add("note", map[string]any{"type": "string", "description": "Handoff notes."}, false)
 	case "accept_transfer":
 		add("transferId", text("Offered transfer ID."), true)
+		revision()
 	case "ask_user":
 		add("question", text("Specific input needed from the user. End this work after receiving waiting."), true)
 		add("options", strings("Optional suggested answers, not security permissions."), false)

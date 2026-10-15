@@ -320,7 +320,7 @@ func TestSnapshotAndEventStream(t *testing.T) {
 	}()
 
 	// Commit an event while the stream is open.
-	if resp, body := c.patchSettings(map[string]any{"chainLimit": 9}, 0); resp.StatusCode != 200 {
+	if resp, body := c.patchSettings(map[string]any{"chainLimit": 9}, 1); resp.StatusCode != 200 {
 		t.Fatalf("patch during stream: %d %v", resp.StatusCode, body)
 	}
 

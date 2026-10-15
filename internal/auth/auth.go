@@ -281,7 +281,13 @@ type Principal struct {
 	BotID     string
 	TeamID    string
 	SessionID string
-	RunID     string // host-bound source execution; never accepted from model args
+	RunID     string        // host-bound source execution; never accepted from model args
+	Write     *WriteRequest // normalized host request, never decoded as identity
+}
+
+type WriteRequest struct {
+	Scope, Key, ArgsHash string
+	ExpectedRevision     int64
 }
 
 // The first version has a single local user; the id is stable per profile

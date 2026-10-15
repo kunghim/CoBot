@@ -33,6 +33,21 @@ type SendMessageResult struct {
 // transaction, then wakes the scheduler. A repeated requestId replays the
 // stored message; the same id with different text is a conflict.
 func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in SendMessageInput) (SendMessageResult, error) {
+	if principal.Write == nil && in.RequestID != "" {
+		var err error
+		principal, err = WithWriteRequest(principal, "message.send", in.RequestID, in)
+		if err != nil {
+			return SendMessageResult{}, err
+		}
+	}
+	cached, unlock, writeErr := beginWrite[SendMessageResult](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return SendMessageResult{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
 	if principal.Kind != auth.KindUser {
 		return SendMessageResult{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -111,6 +126,14 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 			return SendMessageResult{}, err
 		}
 	}
+	queued, err := sqlite.CountQueuedDeliveries(ctx, tx, bot.ID)
+	if err != nil {
+		return SendMessageResult{}, err
+	}
+	result := SendMessageResult{Message: message, DeliveryStatus: domain.DeliveryQueued, QueuedAhead: queued}
+	if err := a.saveWriteResult(ctx, tx, principal, result); err != nil {
+		return SendMessageResult{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return SendMessageResult{}, err
 	}
@@ -124,13 +147,21 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 	if a.Scheduler != nil {
 		a.Scheduler.Wake(bot.ID)
 	}
-	queued, _ := sqlite.CountQueuedDeliveries(ctx, a.DB, bot.ID)
-	return SendMessageResult{Message: message, DeliveryStatus: domain.DeliveryQueued, QueuedAhead: queued}, nil
+	return result, nil
 }
 
 // CancelQueuedMessage cancels a not-yet-dispatched user message. Dispatched
 // or completed work is never claimed to be retractable.
 func (a *App) CancelQueuedMessage(ctx context.Context, principal auth.Principal, messageID string) (domain.Message, error) {
+	cached, unlock, writeErr := beginWrite[domain.Message](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Message{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+
 	if principal.Kind != auth.KindUser {
 		return domain.Message{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -163,11 +194,14 @@ func (a *App) CancelQueuedMessage(ctx context.Context, principal auth.Principal,
 	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, messageID, domain.DeliveryCancelled); err != nil {
 		return domain.Message{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	updated, err := sqlite.GetMessage(ctx, tx, messageID)
+	if err != nil {
 		return domain.Message{}, err
 	}
-	updated, err := sqlite.GetMessage(ctx, a.DB, messageID)
-	if err != nil {
+	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
+		return domain.Message{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return domain.Message{}, err
 	}
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: message.TeamID, BotID: message.BotID, ResourceID: message.ID})

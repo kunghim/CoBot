@@ -23,6 +23,7 @@ type App interface {
 	GetTaskDetail(ctx context.Context, principal auth.Principal, taskID string) (map[string]any, error)
 	AssignTask(ctx context.Context, principal auth.Principal, taskID, newOwnerID string, expectedRevision int64) (domain.Task, error)
 	UpdateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64) (domain.Task, error)
+	ReportCompletion(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error)
 	SubmitEvidence(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string, candidateRef, testResult, reviewResult string) (domain.Evidence, error)
 	ConfirmTask(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error)
 	OfferTransfer(ctx context.Context, principal auth.Principal, taskID, toBotID, note string) (domain.Transfer, error)
@@ -39,7 +40,6 @@ type App interface {
 	// Write idempotency (E05): a retried side-effect call replays its stored
 	// result; the same key with different arguments is a conflict.
 	WriteReplay(ctx context.Context, scope, principal, key, argsHash string) (string, bool, error)
-	WriteReplaySave(ctx context.Context, scope, principal, key, argsHash, response string) error
 }
 
 // Dispatcher validates a bot's identity and routes one tool call onto the
@@ -123,6 +123,15 @@ func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, cal
 			return errorResult(err)
 		}
 	}
+	switch call.Name {
+	case "assign_task", "update_task", "report_completion", "confirm_task", "accept_transfer":
+		var version struct {
+			ExpectedRevision int64 `json:"expectedRevision"`
+		}
+		if json.Unmarshal(call.Arguments, &version) != nil || version.ExpectedRevision < 1 {
+			return rejected("invalid_request", "error.revision.required", nil)
+		}
+	}
 	var replayKey, replayHash string
 	if IsSideEffectTool(call.Name) && principal.Kind == auth.KindBot && principal.BotID != "" {
 		var probe struct {
@@ -141,18 +150,10 @@ func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, cal
 					return stored
 				}
 			}
+			principal.Write = &auth.WriteRequest{Scope: "mcp." + call.Name, Key: replayKey, ArgsHash: replayHash}
 		}
 	}
-	result := d.callToolOnce(ctx, principal, call)
-	// Store the outcome only for real successes: a rejected or failed call
-	// must not poison the key, so the caller can fix its input and retry.
-	if replayKey != "" && (result.Status == StatusAccepted || result.Status == StatusOK ||
-		result.Status == StatusWaiting || result.Status == StatusDuplicate) {
-		if payload, err := json.Marshal(result); err == nil {
-			_ = d.app.WriteReplaySave(ctx, "mcp."+call.Name, principal.BotID, replayKey, replayHash, string(payload))
-		}
-	}
-	return result
+	return d.callToolOnce(ctx, principal, call)
 }
 
 // canonicalArgsHash fingerprints arguments with stable key order, so a retry
@@ -388,7 +389,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
-		task, err := d.app.UpdateTaskStatus(ctx, principal, args.TaskID, domain.TaskReview, "", args.ExpectedRevision)
+		task, err := d.app.ReportCompletion(ctx, principal, args.TaskID, args.EvidenceIDs, args.ExpectedRevision)
 		if err != nil {
 			return errorResult(err)
 		}
@@ -434,8 +435,9 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 
 	case "accept_transfer":
 		var args struct {
-			TransferID string `json:"transferId"`
-			RequestID  string `json:"idempotencyKey"`
+			TransferID       string `json:"transferId"`
+			ExpectedRevision int64  `json:"expectedRevision"`
+			RequestID        string `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
 			return rejected("invalid_request", "error.invalid_json", nil)
@@ -443,6 +445,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
+		principal.Write.ExpectedRevision = args.ExpectedRevision
 		task, err := d.app.AcceptTransfer(ctx, principal, args.TransferID)
 		if err != nil {
 			return errorResult(err)

@@ -352,13 +352,42 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		tx.Rollback()
 		return err
 	}
+	if delivery.Kind == "approval_result" {
+		approval, err := sqlite.ApprovalOfDelivery(ctx, tx, delivery.ID)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if approval.Type == domain.ApprovalMerge && approval.Decision != nil && approval.Decision.OptionID == "approve" {
+			if _, err := s.app.validateMergeDecision(ctx, tx, approval); err != nil {
+				if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
+					tx.Rollback()
+					return err
+				}
+				if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryCancelled); err != nil {
+					tx.Rollback()
+					return err
+				}
+				if err := sqlite.SetApprovalResponseState(ctx, tx, approval.ID, domain.ResponseExpired, "candidate_or_evidence_changed"); err != nil {
+					tx.Rollback()
+					return err
+				}
+				if err := tx.Commit(); err != nil {
+					return err
+				}
+				s.app.publishApprovalUpdated(ctx, approval)
+				s.Wake(botID)
+				return nil
+			}
+		}
+	}
 	if delivery.TaskID != "" {
 		task, err := sqlite.GetTask(ctx, tx, delivery.TaskID)
 		if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
 			tx.Rollback()
 			return err
 		}
-		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
+		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || (task.Status == domain.TaskDone && delivery.Kind != "approval_result") || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				tx.Rollback()
 				return err

@@ -78,6 +78,17 @@ func UpdateSettings(ctx context.Context, db *sql.DB, patch domain.SettingsPatch,
 	}
 	defer tx.Rollback()
 
+	saved, err := UpdateSettingsTx(ctx, tx, patch, expectedRevision)
+	if err != nil {
+		return domain.Settings{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Settings{}, err
+	}
+	return saved, nil
+}
+
+func UpdateSettingsTx(ctx context.Context, tx *sql.Tx, patch domain.SettingsPatch, expectedRevision int64) (domain.Settings, error) {
 	current, err := GetSettings(ctx, tx)
 	if err != nil {
 		return domain.Settings{}, err
@@ -108,9 +119,6 @@ func UpdateSettings(ctx context.Context, db *sql.DB, patch domain.SettingsPatch,
 	saved, err := GetSettings(ctx, tx)
 	if err != nil {
 		return domain.Settings{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return domain.Settings{}, fmt.Errorf("commit settings: %w", err)
 	}
 	return saved, nil
 }
