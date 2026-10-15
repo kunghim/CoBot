@@ -364,10 +364,363 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project a team's task board */
+        get: operations["listTasks"];
+        put?: never;
+        /** Create a task with a unique owner */
+        post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One task with its evidence and transfer history */
+        get: operations["getTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change status, or change owner through the transfer safety rules */
+        patch: operations["patchTask"];
+        trace?: never;
+    };
+    "/api/v1/tasks/{id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a proof reference for a task */
+        post: operations["submitTaskEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm a review task as done against evidence */
+        post: operations["confirmTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{id}/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer a two-phase hand-over; the owner is unchanged until accepted */
+        post: operations["offerTaskTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept and swap the owner atomically */
+        post: operations["acceptTaskTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a live offer */
+        post: operations["cancelTaskTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page a team's user questions */
+        get: operations["listQuestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions/{id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer as the user; delivered as a user message, never an authorization */
+        post: operations["answerQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a still-open question */
+        post: operations["cancelQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/collaboration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read-only record of one member's exchanges with a peer */
+        get: operations["listCollaboration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/collaboration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The MCP bridge's only core route; identity comes from the bot token */
+        post: operations["collaborationTool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Task: {
+            id: string;
+            teamId: string;
+            ownerId: string;
+            parentId?: string;
+            title: string;
+            description?: string;
+            acceptanceCriteria?: string;
+            /** @enum {string} */
+            status: "todo" | "doing" | "review" | "done" | "cancelled";
+            blockedReason?: string;
+            dependencyIds?: string[];
+            /** Format: int64 */
+            revision: number;
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        Evidence: {
+            id: string;
+            taskId: string;
+            authorId: string;
+            summary: string;
+            artifactRefs?: string[];
+            candidateRef?: string;
+            testResult?: string;
+            reviewResult?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        Transfer: {
+            id: string;
+            taskId: string;
+            fromBotId: string;
+            toBotId: string;
+            /** Format: int64 */
+            taskRevision: number;
+            note?: string;
+            /** @enum {string} */
+            status: "offered" | "accepted" | "cancelled" | "stale";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        Question: {
+            id: string;
+            teamId: string;
+            requesterBotId: string;
+            taskId?: string;
+            runId?: string;
+            question: string;
+            options: string[];
+            /** @enum {string} */
+            status: "open" | "answered" | "cancelled";
+            answerText?: string;
+            answerMessageId?: string;
+            /** Format: int64 */
+            revision: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            answeredAt?: string;
+        };
+        Message: {
+            id: string;
+            teamId: string;
+            botId: string;
+            /** @enum {string} */
+            kind: "user" | "assistant" | "collaboration" | "system";
+            blocks: {
+                [key: string]: unknown;
+            }[];
+            requestId?: string;
+            deliveryStatus?: string;
+            runId?: string;
+            sourceBotId?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateTaskRequest: {
+            /** Format: uuid */
+            requestId: string;
+            title: string;
+            description?: string;
+            acceptanceCriteria?: string;
+            ownerId: string;
+            parentId?: string;
+            dependencyIds?: string[];
+        };
+        PatchTaskRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            status?: "todo" | "doing" | "review" | "done" | "cancelled";
+            blockedReason?: string;
+            ownerId?: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+        };
+        SubmitEvidenceRequest: {
+            /** Format: uuid */
+            requestId: string;
+            summary: string;
+            artifactRefs?: string[];
+            candidateRef?: string;
+            testResult?: string;
+            reviewResult?: string;
+        };
+        OfferTransferRequest: {
+            /** Format: uuid */
+            requestId: string;
+            toBotId: string;
+            note?: string;
+        };
+        AnswerQuestionRequest: {
+            /** Format: uuid */
+            requestId: string;
+            answerText: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+        };
+        CollaborationRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            tool: "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge";
+            arguments?: {
+                [key: string]: unknown;
+            };
+        };
+        ToolResult: {
+            /** @enum {string} */
+            status: "ok" | "accepted" | "duplicate" | "waiting" | "rejected" | "unavailable";
+            data?: {
+                [key: string]: unknown;
+            };
+            error?: {
+                code: string;
+                messageKey: string;
+                params?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
         Envelope: {
             data: unknown;
             requestId: string;
@@ -708,7 +1061,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description text/event-stream of cobot.event frames */
+            /** @description text/event-stream of cobot.event frames; each data payload is one Event */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1166,7 +1519,13 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            items?: components["schemas"]["Approval"][];
+                        };
+                    };
+                };
             };
             400: components["responses"]["Error"];
         };
@@ -1198,9 +1557,426 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Approval"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    listTasks: {
+        parameters: {
+            query?: {
+                ownerId?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            items?: components["schemas"]["Task"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Created task */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Task"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Task"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    patchTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
             409: components["responses"]["Error"];
+        };
+    };
+    submitTaskEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Evidence recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Evidence"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    confirmTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    evidenceIds?: string[];
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Confirmed task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    offerTaskTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Offered transfer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transfer"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    acceptTaskTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Transferred task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Task"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    cancelTaskTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Cancelled transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transfer"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    listQuestions: {
+        parameters: {
+            query: {
+                teamId: string;
+                status?: "open" | "answered" | "cancelled";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Questions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            items?: components["schemas"]["Question"][];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    answerQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerQuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered question */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Question"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    cancelQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Cancelled question */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Question"];
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    listCollaboration: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Collaboration messages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            items?: components["schemas"]["Message"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    collaborationTool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollaborationRequest"];
+            };
+        };
+        responses: {
+            /** @description Tool outcome; the status carries accept/reject/waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ToolResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            503: components["responses"]["Error"];
         };
     };
 }

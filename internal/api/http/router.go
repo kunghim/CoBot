@@ -81,6 +81,26 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
 	mux.HandleFunc("POST /api/v1/approvals/{id}/decisions", s.handleDecideApproval)
 
+	// Task board. Status changes and owner changes are separate app calls so
+	// the ownership safety rules cannot be bypassed by a status patch.
+	mux.HandleFunc("GET /api/v1/teams/{id}/tasks", s.handleListTasks)
+	mux.HandleFunc("POST /api/v1/teams/{id}/tasks", s.handleCreateTask)
+	mux.HandleFunc("GET /api/v1/tasks/{id}", s.handleGetTask)
+	mux.HandleFunc("PATCH /api/v1/tasks/{id}", s.handlePatchTask)
+	mux.HandleFunc("POST /api/v1/tasks/{id}/evidence", s.handleSubmitEvidence)
+	mux.HandleFunc("POST /api/v1/tasks/{id}/confirm", s.handleConfirmTask)
+	mux.HandleFunc("POST /api/v1/tasks/{id}/transfers", s.handleOfferTransfer)
+	mux.HandleFunc("POST /api/v1/transfers/{id}/accept", s.handleAcceptTransfer)
+	mux.HandleFunc("POST /api/v1/transfers/{id}/cancel", s.handleCancelTransfer)
+
+	// User questions asked by a bot.
+	mux.HandleFunc("GET /api/v1/questions", s.handleListQuestions)
+	mux.HandleFunc("POST /api/v1/questions/{id}/answers", s.handleAnswerQuestion)
+	mux.HandleFunc("POST /api/v1/questions/{id}/cancel", s.handleCancelQuestion)
+
+	// Read-only collaboration record.
+	mux.HandleFunc("GET /api/v1/bots/{id}/collaboration", s.handleListCollaboration)
+
 	// The MCP bridge's only core route. Bot identity comes from the token, so
 	// a browser session can never reach it.
 	mux.HandleFunc("POST /internal/v1/collaboration", s.handleCollaboration)

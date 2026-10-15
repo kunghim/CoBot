@@ -9,15 +9,67 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	BotTokenScopes      = "BotToken.Scopes"
+	CSRFTokenScopes     = "CSRFToken.Scopes"
+	SessionCookieScopes = "SessionCookie.Scopes"
+)
+
+// Defines values for ApprovalRequestState.
+const (
+	ApprovalRequestStateDecided     ApprovalRequestState = "decided"
+	ApprovalRequestStateInvalidated ApprovalRequestState = "invalidated"
+	ApprovalRequestStatePending     ApprovalRequestState = "pending"
+)
+
+// Defines values for ApprovalResponseState.
+const (
+	ApprovalResponseStateConfirmed ApprovalResponseState = "confirmed"
+	ApprovalResponseStateExpired   ApprovalResponseState = "expired"
+	ApprovalResponseStateQueued    ApprovalResponseState = "queued"
+	ApprovalResponseStateSent      ApprovalResponseState = "sent"
+	ApprovalResponseStateUnknown   ApprovalResponseState = "unknown"
+)
+
+// Defines values for ApprovalType.
+const (
+	ApprovalTypeCollaboration ApprovalType = "collaboration"
+	ApprovalTypeMerge         ApprovalType = "merge"
+	ApprovalTypeNativeTool    ApprovalType = "native_tool"
+	ApprovalTypeRecovery      ApprovalType = "recovery"
+	ApprovalTypeRecruitment   ApprovalType = "recruitment"
+)
+
 // Defines values for BotStatus.
 const (
-	Idle            BotStatus = "idle"
-	Interrupted     BotStatus = "interrupted"
-	Queued          BotStatus = "queued"
-	Unknown         BotStatus = "unknown"
-	WaitingApproval BotStatus = "waiting_approval"
-	WaitingInput    BotStatus = "waiting_input"
-	Working         BotStatus = "working"
+	BotStatusIdle            BotStatus = "idle"
+	BotStatusInterrupted     BotStatus = "interrupted"
+	BotStatusQueued          BotStatus = "queued"
+	BotStatusUnknown         BotStatus = "unknown"
+	BotStatusWaitingApproval BotStatus = "waiting_approval"
+	BotStatusWaitingInput    BotStatus = "waiting_input"
+	BotStatusWorking         BotStatus = "working"
+)
+
+// Defines values for CollaborationRequestTool.
+const (
+	AcceptTransfer   CollaborationRequestTool = "accept_transfer"
+	AskUser          CollaborationRequestTool = "ask_user"
+	AssignTask       CollaborationRequestTool = "assign_task"
+	ConfirmTask      CollaborationRequestTool = "confirm_task"
+	CreateTask       CollaborationRequestTool = "create_task"
+	GetContext       CollaborationRequestTool = "get_context"
+	GetTask          CollaborationRequestTool = "get_task"
+	ListRoles        CollaborationRequestTool = "list_roles"
+	ListTasks        CollaborationRequestTool = "list_tasks"
+	OfferTransfer    CollaborationRequestTool = "offer_transfer"
+	ProposeTask      CollaborationRequestTool = "propose_task"
+	ReportCompletion CollaborationRequestTool = "report_completion"
+	RequestMember    CollaborationRequestTool = "request_member"
+	RequestMerge     CollaborationRequestTool = "request_merge"
+	SendMessage      CollaborationRequestTool = "send_message"
+	SubmitEvidence   CollaborationRequestTool = "submit_evidence"
+	UpdateTask       CollaborationRequestTool = "update_task"
 )
 
 // Defines values for EngineStatusStatus.
@@ -40,6 +92,30 @@ const (
 	NotFound            ErrorEnvelopeErrorCode = "not_found"
 	RevisionConflict    ErrorEnvelopeErrorCode = "revision_conflict"
 	Unauthorized        ErrorEnvelopeErrorCode = "unauthorized"
+)
+
+// Defines values for MessageKind.
+const (
+	MessageKindAssistant     MessageKind = "assistant"
+	MessageKindCollaboration MessageKind = "collaboration"
+	MessageKindSystem        MessageKind = "system"
+	MessageKindUser          MessageKind = "user"
+)
+
+// Defines values for PatchTaskRequestStatus.
+const (
+	PatchTaskRequestStatusCancelled PatchTaskRequestStatus = "cancelled"
+	PatchTaskRequestStatusDoing     PatchTaskRequestStatus = "doing"
+	PatchTaskRequestStatusDone      PatchTaskRequestStatus = "done"
+	PatchTaskRequestStatusReview    PatchTaskRequestStatus = "review"
+	PatchTaskRequestStatusTodo      PatchTaskRequestStatus = "todo"
+)
+
+// Defines values for QuestionStatus.
+const (
+	QuestionStatusAnswered  QuestionStatus = "answered"
+	QuestionStatusCancelled QuestionStatus = "cancelled"
+	QuestionStatusOpen      QuestionStatus = "open"
 )
 
 // Defines values for SettingsBudgetScope.
@@ -80,6 +156,15 @@ const (
 	StatusProfileProduction  StatusProfile = "production"
 )
 
+// Defines values for TaskStatus.
+const (
+	TaskStatusCancelled TaskStatus = "cancelled"
+	TaskStatusDoing     TaskStatus = "doing"
+	TaskStatusDone      TaskStatus = "done"
+	TaskStatusReview    TaskStatus = "review"
+	TaskStatusTodo      TaskStatus = "todo"
+)
+
 // Defines values for TeamStatus.
 const (
 	TeamStatusActive           TeamStatus = "active"
@@ -90,11 +175,85 @@ const (
 	TeamStatusError            TeamStatus = "error"
 )
 
+// Defines values for ToolResultStatus.
+const (
+	Accepted    ToolResultStatus = "accepted"
+	Duplicate   ToolResultStatus = "duplicate"
+	Ok          ToolResultStatus = "ok"
+	Rejected    ToolResultStatus = "rejected"
+	Unavailable ToolResultStatus = "unavailable"
+	Waiting     ToolResultStatus = "waiting"
+)
+
+// Defines values for TransferStatus.
+const (
+	TransferStatusAccepted  TransferStatus = "accepted"
+	TransferStatusCancelled TransferStatus = "cancelled"
+	TransferStatusOffered   TransferStatus = "offered"
+	TransferStatusStale     TransferStatus = "stale"
+)
+
 // Defines values for ListApprovalsParamsState.
 const (
-	History ListApprovalsParamsState = "history"
-	Pending ListApprovalsParamsState = "pending"
+	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
+	ListApprovalsParamsStatePending ListApprovalsParamsState = "pending"
 )
+
+// Defines values for ListQuestionsParamsStatus.
+const (
+	Answered  ListQuestionsParamsStatus = "answered"
+	Cancelled ListQuestionsParamsStatus = "cancelled"
+	Open      ListQuestionsParamsStatus = "open"
+)
+
+// AnswerQuestionRequest defines model for AnswerQuestionRequest.
+type AnswerQuestionRequest struct {
+	AnswerText       string             `json:"answerText"`
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// Approval defines model for Approval.
+type Approval struct {
+	CreatedAt      time.Time              `json:"createdAt"`
+	Decision       *ApprovalDecision      `json:"decision,omitempty"`
+	Id             string                 `json:"id"`
+	Method         *string                `json:"method,omitempty"`
+	Options        []ApprovalOption       `json:"options"`
+	Reason         *string                `json:"reason,omitempty"`
+	RequestState   ApprovalRequestState   `json:"requestState"`
+	RequesterBotId string                 `json:"requesterBotId"`
+	ResponseState  *ApprovalResponseState `json:"responseState,omitempty"`
+	Revision       int64                  `json:"revision"`
+	RunId          *string                `json:"runId,omitempty"`
+	Summary        string                 `json:"summary"`
+	TeamId         string                 `json:"teamId"`
+	Type           ApprovalType           `json:"type"`
+}
+
+// ApprovalRequestState defines model for Approval.RequestState.
+type ApprovalRequestState string
+
+// ApprovalResponseState defines model for Approval.ResponseState.
+type ApprovalResponseState string
+
+// ApprovalType defines model for Approval.Type.
+type ApprovalType string
+
+// ApprovalDecision defines model for ApprovalDecision.
+type ApprovalDecision struct {
+	Actor     string    `json:"actor"`
+	Comment   *string   `json:"comment,omitempty"`
+	DecidedAt time.Time `json:"decidedAt"`
+	OptionId  string    `json:"optionId"`
+}
+
+// ApprovalOption defines model for ApprovalOption.
+type ApprovalOption struct {
+	Id         string  `json:"id"`
+	MessageKey *string `json:"messageKey,omitempty"`
+	Text       *string `json:"text,omitempty"`
+}
 
 // BootstrapResult defines model for BootstrapResult.
 type BootstrapResult struct {
@@ -122,6 +281,27 @@ type Bot struct {
 
 // BotStatus defines model for Bot.Status.
 type BotStatus string
+
+// CollaborationRequest defines model for CollaborationRequest.
+type CollaborationRequest struct {
+	Arguments *map[string]interface{}  `json:"arguments,omitempty"`
+	RequestId openapi_types.UUID       `json:"requestId"`
+	Tool      CollaborationRequestTool `json:"tool"`
+}
+
+// CollaborationRequestTool defines model for CollaborationRequest.Tool.
+type CollaborationRequestTool string
+
+// CreateTaskRequest defines model for CreateTaskRequest.
+type CreateTaskRequest struct {
+	AcceptanceCriteria *string            `json:"acceptanceCriteria,omitempty"`
+	DependencyIds      *[]string          `json:"dependencyIds,omitempty"`
+	Description        *string            `json:"description,omitempty"`
+	OwnerId            string             `json:"ownerId"`
+	ParentId           *string            `json:"parentId,omitempty"`
+	RequestId          openapi_types.UUID `json:"requestId"`
+	Title              string             `json:"title"`
+}
 
 // EngineStatus defines model for EngineStatus.
 type EngineStatus struct {
@@ -155,6 +335,75 @@ type ErrorEnvelope struct {
 
 // ErrorEnvelopeErrorCode defines model for ErrorEnvelope.Error.Code.
 type ErrorEnvelopeErrorCode string
+
+// Evidence defines model for Evidence.
+type Evidence struct {
+	ArtifactRefs *[]string `json:"artifactRefs,omitempty"`
+	AuthorId     string    `json:"authorId"`
+	CandidateRef *string   `json:"candidateRef,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	Id           string    `json:"id"`
+	ReviewResult *string   `json:"reviewResult,omitempty"`
+	Summary      string    `json:"summary"`
+	TaskId       string    `json:"taskId"`
+	TestResult   *string   `json:"testResult,omitempty"`
+}
+
+// Message defines model for Message.
+type Message struct {
+	Blocks         []map[string]interface{} `json:"blocks"`
+	BotId          string                   `json:"botId"`
+	CreatedAt      time.Time                `json:"createdAt"`
+	DeliveryStatus *string                  `json:"deliveryStatus,omitempty"`
+	Id             string                   `json:"id"`
+	Kind           MessageKind              `json:"kind"`
+	RequestId      *string                  `json:"requestId,omitempty"`
+	RunId          *string                  `json:"runId,omitempty"`
+	SourceBotId    *string                  `json:"sourceBotId,omitempty"`
+	TeamId         string                   `json:"teamId"`
+}
+
+// MessageKind defines model for Message.Kind.
+type MessageKind string
+
+// OfferTransferRequest defines model for OfferTransferRequest.
+type OfferTransferRequest struct {
+	Note      *string            `json:"note,omitempty"`
+	RequestId openapi_types.UUID `json:"requestId"`
+	ToBotId   string             `json:"toBotId"`
+}
+
+// PatchTaskRequest defines model for PatchTaskRequest.
+type PatchTaskRequest struct {
+	BlockedReason    *string                 `json:"blockedReason,omitempty"`
+	ExpectedRevision *int64                  `json:"expectedRevision,omitempty"`
+	OwnerId          *string                 `json:"ownerId,omitempty"`
+	RequestId        openapi_types.UUID      `json:"requestId"`
+	Status           *PatchTaskRequestStatus `json:"status,omitempty"`
+}
+
+// PatchTaskRequestStatus defines model for PatchTaskRequest.Status.
+type PatchTaskRequestStatus string
+
+// Question defines model for Question.
+type Question struct {
+	AnswerMessageId *string        `json:"answerMessageId,omitempty"`
+	AnswerText      *string        `json:"answerText,omitempty"`
+	AnsweredAt      *time.Time     `json:"answeredAt,omitempty"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	Id              string         `json:"id"`
+	Options         []string       `json:"options"`
+	Question        string         `json:"question"`
+	RequesterBotId  string         `json:"requesterBotId"`
+	Revision        int64          `json:"revision"`
+	RunId           *string        `json:"runId,omitempty"`
+	Status          QuestionStatus `json:"status"`
+	TaskId          *string        `json:"taskId,omitempty"`
+	TeamId          string         `json:"teamId"`
+}
+
+// QuestionStatus defines model for Question.Status.
+type QuestionStatus string
 
 // Settings defines model for Settings.
 type Settings struct {
@@ -222,6 +471,37 @@ type StatusEnvironment string
 // StatusProfile defines model for Status.Profile.
 type StatusProfile string
 
+// SubmitEvidenceRequest defines model for SubmitEvidenceRequest.
+type SubmitEvidenceRequest struct {
+	ArtifactRefs *[]string          `json:"artifactRefs,omitempty"`
+	CandidateRef *string            `json:"candidateRef,omitempty"`
+	RequestId    openapi_types.UUID `json:"requestId"`
+	ReviewResult *string            `json:"reviewResult,omitempty"`
+	Summary      string             `json:"summary"`
+	TestResult   *string            `json:"testResult,omitempty"`
+}
+
+// Task defines model for Task.
+type Task struct {
+	AcceptanceCriteria *string    `json:"acceptanceCriteria,omitempty"`
+	BlockedReason      *string    `json:"blockedReason,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	CreatedBy          *string    `json:"createdBy,omitempty"`
+	DependencyIds      *[]string  `json:"dependencyIds,omitempty"`
+	Description        *string    `json:"description,omitempty"`
+	Id                 string     `json:"id"`
+	OwnerId            string     `json:"ownerId"`
+	ParentId           *string    `json:"parentId,omitempty"`
+	Revision           int64      `json:"revision"`
+	Status             TaskStatus `json:"status"`
+	TeamId             string     `json:"teamId"`
+	Title              string     `json:"title"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+}
+
+// TaskStatus defines model for Task.Status.
+type TaskStatus string
+
 // Team defines model for Team.
 type Team struct {
 	CreatedAt         *time.Time `json:"createdAt,omitempty"`
@@ -244,6 +524,36 @@ type TeamWithBots struct {
 	Bots []Bot `json:"bots"`
 	Team Team  `json:"team"`
 }
+
+// ToolResult defines model for ToolResult.
+type ToolResult struct {
+	Data  *map[string]interface{} `json:"data,omitempty"`
+	Error *struct {
+		Code       string                  `json:"code"`
+		MessageKey string                  `json:"messageKey"`
+		Params     *map[string]interface{} `json:"params,omitempty"`
+	} `json:"error,omitempty"`
+	Status ToolResultStatus `json:"status"`
+}
+
+// ToolResultStatus defines model for ToolResult.Status.
+type ToolResultStatus string
+
+// Transfer defines model for Transfer.
+type Transfer struct {
+	CreatedAt    time.Time      `json:"createdAt"`
+	FromBotId    string         `json:"fromBotId"`
+	Id           string         `json:"id"`
+	Note         *string        `json:"note,omitempty"`
+	Status       TransferStatus `json:"status"`
+	TaskId       string         `json:"taskId"`
+	TaskRevision int64          `json:"taskRevision"`
+	ToBotId      string         `json:"toBotId"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+}
+
+// TransferStatus defines model for Transfer.Status.
+type TransferStatus string
 
 // Error defines model for Error.
 type Error = ErrorEnvelope
@@ -282,6 +592,11 @@ type EngineLogoutJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// ListCollaborationParams defines parameters for ListCollaboration.
+type ListCollaborationParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListMessagesParams defines parameters for ListMessages.
 type ListMessagesParams struct {
 	Before *string `form:"before,omitempty" json:"before,omitempty"`
@@ -306,6 +621,22 @@ type CancelMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// ListQuestionsParams defines parameters for ListQuestions.
+type ListQuestionsParams struct {
+	TeamId string                     `form:"teamId" json:"teamId"`
+	Status *ListQuestionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int                       `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListQuestionsParamsStatus defines parameters for ListQuestions.
+type ListQuestionsParamsStatus string
+
+// CancelQuestionJSONBody defines parameters for CancelQuestion.
+type CancelQuestionJSONBody struct {
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
 // InterruptRunJSONBody defines parameters for InterruptRun.
 type InterruptRunJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -321,6 +652,13 @@ type ExchangeBootstrapJSONBody struct {
 type UpdateSettingsJSONBody struct {
 	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
 	Patch            SettingsPatch      `json:"patch"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// ConfirmTaskJSONBody defines parameters for ConfirmTask.
+type ConfirmTaskJSONBody struct {
+	EvidenceIds      *[]string          `json:"evidenceIds,omitempty"`
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -343,6 +681,22 @@ type RebuildTeamMarkerJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// ListTasksParams defines parameters for ListTasks.
+type ListTasksParams struct {
+	OwnerId *string `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// AcceptTaskTransferJSONBody defines parameters for AcceptTaskTransfer.
+type AcceptTaskTransferJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// CancelTaskTransferJSONBody defines parameters for CancelTaskTransfer.
+type CancelTaskTransferJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DecideApprovalJSONRequestBody defines body for DecideApproval for application/json ContentType.
 type DecideApprovalJSONRequestBody DecideApprovalJSONBody
 
@@ -361,6 +715,12 @@ type SendMessageJSONRequestBody SendMessageJSONBody
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
 
+// AnswerQuestionJSONRequestBody defines body for AnswerQuestion for application/json ContentType.
+type AnswerQuestionJSONRequestBody = AnswerQuestionRequest
+
+// CancelQuestionJSONRequestBody defines body for CancelQuestion for application/json ContentType.
+type CancelQuestionJSONRequestBody CancelQuestionJSONBody
+
 // InterruptRunJSONRequestBody defines body for InterruptRun for application/json ContentType.
 type InterruptRunJSONRequestBody InterruptRunJSONBody
 
@@ -370,6 +730,18 @@ type ExchangeBootstrapJSONRequestBody ExchangeBootstrapJSONBody
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
 
+// PatchTaskJSONRequestBody defines body for PatchTask for application/json ContentType.
+type PatchTaskJSONRequestBody = PatchTaskRequest
+
+// ConfirmTaskJSONRequestBody defines body for ConfirmTask for application/json ContentType.
+type ConfirmTaskJSONRequestBody ConfirmTaskJSONBody
+
+// SubmitTaskEvidenceJSONRequestBody defines body for SubmitTaskEvidence for application/json ContentType.
+type SubmitTaskEvidenceJSONRequestBody = SubmitEvidenceRequest
+
+// OfferTaskTransferJSONRequestBody defines body for OfferTaskTransfer for application/json ContentType.
+type OfferTaskTransferJSONRequestBody = OfferTransferRequest
+
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
 
@@ -378,3 +750,15 @@ type AddBotJSONRequestBody AddBotJSONBody
 
 // RebuildTeamMarkerJSONRequestBody defines body for RebuildTeamMarker for application/json ContentType.
 type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody
+
+// CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
+type CreateTaskJSONRequestBody = CreateTaskRequest
+
+// AcceptTaskTransferJSONRequestBody defines body for AcceptTaskTransfer for application/json ContentType.
+type AcceptTaskTransferJSONRequestBody AcceptTaskTransferJSONBody
+
+// CancelTaskTransferJSONRequestBody defines body for CancelTaskTransfer for application/json ContentType.
+type CancelTaskTransferJSONRequestBody CancelTaskTransferJSONBody
+
+// CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
+type CollaborationToolJSONRequestBody = CollaborationRequest

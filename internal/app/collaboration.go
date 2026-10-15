@@ -101,8 +101,6 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	return map[string]any{"status": "accepted", "messageId": message.ID, "queuedAhead": queued}, nil
 }
 
-// ListCollaboration projects the read-only exchange between two bots of the
-// same team for either side.
 // BotOf resolves a live member row; the dispatcher uses it to prove a bridge
 // token still maps to a real bot.
 func (a *App) BotOf(ctx context.Context, botID string) (domain.Bot, error) {
@@ -122,6 +120,8 @@ func (a *App) CaptainOf(ctx context.Context, teamID string) (string, error) {
 	return team.LeaderID, nil
 }
 
+// ListCollaboration projects the read-only exchange between two bots of the
+// same team for either side.
 func (a *App) ListCollaboration(ctx context.Context, principal auth.Principal, peerBotID string, limit int) ([]domain.Message, error) {
 	var botID string
 	switch principal.Kind {
