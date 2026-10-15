@@ -74,7 +74,7 @@ func (s *Scheduler) findRunByTurn(ctx context.Context, epoch, threadID, turnID s
 func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notification) {
 	botID, err := s.app.botByThread(ctx, s.engineEpoch(teamID), n.ThreadID)
 	if err != nil {
-		s.logger.Warn("turn completion for unknown thread", "threadId", n.ThreadID)
+		s.logger.Warn("turn completion for unknown thread", "threadId", n.ThreadID, "epoch", s.engineEpoch(teamID), "err", err)
 		return
 	}
 	run, err := sqlite.FindActiveRun(ctx, s.app.DB, botID)
@@ -82,7 +82,13 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		s.logger.Warn("turn completion without active run", "threadId", n.ThreadID, "turnId", n.TurnID)
 		return
 	}
-	if n.TurnID != "" && run.ProviderTurnID != "" && run.ProviderTurnID != n.TurnID {
+	// Turn ids are only unique inside one engine epoch: a restarted app-server
+	// numbers from 1 again, so the stored id of a previous connection must not
+	// be used to judge this completion. A stale completion is one whose turn
+	// id differs from the stored one *within the same epoch*; anything from a
+	// different connection has already been invalidated as unknown, so the
+	// completion of the run that is live now is authoritative.
+	if n.TurnID != "" && run.ProviderTurnID != "" && run.EngineEpoch == s.engineEpoch(teamID) && run.ProviderTurnID != n.TurnID {
 		s.logger.Warn("ignoring stale turn completion", "threadId", n.ThreadID, "turnId", n.TurnID, "runTurnId", run.ProviderTurnID)
 		return // stale completion of an interrupted predecessor
 	}
@@ -112,7 +118,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		return
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, "", true); err != nil {
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, s.engineEpoch(teamID), "", true); err != nil {
 		return
 	}
 	if text != "" {
@@ -187,7 +193,9 @@ func (s *Scheduler) onApproval(teamID string, req engine.ApprovalRequest) {
 		return
 	}
 	if run.ID != "" {
-		if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunWaitingApproval, "", "", false); err != nil {
+		// Pausing for approval keeps the engine's own turn id: only the status
+		// changes, so the eventual turn/completed still matches this run.
+		if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunWaitingApproval, run.ProviderTurnID, run.EngineEpoch, "", false); err != nil {
 			return
 		}
 	}
@@ -273,7 +281,7 @@ func (s *Scheduler) onServerExit(teamID string, err error) {
 		if txErr != nil {
 			continue
 		}
-		if uerr := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown, "", "error.engine.connection_lost", true); uerr != nil {
+		if uerr := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown, "", "", "error.engine.connection_lost", true); uerr != nil {
 			tx.Rollback()
 			continue
 		}

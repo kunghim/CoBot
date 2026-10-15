@@ -129,7 +129,7 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 		if run, err := sqlite.GetRun(ctx, a.DB, approval.RunID); err == nil && run.Status == domain.RunWaitingApproval {
 			tx, txErr := a.DB.BeginTx(ctx, nil)
 			if txErr == nil {
-				if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, "", "", false); err == nil {
+				if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, run.ProviderTurnID, run.EngineEpoch, "", false); err == nil {
 					if err := sqlite.SetBotRunState(ctx, tx, approval.RequesterBotID, domain.BotStatusWorking, run.ID); err == nil {
 						_ = tx.Commit()
 					} else {

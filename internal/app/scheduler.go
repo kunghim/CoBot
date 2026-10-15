@@ -197,7 +197,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 
 	// Engine interaction happens outside any SQL transaction.
-	server, err := s.ensureTeamServer(ctx, team.ID, directory)
+	server, err := s.EnsureTeamServer(ctx, team.ID, directory)
 	if err != nil {
 		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.unavailable")
 	}
@@ -226,7 +226,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, turnID, "", false); err != nil {
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, turnID, server.Epoch(), "", false); err != nil {
 		return err
 	}
 	if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryAccepted); err != nil {
@@ -251,7 +251,7 @@ func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID,
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunFailed, "", errorKey, true); err != nil {
+	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunFailed, "", "", errorKey, true); err != nil {
 		return err
 	}
 	if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, domain.DeliveryUnknown); err != nil {
@@ -277,7 +277,7 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, message
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, "", "error.engine.turn_unknown", true); err != nil {
+	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, "", "", "error.engine.turn_unknown", true); err != nil {
 		return err
 	}
 	if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, domain.DeliveryUnknown); err != nil {
@@ -297,7 +297,9 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, message
 	return errors.New("turn/start outcome unknown; bot locked for verification")
 }
 
-func (s *Scheduler) ensureTeamServer(ctx context.Context, teamID, cwd string) (engine.Server, error) {
+// EnsureTeamServer returns the team's app-server, starting it on first use.
+// Exported so a test can bring a team up without dispatching a turn.
+func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (engine.Server, error) {
 	s.mu.Lock()
 	if rt, ok := s.teams[teamID]; ok {
 		s.mu.Unlock()
@@ -355,6 +357,27 @@ func (s *Scheduler) runtime(teamID string) *teamRuntime {
 func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server) (string, error) {
 	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
 		if err := server.ResumeThread(ctx, session.ProviderThreadID); err == nil {
+			// The thread now belongs to this connection, so rebind it: thread
+			// ids are only unique inside one engine, and every later lookup
+			// (approval routing, turn completion) resolves the bot by
+			// (thread, epoch). A resume on a new connection without this
+			// update would silently drop that connection's events.
+			if session.EngineEpoch != server.Epoch() {
+				tx, txErr := s.app.DB.BeginTx(ctx, nil)
+				if txErr != nil {
+					return "", txErr
+				}
+				if uerr := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
+					BotID: bot.ID, ProviderThreadID: session.ProviderThreadID,
+					EngineEpoch: server.Epoch(), Model: session.Model, ModelProvider: session.ModelProvider,
+				}); uerr != nil {
+					tx.Rollback()
+					return "", uerr
+				}
+				if cerr := tx.Commit(); cerr != nil {
+					return "", cerr
+				}
+			}
 			return session.ProviderThreadID, nil
 		}
 		// A resume failure falls through to a fresh thread; the old thread is

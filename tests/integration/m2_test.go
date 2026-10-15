@@ -1,18 +1,25 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	apihttp "github.com/kunghim/CoBot/internal/api/http"
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
@@ -29,8 +36,151 @@ type m2Harness struct {
 	user    auth.Principal
 	teamDir string
 
+	// api serves the real HTTP surface over the same app so the MCP route and
+	// the user routes can be exercised together.
+	api    *httptest.Server
+	tokens *auth.TokenStore
+	bearer string
+
 	fakeSeq int
+	epochs  map[string]string
+	fakeMu  sync.Mutex
 	onFake  func(*fakeengine.Server)
+}
+
+// ensureFake waits for the scheduler to build the team's engine. The factory
+// is the only place a fake is constructed, so a bridge credential is always
+// minted against the instance dispatch will actually report — never a twin
+// that would carry a different epoch.
+func (h *m2Harness) ensureFake(t *testing.T, teamID string) *fakeengine.Server {
+	t.Helper()
+	h.fakeMu.Lock()
+	existing := h.fakes[teamID]
+	h.fakeMu.Unlock()
+	if existing != nil {
+		return existing
+	}
+	// Bring the team's engine up now: a bridge credential must be minted
+	// against the server the scheduler really holds, and nothing else may
+	// build a second one for this team.
+	if _, err := h.app.Scheduler.EnsureTeamServer(context.Background(), teamID, h.teamDir); err != nil {
+		t.Fatalf("ensure team server: %v", err)
+	}
+	return h.fakeFor(t, teamID)
+}
+
+// epochFor returns the engine epoch for the server the scheduler is about to
+// build. A restart drops the cached epoch first, so the replacement always
+// gets a new one — the core must treat a different epoch as a different
+// connection and refuse its stale credentials.
+func (h *m2Harness) epochFor(teamID string) string {
+	h.fakeMu.Lock()
+	defer h.fakeMu.Unlock()
+	if e, ok := h.epochs[teamID]; ok {
+		return e
+	}
+	h.fakeSeq++
+	e := fmt.Sprintf("epoch-fake-%d", h.fakeSeq)
+	h.epochs[teamID] = e
+	return e
+}
+
+// resolveUnknownRun closes an unknown run as interrupted, which is what
+// recovery reports when the engine cannot be resumed.
+func (h *m2Harness) resolveUnknownRun(t *testing.T, botID string) {
+	t.Helper()
+	ctx := context.Background()
+	run, err := sqlite.FindActiveRun(ctx, h.app.DB, botID)
+	if errors.Is(err, sqlite.ErrNotFound) {
+		// Recovery is idempotent: the run may already be resolved.
+		return
+	}
+	if err != nil {
+		t.Fatalf("active run: %v", err)
+	}
+	tx, err := h.app.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunInterrupted, "", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusIdle, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// restartTeamServer simulates the team's app-server dying and a new one
+// starting, which is the only way a team reaches a second epoch: the old
+// server is gone, and every credential it minted must stop working.
+func (h *m2Harness) restartTeamServer(t *testing.T, teamID string) {
+	t.Helper()
+	h.fakeMu.Lock()
+	delete(h.epochs, teamID)
+	delete(h.fakes, teamID)
+	h.fakeMu.Unlock()
+}
+
+// botToken mints a bridge credential bound to the engine epoch the fake for
+// that team reports, which is what the core hands the spawned bridge.
+func (h *m2Harness) botToken(t *testing.T, bot domain.Bot) string {
+	t.Helper()
+	fake := h.ensureFake(t, bot.TeamID)
+	token, err := h.tokens.Issue(bot.ID, bot.TeamID, fake.Epoch())
+	if err != nil {
+		t.Fatalf("issue bot token: %v", err)
+	}
+	return token
+}
+
+// callTool drives one MCP tool through the real HTTP route, exactly as the
+// bridge does.
+func (h *m2Harness) callTool(t *testing.T, token, tool string, args map[string]any) (int, map[string]any) {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{"requestId": "req-" + tool, "tool": tool, "arguments": args})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, h.api.URL+"/internal/v1/collaboration", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bot-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("call tool %s: %v", tool, err)
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode tool response: %v", err)
+	}
+	return resp.StatusCode, out
+}
+
+// userGet drives a user route with the bearer token issued at startup.
+func (h *m2Harness) userGet(t *testing.T, path string) (int, map[string]any) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, h.api.URL+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+h.bearer)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode GET %s: %v", path, err)
+	}
+	return resp.StatusCode, out
 }
 
 func newM2Harness(t *testing.T) *m2Harness {
@@ -61,10 +211,28 @@ func newM2Harness(t *testing.T) *m2Harness {
 		DB: db, Paths: paths, Hub: events.NewHub(), InstanceID: "test-instance",
 		ServiceEpoch: "epoch-0", Version: "test", Logger: logger,
 	}
-	h := &m2Harness{t: t, app: a, fakes: map[string]*fakeengine.Server{}, user: auth.NewPrincipalUser("sess-1")}
+	tokens := auth.NewTokenStore(time.Hour)
+	a.CollaborationTokens = tokens
+	bearer := auth.NewBearerStore(time.Hour)
+	tok, err := bearer.Issue(auth.LocalUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &m2Harness{
+		t: t, app: a, tokens: tokens, bearer: tok.Token,
+		fakes: map[string]*fakeengine.Server{}, epochs: map[string]string{}, user: auth.NewPrincipalUser("sess-1"),
+	}
+	apiServer := &apihttp.Server{
+		App: a, Paths: paths, Sessions: auth.NewSessionStore(time.Hour), Bearer: bearer,
+		Issuer: auth.NewBootstrapIssuer(time.Minute), Hub: a.Hub, Logger: logger,
+		CollaborationTokens: tokens,
+		Dispatcher:          collaboration.NewDispatcher(a, tokens),
+		EngineEpochOfTeam:   a.EngineEpochOfTeam,
+	}
+	h.api = httptest.NewServer(apiServer.Handler())
+	t.Cleanup(h.api.Close)
 	sched := app.NewScheduler(a, func(spec app.ServerSpec) (engine.Server, error) {
-		h.fakeSeq++
-		fake := fakeengine.New(spec.Callbacks, fmt.Sprintf("epoch-fake-%d", h.fakeSeq))
+		fake := fakeengine.New(spec.Callbacks, h.epochFor(spec.TeamID))
 		if h.onFake != nil {
 			h.onFake(fake)
 		}
@@ -89,13 +257,68 @@ func newM2Harness(t *testing.T) *m2Harness {
 
 func (h *m2Harness) createTeam(t *testing.T, roles []string) (domain.Team, []domain.Bot) {
 	t.Helper()
+	return h.createTeamWithDir(t, "测试团队", filepath.Base(h.teamDir), roles)
+}
+
+// createTeamWithDir creates a team in its own working directory; one profile
+// binds each directory to exactly one team, so a second team needs its own.
+func (h *m2Harness) createTeamWithDir(t *testing.T, name, dirName string, roles []string) (domain.Team, []domain.Bot) {
+	t.Helper()
+	dir := filepath.Join(filepath.Dir(h.teamDir), dirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	team, bots, err := h.app.CreateTeam(context.Background(), h.user, app.CreateTeamInput{
-		Name: "测试团队", Directory: h.teamDir, InitialRoleIDs: roles,
+		Name: name, Directory: dir, InitialRoleIDs: roles,
 	})
 	if err != nil {
-		t.Fatalf("create team: %v", err)
+		t.Fatalf("create team %s: %v", name, err)
 	}
 	return team, bots
+}
+
+// queuedForBot counts the queued deliveries a bot has yet to run.
+func (h *m2Harness) queuedForBot(t *testing.T, botID string) int {
+	t.Helper()
+	n, err := sqlite.CountQueuedDeliveries(context.Background(), h.app.DB, botID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// deliveryStatusOf reads the status of a task's assignment delivery.
+func (h *m2Harness) deliveryStatusOf(t *testing.T, taskID string) string {
+	t.Helper()
+	var status string
+	err := h.app.DB.QueryRow(`SELECT d.status FROM deliveries d
+		JOIN messages m ON m.id = d.message_id WHERE m.run_id = ?`, taskID).Scan(&status)
+	if err != nil {
+		return ""
+	}
+	return status
+}
+
+// runStatusID reports the id of a bot's most recent run.
+func (h *m2Harness) runStatusID(t *testing.T, botID string) string {
+	t.Helper()
+	var id string
+	err := h.app.DB.QueryRow(`SELECT id FROM runs WHERE bot_id = ? ORDER BY started_at DESC LIMIT 1`, botID).Scan(&id)
+	if err != nil {
+		return ""
+	}
+	return id
+}
+
+// runStatus reports the status of a bot's most recent run, or "none".
+func (h *m2Harness) runStatus(t *testing.T, botID string) string {
+	t.Helper()
+	var status string
+	err := h.app.DB.QueryRow(`SELECT status FROM runs WHERE bot_id = ? ORDER BY started_at DESC LIMIT 1`, botID).Scan(&status)
+	if err != nil {
+		return "none"
+	}
+	return status
 }
 
 func waitUntil(t *testing.T, timeout time.Duration, what string, cond func() bool) {
@@ -116,6 +339,18 @@ func (h *m2Harness) fakeFor(t *testing.T, teamID string) *fakeengine.Server {
 	waitUntil(t, 5*time.Second, "team fake server", func() bool {
 		fake = h.fakes[teamID]
 		return fake != nil
+	})
+	return fake
+}
+
+// fakeGeneration waits for a server the scheduler built after the previous
+// one was dropped, which is what a restart produces.
+func (h *m2Harness) fakeGeneration(t *testing.T, teamID string, after *fakeengine.Server) *fakeengine.Server {
+	t.Helper()
+	var fake *fakeengine.Server
+	waitUntil(t, 5*time.Second, "next engine generation", func() bool {
+		fake = h.fakes[teamID]
+		return fake != nil && fake != after
 	})
 	return fake
 }
@@ -436,7 +671,9 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sqlite.UpdateRunStatus(ctx, tx, pending[0].RunID, domain.RunInterrupted, "", "", true); err != nil {
+	// Resolving a run without an engine clears the turn pair: no connection
+	// owns it any more, which is what recovery reports.
+	if err := sqlite.UpdateRunStatus(ctx, tx, pending[0].RunID, domain.RunInterrupted, "", "", "", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusIdle, ""); err != nil {
@@ -445,28 +682,40 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	// Drop the dead server before waking the bot: a message queued first
+	// would be dispatched into the crashed generation and drain the queue
+	// into a server that cannot answer.
+	prior := h.fakes[team.ID]
+	h.restartTeamServer(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "重启后的新任务"}); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, 5*time.Second, "new server generation", func() bool { return h.fakeSeq >= 2 })
+	// The app-server died. The unknown run keeps the bot locked until a human
+	// verifies it (H04), so resolve it first — this is what recovery does.
+	h.resolveUnknownRun(t, bot.ID)
 	decided2, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
 	if err == nil {
 		t.Fatal("second decision on the same approval must conflict")
 	}
 	_ = decided2
 
-	// A fresh approval issued by the NEW generation expires correctly when
-	// decided after yet another restart: create one with an old epoch.
-	fake2 := h.fakes[team.ID]
-	waitUntil(t, 5*time.Second, "second-generation turn", func() bool { return len(fake2.Turns()) >= 1 })
+	// The next turn brings up a NEW server generation, the only way a team
+	// reaches a second epoch.
+	fake2 := h.fakeGeneration(t, team.ID, prior)
+	waitUntil(t, 5*time.Second, "second-generation turn", func() bool {
+		return len(fake2.Turns()) >= 1
+	})
 	turn2 := fake2.Turns()[len(fake2.Turns())-1]
-	fake2.EmitApproval("req-appr-3", turn2.ThreadID, turn2.TurnID, "old-epoch command")
+	// Emit the approval while the turn is still live: completing the turn first
+	// would make the run terminal, and an exit then marks nothing unknown.
+	fake2.EmitApproval("req-appr-4", turn2.ThreadID, turn2.TurnID, "old-epoch command")
 	waitUntil(t, 5*time.Second, "second pending", func() bool {
 		items, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 		return len(items) == 1
 	})
 	pending2, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
-	// Kill the connection again; the decision then has no live epoch match.
+	// Crash while the approval is still pending: the run is live, so the exit
+	// marks it unknown and the later decision must expire.
 	fake2.EmitExit(errors.New("second crash"))
 	waitUntil(t, 5*time.Second, "second unknown run", func() bool {
 		r, err := sqlite.GetRun(ctx, h.app.DB, pending2[0].RunID)

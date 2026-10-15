@@ -236,15 +236,20 @@ func InsertRun(ctx context.Context, tx *sql.Tx, run domain.Run) error {
 }
 
 // UpdateRunStatus persists a run lifecycle transition.
-func UpdateRunStatus(ctx context.Context, tx *sql.Tx, runID, status, providerTurnID, errorKey string, ended bool) error {
+// UpdateRunStatus transitions one run. providerTurnID and engineEpoch are
+// always written, never coalesced: a turn id is only meaningful inside the
+// engine connection that minted it, so the row must record which connection
+// it belongs to. Passing empty values clears the stale pair rather than
+// keeping a dead connection's ids alongside a live run's status.
+func UpdateRunStatus(ctx context.Context, tx *sql.Tx, runID, status, providerTurnID, engineEpoch, errorKey string, ended bool) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if ended {
-		_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = COALESCE(NULLIF(?, ''), provider_turn_id), error_key = ?, ended_at = ? WHERE id = ?`,
-			status, providerTurnID, errorKey, now, runID)
+		_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = ?, engine_epoch = ?, error_key = ?, ended_at = ? WHERE id = ?`,
+			status, providerTurnID, engineEpoch, errorKey, now, runID)
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = COALESCE(NULLIF(?, ''), provider_turn_id) WHERE id = ?`,
-		status, providerTurnID, runID)
+	_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = ?, engine_epoch = ? WHERE id = ?`,
+		status, providerTurnID, engineEpoch, runID)
 	return err
 }
 
