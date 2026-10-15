@@ -207,6 +207,12 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			},
 		})
 	}
+	// Classify whatever the previous process left behind before the loop can
+	// claim anything: unknown runs, unknown deliveries, dead-connection
+	// approvals, and one recovery card per unresolved run (H03/H05).
+	if err := application.ReconcileAfterRestart(ctx); err != nil {
+		return nil, fmt.Errorf("reconcile after restart: %w", err)
+	}
 	scheduler.Start()
 
 	// Collaboration composition: the token store is the bridge credential

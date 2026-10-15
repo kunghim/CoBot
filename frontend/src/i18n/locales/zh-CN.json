@@ -127,6 +127,9 @@
       "decline": "拒绝",
       "permissions.deny": "拒绝",
       "chain_continue": "继续推进",
+      "recovery_continue": "继续",
+      "recovery_rerun": "重跑当前工作",
+      "recovery_abandon": "放弃",
       "chain_stop": "停止该链",
       "unknown": "未知选项"
     }
@@ -372,6 +375,10 @@
     "error.team.not_archived": "团队当前状态为 {{status}}，请先归档再删除",
     "error.team.open_work": "团队仍有未完成工作：执行 {{activeRuns}}、待处理审批 {{pendingApprovals}}、在途转交 {{offeredTransfers}}、未完成任务 {{openTasks}}、未送投递 {{queuedDeliveries}}",
     "error.bot.leader_delete": "队长不能删除；请先处理团队本身",
+    "error.run.unknown_after_restart": "上次进程退出后该执行状态未知，已锁定待核对",
+    "error.recovery.binding_missing": "恢复确认缺少执行信息，请刷新后重试",
+    "error.recovery.not_unknown": "该执行当前状态为 {{status}}，无需恢复处理",
+    "error.recovery.delivery_not_rerunnable": "该投递当前状态为 {{status}}，不能重跑",
     "error.bot.open_work": "该成员仍有未完成工作：执行 {{activeRuns}}、待处理审批 {{pendingApprovals}}、在途转交 {{offeredTransfers}}、未完成任务 {{openTasks}}、未送投递 {{queuedDeliveries}}"
   }
 }

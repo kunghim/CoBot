@@ -95,6 +95,21 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	s.mu.Unlock()
 	var errs []error
 	for teamID, rt := range teams {
+		// H01: request interruption of every in-flight turn before the engine
+		// goes down. Whatever cannot finish in the bounded window dies with
+		// its own process; the next startup's reconciliation classifies it as
+		// unknown instead of this shutdown guessing an outcome.
+		if runs, rerr := sqlite.ListActiveRunsByTeam(ctx, s.app.DB, teamID); rerr == nil {
+			for _, run := range runs {
+				session, serr := sqlite.GetProviderSession(ctx, s.app.DB, run.BotID)
+				if serr != nil || session.ProviderThreadID == "" {
+					continue
+				}
+				if ierr := rt.server.InterruptTurn(ctx, session.ProviderThreadID); ierr != nil {
+					s.logger.Warn("interrupt in-flight run on shutdown", "botId", run.BotID, "error", ierr)
+				}
+			}
+		}
 		if err := rt.server.Shutdown(ctx); err != nil {
 			s.logger.Warn("team server shutdown", "teamId", teamID, "error", err)
 			errs = append(errs, err)

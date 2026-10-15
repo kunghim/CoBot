@@ -100,6 +100,16 @@ const (
 	ApprovalMerge         = "merge"
 )
 
+// Recovery option ids on the unresolved-execution card. This build cannot
+// reattach to a previous process's execution — a live PID or a resumable
+// thread is never a takeover (H04) — so the card offers exactly the
+// capabilities that exist: continue, rerun, abandon (H05).
+const (
+	RecoveryOptionContinue = "continue"
+	RecoveryOptionRerun    = "rerun"
+	RecoveryOptionAbandon  = "abandon"
+)
+
 // Approval request states; decided history survives later invalidation.
 const (
 	ApprovalStatePending     = "pending"

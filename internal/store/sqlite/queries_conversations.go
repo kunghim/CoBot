@@ -478,6 +478,17 @@ func SetApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state
 	return err
 }
 
+// EnsureApprovalResponseState records a response outcome even when no
+// response row was ever created (an approval invalidated at startup never
+// had a decision to seed one).
+func EnsureApprovalResponseState(ctx context.Context, db *sql.DB, approvalID, state, detail string) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO approval_responses (approval_id, state, detail, updated_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(approval_id) DO UPDATE SET state = excluded.state, detail = excluded.detail, updated_at = excluded.updated_at`,
+		approvalID, state, detail, time.Now().UTC().Format(time.RFC3339Nano))
+	return err
+}
+
 // InvalidateApprovalsOfEpoch marks undecided requests of a dead connection as
 // invalidated; decided history is preserved untouched.
 func InvalidateApprovalsOfEpoch(ctx context.Context, db *sql.DB, epoch string) (int64, error) {
@@ -579,4 +590,116 @@ func ListDeliveriesByMessage(ctx context.Context, q Queryer, messageID string) (
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// ListUnresolvedRuns returns every run in a non-terminal state across all
+// teams; after a restart none of them may be taken over (H03).
+func ListUnresolvedRuns(ctx context.Context, q Queryer) ([]domain.Run, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
+		FROM runs WHERE status IN (?, ?, ?, ?, ?) ORDER BY started_at ASC`,
+		domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Run
+	for rows.Next() {
+		var r domain.Run
+		var started, ended string
+		if err := rows.Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended); err != nil {
+			return nil, err
+		}
+		r.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+		r.EndedAt, _ = time.Parse(time.RFC3339Nano, ended)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// MarkDeliveryUnknownByRun flips a claimed delivery to unknown (its turn is
+// gone with the previous process) and mirrors the message; the delivery id is
+// returned so a recovery card can bind it.
+func MarkDeliveryUnknownByRun(ctx context.Context, tx *sql.Tx, runID string) (string, error) {
+	if runID == "" {
+		return "", nil
+	}
+	var deliveryID, messageID, status string
+	err := tx.QueryRowContext(ctx, `SELECT id, message_id, status FROM deliveries WHERE run_id = ? ORDER BY created_at DESC LIMIT 1`, runID).
+		Scan(&deliveryID, &messageID, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if status != domain.DeliveryDispatching && status != domain.DeliveryAccepted {
+		return deliveryID, nil // already terminal or queued; leave the fact alone
+	}
+	if status == domain.DeliveryDispatching {
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?`,
+			domain.DeliveryUnknown, now, deliveryID); err != nil {
+			return "", err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE id = ?`,
+			domain.DeliveryUnknown, messageID); err != nil {
+			return "", err
+		}
+	}
+	return deliveryID, nil
+}
+
+// ListPendingApprovalsOfType returns undecided requests of one type across
+// teams; startup reconciliation uses it for connection-bound approvals.
+func ListPendingApprovalsOfType(ctx context.Context, q Queryer, approvalType string) ([]domain.Approval, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id FROM approvals WHERE request_state = ? AND type = ? ORDER BY created_at ASC`,
+		domain.ApprovalStatePending, approvalType)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []domain.Approval
+	for _, id := range ids {
+		approval, err := GetApproval(ctx, q, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, approval)
+	}
+	return out, nil
+}
+
+// SetApprovalRequestState moves one request's state with a revision bump
+// (used by startup invalidation; decisions keep their own CAS path).
+func SetApprovalRequestState(ctx context.Context, tx *sql.Tx, id, state string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE id = ? AND request_state = ?`,
+		state, id, domain.ApprovalStatePending); err != nil {
+		return fmt.Errorf("set approval state: %w", err)
+	}
+	return nil
+}
+
+// HasPendingRecoveryForRun keeps reconciliation idempotent: one open recovery
+// card per unresolved run, however many times the process starts.
+func HasPendingRecoveryForRun(ctx context.Context, q Queryer, runID string) (bool, error) {
+	var n int
+	pattern := `%"runId":"` + runID + `"%`
+	err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM approvals WHERE type = ? AND request_state = ? AND engine_request_id LIKE ?`,
+		domain.ApprovalRecovery, domain.ApprovalStatePending, pattern).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }

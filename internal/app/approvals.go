@@ -95,6 +95,19 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 		a.publishApprovalUpdated(ctx, approval)
 		return sqlite.GetApproval(ctx, a.DB, approvalID)
 	}
+	// A recovery card decides what happens to an execution that ended with
+	// a previous process: confirm it ended, then continue, requeue, or
+	// cancel the triggering delivery. No engine is attached to answer (H05).
+	if approval.Type == domain.ApprovalRecovery {
+		if err := a.ApplyRecoveryDecision(ctx, approval, optionID); err != nil {
+			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "recovery_decision_failed")
+			a.publishApprovalUpdated(ctx, approval)
+			return domain.Approval{}, err
+		}
+		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, "recovery_resolved")
+		a.publishApprovalUpdated(ctx, approval)
+		return sqlite.GetApproval(ctx, a.DB, approvalID)
+	}
 	// A recruitment approval has a product side effect instead of an engine
 	// reply: only an approval creates the member, so a rejected or expired
 	// request never leaves a runnable bot behind.

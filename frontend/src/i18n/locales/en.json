@@ -127,6 +127,9 @@
       "decline": "Decline",
       "permissions.deny": "Deny",
       "chain_continue": "Continue",
+      "recovery_continue": "Continue",
+      "recovery_rerun": "Rerun current work",
+      "recovery_abandon": "Abandon",
       "chain_stop": "Stop this chain",
       "unknown": "Unknown option"
     }
@@ -372,6 +375,10 @@
     "error.team.not_archived": "Team status is {{status}}; archive the team before deleting it",
     "error.team.open_work": "The team still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}",
     "error.bot.leader_delete": "The captain cannot be deleted; remove the team instead",
+    "error.run.unknown_after_restart": "This execution is unresolved after the previous process exited and is locked for verification",
+    "error.recovery.binding_missing": "This recovery card is missing its execution binding; refresh and retry",
+    "error.recovery.not_unknown": "The execution is {{status}} and needs no recovery decision",
+    "error.recovery.delivery_not_rerunnable": "The delivery is {{status}} and cannot be rerun",
     "error.bot.open_work": "This member still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}"
   }
 }
