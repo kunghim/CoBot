@@ -55,6 +55,13 @@ var objectSchema = json.RawMessage(`{"type": "object"}`)
 
 // Run serves the MCP stdio transport until the client disconnects.
 func (b *Bridge) Run(ctx context.Context) error {
+	return b.Serve(ctx, &mcp.StdioTransport{})
+}
+
+// Serve runs the bridge on an arbitrary transport. Run wires stdio, which is
+// what the engine spawns; tests drive the same registration through an
+// in-memory transport so the protocol framing is exercised for real.
+func (b *Bridge) Serve(ctx context.Context, transport mcp.Transport) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "cobot-collaboration", Version: "0.1.0"}, &mcp.ServerOptions{
 		// The tool descriptions are the model's only view of what it may do,
 		// so they state the permission and idempotency rules explicitly.
@@ -62,7 +69,7 @@ func (b *Bridge) Run(ctx context.Context) error {
 			"权限由宿主校验，调用被拒绝时如实返回 rejected，不会假装成功。",
 	})
 	b.register(server)
-	return server.Run(ctx, &mcp.StdioTransport{})
+	return server.Run(ctx, transport)
 }
 
 // register adds every collaboration tool with its schema.
@@ -145,6 +152,11 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 		return toolFailure(te.Status, te.MessageKey, te.Params), nil, nil
 	}
 	result := envelope.Data
+	// A rejection is a failed call the model must be able to read, not a
+	// success with a status field buried in the payload.
+	if result.Status == StatusRejected || result.Status == StatusUnavailable {
+		return toolFailure(result.Status, errorKeyOf(result), paramsOf(result)), nil, nil
+	}
 	text, err := json.Marshal(result)
 	if err != nil {
 		return toolFailure(StatusUnavailable, "error.internal", nil), nil, nil
@@ -203,3 +215,20 @@ func newRequest(ctx context.Context, endpoint, token string, body []byte) (*http
 }
 
 var _ = errors.Is
+
+// errorKeyOf extracts the i18n key from a structured tool error, falling back
+// to the status so the model never receives an empty reason.
+func errorKeyOf(r ToolResult) string {
+	if r.Error != nil && r.Error.MessageKey != "" {
+		return r.Error.MessageKey
+	}
+	return "error.internal"
+}
+
+// paramsOf carries the structured error parameters into the rendered result.
+func paramsOf(r ToolResult) map[string]any {
+	if r.Error != nil {
+		return r.Error.Params
+	}
+	return nil
+}
