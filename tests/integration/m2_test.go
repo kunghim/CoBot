@@ -407,6 +407,8 @@ func (h *m2Harness) fakeFor(t *testing.T, teamID string) *fakeengine.Server {
 	t.Helper()
 	var fake *fakeengine.Server
 	waitUntil(t, 5*time.Second, "team fake server", func() bool {
+		h.fakeMu.Lock()
+		defer h.fakeMu.Unlock()
 		fake = h.fakes[teamID]
 		return fake != nil
 	})
@@ -419,6 +421,8 @@ func (h *m2Harness) fakeGeneration(t *testing.T, teamID string, after *fakeengin
 	t.Helper()
 	var fake *fakeengine.Server
 	waitUntil(t, 5*time.Second, "next engine generation", func() bool {
+		h.fakeMu.Lock()
+		defer h.fakeMu.Unlock()
 		fake = h.fakes[teamID]
 		return fake != nil && fake != after
 	})
@@ -763,7 +767,9 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	// Drop the dead server before waking the bot: a message queued first
 	// would be dispatched into the crashed generation and drain the queue
 	// into a server that cannot answer.
+	h.fakeMu.Lock()
 	prior := h.fakes[team.ID]
+	h.fakeMu.Unlock()
 	h.restartTeamServer(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "重启后的新任务"}); err != nil {
 		t.Fatal(err)

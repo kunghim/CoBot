@@ -54,7 +54,8 @@ if ($LASTEXITCODE -ne 0) { throw "go build after asset build failed" }
 
 if ($Desktop) {
     Write-Host "==> desktop shell compile (tags=desktop)"
-    go build -tags desktop ./cmd/cobot-desktop
+    New-Item -ItemType Directory -Force -Path ".tmp/bin" | Out-Null
+    go build -tags desktop -o .tmp/bin/check-cobot-desktop.exe ./cmd/cobot-desktop
     if ($LASTEXITCODE -ne 0) { throw "desktop build failed" }
 }
 

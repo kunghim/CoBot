@@ -46,7 +46,8 @@ go build ./...
 
 if [ "${1:-}" = "--desktop" ]; then
   echo "==> desktop shell compile (tags=desktop)"
-  go build -tags desktop ./cmd/cobot-desktop
+  mkdir -p .tmp/bin
+  go build -tags desktop -o .tmp/bin/check-cobot-desktop ./cmd/cobot-desktop
 fi
 
 echo "==> check passed"

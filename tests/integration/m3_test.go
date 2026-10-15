@@ -420,9 +420,17 @@ func TestWriteIdempotencyReplaysAndRejectsKeyReuse(t *testing.T) {
 	team, bots := h.createTeam(t, []string{"backend-dev"})
 	captain := bots[0]
 	token := h.botToken(t, captain)
+	// All retries belong to one model turn. Ending a simulated turn between
+	// calls lets the scheduler legitimately claim the new self-assignment.
+	binding, err := h.tokens.Resolve(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, cleanup := h.scriptExecution(t, binding)
+	defer cleanup()
 
 	create := func(title string) (int, map[string]any) {
-		return h.callTool(t, token, "create_task", map[string]any{
+		return h.callToolRaw(t, token, "create_task", map[string]any{
 			"title": title, "ownerId": captain.ID, "idempotencyKey": "e05-key",
 		})
 	}
