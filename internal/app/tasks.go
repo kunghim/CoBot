@@ -583,8 +583,14 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 	if err != nil {
 		return domain.Evidence{}, err
 	}
-	if principal.Kind == auth.KindBot && (fresh.OwnerID != principal.BotID || fresh.TeamID != principal.TeamID) {
-		return domain.Evidence{}, domain.Forbidden("error.task.owner_only", nil)
+	if principal.Kind == auth.KindBot {
+		team, _, err := sqlite.GetTeam(ctx, tx, fresh.TeamID)
+		if err != nil {
+			return domain.Evidence{}, err
+		}
+		if fresh.TeamID != principal.TeamID || (fresh.OwnerID != principal.BotID && team.LeaderID != principal.BotID) {
+			return domain.Evidence{}, domain.Forbidden("error.task.owner_or_captain", nil)
+		}
 	}
 	if fresh.Status == domain.TaskCancelled || fresh.Status == domain.TaskDone {
 		return domain.Evidence{}, domain.Conflict("error.task.terminal", nil)

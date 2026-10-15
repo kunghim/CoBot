@@ -8,9 +8,27 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
+
+func TestCaptainCanSubmitReviewEvidenceForMemberTask(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "reviewed candidate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	captain := auth.NewPrincipalBot(bots[0].ID, team.ID)
+	if _, err := h.app.SubmitEvidence(ctx, captain, task.ID, "Independent review reported by reviewer", []string{}, "candidate", "", "review passed"); err != nil {
+		t.Fatal("captain lost evidence permission", err)
+	}
+	if _, err := h.app.SubmitEvidence(ctx, auth.NewPrincipalBot(bots[2].ID, team.ID), task.ID, "unowned evidence", nil, "candidate", "", "review"); err == nil {
+		t.Fatal("unrelated member bypassed evidence ownership")
+	}
+}
 
 func TestAssignmentCarriesFullTaskRequirementsAndIdentity(t *testing.T) {
 	h := newM2Harness(t)
