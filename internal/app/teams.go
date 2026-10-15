@@ -24,6 +24,10 @@ type CreateTeamInput struct {
 	InitialRoleIDs   []string
 	RequestID        string
 	ExpectedRevision int64
+	// AdoptMarker confirms the user's explicit choice to claim a directory
+	// that already carries a team marker (B04): without it the product
+	// refuses rather than adopting or overwriting another claim.
+	AdoptMarker bool
 }
 
 // TeamMarker is the on-disk identification file inside <teamDir>/.cobot.
@@ -85,6 +89,17 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	} else if conflict != nil {
 		return domain.Team{}, nil, domain.Conflict("error.team.directory_nested", map[string]any{
 			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
+		})
+	}
+
+	// A marker in an unbound directory claims the folder for some team —
+	// this profile's deleted one, a moved original, or a copy (B04). Never
+	// adopt it silently: only an explicit adoptMarker overwrites it.
+	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
+		return domain.Team{}, nil, merr
+	} else if present && !in.AdoptMarker {
+		return domain.Team{}, nil, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
+			"instanceId": marker.InstanceID, "directory": canon.Display,
 		})
 	}
 

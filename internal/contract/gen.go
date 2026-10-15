@@ -592,6 +592,11 @@ type EngineLogoutJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// DeleteBotParams defines parameters for DeleteBot.
+type DeleteBotParams struct {
+	ExpectedRevision *int64 `form:"expectedRevision,omitempty" json:"expectedRevision,omitempty"`
+}
+
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -664,10 +669,30 @@ type ConfirmTaskJSONBody struct {
 
 // CreateTeamJSONBody defines parameters for CreateTeam.
 type CreateTeamJSONBody struct {
+	// AdoptMarker Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently.
+	AdoptMarker    *bool              `json:"adoptMarker,omitempty"`
 	Directory      string             `json:"directory"`
 	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
 	Name           string             `json:"name"`
 	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// DeleteTeamParams defines parameters for DeleteTeam.
+type DeleteTeamParams struct {
+	ExpectedRevision *int64 `form:"expectedRevision,omitempty" json:"expectedRevision,omitempty"`
+}
+
+// PatchTeamJSONBody defines parameters for PatchTeam.
+type PatchTeamJSONBody struct {
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	Name             string             `json:"name"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// ArchiveTeamJSONBody defines parameters for ArchiveTeam.
+type ArchiveTeamJSONBody struct {
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // AddBotJSONBody defines parameters for AddBot.
@@ -679,6 +704,12 @@ type AddBotJSONBody struct {
 // RebuildTeamMarkerJSONBody defines parameters for RebuildTeamMarker.
 type RebuildTeamMarkerJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// RestoreTeamJSONBody defines parameters for RestoreTeam.
+type RestoreTeamJSONBody struct {
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // ListTasksParams defines parameters for ListTasks.
@@ -745,11 +776,20 @@ type OfferTaskTransferJSONRequestBody = OfferTransferRequest
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
 
+// PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
+type PatchTeamJSONRequestBody PatchTeamJSONBody
+
+// ArchiveTeamJSONRequestBody defines body for ArchiveTeam for application/json ContentType.
+type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
+
 // AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
 type AddBotJSONRequestBody AddBotJSONBody
 
 // RebuildTeamMarkerJSONRequestBody defines body for RebuildTeamMarker for application/json ContentType.
 type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody
+
+// RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
+type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest

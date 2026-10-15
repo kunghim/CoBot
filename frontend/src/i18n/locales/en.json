@@ -367,6 +367,11 @@
     "error.memory.body_required": "Memory body cannot be empty",
     "error.memory.too_long": "Memory is too long: at most {{max}} characters",
     "error.memory.looks_secret": "The body looks like a secret (key/password) and was refused; store working methods and preferences only",
-    "error.memory.duplicate": "The same memory already exists and is not recorded twice"
+    "error.memory.duplicate": "The same memory already exists and is not recorded twice",
+    "error.team.marker_adopt_required": "This directory already carries a team marker (instance {{instanceId}}) and is never adopted silently; retry with adopt-marker to claim it as a new team",
+    "error.team.not_archived": "Team status is {{status}}; archive the team before deleting it",
+    "error.team.open_work": "The team still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}",
+    "error.bot.leader_delete": "The captain cannot be deleted; remove the team instead",
+    "error.bot.open_work": "This member still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}"
   }
 }

@@ -297,3 +297,182 @@ func ListDirectoryBindings(ctx context.Context, q Queryer) ([]DirectoryBinding, 
 	}
 	return out, rows.Err()
 }
+
+// UnbindTeamDirectory removes the directory binding rows of a team being
+// deleted. User files on disk are never touched here (B09).
+func UnbindTeamDirectory(ctx context.Context, tx *sql.Tx, teamID string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM directory_bindings WHERE team_id = ?`, teamID); err != nil {
+		return fmt.Errorf("unbind directory: %w", err)
+	}
+	return nil
+}
+
+// SoftDeleteBotsOfTeam tombstones every member of a deleted team; rows stay
+// for audit and history (B09).
+func SoftDeleteBotsOfTeam(ctx context.Context, tx *sql.Tx, teamID string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `UPDATE bots SET deleted_at = ? WHERE team_id = ? AND deleted_at = ''`, now, teamID); err != nil {
+		return fmt.Errorf("soft delete bots: %w", err)
+	}
+	return nil
+}
+
+// SoftDeleteBot tombstones one member with optimistic revision.
+func SoftDeleteBot(ctx context.Context, tx *sql.Tx, botID string, expectedRevision int64) error {
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM bots WHERE id = ?`, botID).Scan(&revision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if expectedRevision > 0 && revision != expectedRevision {
+		return domain.RevisionConflict("error.settings.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := tx.ExecContext(ctx, `UPDATE bots SET deleted_at = ?, revision = revision + 1 WHERE id = ? AND deleted_at = ''`, now, botID)
+	if err != nil {
+		return fmt.Errorf("soft delete bot: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CancelQueuedDeliveriesByTeam cancels the still-undelivered work of a team
+// (or one target bot when botID is set), mirroring each delivery's status
+// onto its message so the records stay consistent.
+func CancelQueuedDeliveriesByTeam(ctx context.Context, tx *sql.Tx, teamID, botID string) (int64, error) {
+	query := `SELECT id, message_id FROM deliveries WHERE status IN (?, ?)`
+	args := []any{domain.DeliveryQueued, domain.DeliveryWaitingDependency}
+	if botID != "" {
+		query += ` AND target_bot_id = ?`
+		args = append(args, botID)
+	} else {
+		query += ` AND team_id = ?`
+		args = append(args, teamID)
+	}
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	type pending struct{ deliveryID, messageID string }
+	var items []pending
+	for rows.Next() {
+		var p pending
+		if err := rows.Scan(&p.deliveryID, &p.messageID); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		items = append(items, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, item := range items {
+		if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?`,
+			domain.DeliveryCancelled, now, item.deliveryID); err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE id = ?`,
+			domain.DeliveryCancelled, item.messageID); err != nil {
+			return 0, err
+		}
+	}
+	return int64(len(items)), nil
+}
+
+// UpdateTeamName renames a team with optimistic revision.
+func UpdateTeamName(ctx context.Context, db *sql.DB, teamID, name string, expectedRevision int64) (domain.Team, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Team{}, ErrNotFound
+		}
+		return domain.Team{}, err
+	}
+	if expectedRevision > 0 && revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET name = ?, revision = revision + 1, updated_at = ? WHERE id = ?`, name, now, teamID); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	return GetTeamByID(ctx, db, teamID)
+}
+
+// GetTeamByID reads the team row without its directory join.
+func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error) {
+	var t domain.Team
+	var created, updated string
+	err := q.QueryRowContext(ctx, `SELECT `+prefixedTeamColumns("t")+` FROM teams t WHERE t.id = ?`, id).
+		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Team{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Team{}, err
+	}
+	t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	t.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
+	return t, nil
+}
+
+// OpenWorkCounts is the "unfinished work" census that gates archive and
+// delete decisions (B08/B09).
+type OpenWorkCounts struct {
+	ActiveRuns       int64 `json:"activeRuns"`
+	PendingApprovals int64 `json:"pendingApprovals"`
+	OfferedTransfers int64 `json:"offeredTransfers"`
+	OpenTasks        int64 `json:"openTasks"`
+	QueuedDeliveries int64 `json:"queuedDeliveries"`
+}
+
+// TeamOpenWork counts a team's blocking work.
+func TeamOpenWork(ctx context.Context, q Queryer, teamID string) (OpenWorkCounts, error) {
+	var c OpenWorkCounts
+	err := q.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM runs WHERE team_id = ? AND status IN (?, ?, ?, ?, ?)),
+		(SELECT COUNT(*) FROM approvals WHERE team_id = ? AND request_state = 'pending'),
+		(SELECT COUNT(*) FROM transfers t JOIN tasks k ON k.id = t.task_id WHERE k.team_id = ? AND t.status = 'offered'),
+		(SELECT COUNT(*) FROM tasks WHERE team_id = ? AND status NOT IN ('done', 'cancelled')),
+		(SELECT COUNT(*) FROM deliveries WHERE team_id = ? AND status IN (?, ?))`,
+		teamID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
+		teamID, teamID, teamID, teamID,
+		domain.DeliveryQueued, domain.DeliveryWaitingDependency).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries)
+	if err != nil {
+		return OpenWorkCounts{}, err
+	}
+	return c, nil
+}
+
+// BotOpenWork counts the blocking work of one member (B08).
+func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, error) {
+	var c OpenWorkCounts
+	err := q.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM runs WHERE bot_id = ? AND status IN (?, ?, ?, ?, ?)),
+		(SELECT COUNT(*) FROM approvals WHERE requester_bot_id = ? AND request_state = 'pending'),
+		(SELECT COUNT(*) FROM transfers WHERE (from_bot_id = ? OR to_bot_id = ?) AND status = 'offered'),
+		(SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND status NOT IN ('done', 'cancelled')),
+		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?))`,
+		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
+		botID, botID, botID, botID,
+		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries)
+	if err != nil {
+		return OpenWorkCounts{}, err
+	}
+	return c, nil
+}

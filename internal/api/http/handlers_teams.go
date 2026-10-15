@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -12,6 +13,7 @@ type createTeamRequest struct {
 	Name           string   `json:"name"`
 	Directory      string   `json:"directory"`
 	InitialRoleIDs []string `json:"initialRoleIds"`
+	AdoptMarker    bool     `json:"adoptMarker,omitempty"`
 }
 
 func (s *Server) handleListTeams(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +41,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	team, bots, err := s.App.CreateTeam(r.Context(), principal, app.CreateTeamInput{
 		Name: req.Name, Directory: req.Directory, InitialRoleIDs: req.InitialRoleIDs, RequestID: req.RequestID,
+		AdoptMarker: req.AdoptMarker,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -139,3 +142,119 @@ func (s *Server) handleListRoles(w http.ResponseWriter, r *http.Request) {
 func pathTeamID(r *http.Request) string { return r.PathValue("id") }
 
 var _ = domain.Team{}
+
+// handlePatchTeam renames a team; ownership changes are never part of a
+// generic patch.
+func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID        string `json:"requestId"`
+		Name             string `json:"name"`
+		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	var expected int64
+	if req.ExpectedRevision != nil {
+		expected = *req.ExpectedRevision
+	}
+	team, err := s.App.PatchTeamName(r.Context(), principal, r.PathValue("id"), req.Name, expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, team)
+}
+
+// handleArchiveTeam pauses dispatch for a team without touching its work.
+func (s *Server) handleArchiveTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID        string `json:"requestId"`
+		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	var expected int64
+	if req.ExpectedRevision != nil {
+		expected = *req.ExpectedRevision
+	}
+	team, err := s.App.ArchiveTeam(r.Context(), principal, r.PathValue("id"), expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, team)
+}
+
+// handleRestoreTeam resumes an archived team.
+func (s *Server) handleRestoreTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID        string `json:"requestId"`
+		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	var expected int64
+	if req.ExpectedRevision != nil {
+		expected = *req.ExpectedRevision
+	}
+	team, err := s.App.RestoreTeam(r.Context(), principal, r.PathValue("id"), expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, team)
+}
+
+// handleDeleteTeam soft-deletes an archived, work-free team; user files stay.
+func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var expected int64
+	if raw := r.URL.Query().Get("expectedRevision"); raw != "" {
+		expected, _ = strconv.ParseInt(raw, 10, 64)
+	}
+	team, err := s.App.DeleteTeam(r.Context(), principal, r.PathValue("id"), expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, team)
+}
+
+// handleDeleteBot tombstones a member that carries no unfinished work.
+func (s *Server) handleDeleteBot(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var expected int64
+	if raw := r.URL.Query().Get("expectedRevision"); raw != "" {
+		expected, _ = strconv.ParseInt(raw, 10, 64)
+	}
+	bot, err := s.App.DeleteBot(r.Context(), principal, r.PathValue("id"), expected)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, bot)
+}

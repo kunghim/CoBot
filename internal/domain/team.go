@@ -68,6 +68,10 @@ type ProviderSession struct {
 const (
 	EventTeamCreated     = "team.created"
 	EventTeamUpdated     = "team.updated"
+	EventTeamArchived    = "team.archived"
+	EventTeamRestored    = "team.restored"
+	EventTeamDeleted     = "team.deleted"
+	EventBotDeleted      = "bot.deleted"
 	EventBotAdded        = "bot.added"
 	EventMessageCreated  = "message.created"
 	EventMessageUpdated  = "message.updated"

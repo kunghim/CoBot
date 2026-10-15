@@ -238,7 +238,60 @@ export interface paths {
         get: operations["getTeam"];
         put?: never;
         post?: never;
+        /** Soft-delete an archived team with no unfinished work; user files are never touched */
+        delete: operations["deleteTeam"];
+        options?: never;
+        head?: never;
+        /** Rename a team */
+        patch: operations["patchTeam"];
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a team (dispatch pauses; queued work and tasks are kept) */
+        post: operations["archiveTeam"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an archived team; queued work resumes */
+        post: operations["restoreTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Tombstone a member with no unfinished work; history is kept */
+        delete: operations["deleteBot"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1292,6 +1345,8 @@ export interface operations {
                     name: string;
                     directory: string;
                     initialRoleIds?: string[];
+                    /** @description Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently. */
+                    adoptMarker?: boolean;
                 };
             };
         };
@@ -1331,6 +1386,167 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+        };
+    };
+    deleteTeam: {
+        parameters: {
+            query?: {
+                expectedRevision?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    patchTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    name: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Renamed team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    archiveTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Archived team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    restoreTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Restored team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    deleteBot: {
+        parameters: {
+            query?: {
+                expectedRevision?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     addBot: {

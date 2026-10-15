@@ -525,7 +525,12 @@ func SaveIdempotency(ctx context.Context, tx *sql.Tx, scope, principal, key, req
 // app-servers that hand out the same thread id cannot collide.
 func FindBotByThread(ctx context.Context, q Queryer, epoch, threadID string) (string, error) {
 	var botID string
-	err := q.QueryRowContext(ctx, `SELECT bot_id FROM provider_sessions WHERE provider_thread_id = ? AND engine_epoch = ?`, threadID, epoch).Scan(&botID)
+	// The join keeps a tombstoned member's old thread from resolving: after
+	// a delete, engine events for that thread are reported as unknown rather
+	// than routed back to a bot that no longer exists.
+	err := q.QueryRowContext(ctx, `SELECT ps.bot_id FROM provider_sessions ps
+		JOIN bots b ON b.id = ps.bot_id AND b.deleted_at = ''
+		WHERE ps.provider_thread_id = ? AND ps.engine_epoch = ?`, threadID, epoch).Scan(&botID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}

@@ -382,6 +382,9 @@ paths:
                 initialRoleIds:
                   type: array
                   items: { type: string }
+                adoptMarker:
+                  type: boolean
+                  description: Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently.
       responses:
         "201":
           description: Team created (staged, then activated)
@@ -414,6 +417,171 @@ paths:
                     properties:
                       data: { $ref: "#/components/schemas/TeamWithBots" }
         "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: patchTeam
+      security:
+        - SessionCookie: []
+      summary: Rename a team
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, name]
+              properties:
+                requestId: { type: string, format: uuid }
+                name: { type: string }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Renamed team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteTeam
+      security:
+        - SessionCookie: []
+      summary: Soft-delete an archived team with no unfinished work; user files are never touched
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: expectedRevision
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Deleted team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/archive:
+    post:
+      operationId: archiveTeam
+      security:
+        - SessionCookie: []
+      summary: 'Archive a team (dispatch pauses; queued work and tasks are kept)'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Archived team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/restore:
+    post:
+      operationId: restoreTeam
+      security:
+        - SessionCookie: []
+      summary: Restore an archived team; queued work resumes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Restored team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}:
+    delete:
+      operationId: deleteBot
+      security:
+        - SessionCookie: []
+      summary: Tombstone a member with no unfinished work; history is kept
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: expectedRevision
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Deleted member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Bot" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/bots:
     post:
