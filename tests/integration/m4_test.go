@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -221,4 +222,199 @@ func TestChainWakeDeduplicatesDispatchKey(t *testing.T) {
 	if chain.WakeCount != 1 {
 		t.Fatalf("wake count = %d, want 1 (duplicate key must not count)", chain.WakeCount)
 	}
+}
+
+// TestUsageLedgerSnapshotsAndDedupes pins G06: one row per engine turn
+// updated in place (never summed), cached input never counted twice, unknown
+// markers resolve when real numbers arrive, and system sessions count only
+// toward the team.
+func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	bot := bots[1]
+
+	base := domain.UsageEntry{
+		TeamID: team.ID, BotID: bot.ID, Purpose: domain.UsagePurposeRun,
+		EngineEpoch: "epoch-u1", ThreadID: "thread-a", TurnID: "turn-1",
+		InputTokens: 100, OutputTokens: 40, CachedInputTokens: 60,
+		Status: domain.UsageStatusRecorded,
+	}
+	if err := h.app.RecordUsage(ctx, base); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	// The engine re-sends a fuller snapshot for the same turn: the row is
+	// replaced, never accumulated.
+	newer := base
+	newer.ID = domain.NewID()
+	newer.InputTokens = 130
+	newer.OutputTokens = 55
+	if err := h.app.RecordUsage(ctx, newer); err != nil {
+		t.Fatalf("re-record: %v", err)
+	}
+	got, err := sqlite.GetUsage(ctx, h.app.DB, base.EngineEpoch, base.ThreadID, base.TurnID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.InputTokens != 130 || got.OutputTokens != 55 {
+		t.Fatalf("snapshot = in %d out %d, want the newest 130/55 (never 230/95)", got.InputTokens, got.OutputTokens)
+	}
+	if got.BillableTokens() != 185 {
+		t.Fatalf("billable = %d, want input+output only (cached must not be added again)", got.BillableTokens())
+	}
+
+	// A second turn is a second row; the team total adds rows, not updates.
+	second := base
+	second.ID = domain.NewID()
+	second.TurnID = "turn-2"
+	second.InputTokens = 15
+	second.OutputTokens = 5
+	if err := h.app.RecordUsage(ctx, second); err != nil {
+		t.Fatalf("second turn: %v", err)
+	}
+	billable, unknown, err := sqlite.SumUsage(ctx, h.app.DB, team.ID, "")
+	if err != nil {
+		t.Fatalf("sum: %v", err)
+	}
+	if billable != 205 || unknown != 0 {
+		t.Fatalf("team sum = %d/%d unknown, want 205/0", billable, unknown)
+	}
+
+	// A turn that ends without usage is unknown — until real numbers arrive.
+	tx, err := h.app.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("tx: %v", err)
+	}
+	if err := h.app.MarkUsageUnknownIfMissing(ctx, tx, team.ID, bot.ID, base.EngineEpoch, "thread-a", "turn-3"); err != nil {
+		tx.Rollback()
+		t.Fatalf("mark unknown: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if _, unknown, err = sqlite.SumUsage(ctx, h.app.DB, team.ID, ""); err != nil || unknown != 1 {
+		t.Fatalf("unknown count = %d (err %v), want 1", unknown, err)
+	}
+	real := base
+	real.ID = domain.NewID()
+	real.TurnID = "turn-3"
+	if err := h.app.RecordUsage(ctx, real); err != nil {
+		t.Fatalf("resolve unknown: %v", err)
+	}
+	if _, unknown, _ = sqlite.SumUsage(ctx, h.app.DB, team.ID, ""); unknown != 0 {
+		t.Fatalf("unknown count after real usage = %d, want 0", unknown)
+	}
+
+	// A system session (future risk evaluation) counts for the team only.
+	system := base
+	system.ID = domain.NewID()
+	system.BotID = ""
+	system.Purpose = domain.UsagePurposeRiskEval
+	system.TurnID = "turn-eval"
+	system.InputTokens = 7
+	system.OutputTokens = 3
+	if err := h.app.RecordUsage(ctx, system); err != nil {
+		t.Fatalf("system usage: %v", err)
+	}
+	teamTotal, _, _ := sqlite.SumUsage(ctx, h.app.DB, team.ID, "")
+	botTotal, _, _ := sqlite.SumUsage(ctx, h.app.DB, team.ID, bot.ID)
+	if teamTotal != botTotal+10 {
+		t.Fatalf("team %d vs bot %d: system session must count for the team only", teamTotal, botTotal)
+	}
+}
+
+// TestBudgetPausesNewTurnsAndResumes walks G07/G08 end to end: a budget
+// stops only new turns, fixing the budget resumes them, a turn without usage
+// pauses the queue as unknown, and real numbers arriving resume it.
+func TestBudgetPausesNewTurnsAndResumes(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	captain := bots[0]
+	fake := h.ensureFake(t, team.ID)
+
+	settings, err := h.app.GetSettings(ctx)
+	if err != nil {
+		t.Fatalf("settings: %v", err)
+	}
+	scope := domain.BudgetScopeTeam
+	tokens := int64(100)
+	if _, err := h.app.UpdateSettings(ctx, h.user, domain.SettingsPatch{BudgetScope: &scope, BudgetTokens: &tokens}, settings.Revision); err != nil {
+		t.Fatalf("enable budget: %v", err)
+	}
+
+	// Turn 1 reports 90 billable tokens: under the limit.
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第一条"}); err != nil {
+		t.Fatalf("msg1: %v", err)
+	}
+	waitUntil(t, 5*time.Second, "turn 1", func() bool { return len(fake.Turns()) == 1 })
+	turn1 := fake.Turns()[0]
+	fake.EmitTokenUsage(turn1.ThreadID, turn1.TurnID, 60, 30, 10)
+	fake.EmitTurnCompleted(turn1.ThreadID, turn1.TurnID, "completed", "好的")
+	waitUntil(t, 5*time.Second, "turn 1 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return errors.Is(err, sqlite.ErrNotFound)
+	})
+
+	// Turn 2 adds 25: the scope now totals 115 of 100 — over budget.
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第二条"}); err != nil {
+		t.Fatalf("msg2: %v", err)
+	}
+	waitUntil(t, 5*time.Second, "turn 2", func() bool { return len(fake.Turns()) == 2 })
+	turn2 := fake.Turns()[1]
+	fake.EmitTokenUsage(turn2.ThreadID, turn2.TurnID, 20, 5, 0)
+	fake.EmitTurnCompleted(turn2.ThreadID, turn2.TurnID, "completed", "好的")
+	waitUntil(t, 5*time.Second, "turn 2 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return errors.Is(err, sqlite.ErrNotFound)
+	})
+
+	// The third message must not start: the budget holds the queue and the
+	// bot asks for input instead of pretending to work.
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第三条"}); err != nil {
+		t.Fatalf("msg3: %v", err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	if len(fake.Turns()) != 2 {
+		t.Fatalf("over-budget turn started: %d turns", len(fake.Turns()))
+	}
+	bot, err := sqlite.GetBot(ctx, h.app.DB, captain.ID)
+	if err != nil {
+		t.Fatalf("bot: %v", err)
+	}
+	if bot.Status != domain.BotStatusWaitingInput {
+		t.Fatalf("bot status = %s, want waiting_input while the budget holds the queue", bot.Status)
+	}
+	if h.queuedForBot(t, captain.ID) != 1 {
+		t.Fatalf("queued = %d, want the held delivery kept", h.queuedForBot(t, captain.ID))
+	}
+
+	// Raising the budget resumes exactly the held delivery.
+	settings, _ = h.app.GetSettings(ctx)
+	tokens = 1000
+	if _, err := h.app.UpdateSettings(ctx, h.user, domain.SettingsPatch{BudgetTokens: &tokens}, settings.Revision); err != nil {
+		t.Fatalf("raise budget: %v", err)
+	}
+	waitUntil(t, 5*time.Second, "turn 3 after raise", func() bool { return len(fake.Turns()) == 3 })
+
+	// This turn never reports usage: at completion the ledger records an
+	// unknown, and the enabled budget must pause the next turn (G08).
+	turn3 := fake.Turns()[2]
+	fake.EmitTurnCompleted(turn3.ThreadID, turn3.TurnID, "completed", "好的")
+	waitUntil(t, 5*time.Second, "turn 3 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return errors.Is(err, sqlite.ErrNotFound)
+	})
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第四条"}); err != nil {
+		t.Fatalf("msg4: %v", err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	if len(fake.Turns()) != 3 {
+		t.Fatalf("turn started despite unknown usage: %d turns", len(fake.Turns()))
+	}
+
+	// Real numbers for the unknown turn make the spend determinable again:
+	// the ledger update itself re-wakes the held queue.
+	fake.EmitTokenUsage(turn3.ThreadID, turn3.TurnID, 40, 10, 0)
+	waitUntil(t, 5*time.Second, "turn 4 after usage arrives", func() bool { return len(fake.Turns()) == 4 })
 }

@@ -35,6 +35,10 @@ func (s *Scheduler) onNotification(teamID string, n engine.Notification) {
 				}
 			}
 		}
+	case "thread/tokenUsage/updated":
+		if uerr := s.app.ingestTokenUsage(ctx, teamID, n.TokenUsage); uerr != nil {
+			s.logger.Warn("record usage snapshot", "teamId", teamID, "error", uerr)
+		}
 	case "turn/completed":
 		s.finishRun(ctx, teamID, n)
 	case "account/updated", "account/login/completed":
@@ -119,6 +123,20 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 	}
 	defer tx.Rollback()
 	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, s.engineEpoch(teamID), "", true); err != nil {
+		return
+	}
+	// A finished turn that never reported tokens is an unknown spend, not a
+	// zero one: a budget must pause rather than trust it (G08). A usage row
+	// that already arrived keeps its real numbers.
+	epoch := run.EngineEpoch
+	if epoch == "" {
+		epoch = s.engineEpoch(teamID)
+	}
+	turnID := n.TurnID
+	if turnID == "" {
+		turnID = run.ProviderTurnID
+	}
+	if uerr := s.app.MarkUsageUnknownIfMissing(ctx, tx, teamID, botID, epoch, n.ThreadID, turnID); uerr != nil {
 		return
 	}
 	if text != "" {

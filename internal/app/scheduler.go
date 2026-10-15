@@ -153,6 +153,19 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	record := queue[0]
 
+	settings, err := s.app.GetSettings(ctx)
+	if err != nil {
+		return err
+	}
+	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
+	// product cannot judge, holds the queue and asks the user through
+	// settings; it never interrupts work that already started (G07/G08).
+	if pause, perr := s.app.budgetPaused(ctx, team.ID, bot.ID, settings); perr != nil {
+		return perr
+	} else if pause != nil {
+		return s.holdForBudget(ctx, team.ID, bot.ID, pause.Reason)
+	}
+
 	// Claim: delivery -> dispatching, run row created, bot -> working.
 	run := domain.Run{
 		ID: domain.NewID(), TeamID: team.ID, BotID: bot.ID,
@@ -240,7 +253,6 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.thread_failed")
 	}
-	settings, _ := s.app.GetSettings(ctx)
 	// The context is rebuilt on every dispatch so the bot sees the current
 	// team, member list and task instead of trusting a stale model memory.
 	// A task-assignment message carries its task id in run_id.
@@ -333,6 +345,26 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, message
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, BotID: botID, ResourceID: runID})
 	s.app.Hub.Publish()
 	return errors.New("turn/start outcome unknown; bot locked for verification")
+}
+
+// holdForBudget parks a bot whose queue is blocked by a budget: the bot
+// shows "needs input", the deliveries keep their place, and the reason is a
+// durable event the UI can explain. Fixing the budget re-wakes these bots.
+func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID, reason string) error {
+	tx, err := s.app.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusWaitingInput, ""); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventBudgetPaused, TeamID: teamID, BotID: botID, ResourceID: reason})
+	s.app.Hub.Publish()
+	return nil
 }
 
 // EnsureTeamServer returns the team's app-server, starting it on first use.

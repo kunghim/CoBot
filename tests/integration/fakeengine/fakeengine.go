@@ -174,6 +174,26 @@ func (s *Server) EmitTurnCompleted(threadID, turnID, status, assistantText strin
 	})
 }
 
+// EmitTokenUsage simulates the engine reporting this turn's newest token
+// snapshot. The payload matches thread/tokenUsage/updated.
+func (s *Server) EmitTokenUsage(threadID, turnID string, input, output, cached int64) {
+	params, _ := json.Marshal(map[string]any{
+		"threadId": threadID,
+		"turnId":   turnID,
+		"tokenUsage": map[string]any{
+			"last": map[string]any{
+				"inputTokens":       input,
+				"outputTokens":      output,
+				"cachedInputTokens": cached,
+			},
+			"total": map[string]any{},
+		},
+	})
+	s.callbacks.OnNotification(engine.Notification{
+		Method: "thread/tokenUsage/updated", ThreadID: threadID, TurnID: turnID, TokenUsage: params,
+	})
+}
+
 // EmitApproval simulates a native tool approval request.
 func (s *Server) EmitApproval(requestID string, threadID, turnID, command string) {
 	params, _ := json.Marshal(map[string]any{

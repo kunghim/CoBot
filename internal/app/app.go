@@ -101,6 +101,12 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 		return domain.Settings{}, err
 	}
 	a.Hub.Publish()
+	// A budget change can un-hold deliveries the old limit paused, so the
+	// affected bots are re-woken immediately instead of waiting for a message
+	// that may never come.
+	if patch.BudgetScope != nil || patch.BudgetTokens != nil {
+		a.ResumeBudgetPausedBots(ctx)
+	}
 	return saved, nil
 }
 
