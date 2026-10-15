@@ -124,11 +124,17 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if principal.Kind == auth.KindBot {
 		createdBy = principal.BotID
 	}
+	// The wire contract promises arrays, never null: a Go nil slice would
+	// serialize as null and break clients that read .length.
+	deps := in.DependencyIDs
+	if deps == nil {
+		deps = []string{}
+	}
 	task := domain.Task{
 		ID: domain.NewID(), TeamID: in.TeamID, OwnerID: in.OwnerID,
 		ParentID: in.ParentID, Title: title, Description: in.Description,
 		AcceptanceCriteria: in.AcceptanceCriteria, Status: domain.TaskTodo,
-		Revision: 1, CreatedBy: createdBy,
+		DependencyIDs: deps, Revision: 1, CreatedBy: createdBy,
 	}
 
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -400,6 +406,9 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 	}
 	if strings.TrimSpace(summary) == "" {
 		return domain.Evidence{}, domain.InvalidRequest("error.task.evidence_summary_required", nil)
+	}
+	if artifactRefs == nil {
+		artifactRefs = []string{} // arrays on the wire, never null
 	}
 	evidence := domain.Evidence{
 		ID: domain.NewID(), TaskID: task.ID, AuthorID: author, Summary: strings.TrimSpace(summary),

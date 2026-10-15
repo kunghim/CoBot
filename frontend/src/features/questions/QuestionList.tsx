@@ -51,9 +51,9 @@ function QuestionCard({ question }: { question: Question }) {
     <li className="rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-700">
       <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
       <p className="mt-1 text-[11px] text-neutral-400">{t('questions.answerIsInput')}</p>
-      {question.options.length > 0 && (
+      {(question.options ?? []).length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
-          {question.options.map((option) => (
+          {(question.options ?? []).map((option) => (
             <button
               key={option}
               type="button"

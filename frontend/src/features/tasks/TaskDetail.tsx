@@ -114,7 +114,7 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
           {t('tasks.blocked')}: {current.blockedReason}
         </p>
       )}
-      {current.dependencyIds.length > 0 && (
+      {(current.dependencyIds ?? []).length > 0 && (
         <p className="flex flex-wrap gap-1 text-xs text-neutral-500 dark:text-neutral-400">
           {t('tasks.dependenciesTitle')}
           {dependencyLabels(current, tasks).map((label) => (
@@ -134,8 +134,8 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
             <li key={item.id} className="rounded bg-neutral-50 px-2 py-1 text-xs dark:bg-neutral-800/60">
               <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{item.summary}</p>
               {item.testResult && <p className="text-neutral-500 dark:text-neutral-400">{t('tasks.testResult')}: {item.testResult}</p>}
-              {item.artifactRefs.length > 0 && (
-                <p className="break-all text-neutral-400">{item.artifactRefs.join(', ')}</p>
+              {(item.artifactRefs ?? []).length > 0 && (
+                <p className="break-all text-neutral-400">{(item.artifactRefs ?? []).join(', ')}</p>
               )}
             </li>
           ))}

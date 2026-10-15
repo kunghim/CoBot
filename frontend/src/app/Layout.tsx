@@ -36,10 +36,17 @@ function IconButton({
  * panel. Both panels stay reachable; on narrow screens they overlay the
  * conversation.
  */
+// On narrow screens both side panels overlay the conversation, so they
+// start closed: a first load must show the conversation, not a panel covering
+// it. The toggles reopen each one (I05).
+function startsOpen(): boolean {
+  return typeof window === 'undefined' || window.matchMedia('(min-width: 1024px)').matches;
+}
+
 export default function Layout() {
   const { t } = useTranslation();
-  const [listOpen, setListOpen] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [listOpen, setListOpen] = useState(startsOpen);
+  const [panelOpen, setPanelOpen] = useState(startsOpen);
   const { botId, setBotId } = useSelectedBot();
   const teams = useTeams(true);
 
@@ -122,12 +129,16 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {/* Work panel: tasks/approvals/activity/collaboration/memories; only
-          approvals is real in M2, the rest say so honestly. */}
+      {/* Work panel: all five pages are real (tasks, approvals, activity,
+          collaboration, memories). */}
       {panelOpen && (
         <aside
           aria-label={t('nav.toggleWorkPanel')}
-          className="hidden w-72 shrink-0 border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 lg:block"
+          // On narrow screens the panel overlays the conversation (like the
+          // team list); below lg it is static in-flow. It must never be
+          // "open" yet unreachable, which the old hidden-lg:block did on
+          // narrow screens (I05).
+          className="absolute right-0 z-10 h-full w-72 border-l border-neutral-200 bg-white shadow-lg dark:border-neutral-800 dark:bg-neutral-900 lg:static lg:z-auto lg:w-72 lg:shrink-0 lg:shadow-none"
         >
           <WorkPanel onCollapse={() => setPanelOpen(false)} />
         </aside>

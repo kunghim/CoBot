@@ -165,7 +165,8 @@ function TaskRow({
           </span>
           <span className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">
             {ownerLabel(task.ownerId, bots, userLabel)}
-            {task.dependencyIds.length > 0 && ` · ${t('tasks.dependencies', { count: task.dependencyIds.length })}`}
+            {(task.dependencyIds ?? []).length > 0 &&
+              ` · ${t('tasks.dependencies', { count: (task.dependencyIds ?? []).length })}`}
           </span>
         </span>
       </button>
