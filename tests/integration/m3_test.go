@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // TestDependencyChainIsRecorded pins the create-time contract: a task stores
@@ -156,6 +158,7 @@ func TestTwoPhaseTransferKeepsSingleOwner(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	captain := bots[0]
 	owner, target := bots[1].ID, bots[2].ID
 
 	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
@@ -190,6 +193,96 @@ func TestTwoPhaseTransferKeepsSingleOwner(t *testing.T) {
 	var de *domain.Error
 	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
 		t.Fatalf("accepting a cancelled transfer must conflict, got %v", err)
+	}
+
+	// A second hand-over exercises the accept path end to end. Its assignment
+	// waits on an unfinished dependency, so it is still undelivered when the
+	// hand-over is accepted — the state in which E10 requires the old
+	// owner's assignment to be cancelled.
+	dep, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
+		TeamID: team.ID, OwnerID: captain.ID, Title: "前置依赖", AcceptanceCriteria: "不会完成",
+	})
+	if err != nil {
+		t.Fatalf("create dep: %v", err)
+	}
+	task2, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
+		TeamID: team.ID, OwnerID: owner, Title: "转交并接受", AcceptanceCriteria: "接受后唯一负责人",
+		DependencyIDs: []string{dep.ID},
+	})
+	if err != nil {
+		t.Fatalf("create task2: %v", err)
+	}
+	transfer2, err := h.app.OfferTransfer(ctx, h.user, task2.ID, target, "请接手")
+	if err != nil {
+		t.Fatalf("offer task2: %v", err)
+	}
+
+	// E03: while the old owner has a run in flight it may still be writing
+	// files, so the product refuses the hand-over. The first task's own
+	// assignment is that run; wait until the engine has really started its
+	// turn so the refusal is not racing a run that has not reached the fake.
+	fake := h.fakeFor(t, team.ID)
+	ownerTurnSeen := func() bool {
+		session, sessErr := sqlite.GetProviderSession(ctx, h.app.DB, owner)
+		if sessErr != nil {
+			return false
+		}
+		for _, turn := range fake.Turns() {
+			if turn.ThreadID == session.ProviderThreadID {
+				return true
+			}
+		}
+		return false
+	}
+	waitUntil(t, 5*time.Second, "owner assignment turn", ownerTurnSeen)
+	_, err = h.app.AcceptTransfer(ctx, h.user, transfer2.ID)
+	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
+		t.Fatalf("accept while the owner's run is active must conflict, got %v", err)
+	}
+
+	// Completing every started turn ends the owner's run and unblocks the
+	// hand-over. The dependency task stays todo, so task2 remains blocked and
+	// its assignment is still undelivered.
+	waitUntil(t, 5*time.Second, "engine turns", func() bool { return len(fake.Turns()) >= 1 })
+	for _, turn := range fake.Turns() {
+		fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "已处理")
+	}
+	waitUntil(t, 5*time.Second, "owner run ended", func() bool {
+		_, runErr := sqlite.FindActiveRun(ctx, h.app.DB, owner)
+		return errors.Is(runErr, sqlite.ErrNotFound)
+	})
+
+	moved, err := h.app.AcceptTransfer(ctx, h.user, transfer2.ID)
+	if err != nil {
+		t.Fatalf("accept: %v", err)
+	}
+	if moved.OwnerID != target {
+		t.Fatalf("owner after accept = %q, want %q", moved.OwnerID, target)
+	}
+
+	rows, err := h.app.DB.Query(`SELECT m.bot_id, d.status FROM deliveries d
+		JOIN messages m ON m.id = d.message_id WHERE m.run_id = ? ORDER BY m.created_at, m.id`, task2.ID)
+	if err != nil {
+		t.Fatalf("deliveries: %v", err)
+	}
+	defer rows.Close()
+	type assignment struct{ bot, status string }
+	var seen []assignment
+	for rows.Next() {
+		var r assignment
+		if err := rows.Scan(&r.bot, &r.status); err != nil {
+			t.Fatalf("scan delivery: %v", err)
+		}
+		seen = append(seen, r)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("task2 deliveries = %+v, want the cancelled original plus the new owner's", seen)
+	}
+	if seen[0].bot != owner || seen[0].status != domain.DeliveryCancelled {
+		t.Fatalf("old assignment = %+v, want cancelled for the old owner", seen[0])
+	}
+	if seen[1].bot != target || seen[1].status == domain.DeliveryCancelled {
+		t.Fatalf("new assignment = %+v, want a live delivery for the new owner", seen[1])
 	}
 }
 
@@ -274,6 +367,45 @@ func TestUserReadsWholeCollaborationRecord(t *testing.T) {
 	}
 	if len(byA) != 1 {
 		t.Fatalf("A's peer segment = %+v, want the one message", byA)
+	}
+}
+
+// TestTaskPermissionEdges pins the E01/E04 permission half: a member may not
+// create through the captain-only path, touch another owner's task, or attach
+// evidence to it — while the owner may still move its own task.
+func TestTaskPermissionEdges(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	owner, outsider := bots[1], bots[2]
+
+	_, err := h.app.CreateTask(ctx, auth.NewPrincipalBot(outsider.ID, team.ID), true, app.CreateTaskInput{
+		TeamID: team.ID, OwnerID: outsider.ID, Title: "越权建任务", AcceptanceCriteria: "应被拒绝",
+	})
+	if !errors.As(err, &de) || de.Code != domain.CodeForbidden {
+		t.Fatalf("member create through captain tool must be refused, got %v", err)
+	}
+
+	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
+		TeamID: team.ID, OwnerID: owner.ID, Title: "归属任务", AcceptanceCriteria: "只有负责人能改",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	_, err = h.app.UpdateTaskStatus(ctx, auth.NewPrincipalBot(outsider.ID, team.ID), task.ID, domain.TaskDoing, "", 0)
+	if !errors.As(err, &de) || de.Code != domain.CodeForbidden {
+		t.Fatalf("non-owner status patch must be refused, got %v", err)
+	}
+
+	_, err = h.app.SubmitEvidence(ctx, auth.NewPrincipalBot(outsider.ID, team.ID), task.ID, "越权证据", nil, "", "", "")
+	if !errors.As(err, &de) || de.Code != domain.CodeForbidden {
+		t.Fatalf("non-owner evidence must be refused, got %v", err)
+	}
+
+	// The owner moves its own task, which the same call refused for others.
+	if _, err := h.app.UpdateTaskStatus(ctx, auth.NewPrincipalBot(owner.ID, team.ID), task.ID, domain.TaskDoing, "", 0); err != nil {
+		t.Fatalf("owner start: %v", err)
 	}
 }
 
