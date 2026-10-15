@@ -193,6 +193,49 @@ export const api = {
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
+
+  // Tasks, transfers, questions and collaboration records (M3).
+  listTasks: (params: { teamId: string; ownerId?: string; limit?: number }) => {
+    const query = new URLSearchParams({ teamId: params.teamId });
+    if (params.ownerId) query.set('ownerId', params.ownerId);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    return request<import('./types').TaskListResult>('GET', `/api/v1/teams/${params.teamId}/tasks?${query.toString()}`);
+  },
+  createTask: (
+    teamId: string,
+    body: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; parentId?: string; dependencyIds?: string[] },
+  ) => request<import('./types').Task>('POST', `/api/v1/teams/${teamId}/tasks`, body),
+  getTask: (taskId: string) => request<import('./types').TaskDetailResult>('GET', `/api/v1/tasks/${taskId}`),
+  patchTask: (
+    taskId: string,
+    body: { status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number },
+  ) => request<import('./types').Task>('PATCH', `/api/v1/tasks/${taskId}`, body),
+  submitEvidence: (
+    taskId: string,
+    body: { summary: string; artifactRefs?: string[]; candidateRef?: string; testResult?: string; reviewResult?: string },
+  ) => request<import('./types').Evidence>('POST', `/api/v1/tasks/${taskId}/evidence`, body),
+  confirmTask: (taskId: string, body: { evidenceIds?: string[]; expectedRevision: number }) =>
+    request<import('./types').Task>('POST', `/api/v1/tasks/${taskId}/confirm`, body),
+  offerTransfer: (taskId: string, body: { toBotId: string; note?: string }) =>
+    request<import('./types').Transfer>('POST', `/api/v1/tasks/${taskId}/transfers`, body),
+  acceptTransfer: (transferId: string) =>
+    request<import('./types').Task>('POST', `/api/v1/transfers/${transferId}/accept`, {}),
+  cancelTransfer: (transferId: string) =>
+    request<import('./types').Transfer>('POST', `/api/v1/transfers/${transferId}/cancel`, {}),
+  listQuestions: (params: { teamId: string; status?: string; limit?: number }) => {
+    const query = new URLSearchParams({ teamId: params.teamId });
+    if (params.status) query.set('status', params.status);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
+  },
+  answerQuestion: (questionId: string, body: { answerText: string; expectedRevision: number }) =>
+    request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
+  cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
+    request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
+  listCollaboration: (botId: string, limit?: number) => {
+    const query = limit !== undefined ? `?limit=${limit}` : '';
+    return request<import('./types').CollaborationListResult>('GET', `/api/v1/bots/${botId}/collaboration${query}`);
+  },
 };
 
 import { desktopBridge } from '../platform/native-bridge';

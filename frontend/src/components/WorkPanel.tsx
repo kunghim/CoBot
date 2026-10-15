@@ -1,5 +1,6 @@
-// WorkPanel is the right column. For M2 only the 审批 tab is real (read-only
-// decided history); 任务/动态/协作/记忆 honestly say they arrive in later
+// WorkPanel is the right column. Real as of M3: 任务 (team board with
+// questions the user owes), 审批 (decided history) and 协作 (the selected
+// member's read-only record); 动态/记忆 honestly say they arrive in later
 // milestones instead of showing fabricated data.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +8,9 @@ import { X } from 'lucide-react';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
+import CollaborationList from '../features/collaboration/CollaborationList';
+import QuestionList from '../features/questions/QuestionList';
+import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
 
 type TabId = 'tasks' | 'approvals' | 'activity' | 'collab' | 'memory';
@@ -17,7 +21,7 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
   const { t } = useTranslation();
   const { botId } = useSelectedBot();
   const teams = useTeams(true);
-  const [tab, setTab] = useState<TabId>('approvals');
+  const [tab, setTab] = useState<TabId>('tasks');
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
   const scope = context ? `${context.bot.name} · ${context.team.name}` : '';
@@ -60,8 +64,17 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {!context && <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
+        {context && tab === 'tasks' && (
+          <div key={context.team.id}>
+            <QuestionList teamId={context.team.id} />
+            <TaskBoardList teamId={context.team.id} bots={context.item.bots} />
+          </div>
+        )}
         {context && tab === 'approvals' && <ApprovalHistoryList key={context.team.id} teamId={context.team.id} />}
-        {context && tab !== 'approvals' && (
+        {context && tab === 'collab' && (
+          <CollaborationList key={context.bot.id} botId={context.bot.id} bots={context.item.bots} />
+        )}
+        {context && (tab === 'activity' || tab === 'memory') && (
           <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.notReadyYet')}</p>
         )}
       </div>

@@ -3,18 +3,26 @@ import { useEffect } from 'react';
 import type {
   Approval,
   Bot,
+  CollaborationListResult,
   ConversationResult,
   CreateTeamResult,
   EngineStatus,
   Event,
+  Evidence,
   ModelListResult,
+  Question,
+  QuestionListResult,
   RoleListResult,
   SendMessageResult,
   Settings,
   SettingsPatch,
   Snapshot,
   Status,
+  Task,
+  TaskDetailResult,
+  TaskListResult,
   TeamListResult,
+  Transfer,
 } from './types';
 import { api, bearerToken, reportUnauthorized } from './client';
 
@@ -28,6 +36,10 @@ export const queryKeys = {
   models: ['models'] as const,
   messages: (botId: string) => ['messages', botId] as const,
   approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
+  tasks: (teamId: string) => ['tasks', teamId] as const,
+  taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
+  questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
+  collaboration: (botId: string) => ['collaboration', botId] as const,
 };
 
 export function useStatus() {
@@ -263,19 +275,165 @@ export function useEngineModels(enabled: boolean) {
   return useQuery({ queryKey: queryKeys.models, queryFn: api.listModels, enabled });
 }
 
+// ---------------------------------------------------------------------------
+// M3: tasks, transfers, questions, collaboration records
+// ---------------------------------------------------------------------------
+
+/** GET /teams/{id}/tasks: the team board; the server narrows a member's
+ * scope, the page never decides who sees what. */
+export function useTasks(teamId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.tasks(teamId ?? ''),
+    queryFn: () => api.listTasks({ teamId: teamId as string }),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+/** GET /tasks/{id}: one task with evidence and transfer history, loaded only
+ * while the row is expanded. */
+export function useTaskDetail(taskId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.taskDetail(taskId ?? ''),
+    queryFn: () => api.getTask(taskId as string),
+    enabled: taskId !== null && enabled,
+  });
+}
+
+function useInvalidateTasks() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['tasks'] });
+    void qc.invalidateQueries({ queryKey: ['taskDetail'] });
+    void qc.invalidateQueries({ queryKey: queryKeys.teams });
+  };
+}
+
+export function useCreateTask(teamId: string) {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: (input: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; dependencyIds?: string[] }) =>
+      api.createTask(teamId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePatchTask() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ taskId, ...body }: { taskId: string; status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number }) =>
+      api.patchTask(taskId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSubmitEvidence() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ taskId, ...body }: { taskId: string; summary: string; artifactRefs?: string[]; testResult?: string; reviewResult?: string }) =>
+      api.submitEvidence(taskId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useConfirmTask() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ taskId, evidenceIds, expectedRevision }: { taskId: string; evidenceIds?: string[]; expectedRevision: number }) =>
+      api.confirmTask(taskId, { evidenceIds, expectedRevision }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useOfferTransfer() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ taskId, toBotId, note }: { taskId: string; toBotId: string; note?: string }) =>
+      api.offerTransfer(taskId, { toBotId, note }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAcceptTransfer() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: (transferId: string) => api.acceptTransfer(transferId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCancelTransfer() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: (transferId: string) => api.cancelTransfer(transferId),
+    onSuccess: invalidate,
+  });
+}
+
+/** GET /questions?status=open: the answers the user still owes. */
+export function useQuestions(teamId: string | null, status = 'open', enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.questions(teamId ?? '', status),
+    queryFn: () => api.listQuestions({ teamId: teamId as string, status }),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+export function useAnswerQuestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ questionId, answerText, expectedRevision }: { questionId: string; answerText: string; expectedRevision: number }) =>
+      api.answerQuestion(questionId, { answerText, expectedRevision }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['questions'] });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+      // The answer is delivered as a user message to the asking bot.
+      void qc.invalidateQueries({ queryKey: ['messages'] });
+    },
+  });
+}
+
+export function useCancelQuestion(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ questionId, expectedRevision }: { questionId: string; expectedRevision: number }) =>
+      api.cancelQuestion(questionId, { expectedRevision }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.questions(teamId, 'open') });
+    },
+  });
+}
+
+/** GET /bots/{id}/collaboration: the read-only exchange of the selected
+ * member; the user reads a named member's whole record. */
+export function useCollaboration(botId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.collaboration(botId ?? ''),
+    queryFn: () => api.listCollaboration(botId as string),
+    enabled: botId !== null && enabled,
+  });
+}
+
 export type {
   Approval,
   Bot,
+  CollaborationListResult,
   ConversationResult,
   CreateTeamResult,
   EngineStatus,
   Event,
+  Evidence,
   ModelListResult,
+  Question,
+  QuestionListResult,
   RoleListResult,
   SendMessageResult,
   Snapshot,
   Status,
   Settings,
   SettingsPatch,
+  Task,
+  TaskDetailResult,
+  TaskListResult,
   TeamListResult,
+  Transfer,
 };

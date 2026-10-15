@@ -138,6 +138,9 @@ export interface Message {
   requestId?: string;
   deliveryStatus?: DeliveryStatus;
   runId?: string;
+  /** For collaboration messages: the member that sent it; absent means the
+   * user wrote it. */
+  sourceBotId?: string;
   createdAt: string;
 }
 
@@ -233,4 +236,99 @@ export interface Snapshot {
   settings: Settings;
   teams: TeamWithBots[];
   engine: EngineStatus;
+}
+
+// ---------------------------------------------------------------------------
+// M3: tasks, evidence, transfers, questions, collaboration records
+// ---------------------------------------------------------------------------
+
+/** done only through confirm (evidence-backed); a chat message never changes
+ * status by itself. */
+export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'cancelled';
+
+export interface Task {
+  id: string;
+  teamId: string;
+  ownerId: string;
+  parentId?: string;
+  title: string;
+  description?: string;
+  acceptanceCriteria?: string;
+  status: TaskStatus;
+  blockedReason?: string;
+  dependencyIds: string[];
+  revision: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Evidence {
+  id: string;
+  taskId: string;
+  authorId: string;
+  summary: string;
+  artifactRefs: string[];
+  candidateRef?: string;
+  testResult?: string;
+  reviewResult?: string;
+  createdAt: string;
+}
+
+export type TransferStatus = 'offered' | 'accepted' | 'cancelled' | 'stale';
+
+export interface Transfer {
+  id: string;
+  taskId: string;
+  fromBotId: string;
+  toBotId: string;
+  taskRevision: number;
+  note?: string;
+  status: TransferStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /teams/{id}/tasks */
+export interface TaskListResult {
+  items: Task[];
+  nextCursor: string;
+}
+
+/** GET /tasks/{id} */
+export interface TaskDetailResult {
+  task: Task;
+  evidence: Evidence[];
+  transfers: Transfer[];
+}
+
+export type QuestionStatus = 'open' | 'answered' | 'cancelled';
+
+/** ask_user output: user input, never a security authorization. */
+export interface Question {
+  id: string;
+  teamId: string;
+  requesterBotId: string;
+  taskId?: string;
+  runId?: string;
+  question: string;
+  options: string[];
+  status: QuestionStatus;
+  answerText?: string;
+  answerMessageId?: string;
+  revision: number;
+  createdAt: string;
+  answeredAt?: string;
+}
+
+/** GET /questions?teamId&status */
+export interface QuestionListResult {
+  items: Question[];
+  nextCursor: string;
+}
+
+/** GET /bots/{id}/collaboration */
+export interface CollaborationListResult {
+  items: Message[];
+  nextCursor: string;
 }
