@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -114,4 +115,32 @@ func (s *TokenStore) sweepLocked() {
 			delete(s.tokens, token)
 		}
 	}
+}
+
+// PublicBinding is the non-secret view of one live bridge credential, for
+// the authorizations page. The token value itself is never exposed.
+type PublicBinding struct {
+	BotID       string    `json:"botId"`
+	TeamID      string    `json:"teamId"`
+	EngineEpoch string    `json:"engineEpoch"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+}
+
+// List reports every live credential; tokens are excluded by construction.
+func (s *TokenStore) List() []PublicBinding {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	out := make([]PublicBinding, 0, len(s.tokens))
+	for _, binding := range s.tokens {
+		if !binding.ExpiresAt.After(now) {
+			continue
+		}
+		out = append(out, PublicBinding{
+			BotID: binding.BotID, TeamID: binding.TeamID,
+			EngineEpoch: binding.EngineEpoch, ExpiresAt: binding.ExpiresAt,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].BotID < out[j].BotID })
+	return out
 }

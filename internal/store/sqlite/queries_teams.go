@@ -298,6 +298,27 @@ func ListDirectoryBindings(ctx context.Context, q Queryer) ([]DirectoryBinding, 
 	return out, rows.Err()
 }
 
+// SetTeamStatusTx is SetTeamStatus inside the caller's transaction, so a
+// rebind can move the binding and update lifecycle state atomically (the
+// pool is a single connection; a nested tx here would deadlock).
+func SetTeamStatusTx(ctx context.Context, tx *sql.Tx, teamID, status, detail string, expectedRevision int64) (domain.Team, error) {
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Team{}, ErrNotFound
+		}
+		return domain.Team{}, err
+	}
+	if expectedRevision > 0 && revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
+		status, detail, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
+		return domain.Team{}, err
+	}
+	return GetTeamByID(ctx, tx, teamID)
+}
+
 // UnbindTeamDirectory removes the directory binding rows of a team being
 // deleted. User files on disk are never touched here (B09).
 func UnbindTeamDirectory(ctx context.Context, tx *sql.Tx, teamID string) error {
@@ -502,4 +523,19 @@ func ListLeaseBots(ctx context.Context, q Queryer) ([]LeaseBot, error) {
 		out = append(out, b)
 	}
 	return out, rows.Err()
+}
+
+// UpdateDirectoryBinding points a team at a new canonical directory (M5
+// rebind). The old row is replaced inside the caller's transaction, so a
+// team is bound to exactly one directory at every instant.
+func UpdateDirectoryBinding(ctx context.Context, tx *sql.Tx, teamID, directory, key string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `DELETE FROM directory_bindings WHERE team_id = ?`, teamID); err != nil {
+		return fmt.Errorf("clear directory binding: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_bindings (team_id, directory_key, directory, created_at) VALUES (?, ?, ?, ?)`,
+		teamID, key, directory, now); err != nil {
+		return fmt.Errorf("insert directory binding: %w", err)
+	}
+	return nil
 }

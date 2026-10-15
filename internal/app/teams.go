@@ -193,11 +193,20 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 // findNestedBinding returns a team whose bound directory contains or is
 // contained by the candidate, comparing component-wise on canonical keys.
 func (a *App) findNestedBinding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir) (*domain.Team, error) {
+	return a.findNestedBindingExcluding(ctx, tx, candidate, "")
+}
+
+// findNestedBindingExcluding ignores one team's own binding, which a rebind
+// must do: moving a team must not conflict with where it lives today.
+func (a *App) findNestedBindingExcluding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir, excludeTeamID string) (*domain.Team, error) {
 	bindings, err := sqlite.ListDirectoryBindings(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 	for _, binding := range bindings {
+		if binding.TeamID == excludeTeamID {
+			continue
+		}
 		other := platform.CanonicalDir{Key: binding.DirectoryKey, Display: binding.Directory}
 		if other.Contains(candidate) || candidate.Contains(other) {
 			team, _, err := sqlite.GetTeam(ctx, tx, binding.TeamID)

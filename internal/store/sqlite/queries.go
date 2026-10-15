@@ -246,3 +246,29 @@ func ImportEventRow(ctx context.Context, db *sql.DB, ev domain.Event) (bool, err
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+// ListRecentTeamEvents returns a team's newest events for the activity feed,
+// newest first (M5).
+func ListRecentTeamEvents(ctx context.Context, q Queryer, teamID string, limit int) ([]domain.Event, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := q.QueryContext(ctx, `SELECT seq, id, instance_id, type, team_id, bot_id, resource_id, revision, payload, created_at
+		FROM events WHERE team_id = ? ORDER BY seq DESC LIMIT ?`, teamID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Event
+	for rows.Next() {
+		var ev domain.Event
+		var payload, createdAt string
+		if err := rows.Scan(&ev.Seq, &ev.ID, &ev.InstanceID, &ev.Type, &ev.TeamID, &ev.BotID, &ev.ResourceID, &ev.Revision, &payload, &createdAt); err != nil {
+			return nil, err
+		}
+		ev.Payload = json.RawMessage(payload)
+		ev.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+		out = append(out, ev)
+	}
+	return out, rows.Err()
+}

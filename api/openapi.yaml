@@ -1246,6 +1246,270 @@ paths:
                             items: { $ref: "#/components/schemas/Message" }
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/activity:
+    get:
+      operationId: listActivity
+      security:
+        - SessionCookie: []
+      summary: Newest-first team activity feed (events)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Activity events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Event" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/memories:
+    get:
+      operationId: listMemories
+      security:
+        - SessionCookie: []
+      summary: Live memories of one member (user reads any member; a bot only itself)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Memories
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Memory" }
+  /api/v1/bots/{id}/memories/{memoryId}:
+    delete:
+      operationId: deleteMemory
+      security:
+        - SessionCookie: []
+      summary: Tombstone one memory; the same fact is never recreated automatically
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: memoryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted: { type: boolean }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories:
+    get:
+      operationId: listDirectories
+      security:
+        - SessionCookie: []
+      summary: Immediate subdirectories of one path for the Web picker (names only)
+      parameters:
+        - name: path
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Child directories
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          path: { type: string }
+                          children:
+                            type: array
+                            items: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories/check:
+    post:
+      operationId: checkDirectory
+      security:
+        - SessionCookie: []
+      summary: Validate a directory for team creation or rebind without touching anything
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+      responses:
+        "200":
+          description: Verdict
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          canonical: { type: string }
+                          ok: { type: boolean }
+                          duplicate: { type: boolean }
+                          nested: { type: boolean }
+                          markerPresent: { type: boolean }
+                          adoptRequired: { type: boolean }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/directory/rebind:
+    post:
+      operationId: rebindDirectory
+      security:
+        - SessionCookie: []
+      summary: Move a team's working directory through the same conflict rules as creation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, directory]
+              properties:
+                requestId: { type: string, format: uuid }
+                directory: { type: string }
+                adoptMarker: { type: boolean }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Rebound team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/authorizations:
+    get:
+      operationId: listAuthorizations
+      security:
+        - SessionCookie: []
+      summary: Live bridge credentials without their token values
+      responses:
+        "200":
+          description: Authorizations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                botId: { type: string }
+                                teamId: { type: string }
+                                engineEpoch: { type: string }
+                                expiresAt: { type: string, format: date-time }
+  /api/v1/authorizations/{id}/revoke:
+    post:
+      operationId: revokeAuthorization
+      security:
+        - SessionCookie: []
+      summary: Revoke every live credential of one member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked: { type: boolean }
+        "404":
+          $ref: "#/components/responses/Error"
   /internal/v1/collaboration:
     post:
       operationId: collaborationTool
@@ -1379,6 +1643,17 @@ components:
         deliveryStatus: { type: string }
         runId: { type: string }
         sourceBotId: { type: string }
+        createdAt: { type: string, format: date-time }
+    Memory:
+      type: object
+      required: [id, teamId, botId, body, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        body: { type: string }
+        sourceRunId: { type: string }
+        sourceTaskId: { type: string }
         createdAt: { type: string, format: date-time }
     CreateTaskRequest:
       type: object

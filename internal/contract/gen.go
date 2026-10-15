@@ -336,6 +336,20 @@ type ErrorEnvelope struct {
 // ErrorEnvelopeErrorCode defines model for ErrorEnvelope.Error.Code.
 type ErrorEnvelopeErrorCode string
 
+// Event defines model for Event.
+type Event struct {
+	BotId      string                 `json:"botId"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	Id         string                 `json:"id"`
+	InstanceId string                 `json:"instanceId"`
+	Payload    map[string]interface{} `json:"payload"`
+	ResourceId string                 `json:"resourceId"`
+	Revision   int64                  `json:"revision"`
+	Seq        int64                  `json:"seq"`
+	TeamId     string                 `json:"teamId"`
+	Type       string                 `json:"type"`
+}
+
 // Evidence defines model for Evidence.
 type Evidence struct {
 	ArtifactRefs *[]string `json:"artifactRefs,omitempty"`
@@ -347,6 +361,17 @@ type Evidence struct {
 	Summary      string    `json:"summary"`
 	TaskId       string    `json:"taskId"`
 	TestResult   *string   `json:"testResult,omitempty"`
+}
+
+// Memory defines model for Memory.
+type Memory struct {
+	Body         string    `json:"body"`
+	BotId        string    `json:"botId"`
+	CreatedAt    time.Time `json:"createdAt"`
+	Id           string    `json:"id"`
+	SourceRunId  *string   `json:"sourceRunId,omitempty"`
+	SourceTaskId *string   `json:"sourceTaskId,omitempty"`
+	TeamId       string    `json:"teamId"`
 }
 
 // Message defines model for Message.
@@ -592,6 +617,11 @@ type EngineLogoutJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// RevokeAuthorizationJSONBody defines parameters for RevokeAuthorization.
+type RevokeAuthorizationJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteBotParams defines parameters for DeleteBot.
 type DeleteBotParams struct {
 	ExpectedRevision *int64 `form:"expectedRevision,omitempty" json:"expectedRevision,omitempty"`
@@ -599,6 +629,11 @@ type DeleteBotParams struct {
 
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMemoriesParams defines parameters for ListMemories.
+type ListMemoriesParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
@@ -612,6 +647,17 @@ type ListMessagesParams struct {
 type SendMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 	Text      string             `json:"text"`
+}
+
+// ListDirectoriesParams defines parameters for ListDirectories.
+type ListDirectoriesParams struct {
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// CheckDirectoryJSONBody defines parameters for CheckDirectory.
+type CheckDirectoryJSONBody struct {
+	Path      string             `json:"path"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // StreamEventsParams defines parameters for StreamEvents.
@@ -689,6 +735,11 @@ type PatchTeamJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ListActivityParams defines parameters for ListActivity.
+type ListActivityParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ArchiveTeamJSONBody defines parameters for ArchiveTeam.
 type ArchiveTeamJSONBody struct {
 	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
@@ -699,6 +750,14 @@ type ArchiveTeamJSONBody struct {
 type AddBotJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 	RoleId    string             `json:"roleId"`
+}
+
+// RebindDirectoryJSONBody defines parameters for RebindDirectory.
+type RebindDirectoryJSONBody struct {
+	AdoptMarker      *bool              `json:"adoptMarker,omitempty"`
+	Directory        string             `json:"directory"`
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // RebuildTeamMarkerJSONBody defines parameters for RebuildTeamMarker.
@@ -740,8 +799,14 @@ type EngineLoginCancelJSONRequestBody EngineLoginCancelJSONBody
 // EngineLogoutJSONRequestBody defines body for EngineLogout for application/json ContentType.
 type EngineLogoutJSONRequestBody EngineLogoutJSONBody
 
+// RevokeAuthorizationJSONRequestBody defines body for RevokeAuthorization for application/json ContentType.
+type RevokeAuthorizationJSONRequestBody RevokeAuthorizationJSONBody
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
+
+// CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
+type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
@@ -784,6 +849,9 @@ type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
 // AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
 type AddBotJSONRequestBody AddBotJSONBody
+
+// RebindDirectoryJSONRequestBody defines body for RebindDirectory for application/json ContentType.
+type RebindDirectoryJSONRequestBody RebindDirectoryJSONBody
 
 // RebuildTeamMarkerJSONRequestBody defines body for RebuildTeamMarker for application/json ContentType.
 type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody
