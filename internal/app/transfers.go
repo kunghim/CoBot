@@ -32,17 +32,6 @@ func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskI
 	if err := a.assertSameTeamOwner(ctx, a.DB, task.TeamID, toBotID); err != nil {
 		return domain.Transfer{}, err
 	}
-	// Only one live offer per task, so an old offer can never be accepted
-	// after the owner has moved on.
-	if open, err := sqlite.ListTransfersForTask(ctx, a.DB, task.ID); err != nil {
-		return domain.Transfer{}, err
-	} else {
-		for _, t := range open {
-			if t.Status == domain.TransferOffered {
-				return domain.Transfer{}, domain.Conflict("error.transfer.already_offered", map[string]any{"transferId": t.ID})
-			}
-		}
-	}
 	transfer := domain.Transfer{
 		ID: domain.NewID(), TaskID: task.ID, FromBotID: task.OwnerID,
 		ToBotID: toBotID, TaskRevision: task.Revision, Note: strings.TrimSpace(note),
@@ -53,7 +42,23 @@ func (a *App) OfferTransfer(ctx context.Context, principal auth.Principal, taskI
 		return domain.Transfer{}, err
 	}
 	defer tx.Rollback()
+	// Only one live offer per task, so an old offer can never be accepted
+	// after the owner has moved on. Checked inside the insert transaction
+	// (backstopped by a partial unique index) so two concurrent offers
+	// cannot both land.
+	if open, err := sqlite.ListTransfersForTask(ctx, tx, task.ID); err != nil {
+		return domain.Transfer{}, err
+	} else {
+		for _, t := range open {
+			if t.Status == domain.TransferOffered {
+				return domain.Transfer{}, domain.Conflict("error.transfer.already_offered", map[string]any{"transferId": t.ID})
+			}
+		}
+	}
 	if err := sqlite.InsertTransfer(ctx, tx, transfer); err != nil {
+		if isUniqueViolation(err) {
+			return domain.Transfer{}, domain.Conflict("error.transfer.already_offered", nil)
+		}
 		return domain.Transfer{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -107,7 +112,7 @@ func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, tran
 		return domain.Task{}, err
 	}
 	defer tx.Rollback()
-	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferAccepted); err != nil {
+	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferOffered, domain.TransferAccepted); err != nil {
 		return domain.Task{}, err
 	}
 	if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, transfer.FromBotID); err != nil {
@@ -149,7 +154,7 @@ func (a *App) staleTransfer(ctx context.Context, transfer domain.Transfer) error
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferStale); err != nil {
+	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferOffered, domain.TransferStale); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -178,7 +183,7 @@ func (a *App) CancelTransfer(ctx context.Context, principal auth.Principal, tran
 		return domain.Transfer{}, err
 	}
 	defer tx.Rollback()
-	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferCancelled); err != nil {
+	if err := sqlite.SetTransferStatus(ctx, tx, transfer.ID, domain.TransferOffered, domain.TransferCancelled); err != nil {
 		return domain.Transfer{}, err
 	}
 	if err := tx.Commit(); err != nil {

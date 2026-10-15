@@ -78,20 +78,29 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 	}
 }
 
-// Start launches the dispatch loop until Stop. The loop also ticks the local
-// leases (H06): while this process runs, every live member's lease stays
-// fresh; after Stop they age out and external helpers refuse side effects.
+// Start launches the dispatch loop and the lease refresh loop until Stop.
+// Leases tick on their own goroutine (review B9): a slow engine call inside
+// dispatch must never starve the 2-second refresh, or every member's bridge
+// would start refusing side effects while the core is healthy (H06).
 func (s *Scheduler) Start() {
 	go func() {
 		defer close(s.done)
-		leaseTicker := time.NewTicker(platform.LeaseInterval)
-		defer leaseTicker.Stop()
 		for {
 			select {
 			case <-s.stop:
 				return
 			case botID := <-s.wake:
 				s.dispatchSafely(botID)
+			}
+		}
+	}()
+	go func() {
+		leaseTicker := time.NewTicker(platform.LeaseInterval)
+		defer leaseTicker.Stop()
+		for {
+			select {
+			case <-s.stop:
+				return
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(context.Background())
 			}
@@ -278,6 +287,12 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	// The counted wake committed with the claim: emit its events now, before
+	// any engine interaction can fail, so the fact is never persisted without
+	// its trail (review B18).
+	for _, ev := range chainEvents {
+		s.app.recordEvent(ctx, ev)
+	}
 
 	// Engine interaction happens outside any SQL transaction.
 	server, err := s.EnsureTeamServer(ctx, team.ID, directory)
@@ -319,9 +334,6 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return err
-	}
-	for _, ev := range chainEvents {
-		s.app.recordEvent(ctx, ev)
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: run.ID})
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: message.ID})

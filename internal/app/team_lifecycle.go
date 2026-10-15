@@ -144,6 +144,17 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 		return domain.Team{}, err
 	}
 	defer tx.Rollback()
+	// Everything the delete changes — including the lifecycle state with its
+	// revision check and a fresh open-work census — happens in this one
+	// transaction: a stale expectedRevision must roll the whole delete back
+	// instead of leaving a half-removed team (review B7/B11).
+	work, err = sqlite.TeamOpenWork(ctx, tx, teamID)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	if work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+		return domain.Team{}, openWorkError("team", work)
+	}
 	if _, err := sqlite.CancelQueuedDeliveriesByTeam(ctx, tx, teamID, ""); err != nil {
 		return domain.Team{}, err
 	}
@@ -153,12 +164,12 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if err := sqlite.UnbindTeamDirectory(ctx, tx, teamID); err != nil {
 		return domain.Team{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Team{}, err
-	}
-	deleted, err := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusDeleted, "", expectedRevision)
+	deleted, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusDeleted, "", expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
 	}
 	if a.CollaborationTokens != nil {
 		for _, bot := range mustListBots(ctx, a, teamID) {

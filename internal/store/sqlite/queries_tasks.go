@@ -134,7 +134,10 @@ func ChangeTaskOwner(ctx context.Context, tx *sql.Tx, taskID, ownerID string) er
 
 // ---- dependencies ----
 
-// ListDependencies returns the ids a task depends on.
+// ListDependencies returns the ids a task depends on. The result is never
+// nil: the wire contract promises an array, not null (a nil slice would
+// serialize as null and break array-typed consumers).
+// (normalization happens at the end of the function)
 func ListDependencies(ctx context.Context, q Queryer, taskID string) ([]string, error) {
 	rows, err := q.QueryContext(ctx, `SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id`, taskID)
 	if err != nil {
@@ -149,7 +152,13 @@ func ListDependencies(ctx context.Context, q Queryer, taskID string) ([]string, 
 		}
 		out = append(out, id)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []string{}
+	}
+	return out, nil
 }
 
 // AddDependency records one edge; the caller has already proven the tasks
@@ -286,10 +295,17 @@ func GetTransfer(ctx context.Context, q Queryer, id string) (domain.Transfer, er
 
 // SetTransferStatus transitions a transfer with optimistic revision on the
 // owning task.
-func SetTransferStatus(ctx context.Context, tx *sql.Tx, id, status string) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE transfers SET status = ?, updated_at = ? WHERE id = ?`,
-		status, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
+// SetTransferStatus moves a transfer only from the expected state: the guard
+// lives in the WHERE clause, so two concurrent accept/cancel attempts cannot
+// both succeed (one sees no row and gets a conflict).
+func SetTransferStatus(ctx context.Context, tx *sql.Tx, id, fromStatus, toStatus string) error {
+	res, err := tx.ExecContext(ctx, `UPDATE transfers SET status = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		toStatus, time.Now().UTC().Format(time.RFC3339Nano), id, fromStatus)
+	if err != nil {
 		return fmt.Errorf("update transfer: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return domain.Conflict("error.transfer.not_offered", map[string]any{"status": fromStatus})
 	}
 	return nil
 }

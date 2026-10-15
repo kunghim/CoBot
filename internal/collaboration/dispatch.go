@@ -2,6 +2,8 @@ package collaboration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"time"
 
@@ -33,6 +35,10 @@ type App interface {
 	SubmitMergeRequest(ctx context.Context, principal auth.Principal, taskID, candidateRef, targetRef, executionDirectory string, evidenceIDs []string) (domain.Approval, error)
 	RememberMemory(ctx context.Context, principal auth.Principal, body, sourceTaskID string) (domain.Memory, error)
 	SearchMemories(ctx context.Context, principal auth.Principal, query string, limit int) (map[string]any, error)
+	// Write idempotency (E05): a retried side-effect call replays its stored
+	// result; the same key with different arguments is a conflict.
+	WriteReplay(ctx context.Context, scope, principal, key, argsHash string) (string, bool, error)
+	WriteReplaySave(ctx context.Context, scope, principal, key, argsHash, response string) error
 }
 
 // Dispatcher validates a bot's identity and routes one tool call onto the
@@ -103,9 +109,58 @@ func asToolError(err error, target **ToolError) bool {
 	return ok
 }
 
-// CallTool routes one tool by name. Every write tool requires an idempotency
-// key; read tools do not.
+// CallTool routes one tool by name with write idempotency (E05): a retried
+// side-effect call carrying the same key and the same arguments replays the
+// stored result instead of creating a second resource, and the same key with
+// different arguments is rejected. Read tools and keyless calls pass through
+// to the router, where each write tool still enforces key presence.
 func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
+	var replayKey, replayHash string
+	if IsSideEffectTool(call.Name) && principal.Kind == auth.KindBot && principal.BotID != "" {
+		var probe struct {
+			RequestID string `json:"idempotencyKey"`
+		}
+		if err := json.Unmarshal(call.Arguments, &probe); err == nil && probe.RequestID != "" {
+			replayKey = probe.RequestID
+			replayHash = canonicalArgsHash(call.Arguments)
+			cached, hit, rerr := d.app.WriteReplay(ctx, "mcp."+call.Name, principal.BotID, replayKey, replayHash)
+			if rerr != nil {
+				return errorResult(rerr)
+			}
+			if hit {
+				var stored ToolResult
+				if json.Unmarshal([]byte(cached), &stored) == nil {
+					return stored
+				}
+			}
+		}
+	}
+	result := d.callToolOnce(ctx, principal, call)
+	// Store the outcome only for real successes: a rejected or failed call
+	// must not poison the key, so the caller can fix its input and retry.
+	if replayKey != "" && (result.Status == StatusAccepted || result.Status == StatusOK ||
+		result.Status == StatusWaiting || result.Status == StatusDuplicate) {
+		if payload, err := json.Marshal(result); err == nil {
+			_ = d.app.WriteReplaySave(ctx, "mcp."+call.Name, principal.BotID, replayKey, replayHash, string(payload))
+		}
+	}
+	return result
+}
+
+// canonicalArgsHash fingerprints arguments with stable key order, so a retry
+// that reserializes the same object still matches the stored request.
+func canonicalArgsHash(raw json.RawMessage) string {
+	var canon any
+	if err := json.Unmarshal(raw, &canon); err != nil {
+		canon = string(raw)
+	}
+	stable, _ := json.Marshal(canon)
+	sum := sha256.Sum256(stable)
+	return hex.EncodeToString(sum[:])
+}
+
+// callToolOnce is the routing switch itself (pre-idempotency behavior).
+func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
 	ctx, cancel := context.WithTimeout(ctx, dispatchTimeout)
 	defer cancel()
 
@@ -503,13 +558,4 @@ func (d *Dispatcher) requireBot(ctx context.Context, principal auth.Principal) (
 
 func (d *Dispatcher) captainOf(ctx context.Context, teamID string) (string, error) {
 	return d.app.CaptainOf(ctx, teamID)
-}
-
-// contextWithTimeout is a small helper so every bridge-driven call is bounded
-// even when the caller supplies no deadline.
-func contextWithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
-	if _, ok := parent.Deadline(); ok {
-		return context.WithCancel(parent)
-	}
-	return context.WithTimeout(parent, d)
 }

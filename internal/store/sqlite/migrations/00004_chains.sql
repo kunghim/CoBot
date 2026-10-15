@@ -9,7 +9,7 @@ CREATE TABLE chains (
     origin_message_id TEXT NOT NULL,
     origin_bot_id     TEXT NOT NULL DEFAULT '',
     epoch             INTEGER NOT NULL DEFAULT 1,
-    status            TEXT NOT NULL DEFAULT 'active', -- active|awaiting_approval|stopped
+    status            TEXT NOT NULL DEFAULT 'active', -- active|evaluating|awaiting_approval|stopped
     wake_count        INTEGER NOT NULL DEFAULT 0,
     limit_count       INTEGER NOT NULL,
     risk_start        INTEGER NOT NULL,

@@ -481,6 +481,40 @@ paths:
                       data: { $ref: "#/components/schemas/Team" }
         "404":
           $ref: "#/components/responses/Error"
+    post:
+      operationId: retryTeam
+      security:
+        - SessionCookie: []
+      summary: Retry a team whose staged creation failed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Retried team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/archive:
     post:
       operationId: archiveTeam
@@ -1310,6 +1344,8 @@ paths:
                           items:
                             type: array
                             items: { $ref: "#/components/schemas/Memory" }
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/bots/{id}/memories/{memoryId}:
     delete:
       operationId: deleteMemory
@@ -1474,7 +1510,10 @@ paths:
                                 teamId: { type: string }
                                 engineEpoch: { type: string }
                                 expiresAt: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
   /api/v1/authorizations/{id}/revoke:
+
     post:
       operationId: revokeAuthorization
       security:
@@ -1510,6 +1549,41 @@ paths:
                           revoked: { type: boolean }
         "404":
           $ref: "#/components/responses/Error"
+  /internal/v1/session/link:
+    post:
+      operationId: internalSessionLink
+      security:
+        - InstanceSecret: []
+      summary: Mint a one-time bootstrap secret (internal, instance secret only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: One-time bootstrap secret
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          bootstrapSecret: { type: string }
+                          endpoint: { type: string }
+                          expiresAt: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
   /internal/v1/collaboration:
     post:
       operationId: collaborationTool
@@ -1538,6 +1612,11 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   securitySchemes:
+    InstanceSecret:
+      type: apiKey
+      in: header
+      name: X-Instance-Secret
+      description: Local instance secret for internal endpoints; only a process holding this profile's runtime credential may mint bootstrap links.
     SessionCookie:
       type: apiKey
       in: cookie
@@ -1825,14 +1904,15 @@ components:
         enginePath: { type: string }
     Snapshot:
       type: object
-      required: [seq, instanceId, settings, teams]
+      required: [seq, instanceId, settings, teams, engine]
       properties:
         seq: { type: integer, format: int64 }
         instanceId: { type: string }
         settings: { $ref: "#/components/schemas/Settings" }
         teams:
           type: array
-          items: { type: object, additionalProperties: true }
+          items: { $ref: "#/components/schemas/TeamWithBots" }
+        engine: { $ref: "#/components/schemas/EngineStatus" }
     Team:
       type: object
       required: [id, name, profileInstanceId, leaderId, status, revision]

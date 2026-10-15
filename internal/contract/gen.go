@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	BotTokenScopes      = "BotToken.Scopes"
-	CSRFTokenScopes     = "CSRFToken.Scopes"
-	SessionCookieScopes = "SessionCookie.Scopes"
+	BotTokenScopes       = "BotToken.Scopes"
+	CSRFTokenScopes      = "CSRFToken.Scopes"
+	InstanceSecretScopes = "InstanceSecret.Scopes"
+	SessionCookieScopes  = "SessionCookie.Scopes"
 )
 
 // Defines values for ApprovalRequestState.
@@ -469,10 +470,11 @@ type SettingsPatchLanguage string
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
-	InstanceId string                   `json:"instanceId"`
-	Seq        int64                    `json:"seq"`
-	Settings   Settings                 `json:"settings"`
-	Teams      []map[string]interface{} `json:"teams"`
+	Engine     EngineStatus   `json:"engine"`
+	InstanceId string         `json:"instanceId"`
+	Seq        int64          `json:"seq"`
+	Settings   Settings       `json:"settings"`
+	Teams      []TeamWithBots `json:"teams"`
 }
 
 // Status defines model for Status.
@@ -735,6 +737,11 @@ type PatchTeamJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// RetryTeamJSONBody defines parameters for RetryTeam.
+type RetryTeamJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // ListActivityParams defines parameters for ListActivity.
 type ListActivityParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -784,6 +791,11 @@ type AcceptTaskTransferJSONBody struct {
 
 // CancelTaskTransferJSONBody defines parameters for CancelTaskTransfer.
 type CancelTaskTransferJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// InternalSessionLinkJSONBody defines parameters for InternalSessionLink.
+type InternalSessionLinkJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -844,6 +856,9 @@ type CreateTeamJSONRequestBody CreateTeamJSONBody
 // PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
 type PatchTeamJSONRequestBody PatchTeamJSONBody
 
+// RetryTeamJSONRequestBody defines body for RetryTeam for application/json ContentType.
+type RetryTeamJSONRequestBody RetryTeamJSONBody
+
 // ArchiveTeamJSONRequestBody defines body for ArchiveTeam for application/json ContentType.
 type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
@@ -870,3 +885,6 @@ type CancelTaskTransferJSONRequestBody CancelTaskTransferJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest
+
+// InternalSessionLinkJSONRequestBody defines body for InternalSessionLink for application/json ContentType.
+type InternalSessionLinkJSONRequestBody InternalSessionLinkJSONBody

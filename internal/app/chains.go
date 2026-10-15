@@ -205,10 +205,10 @@ func (a *App) requestChainDecision(ctx context.Context, tx *sql.Tx, chain domain
 	if exists {
 		return nil, nil // this chain already waits on a card
 	}
-	summary := "下一步将继续推进当前任务，请确认是否按当前方向继续"
+	summary := "approval.card.chain_risk"
 	reason := "risk_zone"
 	if overLimit {
-		summary = "协作链的唤醒次数已用尽，请确认是否再继续推进一次"
+		summary = "approval.card.chain_over_limit"
 		reason = "over_limit"
 	}
 	binding, err := json.Marshal(chainApprovalBinding{

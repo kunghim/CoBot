@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -115,6 +116,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 	}
 
 	var text string
+	assistantID := ""
 	if rt := s.runtime(teamID); rt != nil {
 		rt.mu.Lock()
 		if buf := rt.buffer[run.ID]; buf != nil {
@@ -156,6 +158,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		if err := sqlite.InsertMessage(ctx, tx, assistant); err != nil {
 			return
 		}
+		assistantID = assistant.ID
 	}
 	nextStatus := domain.BotStatusIdle
 	if queued, err := sqlite.CountQueuedDeliveries(ctx, tx, botID); err == nil && queued > 0 {
@@ -168,20 +171,17 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		return
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: botID, ResourceID: run.ID})
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: teamID, BotID: botID, ResourceID: botID})
+	messageResource := assistantID
+	if messageResource == "" {
+		messageResource = botID
+	}
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: teamID, BotID: botID, ResourceID: messageResource})
 	s.app.Hub.Publish()
 	s.Wake(botID) // pick up the next queued delivery without model help
 }
 
 func joinTexts(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ""
-		}
-		out += p
-	}
-	return out
+	return strings.Join(parts, "\n")
 }
 
 // onApproval persists a native tool approval and projects it to the member
@@ -272,9 +272,12 @@ func nativeToolOptions(method string) []domain.ApprovalOption {
 			{ID: "deny", MessageKey: "approval.option.permissions.deny"},
 		}
 	}
+	// "Always allow" (acceptForSession) is deliberately NOT offered: this
+	// build could not verify its session semantics or provide a runtime
+	// revocation, and plan 3.5 requires disabling a capability that cannot
+	// be implemented accurately (review A6; F07 stays unimplemented).
 	return []domain.ApprovalOption{
 		{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.allow_once"},
-		{ID: "acceptForSession", MessageKey: "approval.option.allow_thread_session"},
 		{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.decline"},
 	}
 }
@@ -291,6 +294,7 @@ func truncate(s string, max int) string {
 // automatic restart happens.
 func (s *Scheduler) onServerExit(teamID string, err error) {
 	s.mu.Lock()
+	rt := s.teams[teamID]
 	delete(s.teams, teamID)
 	s.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -318,6 +322,29 @@ func (s *Scheduler) onServerExit(teamID string, err error) {
 			continue
 		}
 		s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: run.BotID, ResourceID: run.ID})
+	}
+	// Pending approvals bound to the dead connection can never be answered
+	// from it; invalidate them now instead of leaving cards that only fail
+	// later (review B14, F04).
+	if rt != nil {
+		epoch := rt.server.Epoch()
+		// Collect this connection's pending cards first — the invalidate step
+		// removes them from the pending set — then expire their responses and
+		// publish each one so history shows why the card stopped.
+		if pending, lerr := sqlite.ListPendingApprovalsOfType(ctx, s.app.DB, domain.ApprovalNativeTool); lerr == nil {
+			var mine []domain.Approval
+			for _, approval := range pending {
+				if approval.EngineEpoch == epoch {
+					mine = append(mine, approval)
+				}
+			}
+			if n, ierr := sqlite.InvalidateApprovalsOfEpoch(ctx, s.app.DB, epoch); ierr == nil && n > 0 {
+				for _, approval := range mine {
+					_ = sqlite.EnsureApprovalResponseState(ctx, s.app.DB, approval.ID, domain.ResponseExpired, "engine_exited")
+					s.app.publishApprovalUpdated(ctx, approval)
+				}
+			}
+		}
 	}
 	s.app.Hub.Publish()
 }

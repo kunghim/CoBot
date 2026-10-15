@@ -195,7 +195,7 @@ func engineResponseFor(approvalType, method, optionID string) (map[string]any, e
 		return map[string]any{"permissions": map[string]any{}}, nil
 	default:
 		switch optionID {
-		case "accept", "acceptForSession", "decline":
+		case "accept", "decline":
 			return map[string]any{"decision": optionID}, nil
 		default:
 			return nil, nil

@@ -651,17 +651,25 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	if len(fake.Turns()) != 1 {
 		t.Fatal("locked bot must not start new turns after connection loss")
 	}
-	decided, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
+	// Connection death invalidates the undecided card immediately (F04:
+	// 未决失效) and marks its response honestly expired — the dead engine can
+	// never answer its request id. A later decision is therefore refused
+	// instead of recording a decision that could not be delivered.
+	invalidated, err := sqlite.GetApproval(ctx, h.app.DB, pending[0].ID)
 	if err != nil {
-		t.Fatalf("decide on stale approval: %v", err)
+		t.Fatalf("read card after exit: %v", err)
 	}
-	if decided.ResponseState != domain.ResponseUnknown {
-		t.Fatalf("decision without a live connection must be unknown, got %s", decided.ResponseState)
+	if invalidated.RequestState != domain.ApprovalStateInvalidated {
+		t.Fatalf("card of the dead connection = %s, want invalidated at exit", invalidated.RequestState)
 	}
-	// Decided history is preserved even though delivery is unknown.
-	if decided.Decision == nil || decided.RequestState != domain.ApprovalStateDecided {
-		t.Fatalf("decision must be preserved: %+v", decided)
+	if invalidated.ResponseState != domain.ResponseExpired {
+		t.Fatalf("card response = %q, want expired", invalidated.ResponseState)
 	}
+	if _, derr := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0); derr == nil {
+		t.Fatal("an invalidated card must refuse a new decision")
+	}
+	// Decided history rules still hold for cards decided before the crash:
+	// nothing else to assert here beyond the refusal above.
 
 	// F04: once the run is resolved (recovery does this in M4; here we
 	// simulate the resolved state) and a NEW server generation exists, the
@@ -721,12 +729,17 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 		r, err := sqlite.GetRun(ctx, h.app.DB, pending2[0].RunID)
 		return err == nil && r.Status == domain.RunUnknown
 	})
-	decided3, err := h.app.DecideApproval(ctx, h.user, pending2[0].ID, "decline", "", 0)
+	// The same rule as the first crash: the card is invalidated when its
+	// connection dies, so no decision can be recorded against it.
+	invalidated2, err := sqlite.GetApproval(ctx, h.app.DB, pending2[0].ID)
 	if err != nil {
-		t.Fatalf("decide after second crash: %v", err)
+		t.Fatalf("read card after second crash: %v", err)
 	}
-	if decided3.ResponseState != domain.ResponseUnknown {
-		t.Fatalf("want unknown after connection loss, got %s", decided3.ResponseState)
+	if invalidated2.RequestState != domain.ApprovalStateInvalidated || invalidated2.ResponseState != domain.ResponseExpired {
+		t.Fatalf("card after second crash = %s/%s, want invalidated/expired", invalidated2.RequestState, invalidated2.ResponseState)
+	}
+	if _, derr := h.app.DecideApproval(ctx, h.user, pending2[0].ID, "decline", "", 0); derr == nil {
+		t.Fatal("an invalidated card must refuse a decision after the second crash")
 	}
 }
 

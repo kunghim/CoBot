@@ -263,9 +263,18 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 		return domain.Task{}, err
 	}
 	defer tx.Rollback()
+	// Re-read inside the transaction: two concurrent assignments must not
+	// both succeed against the same revision (review B8).
+	fresh, err := sqlite.GetTask(ctx, tx, taskID)
+	if err != nil {
+		return domain.Task{}, sqlite.NormalizeError(err)
+	}
+	if expectedRevision > 0 && fresh.Revision != expectedRevision {
+		return domain.Task{}, domain.RevisionConflict("error.task.revision_conflict", map[string]any{"expected": expectedRevision, "actual": fresh.Revision})
+	}
 	// Cancel the old owner's undelivered assignment, then give the new owner
 	// exactly one.
-	if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, task.OwnerID); err != nil {
+	if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, fresh.OwnerID); err != nil {
 		return domain.Task{}, err
 	}
 	if err := sqlite.ChangeTaskOwner(ctx, tx, task.ID, newOwnerID); err != nil {
@@ -338,6 +347,17 @@ func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, ta
 	}
 	if err := a.authorizeTaskWrite(ctx, principal, task, status); err != nil {
 		return domain.Task{}, err
+	}
+	// Cancelling is the captain's or the user's call; the owner does its own
+	// work but never silently kills the task (review B16, plan 3.4).
+	if status == domain.TaskCancelled && principal.Kind == auth.KindBot {
+		isLeader, lerr := a.isLeaderOf(ctx, task.TeamID, principal.BotID)
+		if lerr != nil {
+			return domain.Task{}, lerr
+		}
+		if !isLeader {
+			return domain.Task{}, domain.Forbidden("error.task.cancel_captain_only", nil)
+		}
 	}
 	switch status {
 	case domain.TaskDoing, domain.TaskReview:
@@ -542,6 +562,11 @@ func (a *App) GetTaskDetail(ctx context.Context, principal auth.Principal, taskI
 	task, err := sqlite.GetTask(ctx, a.DB, taskID)
 	if err != nil {
 		return nil, sqlite.NormalizeError(err)
+	}
+	// A bot may only read its own team's task: ownership rules already cover
+	// writes, this closes the read path (review B6).
+	if principal.Kind == auth.KindBot && task.TeamID != principal.TeamID {
+		return nil, domain.Forbidden("error.message.other_team", map[string]any{"taskId": taskID})
 	}
 	evidence, err := sqlite.ListEvidence(ctx, a.DB, taskID)
 	if err != nil {

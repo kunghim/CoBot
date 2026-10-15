@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -30,6 +31,17 @@ func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserI
 	bot, err := sqlite.GetBot(ctx, a.DB, principal.BotID)
 	if err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
+	}
+	// A question may only reference a task of the asking member's own team
+	// (review B6).
+	if in.TaskID != "" {
+		task, terr := sqlite.GetTask(ctx, a.DB, in.TaskID)
+		if terr != nil {
+			return domain.Question{}, sqlite.NormalizeError(terr)
+		}
+		if task.TeamID != bot.TeamID {
+			return domain.Question{}, domain.Forbidden("error.message.other_team", map[string]any{"taskId": in.TaskID})
+		}
 	}
 	item := domain.Question{
 		ID: domain.NewID(), TeamID: bot.TeamID, RequesterBotID: principal.BotID,
@@ -106,8 +118,12 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	}); err != nil {
 		return domain.Question{}, err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, question.RequesterBotID, domain.BotStatusQueued, ""); err != nil {
-		return domain.Question{}, err
+	// The asking member keeps its working projection if it is mid-run
+	// (review B13): answering enqueues, it never clears a live run.
+	if _, ferr := sqlite.FindActiveRun(ctx, tx, question.RequesterBotID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
+		if err := sqlite.SetBotRunState(ctx, tx, question.RequesterBotID, domain.BotStatusQueued, ""); err != nil {
+			return domain.Question{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Question{}, err

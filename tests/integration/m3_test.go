@@ -410,3 +410,65 @@ func TestTaskPermissionEdges(t *testing.T) {
 }
 
 var de *domain.Error
+
+// TestWriteIdempotencyReplaysAndRejectsKeyReuse pins E05 for the MCP write
+// path: a retried create with the same key and same arguments replays the
+// stored result (one task, same id), and the same key with different
+// arguments is rejected instead of silently creating a second task.
+func TestWriteIdempotencyReplaysAndRejectsKeyReuse(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	captain := bots[0]
+	token := h.botToken(t, captain)
+
+	create := func(title string) (int, map[string]any) {
+		return h.callTool(t, token, "create_task", map[string]any{
+			"title": title, "ownerId": captain.ID, "idempotencyKey": "e05-key",
+		})
+	}
+	taskFrom := func(envelope map[string]any) map[string]any {
+		data, _ := envelope["data"].(map[string]any)
+		payload, _ := data["data"].(map[string]any)
+		task, _ := payload["task"].(map[string]any)
+		return task
+	}
+
+	status, first := create("幂等任务")
+	if status != 200 {
+		t.Fatalf("first create status = %d body=%v", status, first)
+	}
+	created := taskFrom(first)
+	if created["id"] == nil || created["id"] == "" {
+		t.Fatalf("first create returned no task: %v", first)
+	}
+
+	// Retry: same key, same arguments -> replay of the same fact.
+	_, second := create("幂等任务")
+	replayed := taskFrom(second)
+	if replayed["id"] != created["id"] {
+		t.Fatalf("replay returned task %v, want the original %v", replayed["id"], created["id"])
+	}
+	var count int
+	if err := h.app.DB.QueryRow(`SELECT COUNT(*) FROM tasks WHERE team_id = ?`, team.ID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("tasks after replay = %d, want exactly 1", count)
+	}
+
+	// Same key, different arguments -> conflict, still exactly one task.
+	_, third := create("不同的标题")
+	data, _ := third["data"].(map[string]any)
+	statusField, _ := data["status"].(string)
+	errObj, _ := data["error"].(map[string]any)
+	messageKey, _ := errObj["messageKey"].(string)
+	if statusField != "rejected" || messageKey != "error.idempotency.reused_key" {
+		t.Fatalf("key reuse with new body = status %q key %q, want rejected/error.idempotency.reused_key", statusField, messageKey)
+	}
+	if err := h.app.DB.QueryRow(`SELECT COUNT(*) FROM tasks WHERE team_id = ?`, team.ID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("tasks after conflicting retry = %d, want 1", count)
+	}
+}

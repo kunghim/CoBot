@@ -237,7 +237,8 @@ export interface paths {
         /** One team with members */
         get: operations["getTeam"];
         put?: never;
-        post?: never;
+        /** Retry a team whose staged creation failed */
+        post: operations["retryTeam"];
         /** Soft-delete an archived team with no unfinished work; user files are never touched */
         delete: operations["deleteTeam"];
         options?: never;
@@ -742,6 +743,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/session/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint a one-time bootstrap secret (internal, instance secret only) */
+        post: operations["internalSessionLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/collaboration": {
         parameters: {
             query?: never;
@@ -1003,9 +1021,8 @@ export interface components {
             seq: number;
             instanceId: string;
             settings: components["schemas"]["Settings"];
-            teams: {
-                [key: string]: unknown;
-            }[];
+            teams: components["schemas"]["TeamWithBots"][];
+            engine: components["schemas"]["EngineStatus"];
         };
         Team: {
             id: string;
@@ -1532,6 +1549,39 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+        };
+    };
+    retryTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Retried team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     deleteTeam: {
@@ -2368,6 +2418,7 @@ export interface operations {
                     };
                 };
             };
+            404: components["responses"]["Error"];
         };
     };
     deleteMemory: {
@@ -2529,6 +2580,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["Error"];
         };
     };
     revokeAuthorization: {
@@ -2563,6 +2615,42 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+        };
+    };
+    internalSessionLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description One-time bootstrap secret */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            bootstrapSecret?: string;
+                            endpoint?: string;
+                            /** Format: date-time */
+                            expiresAt?: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
         };
     };
     collaborationTool: {

@@ -348,7 +348,7 @@ func SoftDeleteBot(ctx context.Context, tx *sql.Tx, botID string, expectedRevisi
 		return err
 	}
 	if expectedRevision > 0 && revision != expectedRevision {
-		return domain.RevisionConflict("error.settings.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+		return domain.RevisionConflict("error.bot.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	res, err := tx.ExecContext(ctx, `UPDATE bots SET deleted_at = ?, revision = revision + 1 WHERE id = ? AND deleted_at = ''`, now, botID)

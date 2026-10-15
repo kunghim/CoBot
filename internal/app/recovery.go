@@ -79,7 +79,7 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		card := domain.Approval{
 			ID: domain.NewID(), TeamID: run.TeamID, RequesterBotID: run.BotID,
 			EngineRequestID: binding, Type: domain.ApprovalRecovery,
-			Summary: "上次执行在进程退出后状态未知，请选择处理方式",
+			Summary: "approval.card.recovery",
 			Reason:  "unresolved_run",
 			Options: []domain.ApprovalOption{
 				{ID: domain.RecoveryOptionContinue, MessageKey: "approval.option.recovery_continue", Text: "继续"},
@@ -105,6 +105,15 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		approvalIDs = append(approvalIDs, approval.ID)
 	}
 	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// A chain decision whose side effect never landed (the process died
+	// between the approval CAS and the effect) would strand the chain in
+	// awaiting_approval with only a decided card — nobody could decide it
+	// again. Replay the recorded decision now (H09: preserve the known fact,
+	// complete the effect).
+	if err := a.replayStuckChainDecisions(ctx); err != nil {
 		return err
 	}
 
@@ -136,6 +145,38 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		}
 	}
 	a.Hub.Publish()
+	return nil
+}
+
+// replayStuckChainDecisions re-applies the decided option of every chain
+// card whose chain still waits. ApplyChainDecision is idempotent for the
+// continue path (the wake count uses the unique key) and safe to re-run for
+// stop (sweep and interrupt are no-ops when already applied).
+func (a *App) replayStuckChainDecisions(ctx context.Context) error {
+	chains, err := sqlite.ListChains(ctx, a.DB, "", domain.ChainAwaitingApproval, 200)
+	if err != nil {
+		return err
+	}
+	for _, chain := range chains {
+		cards, err := sqlite.ListApprovals(ctx, a.DB, chain.TeamID, domain.ApprovalStateDecided, 100)
+		if err != nil {
+			return err
+		}
+		for _, card := range cards {
+			if card.Type != domain.ApprovalChain || card.Decision == nil {
+				continue
+			}
+			var binding chainApprovalBinding
+			if json.Unmarshal(card.EngineRequestID, &binding) != nil || binding.ChainID != chain.ID {
+				continue
+			}
+			a.Logger.Warn("replaying a chain decision whose side effect was interrupted", "chainId", chain.ID, "option", card.Decision.OptionID)
+			if err := a.ApplyChainDecision(ctx, card, card.Decision.OptionID); err != nil {
+				return err
+			}
+			break
+		}
+	}
 	return nil
 }
 
@@ -177,9 +218,13 @@ func (a *App) ApplyRecoveryDecision(ctx context.Context, approval domain.Approva
 		}
 		switch optionID {
 		case domain.RecoveryOptionRerun:
-			// Only a delivery whose execution is unknown can be requeued; a
-			// cancelled or already-queued one must not silently rerun.
-			if delivery.Status != domain.DeliveryUnknown && delivery.Status != domain.DeliveryDispatching {
+			// The run is already confirmed ended, so an accepted delivery —
+			// the common case: the engine took the turn and the process died
+			// mid-execution — is rerunnable too. Cancelled or live-queued
+			// work must not silently rerun.
+			if delivery.Status != domain.DeliveryUnknown &&
+				delivery.Status != domain.DeliveryDispatching &&
+				delivery.Status != domain.DeliveryAccepted {
 				return domain.Conflict("error.recovery.delivery_not_rerunnable", map[string]any{"status": delivery.Status})
 			}
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryQueued); err != nil {
