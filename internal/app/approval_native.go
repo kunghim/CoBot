@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -26,6 +27,10 @@ func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, op
 	approval, err := sqlite.GetApproval(ctx, tx, id)
 	if err != nil {
 		return domain.Approval{}, sqlite.NormalizeError(err)
+	}
+	projectNativeFileOptions(&approval)
+	if option == "accept" && approval.Method == "item/fileChange/requestApproval" && !hasFilePreview(approval) {
+		return domain.Approval{}, domain.Conflict("error.approval.file_preview_unavailable", nil)
 	}
 	response, err := engineResponseFor(approval.Type, approval.Method, option)
 	if err != nil {
@@ -62,6 +67,31 @@ func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, op
 	}
 	a.publishApprovalUpdated(ctx, approval)
 	return sqlite.GetApproval(ctx, a.DB, id)
+}
+
+func hasFilePreview(card domain.Approval) bool {
+	var details struct {
+		Paths   []string `json:"paths"`
+		Changes []struct {
+			Path string `json:"path"`
+		} `json:"changes"`
+	}
+	if json.Unmarshal([]byte(card.Summary), &details) != nil {
+		return false
+	}
+	return len(details.Paths) > 0 || len(details.Changes) > 0
+}
+
+func projectNativeFileOptions(card *domain.Approval) {
+	if card.Type != domain.ApprovalNativeTool || card.Method != "item/fileChange/requestApproval" || hasFilePreview(*card) {
+		return
+	}
+	for i := range card.Options {
+		if card.Options[i].ID == "accept" {
+			card.Options[i].Disabled = true
+			card.Options[i].DisabledReasonKey = "error.approval.file_preview_unavailable"
+		}
+	}
 }
 
 // A completion or a second approval can arrive before ReplyApproval returns.

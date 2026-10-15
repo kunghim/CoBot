@@ -444,7 +444,7 @@ func GetApproval(ctx context.Context, q Queryer, id string) (domain.Approval, er
 	a.EngineRequestID = []byte(engineReqID)
 	if a.Type == domain.ApprovalMerge {
 		var details domain.MergeApprovalDetails
-		if json.Unmarshal(a.EngineRequestID, &details) == nil {
+		if json.Unmarshal(a.EngineRequestID, &details) == nil && details.TaskID != "" && details.TaskRevision > 0 && details.Evidence != nil {
 			a.Details = &details
 		}
 	}
@@ -555,6 +555,9 @@ func DecideApprovalTx(ctx context.Context, tx *sql.Tx, approvalID, optionID, com
 	valid := false
 	for _, opt := range approval.Options {
 		if opt.ID == optionID {
+			if opt.Disabled {
+				return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", nil)
+			}
 			valid = true
 			break
 		}

@@ -34,11 +34,15 @@ type Server struct {
 	logger    *slog.Logger
 	callbacks engine.Callbacks
 
-	mu      sync.Mutex
-	pending map[string]pendingApproval // key: request-id JSON
-	intents map[string]string          // threadID -> turnID of active turn
-	closed  bool
+	mu        sync.Mutex
+	pending   map[string]pendingApproval // key: request-id JSON
+	intents   map[string]string          // threadID -> turnID of active turn
+	closed    bool
+	cwd       string
+	fileItems map[nativeItemKey][]engine.FileChange
 }
+
+type nativeItemKey struct{ ThreadID, TurnID, ItemID string }
 
 type pendingApproval struct {
 	threadID string
@@ -77,11 +81,13 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		return nil, fmt.Errorf("start codex app-server: %w", err)
 	}
 	s := &Server{
-		cmd:     cmd,
-		epoch:   domain.NewEpochID(),
-		logger:  opts.Logger,
-		pending: map[string]pendingApproval{},
-		intents: map[string]string{},
+		cmd:       cmd,
+		epoch:     domain.NewEpochID(),
+		logger:    opts.Logger,
+		pending:   map[string]pendingApproval{},
+		intents:   map[string]string{},
+		cwd:       opts.Cwd,
+		fileItems: map[nativeItemKey][]engine.FileChange{},
 	}
 	s.client = NewClient(stdin, stdout, ClientHooks{
 		OnRequest: func(req InboundRequest) { s.handleRequest(req) },
@@ -132,9 +138,7 @@ func (s *Server) handleRequest(req InboundRequest) {
 
 	var paths []string
 	var fileChange struct {
-		Changes []struct {
-			Path string `json:"path"`
-		} `json:"changes"`
+		Changes []engine.FileChange `json:"changes"`
 	}
 	if err := json.Unmarshal(req.Params, &fileChange); err == nil {
 		for _, ch := range fileChange.Changes {
@@ -145,23 +149,84 @@ func (s *Server) handleRequest(req InboundRequest) {
 	}
 
 	s.mu.Lock()
+	if req.Method == "item/fileChange/requestApproval" {
+		if cached := s.fileItems[nativeItemKey{base.ThreadID, base.TurnID, base.ItemID}]; len(cached) > 0 {
+			fileChange.Changes = append([]engine.FileChange(nil), cached...)
+			paths = nil
+			for _, change := range cached {
+				paths = append(paths, change.Path)
+			}
+		}
+		if base.Cwd == "" {
+			base.Cwd = s.cwd
+		}
+	}
 	s.pending[string(req.ID)] = pendingApproval{threadID: base.ThreadID, turnID: base.TurnID}
 	s.mu.Unlock()
 
-	if s.callbacks.OnApproval != nil {
-		s.callbacks.OnApproval(engine.ApprovalRequest{
-			RequestID: req.ID,
-			Method:    req.Method,
-			ThreadID:  base.ThreadID,
-			TurnID:    base.TurnID,
-			ItemID:    base.ItemID,
-			Command:   base.Command,
-			Cwd:       base.Cwd,
-			Reason:    base.Reason,
-			Paths:     paths,
-			RawParams: req.Params,
-		})
+	approval := engine.ApprovalRequest{
+		RequestID: req.ID,
+		Method:    req.Method,
+		ThreadID:  base.ThreadID,
+		TurnID:    base.TurnID,
+		ItemID:    base.ItemID,
+		Command:   base.Command,
+		Cwd:       base.Cwd,
+		Reason:    base.Reason,
+		Paths:     paths,
+		Changes:   fileChange.Changes,
+		RawParams: req.Params,
 	}
+	if s.callbacks.OnApproval == nil {
+		return
+	}
+	if req.Method == "item/fileChange/requestApproval" && len(approval.Changes) == 0 && s.client != nil {
+		// Some versions request approval before publishing item/started. An RPC
+		// must not run on Client's read loop, which also resolves that RPC.
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if changes, err := s.inspectFileChanges(ctx, base.ThreadID, base.TurnID, base.ItemID); err == nil && len(changes) > 0 {
+				approval.Changes = changes
+				approval.Paths = nil
+				for _, change := range changes {
+					approval.Paths = append(approval.Paths, change.Path)
+				}
+			}
+			s.callbacks.OnApproval(approval)
+		}()
+		return
+	}
+	s.callbacks.OnApproval(approval)
+}
+
+func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemID string) ([]engine.FileChange, error) {
+	var out struct {
+		Thread struct {
+			Turns []struct {
+				ID    string `json:"id"`
+				Items []struct {
+					ID      string              `json:"id"`
+					Type    string              `json:"type"`
+					Changes []engine.FileChange `json:"changes"`
+				} `json:"items"`
+			} `json:"turns"`
+		} `json:"thread"`
+	}
+	if err := s.client.Call(ctx, "thread/read", map[string]any{"threadId": threadID, "includeTurns": true}, &out); err != nil {
+		return nil, err
+	}
+	for _, turn := range out.Thread.Turns {
+		if turn.ID != turnID {
+			continue
+		}
+		for _, item := range turn.Items {
+			if item.ID == itemID && item.Type == "fileChange" {
+				return item.Changes, nil
+			}
+		}
+	}
+	return nil, errors.New("exact pending file item not found")
 }
 
 func (s *Server) handleNotify(method string, params json.RawMessage) {
@@ -180,10 +245,15 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 						delete(s.pending, key)
 					}
 				}
+				for key := range s.fileItems {
+					if key.ThreadID == n.ThreadID && key.TurnID == n.TurnID {
+						delete(s.fileItems, key)
+					}
+				}
 				s.mu.Unlock()
 			}
 		}
-	case "item/completed":
+	case "item/started", "item/completed":
 		var p ItemCompletedParams
 		if err := json.Unmarshal(params, &p); err == nil {
 			n.ThreadID = p.ThreadID
@@ -193,6 +263,19 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 				n.ItemID = item.ID
 				n.ItemType = item.Type
 				n.Text = item.Text
+				if item.Type == "fileChange" {
+					var file struct {
+						Changes []engine.FileChange `json:"changes"`
+					}
+					if json.Unmarshal(p.Item, &file) == nil {
+						s.mu.Lock()
+						if s.fileItems == nil {
+							s.fileItems = map[nativeItemKey][]engine.FileChange{}
+						}
+						s.fileItems[nativeItemKey{n.ThreadID, n.TurnID, n.ItemID}] = file.Changes
+						s.mu.Unlock()
+					}
+				}
 			}
 		}
 	case "item/agentMessage/delta":

@@ -12,6 +12,60 @@ import (
 	"github.com/kunghim/CoBot/internal/engine"
 )
 
+func TestFileApprovalUsesExactNativeItemPreview(t *testing.T) {
+	var received engine.ApprovalRequest
+	server := &Server{cwd: "team-directory", pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnApproval: func(req engine.ApprovalRequest) { received = req }}}
+	item := json.RawMessage(`{"threadId":"th","turnId":"turn","item":{"id":"item","type":"fileChange","status":"inProgress","changes":[{"path":"file.txt","kind":{"type":"add"},"diff":"+expected"}]}}`)
+	server.handleNotify("item/started", item)
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`1`), Method: "item/fileChange/requestApproval", Params: json.RawMessage(`{"threadId":"th","turnId":"turn","itemId":"item"}`)})
+	if len(received.Paths) != 1 || received.Paths[0] != "file.txt" || len(received.Changes) != 1 || received.Changes[0].Diff != "+expected" || received.Cwd != "team-directory" {
+		t.Fatalf("missing exact preview: %+v", received)
+	}
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`2`), Method: "item/fileChange/requestApproval", Params: json.RawMessage(`{"threadId":"th","turnId":"other","itemId":"item"}`)})
+	if len(received.Paths) != 0 {
+		t.Fatal("a prior turn's file preview was reused")
+	}
+	server.handleNotify("turn/completed", json.RawMessage(`{"threadId":"th","turn":{"id":"turn","status":"completed"}}`))
+	if len(server.fileItems) != 0 {
+		t.Fatal("terminal turn retained native file previews")
+	}
+}
+
+func TestMissingFilePreviewReadsExactItemWithoutBlockingReader(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	received := make(chan engine.ApprovalRequest, 1)
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnApproval: func(req engine.ApprovalRequest) { received <- req }}}
+	client := NewClient(nopCloser{inW}, outR, ClientHooks{OnRequest: server.handleRequest})
+	server.client = client
+	t.Cleanup(func() { inW.Close(); outW.Close(); client.Wait() })
+	go func() {
+		scanner := bufio.NewScanner(inR)
+		for scanner.Scan() {
+			var req map[string]any
+			if json.Unmarshal(scanner.Bytes(), &req) != nil {
+				return
+			}
+			if req["method"] != "thread/read" {
+				continue
+			}
+			writeJSONLine(outW, map[string]any{"id": req["id"], "result": map[string]any{"thread": map[string]any{"turns": []any{
+				map[string]any{"id": "other", "items": []any{map[string]any{"id": "item", "type": "fileChange", "changes": []any{map[string]any{"path": "wrong.txt", "diff": "wrong"}}}}},
+				map[string]any{"id": "turn", "items": []any{map[string]any{"id": "item", "type": "fileChange", "changes": []any{map[string]any{"path": "expected.txt", "diff": "+right"}}}}},
+			}}}})
+		}
+	}()
+	writeJSONLine(outW, map[string]any{"id": "native-request", "method": "item/fileChange/requestApproval", "params": map[string]any{"threadId": "thread", "turnId": "turn", "itemId": "item"}})
+	select {
+	case req := <-received:
+		if len(req.Changes) != 1 || req.Changes[0].Path != "expected.txt" || req.Changes[0].Diff != "+right" {
+			t.Fatalf("wrong file preview: %+v", req)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("file inspection blocked the RPC reader")
+	}
+}
+
 func TestUnsupportedServerRequestsDoNotBecomeCommandApprovals(t *testing.T) {
 	for _, method := range []string{"mcpServer/elicitation/request", "unknown/request"} {
 		var output bytes.Buffer

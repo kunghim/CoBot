@@ -198,7 +198,7 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
                     type="button"
                     onClick={() => {
                       setErrorText('');
-                      accept.mutate(item.id, { onError: fail });
+                      accept.mutate({ transferId: item.id, expectedRevision: current.revision }, { onError: fail });
                     }}
                     className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
                   >

@@ -182,20 +182,9 @@ func (a *App) PersistChainAction(ctx context.Context, tx *sql.Tx, action ChainGa
 // pendingChainDecisionExists reports whether the chain already has an open
 // confirmation card, so repeated wake attempts never stack duplicates.
 func pendingChainDecisionExists(ctx context.Context, q sqlite.Queryer, teamID, chainID string) (bool, error) {
-	pending, err := sqlite.ListApprovals(ctx, q, teamID, domain.ApprovalStatePending, 100)
-	if err != nil {
-		return false, err
-	}
-	for _, existing := range pending {
-		if existing.Type != domain.ApprovalChain {
-			continue
-		}
-		var binding chainApprovalBinding
-		if json.Unmarshal(existing.EngineRequestID, &binding) == nil && binding.ChainID == chainID {
-			return true, nil
-		}
-	}
-	return false, nil
+	var count int
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM approvals WHERE team_id = ? AND type = ? AND request_state = ? AND json_valid(engine_request_id) AND json_extract(engine_request_id,'$.chainId') = ?`, teamID, domain.ApprovalChain, domain.ApprovalStatePending, chainID).Scan(&count)
+	return count > 0, err
 }
 
 func (a *App) requestChainDecision(ctx context.Context, tx *sql.Tx, chain domain.Chain, delivery sqlite.DeliveryRecord, overLimit bool) ([]domain.Event, error) {

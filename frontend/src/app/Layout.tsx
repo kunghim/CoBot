@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Home, PanelLeftOpen, PanelRightOpen, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
@@ -52,13 +52,16 @@ export default function Layout() {
   const [panelOpen, setPanelOpen] = useState(startsOpen);
   const { botId, setBotId } = useSelectedBot();
   const teams = useTeams(true);
+  const knownSelections = useRef(new Set<string>());
 
   // A selection whose bot no longer exists (team deleted elsewhere) clears
   // itself instead of pointing at nothing.
   useEffect(() => {
     if (!botId || !teams.data) return;
     const exists = teams.data.items.some((item) => item.bots.some((bot) => bot.id === botId));
-    if (!exists) setBotId(null);
+    if (exists) knownSelections.current.add(botId);
+    else if (teams.hasNextPage) { if (!teams.isFetchingNextPage) void teams.fetchNextPage(); }
+    else if (knownSelections.current.has(botId) && !teams.isFetching) setBotId(null);
   }, [teams.data, botId, setBotId]);
 
   return (

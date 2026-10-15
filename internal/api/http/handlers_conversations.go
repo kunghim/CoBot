@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -14,17 +13,7 @@ type sendMessageRequest struct {
 }
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	data, err := s.App.ListConversation(r.Context(), principal, r.PathValue("id"), r.URL.Query().Get("before"), limit)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, data)
+	s.handlePage(w, r, "messages")
 }
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {

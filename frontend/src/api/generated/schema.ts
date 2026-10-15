@@ -806,12 +806,12 @@ export interface components {
             description?: string;
             acceptanceCriteria?: string;
             /** @enum {string} */
-            status: "todo" | "doing" | "review" | "cancelled";
+            status: "todo" | "doing" | "review" | "done" | "cancelled";
             blockedReason?: string;
-            dependencyIds?: string[];
+            dependencyIds: string[];
             /** Format: int64 */
             revision: number;
-            createdBy?: string;
+            createdBy: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -822,7 +822,7 @@ export interface components {
             taskId: string;
             authorId: string;
             summary: string;
-            artifactRefs?: string[];
+            artifactRefs: string[];
             candidateRef?: string;
             testResult?: string;
             reviewResult?: string;
@@ -869,11 +869,10 @@ export interface components {
             botId: string;
             /** @enum {string} */
             kind: "user" | "assistant" | "collaboration" | "system";
-            blocks: {
-                [key: string]: unknown;
-            }[];
+            blocks: components["schemas"]["TextBlock"][];
             requestId?: string;
-            deliveryStatus?: string;
+            /** @enum {string} */
+            deliveryStatus?: "waiting_dependency" | "queued" | "dispatching" | "accepted" | "cancelled" | "unknown";
             runId?: string;
             sourceBotId?: string;
             /** Format: date-time */
@@ -903,7 +902,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            status?: "todo" | "doing" | "review" | "done" | "cancelled";
+            status?: "todo" | "doing" | "review" | "cancelled";
             blockedReason?: string;
             ownerId?: string;
             /** Format: int64 */
@@ -1060,16 +1059,16 @@ export interface components {
             name: string;
             profileInstanceId: string;
             leaderId: string;
-            directory?: string;
+            directory: string;
             /** @enum {string} */
             status: "creating" | "active" | "archived" | "deleted" | "directory_missing" | "error";
             statusDetail?: string;
             /** Format: int64 */
             revision: number;
             /** Format: date-time */
-            createdAt?: string;
+            createdAt: string;
             /** Format: date-time */
-            updatedAt?: string;
+            updatedAt: string;
         };
         Bot: {
             id: string;
@@ -1084,7 +1083,7 @@ export interface components {
             /** Format: int64 */
             revision: number;
             /** Format: date-time */
-            createdAt?: string;
+            createdAt: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];
@@ -1152,6 +1151,25 @@ export interface components {
             };
             /** Format: date-time */
             createdAt: string;
+        };
+        TextBlock: {
+            type: string;
+            text: string;
+        };
+        Run: {
+            id: string;
+            teamId: string;
+            botId: string;
+            providerSessionId?: string;
+            providerTurnId?: string;
+            engineEpoch?: string;
+            /** @enum {string} */
+            status: "starting" | "running" | "waiting_approval" | "waiting_input" | "completed" | "failed" | "interrupted" | "unknown";
+            errorKey?: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt?: string;
         };
     };
     responses: {
@@ -1518,7 +1536,12 @@ export interface operations {
     };
     listTeams: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1858,6 +1881,9 @@ export interface operations {
     listMessages: {
         parameters: {
             query?: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 before?: string;
                 limit?: number;
             };
@@ -1969,6 +1995,9 @@ export interface operations {
     listApprovals: {
         parameters: {
             query: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 teamId: string;
                 state?: "pending" | "history";
                 requesterBotId?: string;
@@ -2035,6 +2064,9 @@ export interface operations {
     listTasks: {
         parameters: {
             query?: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 ownerId?: string;
                 limit?: number;
             };
@@ -2301,6 +2333,9 @@ export interface operations {
     listQuestions: {
         parameters: {
             query: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 teamId: string;
                 status?: "open" | "answered" | "cancelled";
                 limit?: number;
@@ -2393,6 +2428,9 @@ export interface operations {
     listCollaboration: {
         parameters: {
             query?: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 limit?: number;
             };
             header?: never;
@@ -2422,6 +2460,9 @@ export interface operations {
     listActivity: {
         parameters: {
             query?: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 limit?: number;
             };
             header?: never;
@@ -2451,6 +2492,9 @@ export interface operations {
     listMemories: {
         parameters: {
             query?: {
+                cursor?: string;
+                /** @description Selected member projection; a leader selects the whole team. */
+                viewBotId?: string;
                 limit?: number;
             };
             header?: never;

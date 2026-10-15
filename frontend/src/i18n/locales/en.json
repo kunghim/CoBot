@@ -57,7 +57,18 @@
       "waiting_input": "Needs input",
       "interrupted": "Interrupted",
       "unknown": "Needs verification"
-    }
+    },
+    "tools": {"add": "Add member", "rebind": "Change directory", "rebuild": "Rebuild marker"},
+    "closeTool": "Close team action",
+    "roleLabel": "Member role",
+    "chooseRole": "Select a role",
+    "directoryLabel": "Team directory",
+    "rebuildExplanation": "Recreate the team marker and resource folders. Previously deleted resources cannot be restored.",
+    "memberAdded": "Member added",
+    "directoryRebound": "Directory changed",
+    "markerRebuilt": "Marker rebuilt",
+    "rebuiltResourcesLost": "Marker rebuilt. Deleted resources were not restored.",
+    "rebuildUnconfirmed": "Rebuild outcome is unknown. Check the directory before trying a new operation."
   },
   "role": {
     "leader": { "name": "Leader" },
@@ -134,7 +145,23 @@
       "confirmed": "Confirmed by engine",
       "unknown": "Needs verification",
       "expired": "Expired"
-    }
+    },
+    "loadFailed": "Could not load approval requests",
+    "optionUnavailable": "This option cannot be verified for this request.",
+    "candidate": "Candidate",
+    "target": "Target",
+    "executionDirectory": "Execution directory",
+    "boundTask": "Task and revision",
+    "reportedEvidence": "These are Agent-reported test and review results for this candidate.",
+    "testReport": "Test report",
+    "reviewReport": "Review report",
+    "requestedAt": "Requested at {{time}}",
+    "originalOptions": "Original choices",
+    "comment": "Comment",
+    "laterInvalidated": "This request was later invalidated; its decision is preserved.",
+    "openConversation": "Open requester conversation",
+    "feedback": "{{type}} result: {{decision}}",
+    "feedbackDecision": {"approve": "Approved", "reject": "Rejected"}
   },
   "approval": {
     "card": {
@@ -208,6 +235,7 @@
     }
   },
   "tasks": {
+    "description": "Task description",
     "new": "New task",
     "create": "Create",
     "titleLabel": "Title",
@@ -335,6 +363,7 @@
     "error": "Failed to load"
   },
   "errors": {
+    "error.approval.file_preview_unavailable": "The exact file changes are unavailable. Approval is disabled; reject or stop this execution.",
     "error.internal": "Internal error; check the service log",
     "error.unauthorized.bad_bootstrap": "Startup link invalid or already used",
     "error.unauthorized.session_expired": "Page session expired; authorize again",
@@ -469,6 +498,25 @@
     "error.recovery.binding_missing": "This recovery card is missing its execution binding; refresh and retry",
     "error.recovery.not_unknown": "The execution is {{status}} and needs no recovery decision",
     "error.recovery.delivery_not_rerunnable": "The delivery is {{status}} and cannot be rerun",
-    "error.bot.open_work": "This member still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}"
+    "error.bot.open_work": "This member still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}",
+    "error.revision.required": "A positive current revision is required.",
+    "error.revision.header_conflict": "The request revision conflicts with If-Match.",
+    "error.idempotency.header_conflict": "The request ID conflicts with Idempotency-Key.",
+    "error.cursor.invalid": "This page cursor is invalid for the selected view.",
+    "error.scope.other_team": "This member belongs to another team.",
+    "error.merge.directory_invalid": "The execution directory must exist inside the team directory.",
+    "error.merge.directory_changed": "The team directory changed. Submit a fresh merge request.",
+    "error.merge.candidate_changed": "The task, candidate or directory changed. Submit a fresh merge request.",
+    "error.merge.evidence_changed": "Evidence changed after this request was created. Submit a fresh request.",
+    "error.merge.binding_unverified": "This older request has no verifiable candidate binding. Reject it and submit a fresh request.",
+    "error.merge.evidence_candidate_mismatch": "Evidence belongs to another candidate.",
+    "error.merge.needs_test_review": "The exact candidate needs test and review reports.",
+    "error.chain.decision_stale": "This decision belongs to an earlier chain authorization.",
+    "error.engine.interrupt_unconfirmed": "The stop request was saved, but delivery is unconfirmed.",
+    "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked."
+  },
+  "paging": {
+    "more": "Load more",
+    "failed": "Could not load the next page. Try again."
   }
 }

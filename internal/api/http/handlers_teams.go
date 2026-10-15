@@ -15,18 +15,7 @@ type createTeamRequest struct {
 	AdoptMarker    bool     `json:"adoptMarker,omitempty"`
 }
 
-func (s *Server) handleListTeams(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	teams, err := s.App.ListTeams(r.Context(), principal)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": teams, "nextCursor": ""})
-}
+func (s *Server) handleListTeams(w http.ResponseWriter, r *http.Request) { s.handlePage(w, r, "teams") }
 
 func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	principal, ok := requireUser(w, r)

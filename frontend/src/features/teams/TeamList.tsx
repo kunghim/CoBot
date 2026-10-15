@@ -1,3 +1,4 @@
+import LoadMore from '../../components/LoadMore';
 // TeamList is the left panel: the "+ new team" action plus the two-level
 // team tree (leader first, then members). Selecting a member makes it the
 // conversation target; the panel shows only data the API really returned.
@@ -10,6 +11,7 @@ import type { Bot, TeamWithBots } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import CreateTeamDialog from './CreateTeamDialog';
+import TeamTools from './TeamTools';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
 
 const DOT_CLASS: Record<string, string> = {
@@ -113,6 +115,7 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
             />
           ))}
         </ul>
+        <LoadMore page={teams} />
       </div>
 
       <CreateTeamDialog
@@ -184,6 +187,7 @@ function TeamRow({
           ))}
         </ul>
       )}
+      {expanded && <TeamTools key={team.id} item={item} />}
     </li>
   );
 }
@@ -253,12 +257,12 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
         </span>
       )}
       <span className="flex shrink-0 items-center gap-0.5">
-      {(team.status === 'error' || team.status === 'creating') && (
+      {team.status === 'error' && (
         <button
           type="button"
           onClick={() => {
             setErrorText('');
-            retry.mutate(team.id, { onError: fail });
+            retry.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
           }}
           title={t('team.retry')}
           aria-label={t('team.retry')}
@@ -272,7 +276,7 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
           type="button"
           onClick={() => {
             setErrorText('');
-            archive.mutate({ teamId: team.id }, { onError: fail });
+            archive.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
           }}
           title={t('team.archive')}
           aria-label={t('team.archive')}
@@ -287,7 +291,7 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
             type="button"
             onClick={() => {
               setErrorText('');
-              restore.mutate({ teamId: team.id }, { onError: fail });
+              restore.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
             }}
             title={t('team.restore')}
             aria-label={t('team.restore')}
@@ -299,7 +303,7 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
             type="button"
             onClick={() => {
               setErrorText('');
-              remove.mutate({ teamId: team.id }, { onError: fail });
+              remove.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
             }}
             title={t('team.delete')}
             aria-label={t('team.delete')}
@@ -328,7 +332,7 @@ function DeleteMemberButton({ bot }: { bot: Bot }) {
         onClick={(event) => {
           event.stopPropagation();
           setErrorText('');
-          remove.mutate({ botId: bot.id }, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
+          remove.mutate({ botId: bot.id, expectedRevision: bot.revision }, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
         }}
         disabled={remove.isPending}
         title={t('team.deleteMember')}

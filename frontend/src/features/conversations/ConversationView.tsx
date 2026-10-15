@@ -12,6 +12,8 @@ import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
 import { deliveryLabelKey, messageText, runStatusLabelKey } from './delivery';
 import { sendBlockReasonKey } from '../teams/teamUtils';
+import { useSelectedBot } from '../../app/SelectedBotContext';
+import LoadMore from '../../components/LoadMore';
 
 export default function ConversationView({ item, bot }: { item: TeamWithBots; bot: Bot }) {
   const { t } = useTranslation();
@@ -21,13 +23,25 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const cancel = useCancelMessage(bot.id);
   const interrupt = useInterruptRun(bot.id);
 
-  const [draft, setDraft] = useState('');
+  const { drafts, setDraft, clearSentDraft } = useSelectedBot();
+  const draft = drafts[bot.id] ?? '';
   const [sendError, setSendError] = useState('');
   // Cancel/interrupt failures are surfaced too: a failed retract must never
   // look like a successful one (review C).
   const [actionError, setActionError] = useState('');
   const [stopping, setStopping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadingOlder = useRef(false);
+  const loadEarlier = async () => {
+    const element = scrollRef.current;
+    const before = element ? { height: element.scrollHeight, top: element.scrollTop } : null;
+    loadingOlder.current = true;
+    await conv.fetchNextPage();
+    requestAnimationFrame(() => {
+      if (element && before) element.scrollTop = before.top + element.scrollHeight - before.height;
+      loadingOlder.current = false;
+    });
+  };
 
   const messages = conv.data?.messages ?? [];
   const activeRun = conv.data?.activeRun ?? null;
@@ -41,7 +55,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   // Keep the newest message visible on load and on new messages.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
+    if (element && !loadingOlder.current) element.scrollTop = element.scrollHeight;
   }, [messages.length, bot.id]);
 
   const blockReasonKey = sendBlockReasonKey(team.status);
@@ -57,7 +71,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     setSendError('');
     setActionError('');
     send.mutate(text, {
-      onSuccess: () => setDraft(''),
+      onSuccess: () => clearSentDraft(bot.id, draft),
       onError: (error) => setSendError(apiErrorMessage(t, error)),
     });
   };
@@ -86,6 +100,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
           <p className="text-center text-sm text-red-600" role="alert">
             {t('status.error')}
@@ -118,7 +133,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </p>
         )}
 
-        <ApprovalCardStack key={team.id} teamId={team.id} botNameById={botNameById} />
+        <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
 
         <div className="flex items-end gap-2">
           <textarea
@@ -127,7 +142,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             value={draft}
             disabled={blockReasonKey !== null}
             rows={2}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => setDraft(bot.id, event.target.value)}
             onKeyDown={(event) => {
               // Enter sends, Shift+Enter inserts a newline; IME composition
               // must never submit mid-composition.
@@ -144,6 +159,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
                 if (!activeRun.id) return;
                 setStopping(true);
                 interrupt.mutate(activeRun.id, {
+                  onSuccess: (result) => {
+                    if (result.responseState === 'unknown') { setStopping(false); setActionError(t('errors.error.engine.interrupt_unconfirmed')); }
+                  },
                   onError: (error) => {
                     setStopping(false);
                     setActionError(apiErrorMessage(t, error));
@@ -201,6 +219,18 @@ function MessageRow({
 }) {
   const { t } = useTranslation();
   const text = messageText(message);
+
+  const feedbackBlock = message.blocks.find((block) => block.type === 'approval_result');
+  if (feedbackBlock) {
+    try {
+      const feedback = JSON.parse(feedbackBlock.text) as { approvalType: string; decision: string; comment?: string; details?: { candidateRef?: string; targetRef?: string } };
+      return <div className="space-y-1 rounded-md border border-neutral-200 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-700">
+        <p>{t('approvals.feedback', { type: t(`approvals.type.${feedback.approvalType}`), decision: t(`approvals.feedbackDecision.${feedback.decision}`, { defaultValue: feedback.decision }) })}</p>
+        {feedback.details?.candidateRef && <p className="break-all font-mono">{feedback.details.candidateRef} → {feedback.details.targetRef}</p>}
+        {feedback.comment && <p className="whitespace-pre-wrap">{feedback.comment}</p>}
+      </div>;
+    } catch { /* A malformed record remains visible as escaped text. */ }
+  }
 
   if (message.kind === 'collaboration' || message.kind === 'system') {
     return (

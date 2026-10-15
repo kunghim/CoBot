@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type {
   Approval,
@@ -24,7 +24,7 @@ import type {
   TeamListResult,
   Transfer,
 } from './types';
-import { api, bearerToken, reportUnauthorized } from './client';
+import { api, apiUrl, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
   status: ['status'] as const,
@@ -97,7 +97,7 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
         if (stopped) return;
         // lastSeq is shared with handleFrame: every reconnect resumes from
         // the cursor instead of replaying from zero (review C).
-        source = new EventSource(`/api/v1/events?after=${lastSeq}`);
+        source = new EventSource(apiUrl(`/api/v1/events?after=${lastSeq}`));
         source.addEventListener('cobot.event', (message) => handleFrame((message as MessageEvent).data));
         source.onerror = () => {
           if (stopped) return;
@@ -105,7 +105,7 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
           // The browser cannot read the error status from EventSource, so the
           // session is probed once before reconnecting: an expired session
           // becomes a re-auth, a transient blip retries with backoff.
-          void fetch('/api/v1/status', { credentials: 'include' })
+          void fetch(apiUrl('/api/v1/status'), { credentials: 'include' })
             .then(async (resp) => {
               if (stopped) return;
               if (resp.status === 401) {
@@ -138,9 +138,9 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
     const run = async () => {
       while (!stopped) {
         try {
-          const resp = await fetch(`/api/v1/events?after=${lastSeq}`, {
+          const resp = await fetch(apiUrl(`/api/v1/events?after=${lastSeq}`), {
             headers: { Accept: 'text/event-stream', Authorization: 'Bearer ' + bearerToken() },
-            credentials: 'include',
+            credentials: 'omit',
             signal: controller.signal,
           });
           if (resp.status === 401) {
@@ -184,8 +184,16 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
 // ---------------------------------------------------------------------------
 
 /** GET /teams: teams with their members, refreshed by the SSE invalidation. */
+function usePagedItems<P extends { items: unknown[]; nextCursor: string }>(key: QueryKey, load: (cursor: string) => Promise<P>, enabled: boolean, chronological = false) {
+  const query = useInfiniteQuery({ queryKey: key, queryFn: ({ pageParam }) => load(pageParam), initialPageParam: '', getNextPageParam: (page) => page.nextCursor || undefined, enabled });
+  const pages = query.data?.pages;
+  const ordered = chronological && pages ? [...pages].reverse() : pages;
+  const data = pages?.[0] ? { ...pages[0], items: ordered!.flatMap((page) => page.items), nextCursor: pages[pages.length - 1].nextCursor } as P : undefined;
+  return { ...query, data };
+}
+
 export function useTeams(enabled = true) {
-  return useQuery({ queryKey: queryKeys.teams, queryFn: api.listTeams, enabled });
+  return usePagedItems(queryKeys.teams, (cursor) => api.listTeams(cursor), enabled);
 }
 
 export function useCreateTeam() {
@@ -206,11 +214,9 @@ export function useRoles(enabled = true) {
 
 /** GET /bots/{id}/messages: one conversation plus queue depth and run state. */
 export function useConversation(botId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.messages(botId ?? ''),
-    queryFn: () => api.listMessages(botId as string),
-    enabled: botId !== null,
-  });
+  const query = useInfiniteQuery({ queryKey: queryKeys.messages(botId ?? ''), queryFn: ({ pageParam }) => api.listMessages(botId as string, { before: pageParam || undefined }), initialPageParam: '', getNextPageParam: (page) => page.nextCursor || undefined, enabled: botId !== null });
+  const pages = query.data?.pages;
+  return { ...query, data: pages?.[0] ? { ...pages[0], messages: [...pages].reverse().flatMap((page) => page.messages) } : undefined };
 }
 
 export function useSendMessage(botId: string) {
@@ -246,12 +252,8 @@ export function useInterruptRun(botId: string) {
 }
 
 /** GET /approvals?teamId&state: pending cards or decided history. */
-export function useApprovals(teamId: string | null, state: 'pending' | 'history', enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.approvals(teamId ?? '', state),
-    queryFn: () => api.listApprovals({ teamId: teamId as string, state }),
-    enabled: teamId !== null && enabled,
-  });
+export function useApprovals(teamId: string | null, state: 'pending' | 'history', enabled = true, viewBotId?: string) {
+  return usePagedItems([...queryKeys.approvals(teamId ?? '', state), viewBotId ?? ''], (cursor) => api.listApprovals({ teamId: teamId as string, state, viewBotId, cursor }), teamId !== null && enabled);
 }
 
 export function useDecideApproval() {
@@ -315,12 +317,8 @@ export function useEngineModels(enabled: boolean) {
 
 /** GET /teams/{id}/tasks: the team board; the server narrows a member's
  * scope, the page never decides who sees what. */
-export function useTasks(teamId: string | null, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.tasks(teamId ?? ''),
-    queryFn: () => api.listTasks({ teamId: teamId as string }),
-    enabled: teamId !== null && enabled,
-  });
+export function useTasks(teamId: string | null, enabled = true, viewBotId?: string) {
+  return usePagedItems([...queryKeys.tasks(teamId ?? ''), viewBotId ?? ''], (cursor) => api.listTasks({ teamId: teamId as string, viewBotId, cursor }), teamId !== null && enabled);
 }
 
 /** GET /tasks/{id}: one task with evidence and transfer history, loaded only
@@ -390,7 +388,7 @@ export function useOfferTransfer() {
 export function useAcceptTransfer() {
   const invalidate = useInvalidateTasks();
   return useMutation({
-    mutationFn: (transferId: string) => api.acceptTransfer(transferId),
+    mutationFn: ({ transferId, expectedRevision }: { transferId: string; expectedRevision: number }) => api.acceptTransfer(transferId, expectedRevision),
     onSuccess: invalidate,
   });
 }
@@ -404,12 +402,8 @@ export function useCancelTransfer() {
 }
 
 /** GET /questions?status=open: the answers the user still owes. */
-export function useQuestions(teamId: string | null, status = 'open', enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.questions(teamId ?? '', status),
-    queryFn: () => api.listQuestions({ teamId: teamId as string, status }),
-    enabled: teamId !== null && enabled,
-  });
+export function useQuestions(teamId: string | null, status = 'open', enabled = true, viewBotId?: string) {
+  return usePagedItems([...queryKeys.questions(teamId ?? '', status), viewBotId ?? ''], (cursor) => api.listQuestions({ teamId: teamId as string, status, viewBotId, cursor }), teamId !== null && enabled);
 }
 
 export function useAnswerQuestion() {
@@ -440,34 +434,20 @@ export function useCancelQuestion(teamId: string) {
 /** GET /bots/{id}/collaboration: the read-only exchange of the selected
  * member; the user reads a named member's whole record. */
 export function useCollaboration(botId: string | null, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.collaboration(botId ?? ''),
-    queryFn: () => api.listCollaboration(botId as string),
-    enabled: botId !== null && enabled,
-  });
+  return usePagedItems(queryKeys.collaboration(botId ?? ''), (cursor) => api.listCollaboration(botId as string, cursor), botId !== null && enabled, true);
 }
-
 
 // ---------------------------------------------------------------------------
 // M5: activity, memories, team lifecycle, authorizations
 // ---------------------------------------------------------------------------
 
 /** GET /teams/{id}/activity: the durable event record, newest first. */
-export function useActivity(teamId: string | null, enabled = true) {
-  return useQuery({
-    queryKey: ['activity', teamId ?? ''],
-    queryFn: () => api.listActivity(teamId as string, 100),
-    enabled: teamId !== null && enabled,
-  });
+export function useActivity(teamId: string | null, enabled = true, viewBotId?: string) {
+  return usePagedItems(['activity', teamId ?? '', viewBotId ?? ''], (cursor) => api.listActivity(teamId as string, viewBotId, cursor), teamId !== null && enabled);
 }
 
-/** GET /bots/{id}/memories: one member's live memories. */
 export function useMemories(botId: string | null, enabled = true) {
-  return useQuery({
-    queryKey: ['memories', botId ?? ''],
-    queryFn: () => api.listMemories(botId as string),
-    enabled: botId !== null && enabled,
-  });
+  return usePagedItems(['memories', botId ?? ''], (cursor) => api.listMemories(botId as string, cursor), botId !== null && enabled);
 }
 
 export function useDeleteMemory() {
@@ -523,7 +503,7 @@ export function useDeleteBot() {
 export function useRetryTeam() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({
-    mutationFn: (teamId: string) => api.retryTeam(teamId),
+    mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision: number }) => api.retryTeam(teamId, expectedRevision),
     onSuccess: invalidate,
   });
 }
@@ -531,8 +511,8 @@ export function useRetryTeam() {
 export function useRebindDirectory() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({
-    mutationFn: ({ teamId, directory, adoptMarker }: { teamId: string; directory: string; adoptMarker?: boolean }) =>
-      api.rebindDirectory(teamId, { directory, adoptMarker }),
+    mutationFn: ({ teamId, directory, adoptMarker, expectedRevision }: { teamId: string; directory: string; adoptMarker?: boolean; expectedRevision: number }) =>
+      api.rebindDirectory(teamId, { directory, adoptMarker, expectedRevision }),
     onSuccess: invalidate,
   });
 }

@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, devLinkSecret, onUnauthorized } from '../api/client';
+import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client';
 import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
-import { desktopBridge } from '../platform/native-bridge';
 
 type AuthState = 'checking' | 'authorized' | 'unauthorized';
 
@@ -22,14 +21,8 @@ async function obtainAndExchangeSecret(): Promise<boolean> {
     history.replaceState(null, '', window.location.pathname + window.location.search);
     return true;
   }
-  const bridge = desktopBridge();
-  if (bridge) {
-    const handoff = await bridge.Bootstrap().catch(() => null);
-    if (handoff?.secret) {
-      await api.exchangeBootstrap(handoff.secret);
-      return true;
-    }
-  }
+  const nativeSecret = await desktopSecret();
+  if (nativeSecret) { await api.exchangeBootstrap(nativeSecret); return true; }
   const devSecret = await devLinkSecret();
   if (devSecret) {
     await api.exchangeBootstrap(devSecret);

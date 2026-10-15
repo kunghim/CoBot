@@ -1,8 +1,5 @@
 // Aliases onto the generated wire types so features import from one place.
-// The M2 surface (teams, conversations, approvals, engine, models) is typed
-// with hand-written interfaces that mirror the Go wire structs; schema.ts is
-// regenerated from api/openapi.yaml by the main agent and must not be edited
-// here.
+// Entity shapes come from OpenAPI; page composites add local view metadata.
 import type { components } from './generated/schema';
 
 export type Status = components['schemas']['Status'];
@@ -31,16 +28,9 @@ export interface EngineStatus {
   checkedAt?: string;
 }
 
-export interface EngineLogin { type: 'chatgpt'; loginId: string; authUrl: string }
+export type EngineLogin = components['schemas']['EngineLogin'];
 
-/** GET /models: engine-provided, sanitized model list. */
-export interface EngineModel {
-  slug?: string;
-  id?: string;
-  displayName?: string;
-  description?: string;
-  family?: string;
-}
+export interface EngineModel { slug?: string; id?: string; displayName?: string; description?: string; family?: string }
 
 export interface ModelListResult {
   models: EngineModel[];
@@ -52,39 +42,14 @@ export interface ModelListResult {
 
 export type TeamStatus = 'creating' | 'active' | 'archived' | 'deleted' | 'directory_missing' | 'error';
 
-export interface Team {
-  id: string;
-  name: string;
-  profileInstanceId: string;
-  leaderId: string;
-  directory: string;
-  status: TeamStatus;
-  statusDetail?: string;
-  revision: number;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Team = components['schemas']['Team'];
 
 export type BotStatus = 'idle' | 'queued' | 'working' | 'waiting_approval' | 'waiting_input' | 'interrupted' | 'unknown';
 
-export interface Bot {
-  id: string;
-  teamId: string;
-  name: string;
-  roleId: string;
-  roleVersion?: string;
-  isLeader: boolean;
-  status: BotStatus;
-  currentRunId?: string;
-  revision: number;
-  createdAt: string;
-}
+export type Bot = components['schemas']['Bot'];
 
 /** One team with its members; the list projection used everywhere. */
-export interface TeamWithBots {
-  team: Team;
-  bots: Bot[];
-}
+export type TeamWithBots = components['schemas']['TeamWithBots'];
 
 export interface TeamListResult {
   items: TeamWithBots[];
@@ -124,42 +89,13 @@ export type DeliveryStatus =
   | 'cancelled'
   | 'unknown';
 
-export interface TextBlock {
-  type: string;
-  text: string;
-}
+export type TextBlock = components['schemas']['TextBlock'];
 
-export interface Message {
-  id: string;
-  teamId: string;
-  botId: string;
-  kind: MessageKind;
-  /** Wire value is a JSON array of blocks; messageText() tolerates a string
-   * form defensively. */
-  blocks: TextBlock[];
-  requestId?: string;
-  deliveryStatus?: DeliveryStatus;
-  runId?: string;
-  /** For collaboration messages: the member that sent it; absent means the
-   * user wrote it. */
-  sourceBotId?: string;
-  createdAt: string;
-}
+export type Message = components['schemas']['Message'];
 
 export type RunStatus = 'starting' | 'running' | 'waiting_approval' | 'waiting_input' | 'completed' | 'failed' | 'interrupted' | 'unknown';
 
-export interface Run {
-  id: string;
-  teamId: string;
-  botId: string;
-  providerSessionId?: string;
-  providerTurnId?: string;
-  engineEpoch?: string;
-  status: RunStatus;
-  errorKey?: string;
-  startedAt: string;
-  endedAt?: string;
-}
+export type Run = components['schemas']['Run'];
 
 /** GET /bots/{id}/messages */
 export interface ConversationResult {
@@ -167,6 +103,7 @@ export interface ConversationResult {
   queuedCount: number;
   bot: Bot;
   activeRun: Run | null;
+  nextCursor: string;
 }
 
 /** POST /bots/{id}/messages (202: queued, not delivered). */
@@ -180,6 +117,8 @@ export interface SendMessageResult {
 export interface InterruptRunResult {
   runId: string;
   interruptRequested: boolean;
+  responseState: 'sent' | 'unknown';
+  messageKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,39 +130,16 @@ export type ApprovalRequestState = 'pending' | 'decided' | 'invalidated';
 /** queued/sent/confirmed/unknown/expired: a decision is not a confirmed reply. */
 export type ApprovalResponseState = 'queued' | 'sent' | 'confirmed' | 'unknown' | 'expired';
 
-export type ApprovalType = 'native_tool' | 'collaboration' | 'recruitment' | 'recovery' | 'merge';
+export type ApprovalType = 'native_tool' | 'collaboration' | 'recruitment' | 'recovery' | 'merge' | 'chain';
 
-export interface ApprovalOption {
-  id: string;
-  messageKey?: string;
-  text?: string;
-}
+export type ApprovalOption = components['schemas']['ApprovalOption'];
 
-export interface ApprovalDecision {
-  optionId: string;
-  comment?: string;
-  actor: string;
-  decidedAt: string;
-}
+export type ApprovalDecision = components['schemas']['ApprovalDecision'];
 
-export interface Approval {
-  id: string;
-  teamId: string;
-  requesterBotId: string;
-  runId?: string;
-  type: ApprovalType;
-  method?: string;
-  summary: string;
-  reason?: string;
-  options: ApprovalOption[];
-  requestState: ApprovalRequestState;
-  decision?: ApprovalDecision;
-  responseState?: ApprovalResponseState;
-  createdAt: string;
-  revision: number;
-}
+export type Approval = components['schemas']['Approval'];
 
 export interface ApprovalListResult {
+  total?: number;
   items: Approval[];
   nextCursor: string;
 }
@@ -234,16 +150,7 @@ export interface ApprovalListResult {
 // ---------------------------------------------------------------------------
 
 /** GET /teams/{id}/activity — one durable product event. */
-export interface ActivityItem {
-  seq: number;
-  id: string;
-  type: string;
-  teamId: string;
-  botId?: string;
-  resourceId?: string;
-  revision: number;
-  createdAt: string;
-}
+export type ActivityItem = components['schemas']['Event'];
 
 /** GET /bots/{id}/memories */
 export interface MemoryListResult {
@@ -251,15 +158,7 @@ export interface MemoryListResult {
   nextCursor: string;
 }
 
-export interface Memory {
-  id: string;
-  teamId: string;
-  botId: string;
-  body: string;
-  sourceRunId?: string;
-  sourceTaskId?: string;
-  createdAt: string;
-}
+export type Memory = components['schemas']['Memory'];
 
 /** GET /directories — subdirectory names only. */
 export interface DirectoryListResult {
@@ -292,13 +191,7 @@ export interface AuthorizationBinding {
 // Snapshot (hand-written: the generated one predates teams/engine)
 // ---------------------------------------------------------------------------
 
-export interface Snapshot {
-  seq: number;
-  instanceId: string;
-  settings: Settings;
-  teams: TeamWithBots[];
-  engine: EngineStatus;
-}
+export type Snapshot = components['schemas']['Snapshot'];
 
 // ---------------------------------------------------------------------------
 // M3: tasks, evidence, transfers, questions, collaboration records
@@ -308,48 +201,13 @@ export interface Snapshot {
  * status by itself. */
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'cancelled';
 
-export interface Task {
-  id: string;
-  teamId: string;
-  ownerId: string;
-  parentId?: string;
-  title: string;
-  description?: string;
-  acceptanceCriteria?: string;
-  status: TaskStatus;
-  blockedReason?: string;
-  dependencyIds: string[];
-  revision: number;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Task = components['schemas']['Task'];
 
-export interface Evidence {
-  id: string;
-  taskId: string;
-  authorId: string;
-  summary: string;
-  artifactRefs: string[];
-  candidateRef?: string;
-  testResult?: string;
-  reviewResult?: string;
-  createdAt: string;
-}
+export type Evidence = components['schemas']['Evidence'];
 
 export type TransferStatus = 'offered' | 'accepted' | 'cancelled' | 'stale';
 
-export interface Transfer {
-  id: string;
-  taskId: string;
-  fromBotId: string;
-  toBotId: string;
-  taskRevision: number;
-  note?: string;
-  status: TransferStatus;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Transfer = components['schemas']['Transfer'];
 
 /** GET /teams/{id}/tasks */
 export interface TaskListResult {
@@ -367,21 +225,7 @@ export interface TaskDetailResult {
 export type QuestionStatus = 'open' | 'answered' | 'cancelled';
 
 /** ask_user output: user input, never a security authorization. */
-export interface Question {
-  id: string;
-  teamId: string;
-  requesterBotId: string;
-  taskId?: string;
-  runId?: string;
-  question: string;
-  options: string[];
-  status: QuestionStatus;
-  answerText?: string;
-  answerMessageId?: string;
-  revision: number;
-  createdAt: string;
-  answeredAt?: string;
-}
+export type Question = components['schemas']['Question'];
 
 /** GET /questions?teamId&status */
 export interface QuestionListResult {

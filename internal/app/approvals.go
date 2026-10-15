@@ -33,6 +33,7 @@ func (a *App) PendingApprovals(ctx context.Context, principal auth.Principal, te
 		approvals[i], approvals[j] = approvals[j], approvals[i]
 	}
 	for i := range approvals {
+		projectNativeFileOptions(&approvals[i])
 		if approvals[i].Type == domain.ApprovalRecovery {
 			a.projectRecoveryOptions(ctx, &approvals[i])
 		}
@@ -45,17 +46,13 @@ func (a *App) ApprovalHistory(ctx context.Context, principal auth.Principal, tea
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	decided, err := sqlite.ListApprovals(ctx, a.DB, teamID, domain.ApprovalStateDecided, limit)
+	page, err := a.ListPage(ctx, principal, PageRequest{Kind: "approvals", TeamID: teamID, State: "history", Limit: limit})
 	if err != nil {
 		return nil, err
 	}
-	invalidated, err := sqlite.ListApprovals(ctx, a.DB, teamID, domain.ApprovalStateInvalidated, limit)
-	if err != nil {
-		return nil, err
-	}
-	out := append(decided, invalidated...)
-	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-		out[i], out[j] = out[j], out[i]
+	out := []domain.Approval{}
+	for _, item := range page["items"].([]any) {
+		out = append(out, item.(domain.Approval))
 	}
 	return out, nil
 }

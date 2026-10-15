@@ -349,6 +349,17 @@ paths:
       security:
         - SessionCookie: []
       summary: Teams with their members
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 100, minimum: 1 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
       responses:
         "200":
           description: Teams
@@ -698,6 +709,13 @@ paths:
         - SessionCookie: []
       summary: Conversation history of one bot
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: id
           in: path
           required: true
@@ -808,6 +826,13 @@ paths:
         - SessionCookie: []
       summary: Pending cards (oldest first) or decided history
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: teamId
           in: query
           required: true
@@ -885,6 +910,13 @@ paths:
         - SessionCookie: []
       summary: Project a team's task board
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: id
           in: path
           required: true
@@ -1171,6 +1203,13 @@ paths:
         - SessionCookie: []
       summary: Page a team's user questions
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: teamId
           in: query
           required: true
@@ -1275,6 +1314,13 @@ paths:
         - SessionCookie: []
       summary: Read-only record of one member's exchanges with a peer
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: id
           in: path
           required: true
@@ -1307,6 +1353,13 @@ paths:
         - SessionCookie: []
       summary: Newest-first team activity feed (events)
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: id
           in: path
           required: true
@@ -1340,6 +1393,13 @@ paths:
         - SessionCookie: []
       summary: Live memories of one member (user reads any member; a bot only itself)
       parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
         - name: id
           in: path
           required: true
@@ -1666,7 +1726,7 @@ components:
   schemas:
     Task:
       type: object
-      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt]
+      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt, dependencyIds, createdBy]
       properties:
         id: { type: string }
         teamId: { type: string }
@@ -1675,7 +1735,7 @@ components:
         title: { type: string }
         description: { type: string }
         acceptanceCriteria: { type: string }
-        status: { type: string, enum: [todo, doing, review, cancelled] }
+        status: { type: string, enum: [todo, doing, review, done, cancelled] }
         blockedReason: { type: string }
         dependencyIds:
           type: array
@@ -1686,7 +1746,7 @@ components:
         updatedAt: { type: string, format: date-time }
     Evidence:
       type: object
-      required: [id, taskId, authorId, summary, createdAt]
+      required: [id, taskId, authorId, summary, createdAt, artifactRefs]
       properties:
         id: { type: string }
         taskId: { type: string }
@@ -1741,9 +1801,9 @@ components:
         kind: { type: string, enum: [user, assistant, collaboration, system] }
         blocks:
           type: array
-          items: { type: object, additionalProperties: true }
+          items: { $ref: "#/components/schemas/TextBlock" }
         requestId: { type: string }
-        deliveryStatus: { type: string }
+        deliveryStatus: { type: string, enum: [waiting_dependency, queued, dispatching, accepted, cancelled, unknown] }
         runId: { type: string }
         sourceBotId: { type: string }
         createdAt: { type: string, format: date-time }
@@ -1776,7 +1836,7 @@ components:
       required: [requestId, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        status: { type: string, enum: [todo, doing, review, done, cancelled] }
+        status: { type: string, enum: [todo, doing, review, cancelled] }
         blockedReason: { type: string }
         ownerId: { type: string }
         expectedRevision: { type: integer, format: int64 }
@@ -1952,7 +2012,7 @@ components:
         engine: { $ref: "#/components/schemas/EngineStatus" }
     Team:
       type: object
-      required: [id, name, profileInstanceId, leaderId, status, revision]
+      required: [id, name, profileInstanceId, leaderId, directory, status, revision, createdAt, updatedAt]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1968,7 +2028,7 @@ components:
         updatedAt: { type: string, format: date-time }
     Bot:
       type: object
-      required: [id, teamId, name, roleId, isLeader, status, revision]
+      required: [id, teamId, name, roleId, isLeader, status, revision, createdAt]
       properties:
         id: { type: string }
         teamId: { type: string }
@@ -2057,3 +2117,23 @@ components:
         revision: { type: integer, format: int64 }
         payload: { type: object, additionalProperties: true }
         createdAt: { type: string, format: date-time }
+    TextBlock:
+      type: object
+      required: [type, text]
+      properties:
+        type: { type: string }
+        text: { type: string }
+    Run:
+      type: object
+      required: [id, teamId, botId, status, startedAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        providerSessionId: { type: string }
+        providerTurnId: { type: string }
+        engineEpoch: { type: string }
+        status: { type: string, enum: [starting, running, waiting_approval, waiting_input, completed, failed, interrupted, unknown] }
+        errorKey: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }

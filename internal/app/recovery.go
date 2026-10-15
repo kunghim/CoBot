@@ -30,10 +30,14 @@ type recoveryBinding struct {
 
 // Only projection changes: original choices remain an immutable snapshot.
 func (a *App) projectRecoveryOptions(ctx context.Context, approval *domain.Approval) {
+	a.projectRecoveryOptionsOn(ctx, a.DB, approval)
+}
+
+func (a *App) projectRecoveryOptionsOn(ctx context.Context, q sqlite.Queryer, approval *domain.Approval) {
 	var binding recoveryBinding
 	_ = json.Unmarshal(approval.EngineRequestID, &binding)
-	run, rerr := sqlite.GetRun(ctx, a.DB, binding.RunID)
-	session, serr := sqlite.GetProviderSession(ctx, a.DB, run.BotID)
+	run, rerr := sqlite.GetRun(ctx, q, binding.RunID)
+	session, serr := sqlite.GetProviderSession(ctx, q, run.BotID)
 	if rerr == nil && serr == nil && run.ProviderTurnID != "" && session.ProviderThreadID != "" && session.EngineEpoch == run.EngineEpoch {
 		return
 	}

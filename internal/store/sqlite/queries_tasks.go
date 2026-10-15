@@ -256,6 +256,9 @@ func ListEvidence(ctx context.Context, q Queryer, taskID string) ([]domain.Evide
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(refs), &e.ArtifactRefs)
+		if e.ArtifactRefs == nil {
+			e.ArtifactRefs = []string{}
+		}
 		e.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 		out = append(out, e)
 	}

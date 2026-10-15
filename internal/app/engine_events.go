@@ -256,6 +256,7 @@ func (s *Scheduler) onApproval(teamID string, source *teamRuntime, req engine.Ap
 		Options:  nativeToolOptions(req.Method),
 		Revision: 1, CreatedAt: time.Now().UTC(),
 	}
+	projectNativeFileOptions(&approval)
 	if rt := source; rt != nil {
 		approval.EngineEpoch = rt.server.Epoch()
 	}
@@ -299,25 +300,26 @@ func runIDOrEmpty(run domain.Run) string {
 }
 
 func approvalSummary(req engine.ApprovalRequest) string {
-	switch {
-	case req.Command != "":
-		return truncate(req.Command, 300)
-	case len(req.Paths) > 0:
-		out := ""
-		for i, p := range req.Paths {
-			if i > 0 {
-				out += ", "
-			}
-			out += p
-			if i >= 4 {
-				out += ", …"
-				break
-			}
-		}
-		return truncate(out, 300)
-	default:
+	// The complete requested operation is needed for a meaningful decision.
+	// Keep only relevant public fields; never persist the transport envelope.
+	details := map[string]any{}
+	if req.Command != "" {
+		details["command"] = req.Command
+	}
+	if req.Cwd != "" {
+		details["cwd"] = req.Cwd
+	}
+	if len(req.Paths) > 0 {
+		details["paths"] = req.Paths
+	}
+	if len(req.Changes) > 0 {
+		details["changes"] = req.Changes
+	}
+	if len(details) == 0 {
 		return req.Method
 	}
+	value, _ := json.MarshalIndent(details, "", "  ")
+	return string(value)
 }
 
 func nativeToolOptions(method string) []domain.ApprovalOption {

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,7 +85,7 @@ func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) 
 		t.Fatal(err)
 	}
 	waitUntil(t, 3*time.Second, "answer releases original assignment", func() bool { return len(fake.Turns()) == 3 })
-	if !endsWithString(fake.Turns()[2].Text, "你被指派了任务：blocked by question\n完成标准：wait for answer") {
+	if text := fake.Turns()[2].Text; !strings.Contains(text, "你被指派了任务：blocked by question") || !strings.Contains(text, task.ID) || !endsWithString(text, "完成标准：wait for answer") {
 		t.Fatal("answer failed to release original task")
 	}
 }

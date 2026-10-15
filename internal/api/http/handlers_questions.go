@@ -2,30 +2,12 @@ package http
 
 import (
 	"net/http"
-	"strconv"
-
-	"github.com/kunghim/CoBot/internal/domain"
 )
 
 // handleListQuestions pages a team's questions. An open question is user input
 // the user still owes; a decided one keeps its answer in the record.
 func (s *Server) handleListQuestions(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	teamID := r.URL.Query().Get("teamId")
-	if teamID == "" {
-		writeError(w, r, domain.InvalidRequest("error.question.team_required", nil))
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	questions, err := s.App.ListQuestions(r.Context(), principal, teamID, r.URL.Query().Get("status"), limit)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": questions, "nextCursor": ""})
+	s.handlePage(w, r, "questions")
 }
 
 type answerQuestionRequest struct {

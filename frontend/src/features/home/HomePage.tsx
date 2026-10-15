@@ -15,7 +15,7 @@ export default function HomePage() {
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
 
   if (botId && context) {
-    return <ConversationView item={context.item} bot={context.bot} />;
+    return <ConversationView key={context.bot.id} item={context.item} bot={context.bot} />;
   }
 
   return (

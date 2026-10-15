@@ -103,6 +103,16 @@ const (
 	Unauthorized        ErrorEnvelopeErrorCode = "unauthorized"
 )
 
+// Defines values for MessageDeliveryStatus.
+const (
+	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
+	MessageDeliveryStatusCancelled         MessageDeliveryStatus = "cancelled"
+	MessageDeliveryStatusDispatching       MessageDeliveryStatus = "dispatching"
+	MessageDeliveryStatusQueued            MessageDeliveryStatus = "queued"
+	MessageDeliveryStatusUnknown           MessageDeliveryStatus = "unknown"
+	MessageDeliveryStatusWaitingDependency MessageDeliveryStatus = "waiting_dependency"
+)
+
 // Defines values for MessageKind.
 const (
 	MessageKindAssistant     MessageKind = "assistant"
@@ -115,7 +125,6 @@ const (
 const (
 	PatchTaskRequestStatusCancelled PatchTaskRequestStatus = "cancelled"
 	PatchTaskRequestStatusDoing     PatchTaskRequestStatus = "doing"
-	PatchTaskRequestStatusDone      PatchTaskRequestStatus = "done"
 	PatchTaskRequestStatusReview    PatchTaskRequestStatus = "review"
 	PatchTaskRequestStatusTodo      PatchTaskRequestStatus = "todo"
 )
@@ -169,6 +178,7 @@ const (
 const (
 	TaskStatusCancelled TaskStatus = "cancelled"
 	TaskStatusDoing     TaskStatus = "doing"
+	TaskStatusDone      TaskStatus = "done"
 	TaskStatusReview    TaskStatus = "review"
 	TaskStatusTodo      TaskStatus = "todo"
 )
@@ -185,12 +195,12 @@ const (
 
 // Defines values for ToolResultStatus.
 const (
-	Accepted    ToolResultStatus = "accepted"
-	Duplicate   ToolResultStatus = "duplicate"
-	Ok          ToolResultStatus = "ok"
-	Rejected    ToolResultStatus = "rejected"
-	Unavailable ToolResultStatus = "unavailable"
-	Waiting     ToolResultStatus = "waiting"
+	ToolResultStatusAccepted    ToolResultStatus = "accepted"
+	ToolResultStatusDuplicate   ToolResultStatus = "duplicate"
+	ToolResultStatusOk          ToolResultStatus = "ok"
+	ToolResultStatusRejected    ToolResultStatus = "rejected"
+	ToolResultStatusUnavailable ToolResultStatus = "unavailable"
+	ToolResultStatusWaiting     ToolResultStatus = "waiting"
 )
 
 // Defines values for TransferStatus.
@@ -280,16 +290,16 @@ type BootstrapResult struct {
 
 // Bot defines model for Bot.
 type Bot struct {
-	CreatedAt    *time.Time `json:"createdAt,omitempty"`
-	CurrentRunId *string    `json:"currentRunId,omitempty"`
-	Id           string     `json:"id"`
-	IsLeader     bool       `json:"isLeader"`
-	Name         string     `json:"name"`
-	Revision     int64      `json:"revision"`
-	RoleId       string     `json:"roleId"`
-	RoleVersion  *string    `json:"roleVersion,omitempty"`
-	Status       BotStatus  `json:"status"`
-	TeamId       string     `json:"teamId"`
+	CreatedAt    time.Time `json:"createdAt"`
+	CurrentRunId *string   `json:"currentRunId,omitempty"`
+	Id           string    `json:"id"`
+	IsLeader     bool      `json:"isLeader"`
+	Name         string    `json:"name"`
+	Revision     int64     `json:"revision"`
+	RoleId       string    `json:"roleId"`
+	RoleVersion  *string   `json:"roleVersion,omitempty"`
+	Status       BotStatus `json:"status"`
+	TeamId       string    `json:"teamId"`
 }
 
 // BotStatus defines model for Bot.Status.
@@ -381,7 +391,7 @@ type Event struct {
 
 // Evidence defines model for Evidence.
 type Evidence struct {
-	ArtifactRefs *[]string `json:"artifactRefs,omitempty"`
+	ArtifactRefs []string  `json:"artifactRefs"`
 	AuthorId     string    `json:"authorId"`
 	CandidateRef *string   `json:"candidateRef,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
@@ -416,17 +426,20 @@ type MergeApprovalDetails struct {
 
 // Message defines model for Message.
 type Message struct {
-	Blocks         []map[string]interface{} `json:"blocks"`
-	BotId          string                   `json:"botId"`
-	CreatedAt      time.Time                `json:"createdAt"`
-	DeliveryStatus *string                  `json:"deliveryStatus,omitempty"`
-	Id             string                   `json:"id"`
-	Kind           MessageKind              `json:"kind"`
-	RequestId      *string                  `json:"requestId,omitempty"`
-	RunId          *string                  `json:"runId,omitempty"`
-	SourceBotId    *string                  `json:"sourceBotId,omitempty"`
-	TeamId         string                   `json:"teamId"`
+	Blocks         []TextBlock            `json:"blocks"`
+	BotId          string                 `json:"botId"`
+	CreatedAt      time.Time              `json:"createdAt"`
+	DeliveryStatus *MessageDeliveryStatus `json:"deliveryStatus,omitempty"`
+	Id             string                 `json:"id"`
+	Kind           MessageKind            `json:"kind"`
+	RequestId      *string                `json:"requestId,omitempty"`
+	RunId          *string                `json:"runId,omitempty"`
+	SourceBotId    *string                `json:"sourceBotId,omitempty"`
+	TeamId         string                 `json:"teamId"`
 }
+
+// MessageDeliveryStatus defines model for Message.DeliveryStatus.
+type MessageDeliveryStatus string
 
 // MessageKind defines model for Message.Kind.
 type MessageKind string
@@ -554,8 +567,8 @@ type Task struct {
 	AcceptanceCriteria *string    `json:"acceptanceCriteria,omitempty"`
 	BlockedReason      *string    `json:"blockedReason,omitempty"`
 	CreatedAt          time.Time  `json:"createdAt"`
-	CreatedBy          *string    `json:"createdBy,omitempty"`
-	DependencyIds      *[]string  `json:"dependencyIds,omitempty"`
+	CreatedBy          string     `json:"createdBy"`
+	DependencyIds      []string   `json:"dependencyIds"`
 	Description        *string    `json:"description,omitempty"`
 	Id                 string     `json:"id"`
 	OwnerId            string     `json:"ownerId"`
@@ -572,8 +585,8 @@ type TaskStatus string
 
 // Team defines model for Team.
 type Team struct {
-	CreatedAt         *time.Time `json:"createdAt,omitempty"`
-	Directory         *string    `json:"directory,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	Directory         string     `json:"directory"`
 	Id                string     `json:"id"`
 	LeaderId          string     `json:"leaderId"`
 	Name              string     `json:"name"`
@@ -581,7 +594,7 @@ type Team struct {
 	Revision          int64      `json:"revision"`
 	Status            TeamStatus `json:"status"`
 	StatusDetail      *string    `json:"statusDetail,omitempty"`
-	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
 }
 
 // TeamStatus defines model for Team.Status.
@@ -591,6 +604,12 @@ type TeamStatus string
 type TeamWithBots struct {
 	Bots []Bot `json:"bots"`
 	Team Team  `json:"team"`
+}
+
+// TextBlock defines model for TextBlock.
+type TextBlock struct {
+	Text string `json:"text"`
+	Type string `json:"type"`
 }
 
 // ToolResult defines model for ToolResult.
@@ -628,6 +647,10 @@ type Error = ErrorEnvelope
 
 // ListApprovalsParams defines parameters for ListApprovals.
 type ListApprovalsParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId      *string                   `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
 	TeamId         string                    `form:"teamId" json:"teamId"`
 	State          *ListApprovalsParamsState `form:"state,omitempty" json:"state,omitempty"`
 	RequesterBotId *string                   `form:"requesterBotId,omitempty" json:"requesterBotId,omitempty"`
@@ -673,12 +696,20 @@ type DeleteBotParams struct {
 
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListMemoriesParams defines parameters for ListMemories.
 type ListMemoriesParams struct {
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // DeleteMemoryParams defines parameters for DeleteMemory.
@@ -688,8 +719,12 @@ type DeleteMemoryParams struct {
 
 // ListMessagesParams defines parameters for ListMessages.
 type ListMessagesParams struct {
-	Before *string `form:"before,omitempty" json:"before,omitempty"`
-	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	Before    *string `form:"before,omitempty" json:"before,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // SendMessageJSONBody defines parameters for SendMessage.
@@ -723,9 +758,13 @@ type CancelMessageJSONBody struct {
 
 // ListQuestionsParams defines parameters for ListQuestions.
 type ListQuestionsParams struct {
-	TeamId string                     `form:"teamId" json:"teamId"`
-	Status *ListQuestionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
-	Limit  *int                       `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string                    `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	TeamId    string                     `form:"teamId" json:"teamId"`
+	Status    *ListQuestionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit     *int                       `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListQuestionsParamsStatus defines parameters for ListQuestions.
@@ -762,6 +801,15 @@ type ConfirmTaskJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ListTeamsParams defines parameters for ListTeams.
+type ListTeamsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+}
+
 // CreateTeamJSONBody defines parameters for CreateTeam.
 type CreateTeamJSONBody struct {
 	// AdoptMarker Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently.
@@ -787,7 +835,11 @@ type PatchTeamJSONBody struct {
 
 // ListActivityParams defines parameters for ListActivity.
 type ListActivityParams struct {
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ArchiveTeamJSONBody defines parameters for ArchiveTeam.
@@ -830,8 +882,12 @@ type RetryTeamJSONBody struct {
 
 // ListTasksParams defines parameters for ListTasks.
 type ListTasksParams struct {
-	OwnerId *string `form:"ownerId,omitempty" json:"ownerId,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// ViewBotId Selected member projection; a leader selects the whole team.
+	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`
+	OwnerId   *string `form:"ownerId,omitempty" json:"ownerId,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // AcceptTaskTransferJSONBody defines parameters for AcceptTaskTransfer.

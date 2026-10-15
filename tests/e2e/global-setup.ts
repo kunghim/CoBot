@@ -56,6 +56,7 @@ export default async function globalSetup(): Promise<void> {
   const child = spawn(exe('cobot'), ['serve', '--data-root', profileRoot, '--listen', `127.0.0.1:${port}`], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  process.once('exit', () => { child.kill(); });
   let output = '';
   child.stdout.on('data', (chunk) => (output += String(chunk)));
   child.stderr.on('data', (chunk) => (output += String(chunk)));
@@ -95,9 +96,10 @@ export default async function globalSetup(): Promise<void> {
   const bootData = (await boot.json()).data;
   const csrf = (await api.storageState()).cookies.find((c) => c.name === bootData.csrfCookieName)?.value;
   if (!csrf) throw new Error('cobot_csrf cookie missing after bootstrap');
+  const settings = (await (await api.get('/api/v1/settings')).json()).data;
   const patch = await api.patch('/api/v1/settings', {
     headers: { 'X-CSRF-Token': csrf },
-    data: { requestId: `e2e-engine-${Date.now()}`, patch: { enginePath: exe('fake-codex') } },
+    data: { requestId: `e2e-engine-${Date.now()}`, expectedRevision: settings.revision, patch: { enginePath: exe('fake-codex') } },
   });
   if (!patch.ok()) throw new Error(`enginePath patch failed: ${patch.status()} ${await patch.text()}`);
   await api.dispose();

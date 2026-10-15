@@ -57,7 +57,18 @@
       "waiting_input": "需要输入",
       "interrupted": "已中断",
       "unknown": "待核对"
-    }
+    },
+    "tools": {"add": "添加成员", "rebind": "更换目录", "rebuild": "重建标记"},
+    "closeTool": "关闭团队操作",
+    "roleLabel": "成员角色",
+    "chooseRole": "选择角色",
+    "directoryLabel": "团队目录",
+    "rebuildExplanation": "重新创建团队标记和资源目录，无法找回此前删除的资源。",
+    "memberAdded": "成员已添加",
+    "directoryRebound": "目录已更换",
+    "markerRebuilt": "标记已重建",
+    "rebuiltResourcesLost": "标记已重建，此前删除的资源未恢复。",
+    "rebuildUnconfirmed": "重建结果尚不确定，请先检查目录，再决定是否发起新操作。"
   },
   "role": {
     "leader": { "name": "队长" },
@@ -132,7 +143,23 @@
       "confirmed": "引擎已确认",
       "unknown": "待核对",
       "expired": "已过期"
-    }
+    },
+    "loadFailed": "审批请求加载失败",
+    "optionUnavailable": "当前无法核实该选项的执行条件。",
+    "candidate": "候选版本",
+    "target": "目标版本",
+    "executionDirectory": "执行目录",
+    "boundTask": "任务与版本",
+    "reportedEvidence": "以下是 Agent 为该候选版本提交的测试与审查报告。",
+    "testReport": "测试报告",
+    "reviewReport": "审查报告",
+    "requestedAt": "申请时间：{{time}}",
+    "originalOptions": "原始选项",
+    "comment": "意见",
+    "laterInvalidated": "该申请后来已失效，原决定仍保留。",
+    "openConversation": "查看申请者会话",
+    "feedback": "{{type}}结果：{{decision}}",
+    "feedbackDecision": {"approve": "已批准", "reject": "已拒绝"}
   },
   "approval": {
     "card": {
@@ -206,6 +233,7 @@
     }
   },
   "tasks": {
+    "description": "详细要求",
     "new": "新建任务",
     "create": "创建",
     "titleLabel": "任务标题",
@@ -331,6 +359,7 @@
     "error": "加载失败"
   },
   "errors": {
+    "error.approval.file_preview_unavailable": "尚未取得本次文件变更明细，暂不能批准；可拒绝或停止本次执行。",
     "error.internal": "内部错误，请查看服务日志",
     "error.unauthorized.bad_bootstrap": "启动链接无效或已使用",
     "error.unauthorized.session_expired": "页面会话已过期，请重新授权",
@@ -465,6 +494,25 @@
     "error.recovery.binding_missing": "恢复确认缺少执行信息，请刷新后重试",
     "error.recovery.not_unknown": "该执行当前状态为 {{status}}，无需恢复处理",
     "error.recovery.delivery_not_rerunnable": "该投递当前状态为 {{status}}，不能重跑",
-    "error.bot.open_work": "该成员仍有未完成工作：执行 {{activeRuns}}、待处理审批 {{pendingApprovals}}、在途转交 {{offeredTransfers}}、未完成任务 {{openTasks}}、未送投递 {{queuedDeliveries}}"
+    "error.bot.open_work": "该成员仍有未完成工作：执行 {{activeRuns}}、待处理审批 {{pendingApprovals}}、在途转交 {{offeredTransfers}}、未完成任务 {{openTasks}}、未送投递 {{queuedDeliveries}}",
+    "error.revision.required": "需要提供大于零的当前版本号。",
+    "error.revision.header_conflict": "请求版本与 If-Match 不一致。",
+    "error.idempotency.header_conflict": "请求 ID 与 Idempotency-Key 不一致。",
+    "error.cursor.invalid": "分页游标不适用于当前视图，请重新加载。",
+    "error.scope.other_team": "该成员不属于当前团队。",
+    "error.merge.directory_invalid": "执行目录必须存在且位于团队目录内。",
+    "error.merge.directory_changed": "团队目录已变化，请重新提交合并申请。",
+    "error.merge.candidate_changed": "任务、候选版本或目录已变化，请重新提交合并申请。",
+    "error.merge.evidence_changed": "申请后证据已变化，请重新提交申请。",
+    "error.merge.binding_unverified": "这条旧申请缺少可核实的候选绑定，请拒绝后重新提交。",
+    "error.merge.evidence_candidate_mismatch": "证据对应的候选版本不一致。",
+    "error.merge.needs_test_review": "该候选版本需要测试报告和审查报告。",
+    "error.chain.decision_stale": "该决定对应旧的链路授权，当前不能再使用。",
+    "error.engine.interrupt_unconfirmed": "停止请求已保存，尚未确认送达。",
+    "error.recovery.end_unverified": "尚未核实上次具体执行已经结束，成员仍保持锁定。"
+  },
+  "paging": {
+    "more": "继续加载",
+    "failed": "下一页加载失败，可以重试。"
   }
 }

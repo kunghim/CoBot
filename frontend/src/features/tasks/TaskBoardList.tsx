@@ -1,3 +1,4 @@
+import LoadMore from '../../components/LoadMore';
 // TaskBoardList is the "任务" page of the right panel: the team's board with
 // honest status flow, dependency chips, evidence, and two-phase transfers.
 // The server authorizes every action; this component only decides which
@@ -11,13 +12,15 @@ import { apiErrorMessage } from '../../i18n/errors';
 import TaskDetail from './TaskDetail';
 import { boardOrder, ownerLabel, statusTone } from './taskFlow';
 
-export default function TaskBoardList({ teamId, bots }: { teamId: string; bots: Bot[] }) {
+export default function TaskBoardList({ teamId, viewBotId, bots }: { teamId: string; viewBotId?: string; bots: Bot[] }) {
   const { t } = useTranslation();
-  const tasks = useTasks(teamId);
+  const tasks = useTasks(teamId, true, viewBotId);
   const create = useCreateTask(teamId);
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
   const [ownerId, setOwnerId] = useState('');
   const [errorText, setErrorText] = useState('');
 
@@ -29,10 +32,12 @@ export default function TaskBoardList({ teamId, bots }: { teamId: string; bots: 
     if (!trimmed || !ownerId) return;
     setErrorText('');
     create.mutate(
-      { title: trimmed, ownerId },
+      { title: trimmed, ownerId, description, acceptanceCriteria },
       {
         onSuccess: (created) => {
           setTitle('');
+          setDescription('');
+          setAcceptanceCriteria('');
           setCreateOpen(false);
           setExpandedId(created.id);
         },
@@ -44,7 +49,7 @@ export default function TaskBoardList({ teamId, bots }: { teamId: string; bots: 
   if (tasks.isPending) {
     return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
   }
-  if (tasks.isError) {
+  if (tasks.isError && !tasks.data) {
     return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('tasks.loadFailed')}</p>;
   }
 
@@ -77,6 +82,14 @@ export default function TaskBoardList({ teamId, bots }: { teamId: string; bots: 
               onChange={(event) => setTitle(event.target.value)}
               className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
             />
+          </label>
+          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
+            {t('tasks.description')}
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-600" />
+          </label>
+          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
+            {t('tasks.acceptance')}
+            <textarea value={acceptanceCriteria} onChange={(event) => setAcceptanceCriteria(event.target.value)} rows={2} className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-600" />
           </label>
           <label className="block text-xs text-neutral-500 dark:text-neutral-400">
             {t('tasks.ownerLabel')}
@@ -125,6 +138,7 @@ export default function TaskBoardList({ teamId, bots }: { teamId: string; bots: 
           />
         ))}
       </ul>
+      <LoadMore page={tasks} />
     </div>
   );
 }

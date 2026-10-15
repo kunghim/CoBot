@@ -1,3 +1,4 @@
+import LoadMore from '../../components/LoadMore';
 // CollaborationList is the "协作记录" page of the right panel: the selected
 // member's read-only exchange, participants labeled on every row. Sending is
 // not this page's job; the user talks to a bot in the conversation area, and
@@ -14,7 +15,7 @@ export default function CollaborationList({ botId, bots }: { botId: string; bots
   if (record.isPending) {
     return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
   }
-  if (record.isError) {
+  if (record.isError && !record.data) {
     return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('collab.loadFailed')}</p>;
   }
 
@@ -33,6 +34,7 @@ export default function CollaborationList({ botId, bots }: { botId: string; bots
           <CollaborationRow key={message.id} message={message} nameOf={nameOf} userLabel={t('tasks.ownerUser')} formatTime={(iso) => new Date(iso).toLocaleString(i18n.language)} />
         ))}
       </ul>
+      <LoadMore page={record} />
     </div>
   );
 }

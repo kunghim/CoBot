@@ -25,6 +25,8 @@ test('create team, message leader, receive engine reply', async ({ page }) => {
 
   await expect(page.getByText('e2e团队').first()).toBeVisible({ timeout: 15000 });
 
+  await expect(page.locator('textarea')).toBeVisible({ timeout: 15000 });
+
   // The team list is newest-first and earlier specs leave their own teams
   // behind, so scope the leader lookup to this team's rows. Collapsed teams
   // keep their bot buttons in the DOM but hidden, and strict mode plus

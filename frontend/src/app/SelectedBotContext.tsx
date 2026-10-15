@@ -7,13 +7,20 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 interface SelectedBotContextValue {
   botId: string | null;
   setBotId: (botId: string | null) => void;
+  drafts: Readonly<Record<string, string>>;
+  setDraft: (botId: string, text: string) => void;
+  clearSentDraft: (botId: string, sent: string) => void;
 }
 
 const SelectedBotContext = createContext<SelectedBotContextValue | null>(null);
 
 export function SelectedBotProvider({ children }: { children: ReactNode }) {
   const [botId, setBotId] = useState<string | null>(null);
-  const value = useMemo(() => ({ botId, setBotId }), [botId]);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const value = useMemo(() => ({ botId, setBotId, drafts,
+    setDraft: (id: string, text: string) => setDrafts((current) => ({ ...current, [id]: text })),
+    clearSentDraft: (id: string, sent: string) => setDrafts((current) => current[id] === sent ? { ...current, [id]: '' } : current),
+  }), [botId, drafts]);
   return <SelectedBotContext.Provider value={value}>{children}</SelectedBotContext.Provider>;
 }
 

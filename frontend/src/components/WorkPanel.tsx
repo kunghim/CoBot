@@ -95,16 +95,16 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
       >
         {!context && <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
         {context && tab === 'tasks' && (
-          <div key={context.team.id}>
-            <QuestionList teamId={context.team.id} />
-            <TaskBoardList teamId={context.team.id} bots={context.item.bots} />
+          <div key={context.bot.id}>
+            <QuestionList teamId={context.team.id} viewBotId={context.bot.id} />
+            <TaskBoardList teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />
           </div>
         )}
-        {context && tab === 'approvals' && <ApprovalHistoryList key={context.team.id} teamId={context.team.id} />}
+        {context && tab === 'approvals' && <ApprovalHistoryList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} />}
         {context && tab === 'collab' && (
           <CollaborationList key={context.bot.id} botId={context.bot.id} bots={context.item.bots} />
         )}
-        {context && tab === 'activity' && <ActivityList key={context.team.id} teamId={context.team.id} />}
+        {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} />}
         {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
       </div>
     </div>

@@ -31,6 +31,8 @@ var (
 // desktopOrigins are the Wails asset-server origins admitted by the core's
 // precise CORS allowlist (v2 serves the shell from wails.localhost).
 var desktopOrigins = []string{
+	"http://wails.localhost",
+	"wails://wails",
 	"http://wails.localhost:34115",
 	"https://wails.localhost:34115",
 	"http://localhost:34115",

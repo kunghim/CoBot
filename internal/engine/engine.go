@@ -74,7 +74,14 @@ type ApprovalRequest struct {
 	Cwd       string
 	Reason    string
 	Paths     []string // file changes involved
+	Changes   []FileChange
 	RawParams json.RawMessage
+}
+
+type FileChange struct {
+	Path string          `json:"path"`
+	Kind json.RawMessage `json:"kind,omitempty"`
+	Diff string          `json:"diff"`
 }
 
 // Notification is a normalized engine event for the app layer.

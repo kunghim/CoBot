@@ -2,37 +2,10 @@ package http
 
 import (
 	"net/http"
-	"strconv"
-
-	"github.com/kunghim/CoBot/internal/domain"
 )
 
 func (s *Server) handleListApprovals(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	teamID := r.URL.Query().Get("teamId")
-	if teamID == "" {
-		writeError(w, r, domain.InvalidRequest("error.approval.team_required", nil))
-		return
-	}
-	state := r.URL.Query().Get("state") // pending | history
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	var (
-		items any
-		err   error
-	)
-	if state == "history" {
-		items, err = s.App.ApprovalHistory(r.Context(), principal, teamID, limit)
-	} else {
-		items, err = s.App.PendingApprovals(r.Context(), principal, teamID, r.URL.Query().Get("requesterBotId"))
-	}
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": items, "nextCursor": ""})
+	s.handlePage(w, r, "approvals")
 }
 
 type decideApprovalRequest struct {

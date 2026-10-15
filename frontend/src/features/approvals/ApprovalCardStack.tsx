@@ -2,28 +2,34 @@
 // a time above the composer. There is no autoplay: the pager only moves on
 // explicit user input, and a decided card disappears from the stack while the
 // right panel keeps the history. Cards arrive oldest-first from the API.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApprovals, useDecideApproval } from '../../api/queries';
 import type { ApprovalOption } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
+import MergeDetails from './MergeDetails';
 
 export default function ApprovalCardStack({
   teamId,
+  viewBotId,
   botNameById,
 }: {
   teamId: string;
+  viewBotId?: string;
   botNameById: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
-  const approvals = useApprovals(teamId, 'pending');
+  const approvals = useApprovals(teamId, 'pending', true, viewBotId);
   const decide = useDecideApproval();
   const [index, setIndex] = useState(0);
   const [decideError, setDecideError] = useState('');
 
   const items = approvals.data?.items ?? [];
+  const selectedId = items[clampPagerIndex(index, items.length)]?.id;
+  useEffect(() => setDecideError(''), [selectedId]);
+  if (approvals.isError && !approvals.data) return <p role="alert" className="text-xs text-red-600">{t('approvals.loadFailed')}</p>;
   if (items.length === 0) return null;
   const current = clampPagerIndex(index, items.length);
   const approval = items[current];
@@ -46,7 +52,7 @@ export default function ApprovalCardStack({
     >
       <header className="flex items-center gap-2 border-b border-amber-200 px-3 py-1.5 dark:border-amber-800">
         <h3 className="text-xs font-semibold text-amber-900 dark:text-amber-100">{typeLabel}</h3>
-        {items.length > 1 && (
+        {(approvals.data?.total ?? items.length) > 1 && (
           <div className="ml-auto flex items-center gap-0.5 text-xs text-amber-800 dark:text-amber-200">
             <button
               type="button"
@@ -58,11 +64,14 @@ export default function ApprovalCardStack({
             >
               <ChevronLeft size={14} aria-hidden="true" />
             </button>
-            <span aria-live="polite">{t('approvals.position', { index: current + 1, total: items.length })}</span>
+            <span aria-live="polite">{t('approvals.position', { index: current + 1, total: approvals.data?.total ?? items.length })}</span>
             <button
               type="button"
-              onClick={() => setIndex(current + 1)}
-              disabled={current === items.length - 1}
+              onClick={() => {
+                if (current < items.length - 1) setIndex(current + 1);
+                else if (approvals.hasNextPage) void approvals.fetchNextPage().then((result) => { if (!result.isError) setIndex(current + 1); });
+              }}
+              disabled={approvals.isFetchingNextPage || (current === items.length - 1 && !approvals.hasNextPage)}
               title={t('approvals.next')}
               aria-label={t('approvals.next')}
               className="flex h-6 w-6 items-center justify-center rounded hover:bg-amber-200 disabled:opacity-40 dark:hover:bg-amber-900"
@@ -77,9 +86,10 @@ export default function ApprovalCardStack({
         <p className="text-xs text-amber-800 dark:text-amber-200">
           {t('approvals.requester', { name: requesterName })}
         </p>
-        <pre className="whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
+        <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
           {approvalSummaryText(t, approval.summary)}
         </pre>
+        <MergeDetails approval={approval} />
         {approval.reason && (
           <p className="text-sm">
             <span className="text-neutral-500 dark:text-neutral-400">{t('approvals.reason')}: </span>
@@ -96,7 +106,8 @@ export default function ApprovalCardStack({
             <button
               key={option.id}
               type="button"
-              disabled={decide.isPending}
+              disabled={decide.isPending || option.disabled}
+              title={option.disabledReasonKey ? t(`errors.${option.disabledReasonKey}`, { defaultValue: t('approvals.optionUnavailable') }) : undefined}
               onClick={() => decideOption(option)}
               className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-neutral-900 dark:text-amber-100 dark:hover:bg-amber-900"
             >
@@ -104,6 +115,8 @@ export default function ApprovalCardStack({
             </button>
           ))}
         </div>
+        {[...new Set(approval.options.map((option) => option.disabledReasonKey).filter(Boolean))].map((reason) => <p className="text-xs text-amber-800 dark:text-amber-200" key={reason}>{t(`errors.${reason}`, { defaultValue: t('approvals.optionUnavailable') })}</p>)}
+        {approvals.isFetchNextPageError && <p role="alert" className="text-xs text-red-600">{t('paging.failed')}</p>}
         {decide.isPending && (
           <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
             {t('approvals.deciding')}

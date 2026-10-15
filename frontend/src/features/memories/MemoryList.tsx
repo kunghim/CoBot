@@ -1,3 +1,4 @@
+import LoadMore from '../../components/LoadMore';
 // MemoryList is the 记忆 tab: the selected member's working methods and
 // preferences, read-only except deletion (a tombstone; the same fact is
 // never recreated automatically). Storing happens through the member's own
@@ -16,7 +17,7 @@ export default function MemoryList({ botId }: { botId: string }) {
   if (memories.isPending) {
     return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
   }
-  if (memories.isError) {
+  if (memories.isError && !memories.data) {
     return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('memories.loadFailed')}</p>;
   }
   const items = memories.data?.items ?? [];
@@ -57,6 +58,7 @@ export default function MemoryList({ botId }: { botId: string }) {
           </li>
         ))}
       </ul>
+      <LoadMore page={memories} />
     </div>
   );
 }

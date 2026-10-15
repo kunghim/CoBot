@@ -34,23 +34,47 @@ function newRequestId(): string {
   return 'req-' + Date.now() + '-' + Math.random().toString(16).slice(2);
 }
 
-const BEARER_KEY = 'cobot_bearer';
+let bearer: string | null = null;
+let baseUrl = '';
+let transportReady: Promise<void> | null = null;
+let bootstrapSecret: string | null = null;
+let renewalTimer = 0;
 
-/** Desktop-only bearer storage; the browser flow keeps cookies. */
-export function bearerToken(): string | null {
-  try {
-    return sessionStorage.getItem(BEARER_KEY);
-  } catch {
-    return null;
+export function bearerToken(): string | null { return bearer; }
+export function clearBearer(): void { bearer = null; window.clearTimeout(renewalTimer); }
+export function apiUrl(path: string): string { return baseUrl + path; }
+
+function setEndpoint(endpoint: string): void {
+  const url = new URL(endpoint);
+  if (!['http:', 'https:'].includes(url.protocol) || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
+    throw new Error('Invalid desktop loopback endpoint');
   }
+  if (baseUrl && baseUrl !== url.origin) clearBearer();
+  baseUrl = url.origin;
 }
 
-export function clearBearer(): void {
-  try {
-    sessionStorage.removeItem(BEARER_KEY);
-  } catch {
-    /* storage unavailable: nothing to clear */
-  }
+/** Every query waits for the native handoff before choosing its HTTP origin. */
+export function initializeTransport(): Promise<void> {
+  if (!transportReady) transportReady = (async () => {
+    const bridge = desktopBridge();
+    if (bridge) { const handoff = await bridge.Bootstrap(); setEndpoint(handoff.endpoint); bootstrapSecret = handoff.secret; }
+  })().catch((error: unknown) => { transportReady = null; throw error; });
+  return transportReady;
+}
+
+export async function desktopSecret(): Promise<string | null> {
+  await initializeTransport();
+  if (bootstrapSecret) { const secret = bootstrapSecret; bootstrapSecret = null; return secret; }
+  const bridge = desktopBridge();
+  if (!bridge) return null;
+  const handoff = await bridge.Bootstrap(); setEndpoint(handoff.endpoint); return handoff.secret;
+}
+
+const pendingWrites = new Map<string, string>();
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, canonical(child)]));
+  return value;
 }
 
 let csrfCookieName = 'cobot_csrf';
@@ -79,48 +103,52 @@ export function reportUnauthorized(): void {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  await initializeTransport();
   const headers: Record<string, string> = {};
-  const payload = body === undefined ? undefined : JSON.stringify({ requestId: newRequestId(), ...(body as object) });
+  const writing = !['GET', 'HEAD'].includes(method);
+  const input = (body ?? {}) as Record<string, unknown>;
+  const fingerprint = method + ' ' + path + ' ' + JSON.stringify(canonical(input));
+  const requestId = String(input.requestId ?? pendingWrites.get(fingerprint) ?? newRequestId());
+  if (writing) {
+    if (pendingWrites.size >= 100 && !pendingWrites.has(fingerprint)) pendingWrites.delete(pendingWrites.keys().next().value!);
+    pendingWrites.set(fingerprint, requestId);
+  }
+  const payload = !writing || method === 'DELETE' ? undefined : JSON.stringify({ ...input, requestId });
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
-  const bearer = bearerToken();
-  if (bearer) {
-    // Desktop shell: the page runs on the Wails asset origin and
-    // authenticates with the in-memory bearer, never with cookies.
-    headers['Authorization'] = 'Bearer ' + bearer;
-  } else {
-    headers['X-CSRF-Token'] = csrfToken();
+  if (method === 'DELETE') {
+    headers['Idempotency-Key'] = requestId;
+    if (input.expectedRevision !== undefined) headers['If-Match'] = String(input.expectedRevision);
   }
-
-  const resp = await fetch(path, { method, headers, credentials: 'include', body: payload });
+  const token = bearerToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
+  else headers['X-CSRF-Token'] = csrfToken();
+  // Only durable business writes are safe to retry after a lost response.
+  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/');
+  let resp: Response;
+  try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload }); }
+  catch (error) {
+    if (!retryable) throw error;
+    resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload });
+  }
   const text = await resp.text();
-  let parsed: unknown = undefined;
-  if (text) {
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = undefined;
-    }
-  }
+  let parsed: unknown;
+  try { parsed = text ? JSON.parse(text) : undefined; } catch { parsed = undefined; }
+  if (!resp.ok && resp.status < 500) pendingWrites.delete(fingerprint);
   if (!resp.ok) {
     const envelope = parsed as ErrorEnvelope | undefined;
-    if (resp.status === 401) {
-      clearBearer();
-      notifyUnauthorized();
-    }
-    throw new ApiError(
-      resp.status,
-      envelope?.error?.code ?? 'internal',
-      envelope?.error?.messageKey ?? 'error.internal',
-      envelope?.error?.params ?? {},
-    );
+    if (resp.status === 401) { clearBearer(); notifyUnauthorized(); }
+    throw new ApiError(resp.status, envelope?.error?.code ?? 'internal', envelope?.error?.messageKey ?? 'error.internal', envelope?.error?.params ?? {});
   }
   const ok = parsed as OkEnvelope<T> | undefined;
-  if (!ok || typeof ok !== 'object' || !('data' in ok)) {
-    // A 200 without the {data,requestId} envelope is a contract violation,
-    // not a client bug; surface it as an internal error.
-    throw new ApiError(500, 'internal', 'error.internal', {});
-  }
+  if (!ok || typeof ok !== 'object' || !('data' in ok)) throw new ApiError(500, 'internal', 'error.internal', {});
+  pendingWrites.delete(fingerprint);
   return ok.data;
+}
+
+function pageQuery(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') query.set(key, String(value));
+  return query.size ? '?' + query.toString() : '';
 }
 
 export const api = {
@@ -143,20 +171,20 @@ export const api = {
       { secret },
     );
     csrfCookieName = result.csrfCookieName;
-    // Only the desktop shell keeps the bearer; browser sessions stay cookies.
     if (result.bearerToken && desktopBridge()) {
-      try {
-        sessionStorage.setItem(BEARER_KEY, result.bearerToken);
-      } catch {
-        /* storage unavailable */
-      }
+      bearer = result.bearerToken;
+      window.clearTimeout(renewalTimer);
+      const delay = Math.max(1000, Date.parse(result.bearerExpiresAt ?? '') - Date.now() - 60_000);
+      renewalTimer = window.setTimeout(() => {
+        void desktopSecret().then((secret) => secret ? api.exchangeBootstrap(secret) : null).catch(() => { clearBearer(); notifyUnauthorized(); });
+      }, Number.isFinite(delay) ? delay : 25 * 60_000);
     }
     return result;
   },
   logout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {}),
 
   // Teams, roles and members (M2).
-  listTeams: () => request<import('./types').TeamListResult>('GET', '/api/v1/teams'),
+  listTeams: (cursor?: string) => request<import('./types').TeamListResult>('GET', '/api/v1/teams' + pageQuery({ cursor })),
   createTeam: (body: { name: string; directory: string; initialRoleIds: string[]; adoptMarker?: boolean }) =>
     request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
   getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
@@ -183,10 +211,12 @@ export const api = {
     request<import('./types').InterruptRunResult>('POST', `/api/v1/runs/${runId}/interrupt`, {}),
 
   // Approvals (M2).
-  listApprovals: (params: { teamId: string; state?: 'pending' | 'history'; requesterBotId?: string; limit?: number }) => {
+  listApprovals: (params: { teamId: string; state?: 'pending' | 'history'; requesterBotId?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.state) query.set('state', params.state);
     if (params.requesterBotId) query.set('requesterBotId', params.requesterBotId);
+    if (params.viewBotId) query.set('viewBotId', params.viewBotId);
+    if (params.cursor) query.set('cursor', params.cursor);
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').ApprovalListResult>('GET', `/api/v1/approvals?${query.toString()}`);
   },
@@ -201,9 +231,11 @@ export const api = {
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
   // Tasks, transfers, questions and collaboration records (M3).
-  listTasks: (params: { teamId: string; ownerId?: string; limit?: number }) => {
+  listTasks: (params: { teamId: string; ownerId?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.ownerId) query.set('ownerId', params.ownerId);
+    if (params.viewBotId) query.set('viewBotId', params.viewBotId);
+    if (params.cursor) query.set('cursor', params.cursor);
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').TaskListResult>('GET', `/api/v1/teams/${params.teamId}/tasks?${query.toString()}`);
   },
@@ -224,13 +256,15 @@ export const api = {
     request<import('./types').Task>('POST', `/api/v1/tasks/${taskId}/confirm`, body),
   offerTransfer: (taskId: string, body: { toBotId: string; note?: string }) =>
     request<import('./types').Transfer>('POST', `/api/v1/tasks/${taskId}/transfers`, body),
-  acceptTransfer: (transferId: string) =>
-    request<import('./types').Task>('POST', `/api/v1/transfers/${transferId}/accept`, {}),
+  acceptTransfer: (transferId: string, expectedRevision: number) =>
+    request<import('./types').Task>('POST', `/api/v1/transfers/${transferId}/accept`, { expectedRevision }),
   cancelTransfer: (transferId: string) =>
     request<import('./types').Transfer>('POST', `/api/v1/transfers/${transferId}/cancel`, {}),
-  listQuestions: (params: { teamId: string; status?: string; limit?: number }) => {
+  listQuestions: (params: { teamId: string; status?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.status) query.set('status', params.status);
+    if (params.viewBotId) query.set('viewBotId', params.viewBotId);
+    if (params.cursor) query.set('cursor', params.cursor);
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
   },
@@ -238,10 +272,7 @@ export const api = {
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
-  listCollaboration: (botId: string, limit?: number) => {
-    const query = limit !== undefined ? `?limit=${limit}` : '';
-    return request<import('./types').CollaborationListResult>('GET', `/api/v1/bots/${botId}/collaboration${query}`);
-  },
+  listCollaboration: (botId: string, cursor?: string) => request<import('./types').CollaborationListResult>('GET', `/api/v1/bots/${botId}/collaboration` + pageQuery({ cursor })),
 
   // Team lifecycle (M4 backend, M5 surface).
   archiveTeam: (teamId: string, expectedRevision?: number) =>
@@ -253,19 +284,18 @@ export const api = {
       ...(expectedRevision !== undefined ? { expectedRevision } : {}),
     }),
   deleteTeam: (teamId: string, expectedRevision?: number) =>
-    request<import('./types').Team>('DELETE', `/api/v1/teams/${teamId}${expectedRevision !== undefined ? `?expectedRevision=${expectedRevision}` : ''}`),
+    request<import('./types').Team>('DELETE', `/api/v1/teams/${teamId}`, { expectedRevision }),
   deleteBot: (botId: string, expectedRevision?: number) =>
-    request<import('./types').Bot>('DELETE', `/api/v1/bots/${botId}${expectedRevision !== undefined ? `?expectedRevision=${expectedRevision}` : ''}`),
+    request<import('./types').Bot>('DELETE', `/api/v1/bots/${botId}`, { expectedRevision }),
   rebindDirectory: (teamId: string, body: { directory: string; adoptMarker?: boolean; expectedRevision?: number }) =>
     request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/directory/rebind`, body),
-  retryTeam: (teamId: string) =>
-    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/retry`, {}),
+  retryTeam: (teamId: string, expectedRevision: number) =>
+    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/retry`, { expectedRevision }),
 
   // Activity, memories, directories, authorizations (M5).
-  listActivity: (teamId: string, limit?: number) =>
-    request<{ items: import('./types').ActivityItem[]; nextCursor: string }>('GET', `/api/v1/teams/${teamId}/activity${limit !== undefined ? `?limit=${limit}` : ''}`),
-  listMemories: (botId: string, limit?: number) =>
-    request<import('./types').MemoryListResult>('GET', `/api/v1/bots/${botId}/memories${limit !== undefined ? `?limit=${limit}` : ''}`),
+  listActivity: (teamId: string, viewBotId?: string, cursor?: string) => request<{ items: import('./types').ActivityItem[]; nextCursor: string }>('GET', `/api/v1/teams/${teamId}/activity` + pageQuery({ viewBotId, cursor })),
+  listMemories: (botId: string, cursor?: string) => request<import('./types').MemoryListResult>('GET', `/api/v1/bots/${botId}/memories` + pageQuery({ cursor })),
+  rebuildMarker: (teamId: string, expectedRevision: number) => request<{ rebuilt: boolean; resourcesLost: boolean; state: string }>('POST', `/api/v1/teams/${teamId}/directory/rebuild-marker`, { expectedRevision }),
   deleteMemory: (botId: string, memoryId: string) =>
     request<{ deleted: boolean }>('DELETE', `/api/v1/bots/${botId}/memories/${memoryId}`),
   listDirectories: (path?: string) =>

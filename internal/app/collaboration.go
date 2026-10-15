@@ -298,8 +298,8 @@ func (a *App) BuildContext(ctx context.Context, bot domain.Bot, taskID string) s
 		// Only this member's own team's task may enter the context (review
 		// B major6); a foreign id is treated as absent, never rendered.
 		if task, err := sqlite.GetTask(ctx, a.DB, taskID); err == nil && task.TeamID == bot.TeamID {
-			fmt.Fprintf(&b, "\n# 当前任务\n标题：%s\n完成标准：%s\n状态：%s\n",
-				task.Title, task.AcceptanceCriteria, task.Status)
+			fmt.Fprintf(&b, "\n# 当前任务\nID：%s\n版本：%d\n负责人：%s\n标题：%s\n详细要求：%s\n完成标准：%s\n状态：%s\n",
+				task.ID, task.Revision, task.OwnerID, task.Title, task.Description, task.AcceptanceCriteria, task.Status)
 			if evidence, err := sqlite.ListEvidence(ctx, a.DB, task.ID); err == nil && len(evidence) > 0 {
 				b.WriteString("已有证据：\n")
 				for _, e := range evidence {

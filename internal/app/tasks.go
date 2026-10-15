@@ -243,7 +243,7 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 	if !ready {
 		status = domain.DeliveryWaitingDependency
 	}
-	text := fmt.Sprintf("你被指派了任务：%s\n完成标准：%s", task.Title, task.AcceptanceCriteria)
+	text := fmt.Sprintf("你被指派了任务：%s\n任务 ID：%s\n详细要求：%s\n完成标准：%s", task.Title, task.ID, task.Description, task.AcceptanceCriteria)
 	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 	if err != nil {
 		return err

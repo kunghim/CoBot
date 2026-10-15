@@ -2,9 +2,6 @@ package http
 
 import (
 	"net/http"
-
-	"github.com/kunghim/CoBot/internal/domain"
-	"strconv"
 )
 
 // The Web completeness surface (M5): activity feed, member memories,
@@ -13,39 +10,11 @@ import (
 // rest of the product uses.
 
 func (s *Server) handleListActivity(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	events, err := s.App.ListTeamActivity(r.Context(), principal, r.PathValue("id"), limit)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	// Empty lists serialize as [] rather than null so the client never has
-	// to special-case a missing array.
-	if events == nil {
-		events = []domain.Event{}
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": events, "nextCursor": ""})
+	s.handlePage(w, r, "activity")
 }
 
 func (s *Server) handleListMemories(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	memories, err := s.App.ListMemories(r.Context(), principal, r.PathValue("id"), limit)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	if memories == nil {
-		memories = []domain.Memory{}
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": memories, "nextCursor": ""})
+	s.handlePage(w, r, "memories")
 }
 
 func (s *Server) handleDeleteMemory(w http.ResponseWriter, r *http.Request) {

@@ -2,34 +2,13 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/kunghim/CoBot/internal/app"
-	"github.com/kunghim/CoBot/internal/domain"
 )
 
 // handleListTasks projects a team's tasks. A member's scope is narrowed
 // server-side; the browser never decides who may see what.
-func (s *Server) handleListTasks(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	teamID := r.URL.Query().Get("teamId")
-	if teamID == "" {
-		writeError(w, r, domain.InvalidRequest("error.task.team_required", nil))
-		return
-	}
-	ownerID := r.URL.Query().Get("ownerId")
-	// The user sees the whole team board; narrowing is opt-in.
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	tasks, err := s.App.ListTasks(r.Context(), principal, teamID, ownerID, limit)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": tasks, "nextCursor": ""})
-}
+func (s *Server) handleListTasks(w http.ResponseWriter, r *http.Request) { s.handlePage(w, r, "tasks") }
 
 type createTaskRequest struct {
 	RequestID          string   `json:"requestId"`

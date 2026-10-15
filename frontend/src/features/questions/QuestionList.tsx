@@ -1,3 +1,4 @@
+import LoadMore from '../../components/LoadMore';
 // QuestionList surfaces the ask_user questions the user still owes an answer
 // to. An answer is ordinary input delivered to the asking bot; it is never a
 // security authorization, and the panel says so.
@@ -7,11 +8,11 @@ import { useAnswerQuestion, useCancelQuestion, useQuestions } from '../../api/qu
 import type { Question } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 
-export default function QuestionList({ teamId }: { teamId: string }) {
+export default function QuestionList({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
   const { t } = useTranslation();
-  const questions = useQuestions(teamId, 'open');
+  const questions = useQuestions(teamId, 'open', true, viewBotId);
 
-  if (questions.isError) {
+  if (questions.isError && !questions.data) {
     return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('questions.loadFailed')}</p>;
   }
   if (questions.isPending) {
@@ -34,6 +35,7 @@ export default function QuestionList({ teamId }: { teamId: string }) {
           <QuestionCard key={question.id} question={question} />
         ))}
       </ul>
+      <LoadMore page={questions} />
     </section>
   );
 }
