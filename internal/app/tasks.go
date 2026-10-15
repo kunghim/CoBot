@@ -64,14 +64,15 @@ func (a *App) validateDependencies(ctx context.Context, q sqlite.Queryer, taskID
 		if depTask.TeamID != teamID {
 			return domain.InvalidRequest("error.task.dependency_other_team", map[string]any{"taskId": dep})
 		}
-		if taskID != "" {
-			cycle, err := sqlite.HasCycleFrom(ctx, q, taskID, dep)
-			if err != nil {
-				return err
-			}
-			if cycle {
-				return domain.InvalidRequest("error.task.dependency_cycle", map[string]any{"taskId": taskID, "dependsOn": dep})
-			}
+		// The cycle walk does not need the task row to exist, so it also
+		// covers the create path: a task may not depend on a task that depends
+		// on it, even while both rows are being written for the first time.
+		cycle, err := sqlite.HasCycleFrom(ctx, q, taskID, dep)
+		if err != nil {
+			return err
+		}
+		if cycle {
+			return domain.InvalidRequest("error.task.dependency_cycle", map[string]any{"taskId": taskID, "dependsOn": dep})
 		}
 	}
 	return nil
