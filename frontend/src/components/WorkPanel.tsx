@@ -1,14 +1,16 @@
-// WorkPanel is the right column. Real as of M3: 任务 (team board with
-// questions the user owes), 审批 (decided history) and 协作 (the selected
-// member's read-only record); 动态/记忆 honestly say they arrive in later
-// milestones instead of showing fabricated data.
+// WorkPanel is the right column. All five tabs are real: 任务 (team board
+// with questions the user owes), 审批 (decided history), 动态 (the durable
+// event record), 协作 (the selected member's read-only record) and 记忆 (the
+// member's working methods).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
+import ActivityList from '../features/activity/ActivityList';
 import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
 import CollaborationList from '../features/collaboration/CollaborationList';
+import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
@@ -74,9 +76,8 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         {context && tab === 'collab' && (
           <CollaborationList key={context.bot.id} botId={context.bot.id} bots={context.item.bots} />
         )}
-        {context && (tab === 'activity' || tab === 'memory') && (
-          <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.notReadyYet')}</p>
-        )}
+        {context && tab === 'activity' && <ActivityList key={context.team.id} teamId={context.team.id} />}
+        {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
       </div>
     </div>
   );

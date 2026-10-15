@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderOpen } from 'lucide-react';
 import { useCreateTeam, useRoles } from '../../api/queries';
+import { api } from '../../api/client';
+import type { DirectoryCheckResult } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { desktopBridge } from '../../platform/native-bridge';
 
@@ -27,6 +29,10 @@ export default function CreateTeamDialog({
   const [directory, setDirectory] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<ReadonlySet<string>>(() => new Set());
   const [errorText, setErrorText] = useState('');
+  const [verdict, setVerdict] = useState<DirectoryCheckResult | null>(null);
+  const [children, setChildren] = useState<string[]>([]);
+  const [adoptMarker, setAdoptMarker] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   // Fresh form each time the dialog opens.
   useEffect(() => {
@@ -35,6 +41,9 @@ export default function CreateTeamDialog({
     setDirectory('');
     setSelectedRoles(new Set());
     setErrorText('');
+    setVerdict(null);
+    setChildren([]);
+    setAdoptMarker(false);
   }, [open]);
 
   useEffect(() => {
@@ -64,6 +73,33 @@ export default function CreateTeamDialog({
       });
   };
 
+  // The browser picker validates through the same rules creation uses, so a
+  // duplicate, nested, or foreign-marked directory is visible before submit
+  // instead of only as a late error.
+  const checkDirectory = () => {
+    if (!directory.trim()) return;
+    setChecking(true);
+    setVerdict(null);
+    api
+      .checkDirectory(directory.trim())
+      .then((result) => {
+        setVerdict(result);
+        setAdoptMarker(false);
+      })
+      .catch((error) => setErrorText(apiErrorMessage(t, error)))
+      .finally(() => setChecking(false));
+  };
+
+  const listChildren = () => {
+    api
+      .listDirectories(directory.trim() || undefined)
+      .then((result) => {
+        setChildren(result.children);
+        if (result.path && !directory.trim()) setDirectory(result.path);
+      })
+      .catch((error) => setErrorText(apiErrorMessage(t, error)));
+  };
+
   const toggleRole = (roleId: string) => {
     setSelectedRoles((prev) => {
       const next = new Set(prev);
@@ -77,7 +113,7 @@ export default function CreateTeamDialog({
     if (!canSubmit) return;
     setErrorText('');
     create.mutate(
-      { name: name.trim(), directory: directory.trim(), initialRoleIds: [...selectedRoles] },
+      { name: name.trim(), directory: directory.trim(), initialRoleIds: [...selectedRoles], adoptMarker },
       {
         onSuccess: (result) => onCreated(result.team.leaderId, result.team.id),
         onError: (error) => setErrorText(apiErrorMessage(t, error)),
@@ -135,8 +171,76 @@ export default function CreateTeamDialog({
                 <FolderOpen size={16} aria-hidden="true" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={checkDirectory}
+              disabled={checking || !directory.trim()}
+              className="shrink-0 rounded-md border border-neutral-300 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              {t('team.checkDirectory')}
+            </button>
           </span>
         </label>
+
+        {!bridge && (
+          <div className="mt-1.5">
+            <button
+              type="button"
+              onClick={listChildren}
+              className="text-xs text-neutral-500 underline-offset-2 hover:underline dark:text-neutral-400"
+            >
+              {t('team.listChildren')}
+            </button>
+            {children.length > 0 && (
+              <ul className="mt-1 max-h-28 overflow-y-auto rounded-md border border-neutral-200 dark:border-neutral-700">
+                {children.map((child) => (
+                  <li key={child}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDirectory(child);
+                        setChildren([]);
+                        setVerdict(null);
+                      }}
+                      className="block w-full truncate px-2 py-1 text-left font-mono text-[11px] hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      {child}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {verdict && (
+          <p
+            role="status"
+            className={`mt-2 text-xs ${verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}
+          >
+            {verdict.ok
+              ? t('team.directoryOk', { path: verdict.canonical })
+              : verdict.duplicate
+                ? t('team.directoryDuplicate', { teamName: verdict.teamName ?? '' })
+                : verdict.nested
+                  ? t('team.directoryNested', { teamName: verdict.teamName ?? '' })
+                  : t('status.error')}
+            {verdict.markerPresent && (
+              <span className="block">
+                {t('team.directoryMarker', { instanceId: verdict.markerInstance ?? '' })}
+                <label className="mt-1 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={adoptMarker}
+                    onChange={() => setAdoptMarker((value) => !value)}
+                    className="h-4 w-4 rounded border-neutral-300"
+                  />
+                  {t('team.adoptMarker')}
+                </label>
+              </span>
+            )}
+          </p>
+        )}
 
         <fieldset className="mt-3">
           <legend className="text-sm text-neutral-500 dark:text-neutral-400">{t('team.initialRoles')}</legend>

@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   queryKeys,
+  useAuthorizations,
   useEngine,
   useEngineLogin,
   useEngineLoginCancel,
   useEngineLogout,
   useEngineModels,
+  useRevokeAuthorization,
   useSettings,
   useStatus,
   useUpdateSettings,
@@ -50,6 +52,10 @@ export default function SettingsPage() {
   const [errorKey, setErrorKey] = useState<string>('');
   const [modelFeedback, setModelFeedback] = useState<Feedback>('idle');
   const [modelErrorText, setModelErrorText] = useState('');
+
+  const authorizations = useAuthorizations(true);
+  const revoke = useRevokeAuthorization();
+  const [revokeError, setRevokeError] = useState('');
 
   const [loginPending, setLoginPending] = useState(false);
   const [loginTimedOut, setLoginTimedOut] = useState(false);
@@ -443,6 +449,52 @@ export default function SettingsPage() {
             </span>
           )}
         </div>
+
+        <section aria-labelledby="settings-authorizations" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+          <h2 id="settings-authorizations" className="text-sm font-semibold">
+            {t('settings.authorizations')}
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">{t('settings.authorizationsHint')}</p>
+          {authorizations.isPending && (
+            <p className="mt-3 text-sm text-neutral-500" role="status">
+              {t('status.loading')}
+            </p>
+          )}
+          {authorizations.isSuccess && (authorizations.data?.items ?? []).length === 0 && (
+            <p className="mt-3 text-sm text-neutral-500">{t('settings.authorizationsEmpty')}</p>
+          )}
+          {authorizations.isSuccess && (authorizations.data?.items ?? []).length > 0 && (
+            <ul className="mt-3 divide-y divide-neutral-100 dark:divide-neutral-800">
+              {(authorizations.data?.items ?? []).map((item) => (
+                <li key={item.botId + item.engineEpoch} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block truncate font-mono text-xs">{item.botId.slice(0, 8)}</span>
+                    <span className="block text-[11px] text-neutral-500">
+                      {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString()}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRevokeError('');
+                      revoke.mutate(item.botId, {
+                        onError: (error) => setRevokeError(apiErrorMessage(t, error)),
+                      });
+                    }}
+                    className="shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-red-950"
+                  >
+                    {t('settings.revoke')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {revokeError && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {revokeError}
+            </p>
+          )}
+        </section>
 
         <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
           <button

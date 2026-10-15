@@ -3,10 +3,11 @@
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Plus, Users, X } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, Plus, Trash2, Undo2, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTeams } from '../../api/queries';
+import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRestoreTeam, useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
+import { apiErrorMessage } from '../../i18n/errors';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import CreateTeamDialog from './CreateTeamDialog';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
@@ -168,12 +169,16 @@ function TeamRow({
             {t(badgeKey)}
           </span>
         )}
+        <TeamActions team={team} />
       </div>
       {expanded && (
         <ul className="ml-6 mt-0.5 space-y-0.5">
           {orderBotsLeaderFirst(bots).map((bot) => (
-            <li key={bot.id}>
-              <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
+            <li key={bot.id} className="flex items-center">
+              <span className="min-w-0 flex-1">
+                <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
+              </span>
+              {!bot.isLeader && <DeleteMemberButton bot={bot} />}
             </li>
           ))}
         </ul>
@@ -202,7 +207,7 @@ function BotRow({
       onClick={() => onSelect(bot.id)}
       aria-current={selected}
       title={directory || undefined}
-      className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors ${
+      className={`flex w-full min-w-0 items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors ${
         selected
           ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
           : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800/60'
@@ -221,6 +226,90 @@ function BotRow({
           {t('team.leader')}
         </span>
       )}
+    </button>
+  );
+}
+
+// TeamActions offers the real lifecycle verbs (B09): archive pauses dispatch
+// and keeps work; restore resumes it; delete is reachable only after
+// archiving and never touches user files.
+function TeamActions({ team }: { team: TeamWithBots['team'] }) {
+  const { t } = useTranslation();
+  const archive = useArchiveTeam();
+  const restore = useRestoreTeam();
+  const remove = useDeleteTeam();
+  const [errorText, setErrorText] = useState('');
+  const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
+
+  return (
+    <span className="flex shrink-0 items-center gap-0.5">
+      {errorText && (
+        <span className="sr-only" role="alert">
+          {errorText}
+        </span>
+      )}
+      {team.status === 'active' && (
+        <button
+          type="button"
+          onClick={() => {
+            setErrorText('');
+            archive.mutate({ teamId: team.id }, { onError: fail });
+          }}
+          title={t('team.archive')}
+          aria-label={t('team.archive')}
+          className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+        >
+          <Archive size={12} aria-hidden="true" />
+        </button>
+      )}
+      {team.status === 'archived' && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setErrorText('');
+              restore.mutate({ teamId: team.id }, { onError: fail });
+            }}
+            title={t('team.restore')}
+            aria-label={t('team.restore')}
+            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          >
+            <Undo2 size={12} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setErrorText('');
+              remove.mutate({ teamId: team.id }, { onError: fail });
+            }}
+            title={t('team.delete')}
+            aria-label={t('team.delete')}
+            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
+          >
+            <Trash2 size={12} aria-hidden="true" />
+          </button>
+        </>
+      )}
+    </span>
+  );
+}
+
+// DeleteMemberButton removes a member that carries no unfinished work (B08).
+function DeleteMemberButton({ bot }: { bot: Bot }) {
+  const { t } = useTranslation();
+  const remove = useDeleteBot();
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        remove.mutate({ botId: bot.id });
+      }}
+      title={t('team.deleteMember')}
+      aria-label={t('team.deleteMember')}
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-red-100 hover:text-red-700 dark:text-neutral-600 dark:hover:bg-red-950 dark:hover:text-red-300"
+    >
+      <Trash2 size={11} aria-hidden="true" />
     </button>
   );
 }

@@ -157,7 +157,7 @@ export function useTeams(enabled = true) {
 export function useCreateTeam() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; directory: string; initialRoleIds: string[] }) => api.createTeam(input),
+    mutationFn: (input: { name: string; directory: string; initialRoleIds: string[]; adoptMarker?: boolean }) => api.createTeam(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.teams });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
@@ -410,6 +410,107 @@ export function useCollaboration(botId: string | null, enabled = true) {
     queryKey: queryKeys.collaboration(botId ?? ''),
     queryFn: () => api.listCollaboration(botId as string),
     enabled: botId !== null && enabled,
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// M5: activity, memories, team lifecycle, authorizations
+// ---------------------------------------------------------------------------
+
+/** GET /teams/{id}/activity: the durable event record, newest first. */
+export function useActivity(teamId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['activity', teamId ?? ''],
+    queryFn: () => api.listActivity(teamId as string, 100),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+/** GET /bots/{id}/memories: one member's live memories. */
+export function useMemories(botId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['memories', botId ?? ''],
+    queryFn: () => api.listMemories(botId as string),
+    enabled: botId !== null && enabled,
+  });
+}
+
+export function useDeleteMemory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, memoryId }: { botId: string; memoryId: string }) => api.deleteMemory(botId, memoryId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['memories'] });
+    },
+  });
+}
+
+function useInvalidateTeamScope() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+  };
+}
+
+export function useArchiveTeam() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision?: number }) => api.archiveTeam(teamId, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRestoreTeam() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision?: number }) => api.restoreTeam(teamId, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteTeam() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision?: number }) => api.deleteTeam(teamId, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteBot() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ botId, expectedRevision }: { botId: string; expectedRevision?: number }) => api.deleteBot(botId, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRebindDirectory() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, directory, adoptMarker }: { teamId: string; directory: string; adoptMarker?: boolean }) =>
+      api.rebindDirectory(teamId, { directory, adoptMarker }),
+    onSuccess: invalidate,
+  });
+}
+
+/** GET /authorizations: live bridge credentials without token values. */
+export function useAuthorizations(enabled = true) {
+  return useQuery({
+    queryKey: ['authorizations'],
+    queryFn: api.listAuthorizations,
+    enabled,
+  });
+}
+
+export function useRevokeAuthorization() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (botId: string) => api.revokeAuthorization(botId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['authorizations'] });
+    },
   });
 }
 

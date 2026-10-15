@@ -12,6 +12,17 @@
     "selectBot": "Pick a member on the left to start a conversation"
   },
   "team": {
+    "archive": "Archive team",
+    "restore": "Restore team",
+    "delete": "Delete team",
+    "deleteMember": "Delete member",
+    "checkDirectory": "Check directory",
+    "listChildren": "List subdirectories",
+    "directoryOk": "Directory usable: {{path}}",
+    "directoryDuplicate": "Already bound to team {{teamName}}",
+    "directoryNested": "Nested with the directory of team {{teamName}}",
+    "directoryMarker": "This directory carries a team marker (instance {{instanceId}})",
+    "adoptMarker": "Adopt it as a new team",
     "new": "New team",
     "createTitle": "New team",
     "name": "Team name",
@@ -134,6 +145,43 @@
       "unknown": "Unknown option"
     }
   },
+  "activity": {
+    "empty": "No activity yet",
+    "loadFailed": "Failed to load activity",
+    "type": {
+      "message.created": "Message created",
+      "message.updated": "Message status changed",
+      "run.updated": "Run state changed",
+      "approval.created": "New approval request",
+      "approval.updated": "Approval decided",
+      "task.created": "Task created",
+      "task.updated": "Task updated",
+      "transfer.offered": "Transfer offered",
+      "transfer.accepted": "Transfer accepted",
+      "question.created": "New question",
+      "question.answered": "Question answered",
+      "chain.updated": "Chain state changed",
+      "usage.updated": "Usage recorded",
+      "budget.paused": "Budget paused new turns",
+      "memory.changed": "Memory changed",
+      "team.updated": "Team updated",
+      "team.archived": "Team archived",
+      "team.restored": "Team restored",
+      "team.deleted": "Team deleted",
+      "team.directory_rebound": "Team directory rebound",
+      "bot.deleted": "Member deleted",
+      "authorization.revoked": "Authorization revoked",
+      "log.gap": "Event ledger gap recorded for verification",
+      "log.quarantined": "Corrupt event file quarantined",
+      "settings.updated": "Settings updated"
+    }
+  },
+  "memories": {
+    "empty": "No memories yet",
+    "loadFailed": "Failed to load memories",
+    "readOnlyHint": "Read-only record; the member stores methods through its own tools",
+    "delete": "Delete"
+  },
   "panel": {
     "noSelection": "Pick a member on the left first",
     "notReadyYet": "Coming in a later milestone",
@@ -218,6 +266,10 @@
     "logoutFailed": "Failed to sign out"
   },
   "settings": {
+    "authorizations": "Live authorizations",
+    "authorizationsHint": "Member bridge credentials (token values never shown); revoking invalidates the next bridge call immediately",
+    "authorizationsEmpty": "No live authorizations",
+    "revoke": "Revoke",
     "title": "Settings",
     "language": "Language",
     "engine": "Codex engine",

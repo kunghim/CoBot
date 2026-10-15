@@ -12,6 +12,17 @@
     "selectBot": "从左侧选择一个成员开始对话"
   },
   "team": {
+    "archive": "归档团队",
+    "restore": "恢复团队",
+    "delete": "删除团队",
+    "deleteMember": "删除成员",
+    "checkDirectory": "检查目录",
+    "listChildren": "列出子目录",
+    "directoryOk": "目录可用：{{path}}",
+    "directoryDuplicate": "该目录已被团队「{{teamName}}」绑定",
+    "directoryNested": "该目录与团队「{{teamName}}」的目录存在包含关系",
+    "directoryMarker": "目录里已有团队标记（实例 {{instanceId}}）",
+    "adoptMarker": "确认以新团队接管该目录",
     "new": "新建团队",
     "createTitle": "新建团队",
     "name": "团队名称",
@@ -134,6 +145,43 @@
       "unknown": "未知选项"
     }
   },
+  "activity": {
+    "empty": "暂无动态",
+    "loadFailed": "动态加载失败",
+    "type": {
+      "message.created": "消息已创建",
+      "message.updated": "消息状态更新",
+      "run.updated": "执行状态更新",
+      "approval.created": "新审批请求",
+      "approval.updated": "审批已处理",
+      "task.created": "任务已创建",
+      "task.updated": "任务已更新",
+      "transfer.offered": "发起转交",
+      "transfer.accepted": "转交已接受",
+      "question.created": "新提问",
+      "question.answered": "提问已回答",
+      "chain.updated": "协作链状态变化",
+      "usage.updated": "用量已记录",
+      "budget.paused": "预算暂停新轮",
+      "memory.changed": "记忆已变更",
+      "team.updated": "团队已更新",
+      "team.archived": "团队已归档",
+      "team.restored": "团队已恢复",
+      "team.deleted": "团队已删除",
+      "team.directory_rebound": "团队目录已改绑",
+      "bot.deleted": "成员已删除",
+      "authorization.revoked": "授权已撤销",
+      "log.gap": "事件落盘出现缺口，待核对",
+      "log.quarantined": "损坏事件文件已隔离",
+      "settings.updated": "设置已更新"
+    }
+  },
+  "memories": {
+    "empty": "暂无记忆",
+    "loadFailed": "记忆加载失败",
+    "readOnlyHint": "只读记录；成员通过自己的工具记录方法与偏好",
+    "delete": "删除"
+  },
   "panel": {
     "noSelection": "先在左侧选择一个成员",
     "notReadyYet": "即将在后续里程碑提供",
@@ -218,6 +266,10 @@
     "logoutFailed": "退出登录失败"
   },
   "settings": {
+    "authorizations": "在线授权",
+    "authorizationsHint": "成员桥接凭据（不含令牌值）；撤销后对应桥的下一次调用立即失效",
+    "authorizationsEmpty": "当前没有在线授权",
+    "revoke": "撤销",
     "title": "设置",
     "language": "语言",
     "engine": "Codex 引擎",

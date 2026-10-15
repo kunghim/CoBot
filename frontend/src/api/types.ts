@@ -226,6 +226,66 @@ export interface ApprovalListResult {
   nextCursor: string;
 }
 
+
+// ---------------------------------------------------------------------------
+// M5: activity, memories, directories, authorizations, team management
+// ---------------------------------------------------------------------------
+
+/** GET /teams/{id}/activity — one durable product event. */
+export interface ActivityItem {
+  seq: number;
+  id: string;
+  type: string;
+  teamId: string;
+  botId?: string;
+  resourceId?: string;
+  revision: number;
+  createdAt: string;
+}
+
+/** GET /bots/{id}/memories */
+export interface MemoryListResult {
+  items: Memory[];
+  nextCursor: string;
+}
+
+export interface Memory {
+  id: string;
+  teamId: string;
+  botId: string;
+  body: string;
+  sourceRunId?: string;
+  sourceTaskId?: string;
+  createdAt: string;
+}
+
+/** GET /directories — subdirectory names only. */
+export interface DirectoryListResult {
+  path: string;
+  children: string[];
+}
+
+/** POST /directories/check */
+export interface DirectoryCheckResult {
+  canonical: string;
+  ok: boolean;
+  duplicate: boolean;
+  nested: boolean;
+  markerPresent: boolean;
+  adoptRequired: boolean;
+  markerInstance?: string;
+  teamId?: string;
+  teamName?: string;
+}
+
+/** GET /authorizations — live bridge credentials, never token values. */
+export interface AuthorizationBinding {
+  botId: string;
+  teamId: string;
+  engineEpoch: string;
+  expiresAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot (hand-written: the generated one predates teams/engine)
 // ---------------------------------------------------------------------------

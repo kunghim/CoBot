@@ -151,7 +151,7 @@ export const api = {
 
   // Teams, roles and members (M2).
   listTeams: () => request<import('./types').TeamListResult>('GET', '/api/v1/teams'),
-  createTeam: (body: { name: string; directory: string; initialRoleIds: string[] }) =>
+  createTeam: (body: { name: string; directory: string; initialRoleIds: string[]; adoptMarker?: boolean }) =>
     request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
   getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
   addBot: (teamId: string, roleId: string) =>
@@ -236,6 +236,38 @@ export const api = {
     const query = limit !== undefined ? `?limit=${limit}` : '';
     return request<import('./types').CollaborationListResult>('GET', `/api/v1/bots/${botId}/collaboration${query}`);
   },
+
+  // Team lifecycle (M4 backend, M5 surface).
+  archiveTeam: (teamId: string, expectedRevision?: number) =>
+    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/archive`, {
+      ...(expectedRevision !== undefined ? { expectedRevision } : {}),
+    }),
+  restoreTeam: (teamId: string, expectedRevision?: number) =>
+    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/restore`, {
+      ...(expectedRevision !== undefined ? { expectedRevision } : {}),
+    }),
+  deleteTeam: (teamId: string, expectedRevision?: number) =>
+    request<import('./types').Team>('DELETE', `/api/v1/teams/${teamId}${expectedRevision !== undefined ? `?expectedRevision=${expectedRevision}` : ''}`),
+  deleteBot: (botId: string, expectedRevision?: number) =>
+    request<import('./types').Bot>('DELETE', `/api/v1/bots/${botId}${expectedRevision !== undefined ? `?expectedRevision=${expectedRevision}` : ''}`),
+  rebindDirectory: (teamId: string, body: { directory: string; adoptMarker?: boolean; expectedRevision?: number }) =>
+    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/directory/rebind`, body),
+
+  // Activity, memories, directories, authorizations (M5).
+  listActivity: (teamId: string, limit?: number) =>
+    request<{ items: import('./types').ActivityItem[]; nextCursor: string }>('GET', `/api/v1/teams/${teamId}/activity${limit !== undefined ? `?limit=${limit}` : ''}`),
+  listMemories: (botId: string, limit?: number) =>
+    request<import('./types').MemoryListResult>('GET', `/api/v1/bots/${botId}/memories${limit !== undefined ? `?limit=${limit}` : ''}`),
+  deleteMemory: (botId: string, memoryId: string) =>
+    request<{ deleted: boolean }>('DELETE', `/api/v1/bots/${botId}/memories/${memoryId}`),
+  listDirectories: (path?: string) =>
+    request<import('./types').DirectoryListResult>('GET', `/api/v1/directories${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+  checkDirectory: (path: string) =>
+    request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
+  listAuthorizations: () =>
+    request<{ items: import('./types').AuthorizationBinding[] }>('GET', '/api/v1/authorizations'),
+  revokeAuthorization: (botId: string) =>
+    request<{ revoked: boolean }>('POST', `/api/v1/authorizations/${botId}/revoke`, {}),
 };
 
 import { desktopBridge } from '../platform/native-bridge';
