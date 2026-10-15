@@ -20,6 +20,12 @@ Write-Host "==> generated-file drift"
 git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "generated contract files differ from the committed ones; run scripts/generate.ps1 and commit" }
 
+# The frontend must be built first: internal/webui/dist is generated and
+# gitignored, and go:embed all:dist fails on a clean checkout otherwise.
+Write-Host "==> frontend build (embedded assets)"
+npm run build --prefix frontend
+if ($LASTEXITCODE -ne 0) { throw "frontend build failed" }
+
 Write-Host "==> go vet"
 go vet ./...
 if ($LASTEXITCODE -ne 0) { throw "go vet failed" }
@@ -37,10 +43,6 @@ npm run typecheck --prefix frontend
 if ($LASTEXITCODE -ne 0) { throw "frontend typecheck failed" }
 npm test --prefix frontend
 if ($LASTEXITCODE -ne 0) { throw "frontend tests failed" }
-
-Write-Host "==> frontend build (embed assets)"
-npm run build --prefix frontend
-if ($LASTEXITCODE -ne 0) { throw "frontend build failed" }
 
 Write-Host "==> go build with embedded assets"
 go build ./...

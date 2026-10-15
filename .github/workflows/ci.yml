@@ -28,17 +28,18 @@ jobs:
         run: |
           ./scripts/generate.sh
           git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated
+      - name: Frontend build (embedded assets, required before go build)
+        run: npm run build --prefix frontend
       - name: Go vet and build
         run: |
           go vet ./...
           go build ./...
       - name: Go tests (unit + integration, temp data roots only)
         run: go test ./internal/... ./tests/...
-      - name: Frontend typecheck, unit tests and build
+      - name: Frontend typecheck and unit tests
         run: |
           npm run typecheck --prefix frontend
           npm test --prefix frontend
-          npm run build --prefix frontend
       - name: Rebuild with embedded assets
         run: go build ./...
 

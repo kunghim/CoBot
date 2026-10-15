@@ -19,9 +19,11 @@ const baseURL = `http://127.0.0.1:${port}`;
 function build(): void {
   mkdirSync(binDir, { recursive: true });
   mkdirSync(teamDir, { recursive: true });
+  // The frontend builds first: internal/webui/dist is generated and
+  // gitignored, and cmd/cobot's go:embed all:dist fails without it.
+  execFileSync('npm', ['run', 'build', '--prefix', 'frontend'], { cwd: root, stdio: 'inherit' });
   execFileSync('go', ['build', '-o', exe('cobot'), './cmd/cobot'], { cwd: root, stdio: 'inherit' });
   execFileSync('go', ['build', '-o', exe('fake-codex'), './tests/e2e/host'], { cwd: root, stdio: 'inherit' });
-  execFileSync('npm', ['run', 'build', '--prefix', 'frontend'], { cwd: root, stdio: 'inherit' });
 }
 
 async function waitJSON(url: string, attempts = 100): Promise<any> {

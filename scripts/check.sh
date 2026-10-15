@@ -18,6 +18,11 @@ echo "==> contract generation (must be committed clean)"
 echo "==> generated-file drift"
 git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated
 
+# Frontend first: internal/webui/dist is generated and gitignored, so
+# go:embed all:dist fails on a clean checkout until vite has run.
+echo "==> frontend build (embedded assets)"
+npm run build --prefix frontend || exit 1
+
 echo "==> go vet"
 go vet ./...
 
@@ -30,9 +35,6 @@ go test ./internal/... ./tests/...
 echo "==> frontend typecheck + unit tests"
 npm run typecheck --prefix frontend
 npm test --prefix frontend
-
-echo "==> frontend build (embed assets)"
-npm run build --prefix frontend
 
 echo "==> go build with embedded assets"
 go build ./...
