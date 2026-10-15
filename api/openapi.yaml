@@ -1798,8 +1798,10 @@ components:
         requestId: { type: string, format: uuid }
         tool:
           type: string
-          enum: [get_context, list_tasks, get_task, list_roles, send_message, create_task, propose_task, assign_task, update_task, submit_evidence, report_completion, confirm_task, offer_transfer, accept_transfer, ask_user, request_member, request_merge]
+          enum: [get_context, list_tasks, get_task, list_roles, send_message, create_task, propose_task, assign_task, update_task, submit_evidence, report_completion, confirm_task, offer_transfer, accept_transfer, ask_user, request_member, request_merge, remember, search_memory]
         arguments: { type: object, additionalProperties: true }
+        providerThreadId: { type: string, description: "Bridge-only native transport identity, never a model argument." }
+        providerTurnId: { type: string, description: "Bridge-only native transport identity, never a model argument." }
     ToolResult:
       type: object
       required: [status]
@@ -1980,6 +1982,8 @@ components:
         id: { type: string }
         messageKey: { type: string }
         text: { type: string }
+        disabled: { type: boolean }
+        disabledReasonKey: { type: string }
     ApprovalDecision:
       type: object
       required: [optionId, actor, decidedAt]

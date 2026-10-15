@@ -2,12 +2,40 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/kunghim/CoBot/internal/engine"
 )
+
+func TestUnsupportedServerRequestsDoNotBecomeCommandApprovals(t *testing.T) {
+	for _, method := range []string{"mcpServer/elicitation/request", "unknown/request"} {
+		var output bytes.Buffer
+		client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{})}
+		approval := false
+		server := &Server{client: client, callbacks: engine.Callbacks{OnApproval: func(engine.ApprovalRequest) { approval = true }}}
+		server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: method, Params: json.RawMessage(`{}`)})
+		if approval {
+			t.Fatal("unsupported request became actionable command card")
+		}
+		var response map[string]any
+		if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if method == "mcpServer/elicitation/request" {
+			result, _ := response["result"].(map[string]any)
+			if result["action"] != "cancel" || result["decision"] != nil {
+				t.Fatal("wrong elicitation response", response)
+			}
+		} else if response["error"] == nil {
+			t.Fatal("unknown request was silently accepted")
+		}
+	}
+}
 
 func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	inR, inW := io.Pipe()
@@ -34,6 +62,8 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 				} else {
 					result = map[string]any{"data": []any{map[string]any{"id": "m2", "model": "two"}}, "nextCursor": nil}
 				}
+			case "thread/read":
+				result = map[string]any{"thread": map[string]any{"turns": []any{map[string]any{"id": "turn-9", "status": "interrupted"}}}}
 			}
 			writeJSONLine(outW, map[string]any{"id": req["id"], "result": result})
 		}
@@ -57,6 +87,18 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	}
 	if p := (<-requests)["params"].(map[string]any); p["threadId"] != "th-1" || p["turnId"] != "turn-9" {
 		t.Fatal("wrong turn identity", p)
+	}
+	if err = s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", DeveloperInstructions: "current-role", Sandbox: "workspace-write", Config: map[string]any{"mcp_servers.cobot.enabled": true}}); err != nil {
+		t.Fatal(err)
+	}
+	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["developerInstructions"] != "current-role" || p["config"] == nil {
+		t.Fatal("resume lost activation config", p)
+	}
+	if status, err := s.InspectTurn(ctx, "th-1", "turn-9"); err != nil || status != "interrupted" {
+		t.Fatalf("terminal fact = %q / %v", status, err)
+	}
+	if p := (<-requests)["params"].(map[string]any); p["includeTurns"] != true || p["threadId"] != "th-1" {
+		t.Fatal("inspection lost identity", p)
 	}
 	models, err := s.ModelList(ctx)
 	if err != nil {

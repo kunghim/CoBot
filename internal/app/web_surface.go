@@ -157,12 +157,22 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// Serialize binding changes with runtime creation and delivery claims.
+	// No engine RPC is performed while a SQL transaction is held.
+	if a.Scheduler != nil {
+		lock := a.Scheduler.teamLock(teamID)
+		lock.Lock()
+		defer lock.Unlock()
+	}
 	team, _, err := sqlite.GetTeam(ctx, a.DB, teamID)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
 	if team.Status == domain.TeamStatusDeleted {
 		return domain.Team{}, domain.NotFound("error.not_found", nil)
+	}
+	if expectedRevision > 0 && team.Revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": team.Revision})
 	}
 	canon, err := platform.CanonicalDirFrom(raw)
 	if err != nil {
@@ -173,6 +183,23 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 	}
 	if reserved, ok := platform.IsReservedDir(a.Paths.Reserved(), canon); ok {
 		return domain.Team{}, domain.InvalidRequest("error.team.directory_reserved", map[string]any{"reserved": reserved})
+	}
+	if runs, err := sqlite.ListActiveRunsByTeam(ctx, a.DB, teamID); err != nil {
+		return domain.Team{}, err
+	} else if len(runs) != 0 {
+		return domain.Team{}, domain.Conflict("error.team.active_runs", nil)
+	}
+	if a.Scheduler != nil {
+		if rt := a.Scheduler.runtime(teamID); rt != nil {
+			if err := rt.server.Shutdown(ctx); err != nil {
+				return domain.Team{}, domain.EngineUnavailable("error.engine.shutdown_failed", nil, err)
+			}
+			a.Scheduler.mu.Lock()
+			if a.Scheduler.teams[teamID] == rt {
+				delete(a.Scheduler.teams, teamID)
+			}
+			a.Scheduler.mu.Unlock()
+		}
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -232,6 +259,13 @@ func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal,
 		_ = platform.EnsureLocalCobotExclude(excludePath)
 	}
 	a.recordEvent(ctx, domain.Event{Type: "team.directory_rebound", TeamID: teamID, ResourceID: teamID, Revision: updated.Revision})
+	if a.Scheduler != nil {
+		if bots, err := sqlite.ListBots(ctx, a.DB, teamID); err == nil {
+			for _, bot := range bots {
+				a.Scheduler.Wake(bot.ID)
+			}
+		}
+	}
 	a.Hub.Publish()
 	return updated, nil
 }

@@ -158,7 +158,7 @@ func (a *App) control(ctx context.Context) (*codex.Server, error) {
 		return nil, errors.New("engine factory is not configured")
 	}
 	cwd := a.Paths.WorkspacesDir()
-	server, err := a.ControlFactory(cwd)
+	server, err := a.ControlFactory(ctx, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("start control app-server: %w", err)
 	}

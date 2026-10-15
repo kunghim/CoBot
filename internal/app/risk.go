@@ -155,7 +155,7 @@ func (s *Scheduler) riskEvalPrompt(ctx context.Context, chain domain.Chain, deli
 }
 
 // onRiskEvalNotification buffers the eval's answer and decides on completion.
-func (s *Scheduler) onRiskEvalNotification(n engine.Notification) {
+func (s *Scheduler) onRiskEvalNotification(epoch string, n engine.Notification) {
 	e := s.riskEvalFor(n.ThreadID)
 	if e == nil {
 		return
@@ -165,7 +165,7 @@ func (s *Scheduler) onRiskEvalNotification(n engine.Notification) {
 		// The eval's spend is real usage of the team's budget (G06); the
 		// run-shaped ingest books it as risk_eval through this thread map.
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := s.app.ingestTokenUsage(ctx, e.TeamID, n.TokenUsage); err != nil {
+		if err := s.app.ingestTokenUsage(ctx, e.TeamID, epoch, n.TokenUsage); err != nil {
 			s.logger.Warn("record risk-eval usage", "error", err)
 		}
 		cancel()

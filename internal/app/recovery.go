@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -24,6 +25,21 @@ type recoveryBinding struct {
 	RunID      string `json:"runId"`
 	BotID      string `json:"botId"`
 	DeliveryID string `json:"deliveryId,omitempty"`
+}
+
+// Only projection changes: original choices remain an immutable snapshot.
+func (a *App) projectRecoveryOptions(ctx context.Context, approval *domain.Approval) {
+	var binding recoveryBinding
+	_ = json.Unmarshal(approval.EngineRequestID, &binding)
+	run, rerr := sqlite.GetRun(ctx, a.DB, binding.RunID)
+	session, serr := sqlite.GetProviderSession(ctx, a.DB, run.BotID)
+	if rerr == nil && serr == nil && run.ProviderTurnID != "" && session.ProviderThreadID != "" && session.EngineEpoch == run.EngineEpoch {
+		return
+	}
+	for i := range approval.Options {
+		approval.Options[i].Disabled = true
+		approval.Options[i].DisabledReasonKey = "error.recovery.end_unverified"
+	}
 }
 
 // ReconcileAfterRestart classifies the work a previous process left behind.
@@ -51,7 +67,7 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		// engine the run belonged to, which is exactly what "unknown after
 		// restart" must not lose (H09 keeps both known and unknown facts).
 		if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown,
-			run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", true); err != nil {
+			run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", false); err != nil {
 			return err
 		}
 		if err := sqlite.SetBotRunState(ctx, tx, run.BotID, domain.BotStatusUnknown, run.ID); err != nil {
@@ -183,11 +199,59 @@ func (a *App) replayStuckChainDecisions(ctx context.Context) error {
 }
 
 // ApplyRecoveryDecision executes the user's choice for an unresolved run.
-// The run's execution from the previous process is confirmed ended (it died
-// with that process); what happens to the triggering delivery depends on the
+// The exact provider execution must be proven terminal before any choice
+// releases the bot; what happens to the triggering delivery depends on the
 // choice — and "continue" deliberately changes nothing else, preserving the
 // unknown delivery as a fact rather than pretending it succeeded (H09).
 func (a *App) ApplyRecoveryDecision(ctx context.Context, approval domain.Approval, optionID string) error {
+	status, err := a.verifyRecoveryTurn(ctx, approval)
+	if err != nil {
+		return err
+	}
+	return a.applyVerifiedRecoveryDecision(ctx, approval, optionID, status)
+}
+
+func (a *App) verifyRecoveryTurn(ctx context.Context, approval domain.Approval) (string, error) {
+	var binding recoveryBinding
+	if json.Unmarshal(approval.EngineRequestID, &binding) != nil || binding.RunID == "" {
+		return "", domain.InvalidRequest("error.recovery.binding_missing", nil)
+	}
+	run, err := sqlite.GetRun(ctx, a.DB, binding.RunID)
+	if err != nil {
+		return "", sqlite.NormalizeError(err)
+	}
+	if run.Status != domain.RunUnknown {
+		return "", domain.Conflict("error.recovery.not_unknown", map[string]any{"status": run.Status})
+	}
+	session, err := sqlite.GetProviderSession(ctx, a.DB, run.BotID)
+	if err != nil || session.ProviderThreadID == "" || session.EngineEpoch != run.EngineEpoch || run.ProviderTurnID == "" || a.Scheduler == nil {
+		return "", domain.Conflict("error.recovery.end_unverified", nil)
+	}
+	_, cwd, err := sqlite.GetTeam(ctx, a.DB, run.TeamID)
+	if err != nil {
+		return "", err
+	}
+	server, err := a.Scheduler.EnsureTeamServer(ctx, run.TeamID, cwd)
+	if err != nil {
+		return "", domain.EngineUnavailable("error.engine.unavailable", nil, err)
+	}
+	inspector, ok := server.(engine.TurnInspector)
+	if !ok {
+		return "", domain.Conflict("error.recovery.end_unverified", nil)
+	}
+	status, err := inspector.InspectTurn(ctx, session.ProviderThreadID, run.ProviderTurnID)
+	if err != nil {
+		return "", domain.Conflict("error.recovery.end_unverified", nil)
+	}
+	switch status {
+	case domain.RunCompleted, domain.RunFailed, domain.RunInterrupted:
+		return status, nil
+	default:
+		return "", domain.Conflict("error.recovery.end_unverified", map[string]any{"providerStatus": status})
+	}
+}
+
+func (a *App) applyVerifiedRecoveryDecision(ctx context.Context, approval domain.Approval, optionID, terminalStatus string) error {
 	var binding recoveryBinding
 	if err := json.Unmarshal(approval.EngineRequestID, &binding); err != nil || binding.RunID == "" {
 		return domain.InvalidRequest("error.recovery.binding_missing", nil)
@@ -209,7 +273,7 @@ func (a *App) ApplyRecoveryDecision(ctx context.Context, approval domain.Approva
 	}
 	// Confirming the old execution ended is the precondition for any of the
 	// three choices; without it nothing may rerun (H05).
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunInterrupted,
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, terminalStatus,
 		run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", true); err != nil {
 		return err
 	}

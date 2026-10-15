@@ -48,8 +48,12 @@ func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 	member := bots[1]
 
 	leaseRoot := t.TempDir()
+	readToken := h.botToken(t, member)
+	binding, _ := h.tokens.Resolve(readToken)
+	writeToken, finish := h.scriptExecution(t, binding)
+	defer finish()
 	t.Setenv(collaboration.BridgeEnvEndpoint, h.api.URL)
-	t.Setenv(collaboration.BridgeEnvToken, h.botToken(t, member))
+	t.Setenv(collaboration.BridgeEnvToken, writeToken)
 	t.Setenv(collaboration.BridgeEnvBotID, member.ID)
 	t.Setenv(collaboration.BridgeEnvLeaseDir, platform.LeaseDir(leaseRoot))
 

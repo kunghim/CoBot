@@ -16,6 +16,7 @@ import (
 // is an interface so the dispatcher stays testable and never reaches into the
 // database itself.
 type App interface {
+	ValidateToolRun(ctx context.Context, principal auth.Principal) error
 	SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in app.CreateTaskInput) (domain.Task, error)
 	ListTasks(ctx context.Context, principal auth.Principal, teamID, ownerID string, limit int) ([]domain.Task, error)
@@ -61,7 +62,9 @@ func (d *Dispatcher) ResolveToken(token string) (auth.Principal, auth.BotBinding
 	if err != nil {
 		return auth.Principal{}, auth.BotBinding{}, err
 	}
-	return auth.NewPrincipalBot(binding.BotID, binding.TeamID), binding, nil
+	principal := auth.NewPrincipalBot(binding.BotID, binding.TeamID)
+	principal.RunID = binding.RunID
+	return principal, binding, nil
 }
 
 // dispatchTimeout bounds every bridge-driven call so a stuck application call
@@ -115,6 +118,11 @@ func asToolError(err error, target **ToolError) bool {
 // different arguments is rejected. Read tools and keyless calls pass through
 // to the router, where each write tool still enforces key presence.
 func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
+	if IsSideEffectTool(call.Name) {
+		if err := d.app.ValidateToolRun(ctx, principal); err != nil {
+			return errorResult(err)
+		}
+	}
 	var replayKey, replayHash string
 	if IsSideEffectTool(call.Name) && principal.Kind == auth.KindBot && principal.BotID != "" {
 		var probe struct {

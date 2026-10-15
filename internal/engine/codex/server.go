@@ -108,6 +108,18 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 }
 
 func (s *Server) handleRequest(req InboundRequest) {
+	switch req.Method {
+	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
+		// Only verified native contracts become actionable product cards.
+	case "mcpServer/elicitation/request":
+		// MCP forms/URL authentication are not command approvals. This build
+		// cannot render them, so answer with the verified cancellation shape.
+		_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
+		return
+	default:
+		_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
+		return
+	}
 	var base struct {
 		ThreadID string `json:"threadId"`
 		TurnID   string `json:"turnId"`
@@ -161,6 +173,15 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.ThreadID = p.ThreadID
 			n.TurnID = p.Turn.ID
 			n.TurnStatus = p.Turn.Status
+			if method == "turn/completed" {
+				s.mu.Lock()
+				for key, pending := range s.pending {
+					if pending.threadID == n.ThreadID && pending.turnID == n.TurnID {
+						delete(s.pending, key)
+					}
+				}
+				s.mu.Unlock()
+			}
 		}
 	case "item/completed":
 		var p ItemCompletedParams
@@ -231,14 +252,38 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 }
 
 // ResumeThread reattaches a previously created thread.
-func (s *Server) ResumeThread(ctx context.Context, threadID string) error {
-	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{ThreadID: threadID}, nil); err != nil {
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
+		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
+		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
+		Model: spec.Model, DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+	}, nil); err != nil {
 		return fmt.Errorf("thread/resume: %w", err)
 	}
 	return nil
 }
 
 // StartTurn dispatches one user turn; completion arrives via notifications.
+func (s *Server) InspectTurn(ctx context.Context, threadID, turnID string) (string, error) {
+	var out struct {
+		Thread struct {
+			Turns []struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			} `json:"turns"`
+		} `json:"thread"`
+	}
+	if err := s.client.Call(ctx, "thread/read", map[string]any{"threadId": threadID, "includeTurns": true}, &out); err != nil {
+		return "", err
+	}
+	for _, turn := range out.Thread.Turns {
+		if turn.ID == turnID {
+			return turn.Status, nil
+		}
+	}
+	return "", errors.New("exact provider turn not found")
+}
+
 func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (string, error) {
 	res := TurnStartResult{}
 	err := s.client.Call(ctx, "turn/start", TurnStartParams{

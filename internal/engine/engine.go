@@ -32,7 +32,7 @@ type ThreadInfo struct {
 // concurrent Close; calls themselves are safe to run in parallel.
 type Server interface {
 	StartThread(ctx context.Context, spec ThreadSpec) (ThreadInfo, error)
-	ResumeThread(ctx context.Context, threadID string) error
+	ResumeThread(ctx context.Context, threadID string, spec ThreadSpec) error
 	// StartTurn dispatches one user turn and returns the provider turn id;
 	// completion arrives as notifications, not as this call's result.
 	StartTurn(ctx context.Context, threadID, text string, model string) (turnID string, err error)
@@ -46,6 +46,12 @@ type Server interface {
 	ModelList(ctx context.Context) (json.RawMessage, error)
 	Shutdown(ctx context.Context) error
 	Epoch() string
+}
+
+// TurnInspector reports only the exact persisted provider turn. Resuming a
+// thread or observing a missing process is not evidence that a turn ended.
+type TurnInspector interface {
+	InspectTurn(ctx context.Context, threadID, turnID string) (string, error)
 }
 
 // LoginInfo is the pending official browser authorization, never a credential.

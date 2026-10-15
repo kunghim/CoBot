@@ -226,6 +226,14 @@ func (c *Client) Call(ctx context.Context, method string, params any, out any) e
 	}
 }
 
+func (c *Client) ReplyError(id json.RawMessage, code int, message string) error {
+	data, err := json.Marshal(map[string]any{"id": id, "error": &RPCError{Code: code, Message: message}})
+	if err != nil {
+		return err
+	}
+	return c.write(data)
+}
+
 // Reply answers an inbound request with the given result object.
 func (c *Client) Reply(id json.RawMessage, result any) error {
 	data, err := json.Marshal(map[string]any{"id": json.RawMessage(id), "result": result})

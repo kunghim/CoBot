@@ -935,10 +935,14 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge";
+            tool: "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge" | "remember" | "search_memory";
             arguments?: {
                 [key: string]: unknown;
             };
+            /** @description Bridge-only native transport identity, never a model argument. */
+            providerThreadId?: string;
+            /** @description Bridge-only native transport identity, never a model argument. */
+            providerTurnId?: string;
         };
         ToolResult: {
             /** @enum {string} */
@@ -1090,6 +1094,8 @@ export interface components {
             id: string;
             messageKey?: string;
             text?: string;
+            disabled?: boolean;
+            disabledReasonKey?: string;
         };
         ApprovalDecision: {
             optionId: string;

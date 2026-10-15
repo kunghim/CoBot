@@ -86,10 +86,17 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 		// A fresh one-time secret establishes a new page identity. A stale
 		// cookie/bearer must not prevent its redemption after restart.
 		bootstrap := r.Method == http.MethodPost && r.URL.Path == "/api/v1/session/bootstrap"
+		// The public shell must load before JavaScript can exchange a new
+		// secret. Otherwise a restart's stale cookie returns JSON instead of
+		// the app, even on a valid link whose fragment never reaches HTTP.
+		asset := !strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/internal/")
 		var principal auth.Principal
 		var err error
-		if !bootstrap {
+		if !bootstrap && !asset {
 			principal, err = s.resolvePrincipal(r)
+		}
+		if err != nil && r.Method == http.MethodGet && r.URL.Path == "/api/v1/status" {
+			principal, err = auth.Principal{}, nil
 		}
 		if err != nil {
 			writeError(w, r, err)

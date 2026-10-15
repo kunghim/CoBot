@@ -30,9 +30,13 @@ func TestMCPBridgeProtocol(t *testing.T) {
 	h := newM2Harness(t)
 	_, bots := h.createTeam(t, []string{"backend-dev"})
 	memberID, captainID := bots[1].ID, bots[0].ID
+	readToken := h.botToken(t, bots[1])
+	binding, _ := h.tokens.Resolve(readToken)
+	writeToken, finish := h.scriptExecution(t, binding)
+	defer finish()
 
 	t.Setenv(collaboration.BridgeEnvEndpoint, h.api.URL)
-	t.Setenv(collaboration.BridgeEnvToken, h.botToken(t, bots[1]))
+	t.Setenv(collaboration.BridgeEnvToken, writeToken)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	bridge := collaboration.NewBridge(h.api.URL, "", slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))

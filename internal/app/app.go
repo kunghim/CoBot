@@ -62,7 +62,7 @@ type App struct {
 	engineLogin     *engine.LoginInfo
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
-	ControlFactory func(cwd string) (*codex.Server, error)
+	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.

@@ -33,7 +33,7 @@ type tokenUsagePayload struct {
 // ingestTokenUsage records one engine usage snapshot for a team. The bot is
 // resolved from the live thread binding so system threads (none yet, risk
 // evaluation later) count to the team without pretending to be a member.
-func (a *App) ingestTokenUsage(ctx context.Context, teamID string, raw json.RawMessage) error {
+func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw json.RawMessage) error {
 	if len(raw) == 0 {
 		return nil
 	}
@@ -41,7 +41,7 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID string, raw json.RawM
 	if err := json.Unmarshal(raw, &p); err != nil || p.TurnID == "" {
 		return nil // malformed usage never crashes the notification loop
 	}
-	botID, _ := a.botByThread(ctx, a.EngineEpochOfTeam(teamID), p.ThreadID)
+	botID, _ := a.botByThread(ctx, epoch, p.ThreadID)
 	purpose := domain.UsagePurposeRun
 	if botID == "" && a.Scheduler != nil {
 		// A risk evaluation is not a member: its spend counts to the team
@@ -52,7 +52,7 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID string, raw json.RawM
 	}
 	entry := domain.UsageEntry{
 		ID: domain.NewID(), TeamID: teamID, BotID: botID, Purpose: purpose,
-		EngineEpoch: a.EngineEpochOfTeam(teamID), ThreadID: p.ThreadID, TurnID: p.TurnID,
+		EngineEpoch: epoch, ThreadID: p.ThreadID, TurnID: p.TurnID,
 		InputTokens: p.TokenUsage.Last.InputTokens, OutputTokens: p.TokenUsage.Last.OutputTokens,
 		CachedInputTokens: p.TokenUsage.Last.CachedInputTokens, Status: domain.UsageStatusRecorded,
 		CreatedAt: time.Now().UTC(),

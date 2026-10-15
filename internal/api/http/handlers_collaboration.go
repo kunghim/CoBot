@@ -13,9 +13,11 @@ import (
 // key travels inside arguments, where the product validates it; the envelope
 // requestId only identifies this HTTP call.
 type collaborationRequest struct {
-	RequestID string          `json:"requestId"`
-	Tool      string          `json:"tool"`
-	Arguments json.RawMessage `json:"arguments"`
+	RequestID        string          `json:"requestId"`
+	Tool             string          `json:"tool"`
+	Arguments        json.RawMessage `json:"arguments"`
+	ProviderThreadID string          `json:"providerThreadId,omitempty"`
+	ProviderTurnID   string          `json:"providerTurnId,omitempty"`
 }
 
 // collaborationResponse matches what the bridge decodes. The status is the
@@ -49,10 +51,11 @@ func (s *Server) handleCollaboration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	principal := auth.NewPrincipalBot(binding.BotID, binding.TeamID)
+	principal.RunID = binding.RunID
 	// The token is bound to one engine epoch: a bridge left behind by a
 	// restarted connection can no longer act for the bot.
 	if s.EngineEpochOfTeam != nil {
-		if current := s.EngineEpochOfTeam(binding.TeamID); current != "" && binding.EngineEpoch != "" && current != binding.EngineEpoch {
+		if current := s.EngineEpochOfTeam(binding.TeamID); current == "" || binding.EngineEpoch == "" || current != binding.EngineEpoch {
 			writeCollabError(w, r, collaboration.Reject("error.unauthorized.stale_token", "error.unauthorized.stale_token", nil))
 			return
 		}
@@ -68,6 +71,12 @@ func (s *Server) handleCollaboration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if binding.NativeMetadata {
+		if err := s.App.ValidateNativeToolSource(r.Context(), principal, req.ProviderThreadID, req.ProviderTurnID); err != nil {
+			writeCollabError(w, r, collaboration.Reject("error.unauthorized.stale_execution", "error.tool.no_active_run", nil))
+			return
+		}
+	}
 	result := s.Dispatcher.CallTool(r.Context(), principal, collaboration.ToolCall{
 		Name:      req.Tool,
 		Arguments: req.Arguments,

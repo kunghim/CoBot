@@ -65,9 +65,11 @@ const (
 	ListTasks        CollaborationRequestTool = "list_tasks"
 	OfferTransfer    CollaborationRequestTool = "offer_transfer"
 	ProposeTask      CollaborationRequestTool = "propose_task"
+	Remember         CollaborationRequestTool = "remember"
 	ReportCompletion CollaborationRequestTool = "report_completion"
 	RequestMember    CollaborationRequestTool = "request_member"
 	RequestMerge     CollaborationRequestTool = "request_merge"
+	SearchMemory     CollaborationRequestTool = "search_memory"
 	SendMessage      CollaborationRequestTool = "send_message"
 	SubmitEvidence   CollaborationRequestTool = "submit_evidence"
 	UpdateTask       CollaborationRequestTool = "update_task"
@@ -256,9 +258,11 @@ type ApprovalDecision struct {
 
 // ApprovalOption defines model for ApprovalOption.
 type ApprovalOption struct {
-	Id         string  `json:"id"`
-	MessageKey *string `json:"messageKey,omitempty"`
-	Text       *string `json:"text,omitempty"`
+	Disabled          *bool   `json:"disabled,omitempty"`
+	DisabledReasonKey *string `json:"disabledReasonKey,omitempty"`
+	Id                string  `json:"id"`
+	MessageKey        *string `json:"messageKey,omitempty"`
+	Text              *string `json:"text,omitempty"`
 }
 
 // BootstrapResult defines model for BootstrapResult.
@@ -292,9 +296,15 @@ type BotStatus string
 
 // CollaborationRequest defines model for CollaborationRequest.
 type CollaborationRequest struct {
-	Arguments *map[string]interface{}  `json:"arguments,omitempty"`
-	RequestId openapi_types.UUID       `json:"requestId"`
-	Tool      CollaborationRequestTool `json:"tool"`
+	Arguments *map[string]interface{} `json:"arguments,omitempty"`
+
+	// ProviderThreadId Bridge-only native transport identity, never a model argument.
+	ProviderThreadId *string `json:"providerThreadId,omitempty"`
+
+	// ProviderTurnId Bridge-only native transport identity, never a model argument.
+	ProviderTurnId *string                  `json:"providerTurnId,omitempty"`
+	RequestId      openapi_types.UUID       `json:"requestId"`
+	Tool           CollaborationRequestTool `json:"tool"`
 }
 
 // CollaborationRequestTool defines model for CollaborationRequest.Tool.

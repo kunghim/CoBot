@@ -16,6 +16,20 @@ func TestBootstrapRecoversFromStaleIdentity(t *testing.T) {
 	_, status := c.do("GET", "/api/v1/status", nil, nil)
 	sessionName := status["data"].(map[string]any)["sessionCookieName"].(string)
 	c.cookies[sessionName] = "expired-from-previous-service"
+	for _, path := range []string{"/", "/settings"} {
+		response, _ := c.do("GET", path, nil, nil)
+		if response.StatusCode != 200 || response.Header.Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Fatalf("stale cookie blocked public shell %s: %d", path, response.StatusCode)
+		}
+	}
+	response, statusProjection := c.do("GET", "/api/v1/status", nil, nil)
+	if response.StatusCode != 200 || statusProjection["data"].(map[string]any)["authorized"] != false {
+		t.Fatal("stale identity must reach reauthorization entry")
+	}
+	response, _ = c.do("GET", "/api/v1/settings", nil, nil)
+	if response.StatusCode != 401 {
+		t.Fatal("public shell widened API access")
+	}
 	response, body := c.do("POST", "/api/v1/session/bootstrap", map[string]any{"requestId": "boot-recovery", "secret": core.StartupBootstrap}, nil)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("fresh secret rejected by stale cookie: %d %v", response.StatusCode, body)

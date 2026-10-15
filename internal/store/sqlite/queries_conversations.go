@@ -273,12 +273,23 @@ func UpdateRunStatus(ctx context.Context, tx *sql.Tx, runID, status, providerTur
 			status, providerTurnID, engineEpoch, errorKey, now, runID)
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = ?, engine_epoch = ? WHERE id = ?`,
-		status, providerTurnID, engineEpoch, runID)
+	_, err := tx.ExecContext(ctx, `UPDATE runs SET status = ?, provider_turn_id = ?, engine_epoch = ?, error_key = ? WHERE id = ?`,
+		status, providerTurnID, engineEpoch, errorKey, runID)
 	return err
 }
 
 // GetRun reads one run.
+// AcknowledgeRunStart records provider identity without undoing facts that
+// arrived before the RPC response (approval/completion/connection loss).
+func AcknowledgeRunStart(ctx context.Context, tx *sql.Tx, runID, turnID, epoch string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE runs SET
+		status = CASE WHEN status = ? THEN ? ELSE status END,
+		provider_turn_id = CASE WHEN provider_turn_id = '' THEN ? ELSE provider_turn_id END,
+		engine_epoch = CASE WHEN engine_epoch = '' THEN ? ELSE engine_epoch END
+		WHERE id = ?`, domain.RunStarting, domain.RunRunning, turnID, epoch, runID)
+	return err
+}
+
 func GetRun(ctx context.Context, q Queryer, id string) (domain.Run, error) {
 	var r domain.Run
 	var started, ended string

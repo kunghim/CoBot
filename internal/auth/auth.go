@@ -281,6 +281,7 @@ type Principal struct {
 	BotID     string
 	TeamID    string
 	SessionID string
+	RunID     string // host-bound source execution; never accepted from model args
 }
 
 // The first version has a single local user; the id is stable per profile

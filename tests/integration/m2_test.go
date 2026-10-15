@@ -141,6 +141,70 @@ func (h *m2Harness) botToken(t *testing.T, bot domain.Bot) string {
 // bridge does.
 func (h *m2Harness) callTool(t *testing.T, token, tool string, args map[string]any) (int, map[string]any) {
 	t.Helper()
+	// These tests script a model's product calls rather than a full model
+	// turn. Supply an explicit, bounded fake host execution for write scripts.
+	// Raw/obsolete credentials are tested through callToolRaw, never repaired.
+	if collaboration.IsSideEffectTool(tool) {
+		if binding, err := h.tokens.Resolve(token); err == nil && binding.RunID == "" && binding.EngineEpoch == h.app.EngineEpochOfTeam(binding.TeamID) {
+			var cleanup func()
+			token, cleanup = h.scriptExecution(t, binding)
+			defer cleanup()
+		}
+	}
+	return h.callToolRaw(t, token, tool, args)
+}
+
+func (h *m2Harness) scriptExecution(t *testing.T, binding auth.BotBinding) (string, func()) {
+	t.Helper()
+	ctx := context.Background()
+	run, err := sqlite.FindActiveRun(ctx, h.app.DB, binding.BotID)
+	created := false
+	if errors.Is(err, sqlite.ErrNotFound) {
+		run = domain.Run{ID: domain.NewID(), TeamID: binding.TeamID, BotID: binding.BotID, EngineEpoch: binding.EngineEpoch, Status: domain.RunRunning, StartedAt: time.Now().UTC()}
+		tx, e := h.app.DB.BeginTx(ctx, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = sqlite.InsertRun(ctx, tx, run); e != nil {
+			tx.Rollback()
+			t.Fatal(e)
+		}
+		if e = tx.Commit(); e != nil {
+			t.Fatal(e)
+		}
+		created = true
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	token, err := h.tokens.IssueForRun(binding.BotID, binding.TeamID, binding.EngineEpoch, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return token, func() {
+		if !created {
+			return
+		}
+		tx, e := h.app.DB.BeginTx(ctx, nil)
+		if e != nil {
+			t.Error(e)
+			return
+		}
+		if e = sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunCompleted, "", binding.EngineEpoch, "", true); e != nil {
+			tx.Rollback()
+			t.Error(e)
+			return
+		}
+		if e = tx.Commit(); e != nil {
+			t.Error(e)
+		}
+		h.tokens.RevokeRun(run.ID)
+		h.app.Scheduler.Wake(binding.BotID)
+	}
+}
+
+// callToolRaw sends the exact credential with no simulated execution.
+func (h *m2Harness) callToolRaw(t *testing.T, token, tool string, args map[string]any) (int, map[string]any) {
+	t.Helper()
 	body, err := json.Marshal(map[string]any{"requestId": "req-" + tool, "tool": tool, "arguments": args})
 	if err != nil {
 		t.Fatal(err)
@@ -197,7 +261,11 @@ func newM2Harness(t *testing.T) *m2Harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 	migrator, err := sqlite.NewMigrator(db)
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +304,9 @@ func newM2Harness(t *testing.T) *m2Harness {
 		if h.onFake != nil {
 			h.onFake(fake)
 		}
+		h.fakeMu.Lock()
 		h.fakes[spec.TeamID] = fake
+		h.fakeMu.Unlock()
 		return fake, nil
 	})
 	a.Scheduler = sched

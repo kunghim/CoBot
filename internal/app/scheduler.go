@@ -24,6 +24,7 @@ type ServerFactory func(spec ServerSpec) (engine.Server, error)
 
 // ServerSpec describes the team server to start.
 type ServerSpec struct {
+	Context   context.Context
 	TeamID    string
 	Cwd       string
 	Callbacks engine.Callbacks
@@ -40,6 +41,7 @@ type teamRuntime struct {
 
 type runBuffer struct {
 	texts []string
+	items map[string]bool
 }
 
 // Scheduler wakes per bot, claims queued deliveries serially and drives the
@@ -50,12 +52,18 @@ type Scheduler struct {
 	factory ServerFactory
 	logger  *slog.Logger
 
-	mu       sync.Mutex
-	teams    map[string]*teamRuntime
-	wake     chan string
-	stop     chan struct{}
-	done     chan struct{}
-	stopOnce sync.Once
+	mu        sync.Mutex
+	teams     map[string]*teamRuntime
+	wake      chan string
+	stop      chan struct{}
+	done      chan struct{}
+	stopOnce  sync.Once
+	ctx       context.Context
+	cancel    context.CancelFunc
+	workers   sync.WaitGroup
+	busy      map[string]bool
+	pending   map[string]bool
+	teamLocks sync.Map // team id -> *sync.Mutex; serializes start/rebind
 
 	// Risk evaluations in flight, keyed by their engine thread (G03). They
 	// are not members, never enter provider_sessions, and their usage is
@@ -68,7 +76,9 @@ type Scheduler struct {
 
 // NewScheduler creates a scheduler bound to one app.
 func NewScheduler(a *App, factory ServerFactory) *Scheduler {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
+		ctx: ctx, cancel: cancel, busy: map[string]bool{}, pending: map[string]bool{},
 		app:       a,
 		factory:   factory,
 		logger:    a.Logger,
@@ -93,7 +103,7 @@ func (s *Scheduler) Start() {
 			case <-s.stop:
 				return
 			case botID := <-s.wake:
-				s.dispatchSafely(botID)
+				s.launch(botID)
 			}
 		}
 	}()
@@ -106,7 +116,7 @@ func (s *Scheduler) Start() {
 			case <-s.stop:
 				return
 			case <-leaseTicker.C:
-				s.app.RefreshLeases(context.Background())
+				s.app.RefreshLeases(s.ctx)
 			}
 		}
 	}()
@@ -114,14 +124,31 @@ func (s *Scheduler) Start() {
 
 // Stop shuts the loop and every owned team server; repeated calls are safe.
 func (s *Scheduler) Stop(ctx context.Context) error {
-	s.stopOnce.Do(func() { close(s.stop) })
-	<-s.done
+	s.stopOnce.Do(func() { s.cancel(); close(s.stop) })
+	select {
+	case <-s.done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	joined := make(chan struct{})
+	go func() { s.workers.Wait(); close(joined) }()
+	select {
+	case <-joined:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	// Both loops must be gone before the caller closes the database: a late
 	// lease write racing DB.Close would be swallowed or worse (review B).
-	<-s.leaseDone
+	select {
+	case <-s.leaseDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	s.mu.Lock()
-	teams := s.teams
-	s.teams = map[string]*teamRuntime{}
+	teams := make(map[string]*teamRuntime, len(s.teams))
+	for id, rt := range s.teams {
+		teams[id] = rt
+	}
 	s.mu.Unlock()
 	var errs []error
 	for teamID, rt := range teams {
@@ -147,19 +174,56 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 			s.logger.Warn("team server shutdown", "teamId", teamID, "error", err)
 			errs = append(errs, err)
 		}
+		s.mu.Lock()
+		if s.teams[teamID] == rt {
+			delete(s.teams, teamID)
+		}
+		s.mu.Unlock()
 	}
 	return errors.Join(errs...)
 }
 
 // Wake schedules a dispatch attempt for one bot without blocking writers.
 func (s *Scheduler) Wake(botID string) {
+	s.mu.Lock()
+	if s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return
+	}
+	s.pending[botID] = true
+	s.mu.Unlock()
 	select {
 	case s.wake <- botID:
 	default:
-		// Queue full: a later wake or notification retry covers it; never
-		// block an API request on the scheduler.
-		s.logger.Warn("scheduler wake queue full", "botId", botID)
+		// The pending map retains the wake even when the bounded signal queue
+		// fills. A worker completion drains it; no business request blocks.
 	}
+}
+
+func (s *Scheduler) launch(botID string) {
+	s.mu.Lock()
+	if s.ctx.Err() != nil || s.busy[botID] || !s.pending[botID] {
+		s.mu.Unlock()
+		return
+	}
+	delete(s.pending, botID)
+	s.busy[botID] = true
+	s.workers.Add(1)
+	s.mu.Unlock()
+	go func() {
+		defer s.workers.Done()
+		s.dispatchSafely(botID)
+		s.mu.Lock()
+		delete(s.busy, botID)
+		ids := make([]string, 0, len(s.pending))
+		for id := range s.pending {
+			ids = append(ids, id)
+		}
+		s.mu.Unlock()
+		for _, id := range ids {
+			s.launch(id)
+		}
+	}()
 }
 
 func (s *Scheduler) dispatchSafely(botID string) {
@@ -168,7 +232,7 @@ func (s *Scheduler) dispatchSafely(botID string) {
 			s.logger.Error("dispatch panic", "botId", botID, "panic", rec)
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	if err := s.dispatch(ctx, botID); err != nil {
 		s.logger.Warn("dispatch failed", "botId", botID, "error", err)
@@ -182,6 +246,16 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err // deleted bot: drop quietly
 	}
+	teamLock := s.teamLock(bot.TeamID)
+	teamLock.Lock()
+	locked := true
+	unlock := func() {
+		if locked {
+			teamLock.Unlock()
+			locked = false
+		}
+	}
+	defer unlock()
 	team, directory, err := sqlite.GetTeam(ctx, s.app.DB, bot.TeamID)
 	if err != nil {
 		return err
@@ -232,6 +306,15 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		tx.Rollback()
 		return nil // cancelled meanwhile
 	}
+	currentTeam, _, err := sqlite.GetTeam(ctx, tx, team.ID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	if currentTeam.Status != domain.TeamStatusActive {
+		tx.Rollback()
+		return nil
+	}
 	// The chain budget is evaluated in the same transaction as the claim:
 	// counting a wake and becoming eligible to run are one decision, so a
 	// crash between them can neither lose nor double-count a wake.
@@ -264,6 +347,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		if action == ChainActionRunRiskEval {
 			// The eval runs on the engine outside any transaction; its
 			// completion (or timeout) resolves the chain later.
+			unlock()
 			s.StartRiskEval(ctx, delivery)
 			return nil
 		}
@@ -297,6 +381,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	unlock()
 	// The counted wake committed with the claim: emit its events now, before
 	// any engine interaction can fail, so the fact is never persisted without
 	// its trail (review B18).
@@ -309,7 +394,12 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.unavailable")
 	}
-	threadID, err := s.ensureThread(ctx, team, bot, directory, server)
+	// Publish the host execution binding before the bridge can call back,
+	// including while turn/start has not yet returned a provider turn id.
+	if _, err := s.app.DB.ExecContext(ctx, `UPDATE runs SET engine_epoch = ? WHERE id = ? AND status = ?`, server.Epoch(), run.ID, domain.RunStarting); err != nil {
+		return err
+	}
+	threadID, err := s.ensureThread(ctx, team, bot, directory, server, run.ID)
 	if err != nil {
 		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.thread_failed")
 	}
@@ -321,6 +411,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		taskID = message.RunID
 	}
 	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + message.RenderText()
+	s.app.TouchLease(ctx, bot.ID)
 	turnID, err := server.StartTurn(ctx, threadID, input, settings.DefaultModel)
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
@@ -333,7 +424,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, turnID, server.Epoch(), "", false); err != nil {
+	if err := sqlite.AcknowledgeRunStart(ctx, tx, run.ID, turnID, server.Epoch()); err != nil {
 		return err
 	}
 	if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryAccepted); err != nil {
@@ -378,17 +469,31 @@ func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID,
 		return err
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, BotID: botID, ResourceID: runID})
+	if s.app.CollaborationTokens != nil {
+		s.app.CollaborationTokens.RevokeRun(runID)
+	}
 	s.app.Hub.Publish()
 	return fmt.Errorf("start failed: %s", errorKey)
 }
 
 func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, messageID, botID string) error {
+	// A cancelled transport does not prove the model rejected the turn. Keep
+	// the uncertainty durable even when Stop cancelled the dispatch context.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, "", "", "error.engine.turn_unknown", true); err != nil {
+	run, err := sqlite.GetRun(ctx, tx, runID)
+	if err != nil {
+		return err
+	}
+	if run.Status != domain.RunStarting {
+		return nil
+	}
+	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, run.ProviderTurnID, run.EngineEpoch, "error.engine.turn_unknown", false); err != nil {
 		return err
 	}
 	if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, domain.DeliveryUnknown); err != nil {
@@ -431,6 +536,12 @@ func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID, reason str
 // EnsureTeamServer returns the team's app-server, starting it on first use.
 // Exported so a test can bring a team up without dispatching a turn.
 func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (engine.Server, error) {
+	lock := s.teamLock(teamID)
+	lock.Lock()
+	defer lock.Unlock()
+	if err := s.ctx.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	if rt, ok := s.teams[teamID]; ok {
 		s.mu.Unlock()
@@ -441,11 +552,20 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	rt := &teamRuntime{cwd: cwd, buffer: map[string]*runBuffer{}}
 	var err error
 	rt.server, err = s.factory(ServerSpec{
-		TeamID: teamID,
-		Cwd:    cwd,
+		Context: ctx,
+		TeamID:  teamID,
+		Cwd:     cwd,
 		Callbacks: engine.Callbacks{
-			OnApproval:     func(req engine.ApprovalRequest) { s.onApproval(teamID, req) },
-			OnNotification: func(n engine.Notification) { s.onNotification(teamID, n) },
+			OnApproval: func(req engine.ApprovalRequest) {
+				if s.runtime(teamID) == rt {
+					s.onApproval(teamID, rt, req)
+				}
+			},
+			OnNotification: func(n engine.Notification) {
+				if s.runtime(teamID) == rt {
+					s.onNotification(teamID, rt, n)
+				}
+			},
 			OnExit: func(err error) {
 				s.onServerExitRuntime(teamID, rt, err)
 			},
@@ -463,6 +583,11 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.teams[teamID] = rt
 	s.mu.Unlock()
 	return rt.server, nil
+}
+
+func (s *Scheduler) teamLock(teamID string) *sync.Mutex {
+	value, _ := s.teamLocks.LoadOrStore(teamID, &sync.Mutex{})
+	return value.(*sync.Mutex)
 }
 
 // EngineEpochOfTeam reports the live engine epoch for a team, or "" when no
@@ -485,9 +610,41 @@ func (s *Scheduler) runtime(teamID string) *teamRuntime {
 	return s.teams[teamID]
 }
 
-func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server) (string, error) {
+func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server, runID string) (string, error) {
+	role, err := roles.Default(bot.RoleID)
+	if err != nil {
+		return "", err
+	}
+	if bot.RoleVersion != "" {
+		// Prefer the user's edited copy from the profile when present.
+		if profile, perr := roles.LoadProfile(s.app.Paths.RolesDir()); perr == nil {
+			for _, r := range profile {
+				if r.ID == bot.RoleID {
+					role = r
+					break
+				}
+			}
+		}
+	}
+	settings, err := s.app.GetSettings(ctx)
+	if err != nil {
+		return "", err
+	}
+	config, err := s.threadConfig(ctx, team, bot, server.Epoch(), runID)
+	if err != nil {
+		return "", err
+	}
+	spec := engine.ThreadSpec{
+		Cwd:                   cwd,
+		Sandbox:               "workspace-write",
+		ApprovalPolicy:        "untrusted",
+		ApprovalsReviewer:     "user",
+		Model:                 settings.DefaultModel,
+		DeveloperInstructions: buildInstructions(team, bot, role),
+		Config:                config,
+	}
 	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
-		if err := server.ResumeThread(ctx, session.ProviderThreadID); err == nil {
+		if err := server.ResumeThread(ctx, session.ProviderThreadID, spec); err == nil {
 			// The thread now belongs to this connection, so rebind it: thread
 			// ids are only unique inside one engine, and every later lookup
 			// (approval routing, turn completion) resolves the bot by
@@ -514,31 +671,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		// A resume failure falls through to a fresh thread; the old thread is
 		// never deleted, so product messages stay intact.
 	}
-	role, err := roles.Default(bot.RoleID)
-	if err != nil {
-		return "", err
-	}
-	if bot.RoleVersion != "" {
-		// Prefer the user's edited copy from the profile when present.
-		if profile, perr := roles.LoadProfile(s.app.Paths.RolesDir()); perr == nil {
-			for _, r := range profile {
-				if r.ID == bot.RoleID {
-					role = r
-					break
-				}
-			}
-		}
-	}
-	settings, _ := s.app.GetSettings(ctx)
-	info, err := server.StartThread(ctx, engine.ThreadSpec{
-		Cwd:                   cwd,
-		Sandbox:               "workspace-write",
-		ApprovalPolicy:        "untrusted",
-		ApprovalsReviewer:     "user",
-		Model:                 settings.DefaultModel,
-		DeveloperInstructions: buildInstructions(team, bot, role),
-		Config:                s.threadConfig(ctx, team, bot, server.Epoch()),
-	})
+	info, err := server.StartThread(ctx, spec)
 	if err != nil {
 		return "", err
 	}
@@ -568,17 +701,17 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 // its environment. That token is minted per bot and bound to this engine
 // epoch, so a bridge left behind by a restarted connection can no longer act:
 // the core refuses it rather than trusting a stale credential.
-func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot domain.Bot, engineEpoch string) map[string]any {
+func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot domain.Bot, engineEpoch, runID string) (map[string]any, error) {
 	extra := map[string]any{}
 	if s.app.MCPBinary == "" || s.app.MCPEndpoint == "" || s.app.CollaborationTokens == nil {
 		// No bridge available (for example a test factory); the tools simply
 		// are not offered rather than being offered and always failing.
-		return codex.ThreadConfig(extra)
+		return codex.ThreadConfig(extra), nil
 	}
-	token, err := s.app.CollaborationTokens.Issue(bot.ID, team.ID, engineEpoch)
+	token, err := s.app.CollaborationTokens.ActivateBridgeRun(bot.ID, team.ID, engineEpoch, runID)
 	if err != nil {
 		s.logger.Error("mint bot token failed; collaboration tools disabled", "botId", bot.ID, "error", err)
-		return codex.ThreadConfig(extra)
+		return nil, err
 	}
 	prefix := "mcp_servers.cobot"
 	extra[prefix+".enabled"] = true
@@ -596,8 +729,8 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 	// The tools are CoBot's own structured collaboration surface, so they
 	// never need a user approval round trip; the core enforces permissions.
 	extra[prefix+".required"] = true
-	extra[prefix+".default_tools_approval_mode"] = "auto"
-	return codex.ThreadConfig(extra)
+	extra[prefix+".default_tools_approval_mode"] = "approve"
+	return codex.ThreadConfig(extra), nil
 }
 
 func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string {

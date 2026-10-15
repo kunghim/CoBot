@@ -50,10 +50,6 @@ func NewBridge(endpoint, token string, logger *slog.Logger) *Bridge {
 	}
 }
 
-// objectSchema is the permissive object schema used for the tools whose
-// arguments the dispatcher validates itself.
-var objectSchema = json.RawMessage(`{"type": "object"}`)
-
 // Run serves the MCP stdio transport until the client disconnects.
 func (b *Bridge) Run(ctx context.Context) error {
 	return b.Serve(ctx, &mcp.StdioTransport{})
@@ -104,9 +100,9 @@ func (b *Bridge) register(server *mcp.Server) {
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        tool.name,
 			Description: tool.description,
-			InputSchema: objectSchema,
+			InputSchema: toolSchema(tool.name),
 		}, func(ctx context.Context, req *mcp.CallToolRequest, _ json.RawMessage) (*mcp.CallToolResult, any, error) {
-			return b.callTool(ctx, req.Params.Name, req.Params.Arguments)
+			return b.callTool(ctx, req.Params.Name, req.Params.Arguments, req.Params.Meta)
 		})
 	}
 }
@@ -114,7 +110,7 @@ func (b *Bridge) register(server *mcp.Server) {
 // callTool forwards one tool call to the core and renders the wire result.
 // Tool failures are reported as error results, never as transport errors, so
 // the model can read the reason and react.
-func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage) (*mcp.CallToolResult, any, error) {
+func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage, meta map[string]any) (*mcp.CallToolResult, any, error) {
 	token := os.Getenv(BridgeEnvToken)
 	if token == "" {
 		return toolFailure(StatusUnavailable, "error.unauthorized.missing_token", nil), nil, nil
@@ -132,7 +128,9 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 			}
 		}
 	}
+	threadID, turnID := nativeTurnIdentity(meta)
 	body, err := json.Marshal(map[string]any{
+		"providerThreadId": threadID, "providerTurnId": turnID,
 		"tool":      name,
 		"arguments": json.RawMessage(args),
 		"requestId": newRequestID(),
@@ -183,6 +181,23 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 	}, nil, nil
 }
 
+// Identity comes from Codex's transport metadata, never tool arguments.
+func nativeTurnIdentity(meta map[string]any) (string, string) {
+	var native map[string]any
+	switch value := meta["x-codex-turn-metadata"].(type) {
+	case string:
+		_ = json.Unmarshal([]byte(value), &native)
+	case map[string]any:
+		native = value
+	}
+	thread, _ := native["thread_id"].(string)
+	if thread == "" {
+		thread, _ = native["session_id"].(string)
+	}
+	turn, _ := native["turn_id"].(string)
+	return thread, turn
+}
+
 // toolFailure reports a structured failure the model can read, marking it as
 // an error result so the client does not treat it as success.
 func toolFailure(status, messageKey string, params map[string]any) *mcp.CallToolResult {
@@ -205,7 +220,9 @@ func PrincipalForToken(store *auth.TokenStore, token string) (auth.Principal, au
 	if err != nil {
 		return auth.Principal{}, auth.BotBinding{}, err
 	}
-	return auth.NewPrincipalBot(binding.BotID, binding.TeamID), binding, nil
+	principal := auth.NewPrincipalBot(binding.BotID, binding.TeamID)
+	principal.RunID = binding.RunID
+	return principal, binding, nil
 }
 
 // newRequestID is a cheap unique id for the HTTP envelope; the tool's own

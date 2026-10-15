@@ -34,6 +34,11 @@ func (a *App) PendingApprovals(ctx context.Context, principal auth.Principal, te
 	for i, j := 0, len(approvals)-1; i < j; i, j = i+1, j-1 {
 		approvals[i], approvals[j] = approvals[j], approvals[i]
 	}
+	for i := range approvals {
+		if approvals[i].Type == domain.ApprovalRecovery {
+			a.projectRecoveryOptions(ctx, &approvals[i])
+		}
+	}
 	return approvals, nil
 }
 
@@ -74,6 +79,15 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 			return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", map[string]any{"optionId": optionID})
 		}
 	}
+	// Verify before consuming the decision: an unproven old execution must
+	// leave a pending, retryable card and a locked bot.
+	verifiedRecoveryStatus := ""
+	if pre, err := sqlite.GetApproval(ctx, a.DB, approvalID); err == nil && pre.Type == domain.ApprovalRecovery {
+		verifiedRecoveryStatus, err = a.verifyRecoveryTurn(ctx, pre)
+		if err != nil {
+			return domain.Approval{}, err
+		}
+	}
 	approval, err := sqlite.DecideApproval(ctx, a.DB, approvalID, optionID, comment, principal.UserID, expectedRevision)
 	if err != nil {
 		return domain.Approval{}, sqlite.NormalizeError(err)
@@ -109,7 +123,7 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	// a previous process: confirm it ended, then continue, requeue, or
 	// cancel the triggering delivery. No engine is attached to answer (H05).
 	if approval.Type == domain.ApprovalRecovery {
-		if err := a.ApplyRecoveryDecision(ctx, approval, optionID); err != nil {
+		if err := a.applyVerifiedRecoveryDecision(ctx, approval, optionID, verifiedRecoveryStatus); err != nil {
 			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "recovery_decision_failed")
 			a.publishApprovalUpdated(ctx, approval)
 			return domain.Approval{}, err

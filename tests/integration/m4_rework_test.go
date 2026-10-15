@@ -22,6 +22,7 @@ func TestRerunFromAcceptedDelivery(t *testing.T) {
 	lost := bots[1]
 
 	runID, deliveryID := seedUnresolvedRun(t, h, team, lost, "崩溃时已接受的派发", "turn-x", "epoch-dead")
+	proveSeededRunEnded(t, h, runID, domain.RunInterrupted)
 	// The turn was accepted before the crash: the delivery mirrors that.
 	tx, err := h.app.DB.BeginTx(ctx, nil)
 	if err != nil {

@@ -179,8 +179,8 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
-	newServer := func(cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
-		settings, err := application.GetSettings(ctx)
+	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
+		settings, err := application.GetSettings(startCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -188,7 +188,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codex.Start(ctx, codex.ServerOptions{
+		return codex.Start(startCtx, codex.ServerOptions{
 			Binary:    binary,
 			Cwd:       cwd,
 			Env:       codex.EngineEnv(paths),
@@ -198,11 +198,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		})
 	}
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
-		return newServer(spec.Cwd, spec.Callbacks)
+		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
 	})
 	application.Scheduler = scheduler
-	application.ControlFactory = func(cwd string) (*codex.Server, error) {
-		return newServer(cwd, engine.Callbacks{
+	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
+		return newServer(startCtx, cwd, engine.Callbacks{
 			OnNotification: func(n engine.Notification) {
 				if n.Method == "account/login/completed" {
 					go application.EngineLoginCompleted(n.Raw)

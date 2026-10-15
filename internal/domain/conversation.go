@@ -128,9 +128,11 @@ const (
 
 // ApprovalOption is one immutable choice snapshot.
 type ApprovalOption struct {
-	ID         string `json:"id"`
-	MessageKey string `json:"messageKey,omitempty"`
-	Text       string `json:"text,omitempty"`
+	ID                string `json:"id"`
+	MessageKey        string `json:"messageKey,omitempty"`
+	Text              string `json:"text,omitempty"`
+	Disabled          bool   `json:"disabled,omitempty"`
+	DisabledReasonKey string `json:"disabledReasonKey,omitempty"`
 }
 
 // Approval is one user decision request.

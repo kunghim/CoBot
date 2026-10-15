@@ -27,12 +27,14 @@ type ThreadStartParams struct {
 
 // ThreadResumeParams mirrors thread/resume.
 type ThreadResumeParams struct {
-	ThreadID          string         `json:"threadId"`
-	Cwd               string         `json:"cwd,omitempty"`
-	Sandbox           string         `json:"sandbox,omitempty"`
-	ApprovalPolicy    string         `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer string         `json:"approvalsReviewer,omitempty"`
-	Config            map[string]any `json:"config,omitempty"`
+	Model                 string         `json:"model,omitempty"`
+	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
+	ThreadID              string         `json:"threadId"`
+	Cwd                   string         `json:"cwd,omitempty"`
+	Sandbox               string         `json:"sandbox,omitempty"`
+	ApprovalPolicy        string         `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     string         `json:"approvalsReviewer,omitempty"`
+	Config                map[string]any `json:"config,omitempty"`
 }
 
 // ThreadRef is the provider thread identity.

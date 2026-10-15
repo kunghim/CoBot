@@ -28,11 +28,31 @@ type Server struct {
 	StartTurnErr    error
 	ReplyErr        error
 	ResumeErr       error
+	TurnFacts       map[string]string // exact thread/turn -> scripted native fact
 	threads         map[string]bool
 	startedTurns    []StartedTurn
 	interrupted     []string
 	replied         []Reply
 	ShutdownCalls   int
+}
+
+func (s *Server) SetTurnFact(threadID, turnID, status string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.TurnFacts == nil {
+		s.TurnFacts = map[string]string{}
+	}
+	s.TurnFacts[threadID+"/"+turnID] = status
+}
+
+func (s *Server) InspectTurn(ctx context.Context, threadID, turnID string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	status, ok := s.TurnFacts[threadID+"/"+turnID]
+	if !ok {
+		return "", fmt.Errorf("exact turn not found")
+	}
+	return status, nil
 }
 
 // StartedTurn records one accepted turn.
@@ -65,7 +85,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: "fake"}, nil
 }
 
-func (s *Server) ResumeThread(ctx context.Context, threadID string) error {
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.ResumeErr != nil {

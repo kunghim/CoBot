@@ -15,40 +15,45 @@ import (
 // onNotification translates engine events into product facts: assistant
 // messages are buffered during the turn and persisted at completion; run and
 // bot status always come from these facts, never from UI optimism.
-func (s *Scheduler) onNotification(teamID string, n engine.Notification) {
+func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.Notification) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	// Threads of in-flight risk evaluations are not bound to any member;
 	// their events belong to the eval, not to a run (G03).
 	if s.riskEvalFor(n.ThreadID) != nil {
-		s.onRiskEvalNotification(n)
+		s.onRiskEvalNotification(source.server.Epoch(), n)
 		return
 	}
 
 	switch n.Method {
+	case "turn/started":
+		s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
 	case "item/completed":
 		if n.ItemType == "agentMessage" && n.TurnID != "" {
-			epoch := s.engineEpoch(teamID)
+			epoch := source.server.Epoch()
 			if runID := s.findRunByTurn(ctx, epoch, n.ThreadID, n.TurnID); runID != "" {
-				if rt := s.runtime(teamID); rt != nil {
+				if rt := source; rt != nil {
 					rt.mu.Lock()
 					buf := rt.buffer[runID]
 					if buf == nil {
-						buf = &runBuffer{}
+						buf = &runBuffer{items: map[string]bool{}}
 						rt.buffer[runID] = buf
 					}
-					buf.texts = append(buf.texts, n.Text)
+					if n.ItemID == "" || !buf.items[n.ItemID] {
+						buf.texts = append(buf.texts, n.Text)
+						buf.items[n.ItemID] = true
+					}
 					rt.mu.Unlock()
 				}
 			}
 		}
 	case "thread/tokenUsage/updated":
-		if uerr := s.app.ingestTokenUsage(ctx, teamID, n.TokenUsage); uerr != nil {
+		if uerr := s.app.ingestTokenUsage(ctx, teamID, source.server.Epoch(), n.TokenUsage); uerr != nil {
 			s.logger.Warn("record usage snapshot", "teamId", teamID, "error", uerr)
 		}
 	case "turn/completed":
-		s.finishRun(ctx, teamID, n)
+		s.finishRun(ctx, teamID, source, n)
 	case "account/updated", "account/login/completed":
 		s.app.invalidateEngineStatus()
 	default:
@@ -71,11 +76,31 @@ func (s *Scheduler) findRunByTurn(ctx context.Context, epoch, threadID, turnID s
 	if err != nil {
 		return ""
 	}
-	run, err := sqlite.FindActiveRun(ctx, s.app.DB, botID)
+	tx, err := s.app.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return ""
+	}
+	defer tx.Rollback()
+	run, err := sqlite.FindActiveRun(ctx, tx, botID)
 	if err != nil {
 		return ""
 	}
 	if run.ProviderTurnID != "" && run.ProviderTurnID != turnID {
+		return ""
+	}
+	if run.EngineEpoch != epoch || turnID == "" {
+		return ""
+	}
+	if run.ProviderTurnID == "" {
+		var previous int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE bot_id = ? AND engine_epoch = ? AND provider_turn_id = ? AND id != ?`, botID, epoch, turnID, run.ID).Scan(&previous); err != nil || previous != 0 {
+			return ""
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE runs SET provider_turn_id = ? WHERE id = ? AND provider_turn_id = ''`, turnID, run.ID); err != nil {
+			return ""
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return ""
 	}
 	return run.ID
@@ -83,13 +108,14 @@ func (s *Scheduler) findRunByTurn(ctx context.Context, epoch, threadID, turnID s
 
 // finishRun maps turn/completed onto run status, persists the merged
 // assistant text and re-opens the bot for the next queued delivery.
-func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notification) {
-	botID, err := s.app.botByThread(ctx, s.engineEpoch(teamID), n.ThreadID)
+func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRuntime, n engine.Notification) {
+	botID, err := s.app.botByThread(ctx, source.server.Epoch(), n.ThreadID)
 	if err != nil {
-		s.logger.Warn("turn completion for unknown thread", "threadId", n.ThreadID, "epoch", s.engineEpoch(teamID), "err", err)
+		s.logger.Warn("turn completion for unknown thread", "threadId", n.ThreadID, "epoch", source.server.Epoch(), "err", err)
 		return
 	}
-	run, err := sqlite.FindActiveRun(ctx, s.app.DB, botID)
+	runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
+	run, err := sqlite.GetRun(ctx, s.app.DB, runID)
 	if err != nil {
 		s.logger.Warn("turn completion without active run", "threadId", n.ThreadID, "turnId", n.TurnID)
 		return
@@ -100,7 +126,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 	// id differs from the stored one *within the same epoch*; anything from a
 	// different connection has already been invalidated as unknown, so the
 	// completion of the run that is live now is authoritative.
-	if n.TurnID != "" && run.ProviderTurnID != "" && run.EngineEpoch == s.engineEpoch(teamID) && run.ProviderTurnID != n.TurnID {
+	if n.TurnID != "" && run.ProviderTurnID != "" && run.EngineEpoch == source.server.Epoch() && run.ProviderTurnID != n.TurnID {
 		s.logger.Warn("ignoring stale turn completion", "threadId", n.ThreadID, "turnId", n.TurnID, "runTurnId", run.ProviderTurnID)
 		return // stale completion of an interrupted predecessor
 	}
@@ -111,13 +137,14 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		status = domain.RunFailed
 	case "interrupted":
 		status = domain.RunInterrupted
-	case "inProgress":
+	case "completed":
+	default:
 		return
 	}
 
 	var text string
 	assistantID := ""
-	if rt := s.runtime(teamID); rt != nil {
+	if rt := source; rt != nil {
 		rt.mu.Lock()
 		if buf := rt.buffer[run.ID]; buf != nil {
 			text = joinTexts(buf.texts)
@@ -131,7 +158,14 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 		return
 	}
 	defer tx.Rollback()
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, s.engineEpoch(teamID), "", true); err != nil {
+	fresh, err := sqlite.FindActiveRun(ctx, tx, botID)
+	if err != nil || fresh.ID != run.ID {
+		return
+	}
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, source.server.Epoch(), "", true); err != nil {
+		return
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE run_id = ? AND type = ? AND request_state = ?`, domain.ApprovalStateInvalidated, run.ID, domain.ApprovalNativeTool, domain.ApprovalStatePending); err != nil {
 		return
 	}
 	// A finished turn that never reported tokens is an unknown spend, not a
@@ -139,7 +173,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 	// that already arrived keeps its real numbers.
 	epoch := run.EngineEpoch
 	if epoch == "" {
-		epoch = s.engineEpoch(teamID)
+		epoch = source.server.Epoch()
 	}
 	turnID := n.TurnID
 	if turnID == "" {
@@ -170,6 +204,9 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, n engine.Notif
 	if err := tx.Commit(); err != nil {
 		return
 	}
+	if s.app.CollaborationTokens != nil {
+		s.app.CollaborationTokens.RevokeRun(run.ID)
+	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: botID, ResourceID: run.ID})
 	messageResource := assistantID
 	if messageResource == "" {
@@ -186,17 +223,22 @@ func joinTexts(parts []string) string {
 
 // onApproval persists a native tool approval and projects it to the member
 // and leader sessions through the shared pending list.
-func (s *Scheduler) onApproval(teamID string, req engine.ApprovalRequest) {
+func (s *Scheduler) onApproval(teamID string, source *teamRuntime, req engine.ApprovalRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	botID, err := s.app.botByThread(ctx, s.engineEpoch(teamID), req.ThreadID)
+	botID, err := s.app.botByThread(ctx, source.server.Epoch(), req.ThreadID)
 	if err != nil {
 		s.logger.Error("approval for unknown thread", "threadId", req.ThreadID, "method", req.Method)
 		// Cannot route: decline explicitly rather than hang the engine.
-		_ = s.replyApproval(ctx, teamID, req, map[string]any{"decision": domain.DecisionDeclineEngine})
+		_ = source.server.ReplyApproval(ctx, req.RequestID, map[string]any{"decision": domain.DecisionDeclineEngine})
 		return
 	}
-	run, _ := sqlite.FindActiveRun(ctx, s.app.DB, botID)
+	runID := s.findRunByTurn(ctx, source.server.Epoch(), req.ThreadID, req.TurnID)
+	run, err := sqlite.GetRun(ctx, s.app.DB, runID)
+	if err != nil {
+		_ = source.server.ReplyApproval(ctx, req.RequestID, map[string]any{"decision": domain.DecisionDeclineEngine})
+		return
+	}
 
 	approval := domain.Approval{
 		ID: domain.NewID(), TeamID: teamID, RequesterBotID: botID,
@@ -206,7 +248,7 @@ func (s *Scheduler) onApproval(teamID string, req engine.ApprovalRequest) {
 		Options:  nativeToolOptions(req.Method),
 		Revision: 1, CreatedAt: time.Now().UTC(),
 	}
-	if rt := s.runtime(teamID); rt != nil {
+	if rt := source; rt != nil {
 		approval.EngineEpoch = rt.server.Epoch()
 	}
 	tx, err := s.app.DB.BeginTx(ctx, nil)
@@ -214,6 +256,13 @@ func (s *Scheduler) onApproval(teamID string, req engine.ApprovalRequest) {
 		return
 	}
 	defer tx.Rollback()
+	var duplicate int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM approvals WHERE engine_epoch = ? AND engine_request_id = ?`, approval.EngineEpoch, string(req.RequestID)).Scan(&duplicate); err != nil || duplicate != 0 {
+		return
+	}
+	if fresh, err := sqlite.FindActiveRun(ctx, tx, botID); err != nil || fresh.ID != run.ID {
+		return
+	}
 	if err := sqlite.InsertApproval(ctx, tx, approval); err != nil {
 		return
 	}
@@ -313,11 +362,14 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 		return
 	}
 	for _, run := range runs {
+		if run.EngineEpoch != rt.server.Epoch() {
+			continue
+		}
 		tx, txErr := s.app.DB.BeginTx(ctx, nil)
 		if txErr != nil {
 			continue
 		}
-		if uerr := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown, "", "", "error.engine.connection_lost", true); uerr != nil {
+		if uerr := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown, run.ProviderTurnID, run.EngineEpoch, "error.engine.connection_lost", false); uerr != nil {
 			tx.Rollback()
 			continue
 		}
@@ -327,6 +379,9 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 		}
 		if cerr := tx.Commit(); cerr != nil {
 			continue
+		}
+		if s.app.CollaborationTokens != nil {
+			s.app.CollaborationTokens.RevokeRun(run.ID)
 		}
 		s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: run.BotID, ResourceID: run.ID})
 	}

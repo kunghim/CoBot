@@ -197,6 +197,7 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 
 	decide := func(runID string, option string) {
 		t.Helper()
+		proveSeededRunEnded(t, h, runID, domain.RunInterrupted)
 		if err := h.app.ReconcileAfterRestart(ctx); err != nil {
 			t.Fatalf("reconcile: %v", err)
 		}
