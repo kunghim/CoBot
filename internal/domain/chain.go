@@ -9,6 +9,7 @@ const (
 	ChainActive           = "active"
 	ChainAwaitingApproval = "awaiting_approval"
 	ChainStopped          = "stopped"
+	ChainEvaluating       = "evaluating"
 )
 
 // Chain is one causal chain with its shared wake budget.

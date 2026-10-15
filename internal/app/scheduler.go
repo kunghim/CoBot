@@ -56,6 +56,12 @@ type Scheduler struct {
 	stop     chan struct{}
 	done     chan struct{}
 	stopOnce sync.Once
+
+	// Risk evaluations in flight, keyed by their engine thread (G03). They
+	// are not members, never enter provider_sessions, and their usage is
+	// booked to the team as risk_eval.
+	evalMu sync.Mutex
+	evals  map[string]*riskEval
 }
 
 // NewScheduler creates a scheduler bound to one app.
@@ -65,6 +71,7 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 		factory: factory,
 		logger:  a.Logger,
 		teams:   map[string]*teamRuntime{},
+		evals:   map[string]*riskEval{},
 		wake:    make(chan string, 256),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
@@ -234,6 +241,12 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 				return cerr
 			}
 			chainEvents = append(chainEvents, evs...)
+		}
+		if action == ChainActionRunRiskEval {
+			// The eval runs on the engine outside any transaction; its
+			// completion (or timeout) resolves the chain later.
+			s.StartRiskEval(ctx, delivery)
+			return nil
 		}
 		for _, ev := range chainEvents {
 			s.app.recordEvent(ctx, ev)

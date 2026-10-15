@@ -18,6 +18,13 @@ func (s *Scheduler) onNotification(teamID string, n engine.Notification) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	// Threads of in-flight risk evaluations are not bound to any member;
+	// their events belong to the eval, not to a run (G03).
+	if s.riskEvalFor(n.ThreadID) != nil {
+		s.onRiskEvalNotification(n)
+		return
+	}
+
 	switch n.Method {
 	case "item/completed":
 		if n.ItemType == "agentMessage" && n.TurnID != "" {

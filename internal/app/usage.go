@@ -42,8 +42,16 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID string, raw json.RawM
 		return nil // malformed usage never crashes the notification loop
 	}
 	botID, _ := a.botByThread(ctx, a.EngineEpochOfTeam(teamID), p.ThreadID)
+	purpose := domain.UsagePurposeRun
+	if botID == "" && a.Scheduler != nil {
+		// A risk evaluation is not a member: its spend counts to the team
+		// only, never to a bot's budget (G06).
+		if _, ok := a.Scheduler.EvalThreadTeam(p.ThreadID); ok {
+			purpose = domain.UsagePurposeRiskEval
+		}
+	}
 	entry := domain.UsageEntry{
-		ID: domain.NewID(), TeamID: teamID, BotID: botID, Purpose: domain.UsagePurposeRun,
+		ID: domain.NewID(), TeamID: teamID, BotID: botID, Purpose: purpose,
 		EngineEpoch: a.EngineEpochOfTeam(teamID), ThreadID: p.ThreadID, TurnID: p.TurnID,
 		InputTokens: p.TokenUsage.Last.InputTokens, OutputTokens: p.TokenUsage.Last.OutputTokens,
 		CachedInputTokens: p.TokenUsage.Last.CachedInputTokens, Status: domain.UsageStatusRecorded,

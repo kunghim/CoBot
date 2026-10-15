@@ -108,6 +108,18 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		return err
 	}
 
+	// A risk evaluation interrupted by the restart must not strand its chain
+	// in evaluating: the chains return to active and held deliveries are
+	// re-woken, so the gate can evaluate again (G03).
+	if evaluating, rerr := sqlite.ResetEvaluatingChains(ctx, a.DB); rerr == nil {
+		for _, chainID := range evaluating {
+			_ = a.recordEvent(ctx, domain.Event{Type: domain.EventChainUpdated, ResourceID: chainID})
+		}
+		if len(evaluating) > 0 {
+			a.ResumeBudgetPausedBots(ctx)
+		}
+	}
+
 	// Events and per-approval projections happen after the transaction: the
 	// pool is a single connection.
 	for _, runID := range runIDs {

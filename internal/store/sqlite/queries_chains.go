@@ -247,3 +247,34 @@ func ActiveChainDeliveries(ctx context.Context, q Queryer, chainID string) ([]De
 	}
 	return out, rows.Err()
 }
+
+// ResetEvaluatingChains returns interrupted risk evaluations to active: after
+// a restart no evaluation is in flight, and a chain must never wait forever
+// on a session that died with the previous process (G03).
+func ResetEvaluatingChains(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT id FROM chains WHERE status = ?`, "evaluating")
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := db.ExecContext(ctx, `UPDATE chains SET status = 'active', updated_at = ? WHERE status = ?`, now, "evaluating"); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}

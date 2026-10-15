@@ -75,6 +75,9 @@ const (
 	ChainActionRaiseCard
 	// ChainActionSweepStopped: cancel the stopped chain's undelivered work.
 	ChainActionSweepStopped
+	// ChainActionRunRiskEval: judge the wake in a separate read-only
+	// session; nothing is persisted by the gate itself (G03).
+	ChainActionRunRiskEval
 )
 
 // EvaluateChainGate applies the chain budget inside the caller's claim
@@ -100,6 +103,8 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 		return ChainGateDrop, ChainActionSweepStopped, nil, nil
 	case domain.ChainAwaitingApproval:
 		return ChainGateSkip, ChainActionNone, nil, nil // the pending card decides
+	case domain.ChainEvaluating:
+		return ChainGateSkip, ChainActionNone, nil, nil // a risk eval is in flight (G03)
 	}
 	if delivery.MessageID == chain.OriginMessageID {
 		// The chain's root is user-caused input; only bot-caused wakes spend
@@ -121,11 +126,10 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 		return ChainGateAllowed, ChainActionNone, nil, nil
 	}
 	next := chain.WakeCount + 1
-	if chain.OverLimit(next) || chain.NeedsEvaluation(next) {
-		// Risk zone and over-limit both wait for the user in this milestone;
-		// the model-evaluated path replaces the risk-zone ask later without
-		// changing this gate. The card itself is written by the caller after
-		// the claim rolls back, so the ask survives.
+	if chain.OverLimit(next) {
+		// The hard limit is never shown to a model (G03): past it only the
+		// user can grant one more wake. The card is written by the caller
+		// after the claim rolls back, so the ask survives.
 		exists, err := pendingChainDecisionExists(ctx, tx, chain.TeamID, chain.ID)
 		if err != nil {
 			return ChainGateSkip, ChainActionNone, nil, err
@@ -134,6 +138,11 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 			return ChainGateSkip, ChainActionNone, nil, nil
 		}
 		return ChainGateSkip, ChainActionRaiseCard, nil, nil
+	}
+	if chain.NeedsEvaluation(next) {
+		// Inside the risk zone the model judges in its read-only session;
+		// ask/unknown/failure falls back to the same user card (G03).
+		return ChainGateSkip, ChainActionRunRiskEval, nil, nil
 	}
 	if _, err := sqlite.CountChainWake(ctx, tx, chain.ID, key, delivery.ID, delivery.TargetBotID); err != nil {
 		return ChainGateSkip, ChainActionNone, nil, err

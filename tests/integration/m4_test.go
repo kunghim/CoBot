@@ -56,16 +56,19 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "已交接")
 	waitUntil(t, 5*time.Second, "captain turn (wake 2)", func() bool { return len(fake.Turns()) == 3 })
 
-	// Wake 3 lands in the risk zone: it must not start; the user gets one
-	// confirmation card for the chain instead.
+	// Wake 3 lands in the risk zone: the model judges it in its own session
+	// (G03); only its escalation produces a user card.
 	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(captain.ID, team.ID), member.ID, "第三棒", "", "req-w3"); err != nil {
 		t.Fatalf("wake 3 send: %v", err)
 	}
-	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "completed", "等待确认")
-	time.Sleep(200 * time.Millisecond)
-	if len(fake.Turns()) != 3 {
-		t.Fatalf("risk-zone wake started a turn: %d turns", len(fake.Turns()))
-	}
+	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "completed", "等待评估")
+	waitUntil(t, 5*time.Second, "risk eval turn", func() bool { return len(fake.Turns()) == 4 })
+	// The captain's own turn ends while the evaluation judges.
+	captainTurn := fake.Turns()[2]
+	fake.EmitTurnCompleted(captainTurn.ThreadID, captainTurn.TurnID, "completed", "已交接")
+	// The model escalates instead of continuing.
+	evalTurn := fake.Turns()[3]
+	fake.EmitTurnCompleted(evalTurn.ThreadID, evalTurn.TurnID, "completed", "建议用户确认方向")
 
 	chains, err := sqlite.ListChains(ctx, h.app.DB, team.ID, "", 10)
 	if err != nil || len(chains) != 1 {
@@ -101,7 +104,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision); err != nil {
 		t.Fatalf("continue: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "member turn (wake 3)", func() bool { return len(fake.Turns()) == 4 })
+	waitUntil(t, 5*time.Second, "member turn (wake 3)", func() bool { return len(fake.Turns()) == 5 })
 	chain, err = sqlite.GetChain(ctx, h.app.DB, chain.ID)
 	if err != nil {
 		t.Fatalf("chain after continue: %v", err)
@@ -114,7 +117,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(member.ID, team.ID), captain.ID, "第四棒", "", "req-w4"); err != nil {
 		t.Fatalf("wake 4 send: %v", err)
 	}
-	fake.EmitTurnCompleted(fake.Turns()[3].ThreadID, fake.Turns()[3].TurnID, "completed", "等待确认")
+	fake.EmitTurnCompleted(fake.Turns()[4].ThreadID, fake.Turns()[4].TurnID, "completed", "等待确认")
 	waitUntil(t, 5*time.Second, "over-limit card", func() bool {
 		pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
