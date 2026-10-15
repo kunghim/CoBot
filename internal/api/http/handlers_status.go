@@ -25,17 +25,19 @@ type EngineStatus struct {
 type EngineStatusProvider func() EngineStatus
 
 type statusResponse struct {
-	Product      string       `json:"product"`
-	Version      string       `json:"version"`
-	Profile      string       `json:"profile"`
-	Environment  string       `json:"environment"`
-	DataRoot     string       `json:"dataRoot"`
-	Endpoint     string       `json:"endpoint"`
-	InstanceID   string       `json:"instanceId"`
-	ServiceEpoch string       `json:"serviceEpoch"`
-	StartedAt    time.Time    `json:"startedAt"`
-	Authorized   bool         `json:"authorized"`
-	Engine       EngineStatus `json:"engine"`
+	SessionCookieName string       `json:"sessionCookieName"`
+	CSRFCookieName    string       `json:"csrfCookieName"`
+	Product           string       `json:"product"`
+	Version           string       `json:"version"`
+	Profile           string       `json:"profile"`
+	Environment       string       `json:"environment"`
+	DataRoot          string       `json:"dataRoot"`
+	Endpoint          string       `json:"endpoint"`
+	InstanceID        string       `json:"instanceId"`
+	ServiceEpoch      string       `json:"serviceEpoch"`
+	StartedAt         time.Time    `json:"startedAt"`
+	Authorized        bool         `json:"authorized"`
+	Engine            EngineStatus `json:"engine"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +47,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		engine = s.EngineStatus()
 	}
 	writeData(w, r, http.StatusOK, statusResponse{
+		SessionCookieName: s.sessionCookieName(), CSRFCookieName: s.csrfCookieName(),
 		Product:      "CoBot",
 		Version:      s.Version,
 		Profile:      string(s.Paths.Environment),

@@ -15,6 +15,7 @@ import (
 	"errors"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
@@ -57,6 +58,8 @@ type App struct {
 
 	engineControlMu sync.Mutex
 	engineControl   *controlServer
+	engineLoginMu   sync.Mutex
+	engineLogin     *engine.LoginInfo
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(cwd string) (*codex.Server, error)

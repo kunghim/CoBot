@@ -272,6 +272,7 @@
     "readOnly": "Read-only record; message the member in the conversation to talk"
   },
   "engine": {
+    "openLogin": "Open official sign-in page",
     "login": "Sign in to Codex",
     "cancelLogin": "Cancel sign-in",
     "logout": "Sign out of Codex",

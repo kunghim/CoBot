@@ -15,8 +15,10 @@ type bootstrapRequest struct {
 }
 
 type bootstrapResponse struct {
-	SessionExpiresAt time.Time `json:"sessionExpiresAt"`
-	UserID           string    `json:"userId"`
+	SessionCookieName string    `json:"sessionCookieName"`
+	CSRFCookieName    string    `json:"csrfCookieName"`
+	SessionExpiresAt  time.Time `json:"sessionExpiresAt"`
+	UserID            string    `json:"userId"`
 	// BearerToken is issued for the desktop shell, whose page runs on the
 	// Wails asset origin and cannot rely on SameSite=Strict cookies. The
 	// browser flow ignores it; credentials stay purpose-separated.
@@ -53,8 +55,9 @@ func (s *Server) handleSessionBootstrap(w http.ResponseWriter, r *http.Request) 
 	}
 	// Loopback HTTP only, so Secure is off in practice; SameSite=Strict plus
 	// the CSRF token still bind state-changing calls to this origin.
-	setSessionCookies(w, sess, false)
+	s.setSessionCookies(w, sess, false)
 	writeData(w, r, http.StatusOK, bootstrapResponse{
+		SessionCookieName: s.sessionCookieName(), CSRFCookieName: s.csrfCookieName(),
 		SessionExpiresAt: sess.ExpiresAt,
 		UserID:           sess.UserID,
 		BearerToken:      bearer.Token,
@@ -77,12 +80,30 @@ func (s *Server) handleSessionLogout(w http.ResponseWriter, r *http.Request) {
 	if h := r.Header.Get("Authorization"); len(h) > 7 && h[:7] == "Bearer " {
 		s.Bearer.Delete(strings.TrimSpace(h[7:]))
 	}
-	clearSessionCookies(w)
+	s.clearSessionCookies(w)
 	writeData(w, r, http.StatusOK, logoutResponse{LoggedOut: true})
 }
 
 type linkRequest struct {
 	RequestID string `json:"requestId"`
+}
+
+func (s *Server) handleInternalStop(w http.ResponseWriter, r *http.Request) {
+	if PrincipalOf(r).Kind != auth.KindLocal {
+		writeError(w, r, domain.Unauthorized("error.unauthorized.local_required"))
+		return
+	}
+	var req linkRequest
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	if s.RequestShutdown == nil {
+		writeError(w, r, domain.Conflict("error.run.not_active", nil))
+		return
+	}
+	writeData(w, r, http.StatusAccepted, map[string]any{"stopping": true})
+	s.RequestShutdown()
 }
 
 type linkResponse struct {

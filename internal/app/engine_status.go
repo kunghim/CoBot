@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/roles"
 )
@@ -76,6 +77,11 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	info.Status = "ready"
 	info.LoggedIn = account.LoggedIn
 	info.AuthMode = account.AuthMode
+	if info.LoggedIn {
+		a.engineLoginMu.Lock()
+		a.engineLogin = nil
+		a.engineLoginMu.Unlock()
+	}
 	a.cacheEngineStatus(info)
 	return info
 }
@@ -124,20 +130,13 @@ func parseAccount(raw json.RawMessage) accountInfo {
 		return accountInfo{}
 	}
 	info := accountInfo{}
-	// Shape verified against the target CLI during R acceptance; unknown
-	// shapes degrade to "not logged in" instead of guessing.
-	if auth, ok := m["auth"].(map[string]any); ok {
-		if mode, ok := auth["mode"].(string); ok {
+	if account, ok := m["account"].(map[string]any); ok {
+		mode, _ := account["type"].(string)
+		switch mode {
+		case "chatgpt", "apiKey", "amazonBedrock":
 			info.AuthMode = mode
-			info.LoggedIn = mode != ""
+			info.LoggedIn = true
 		}
-	}
-	if mode, ok := m["mode"].(string); ok && info.AuthMode == "" {
-		info.AuthMode = mode
-		info.LoggedIn = true
-	}
-	if logged, ok := m["loggedIn"].(bool); ok {
-		info.LoggedIn = logged
 	}
 	return info
 }
@@ -151,6 +150,9 @@ func (a *App) control(ctx context.Context) (*codex.Server, error) {
 			return a.engineControl.server, nil
 		}
 		a.engineControl = nil
+		a.engineLoginMu.Lock()
+		a.engineLogin = nil
+		a.engineLoginMu.Unlock()
 	}
 	if a.ControlFactory == nil {
 		return nil, errors.New("engine factory is not configured")
@@ -178,17 +180,25 @@ func (a *App) ShutdownControl(ctx context.Context) error {
 
 // StartEngineLogin triggers the official browser login on the control
 // server; completion arrives as account/login/completed.
-func (a *App) StartEngineLogin(ctx context.Context) error {
+func (a *App) StartEngineLogin(ctx context.Context) (engine.LoginInfo, error) {
 	server, err := a.control(ctx)
 	if err != nil {
-		return err
+		return engine.LoginInfo{}, err
+	}
+	a.engineLoginMu.Lock()
+	defer a.engineLoginMu.Unlock()
+	if a.engineLogin != nil {
+		return *a.engineLogin, nil
 	}
 	loginCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := server.AccountLoginStart(loginCtx); err != nil {
-		return err
+	info, err := server.AccountLoginStart(loginCtx)
+	if err != nil {
+		return engine.LoginInfo{}, err
 	}
-	return nil
+	a.engineLogin = &info
+	a.invalidateEngineStatus()
+	return info, nil
 }
 
 // CancelEngineLogin aborts a pending login.
@@ -197,9 +207,36 @@ func (a *App) CancelEngineLogin(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.engineLoginMu.Lock()
+	defer a.engineLoginMu.Unlock()
+	if a.engineLogin == nil {
+		return nil
+	}
 	cancelCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	return server.AccountLoginCancel(cancelCtx)
+	if err := server.AccountLoginCancel(cancelCtx, a.engineLogin.LoginID); err != nil {
+		return err
+	}
+	a.engineLogin = nil
+	a.invalidateEngineStatus()
+	return nil
+}
+
+// EngineLoginCompleted runs outside the protocol reader, so a completion
+// arriving before the start response cannot deadlock that response.
+func (a *App) EngineLoginCompleted(raw json.RawMessage) {
+	var result struct {
+		LoginID string `json:"loginId"`
+	}
+	if json.Unmarshal(raw, &result) != nil {
+		return
+	}
+	a.engineLoginMu.Lock()
+	if a.engineLogin != nil && a.engineLogin.LoginID == result.LoginID {
+		a.engineLogin = nil
+	}
+	a.engineLoginMu.Unlock()
+	a.invalidateEngineStatus()
 }
 
 // EngineLogout ends the private environment session through the engine.
@@ -214,6 +251,9 @@ func (a *App) EngineLogout(ctx context.Context) error {
 		return err
 	}
 	a.invalidateEngineStatus()
+	a.engineLoginMu.Lock()
+	a.engineLogin = nil
+	a.engineLoginMu.Unlock()
 	return nil
 }
 
@@ -236,7 +276,7 @@ func (a *App) ModelList(ctx context.Context) (json.RawMessage, error) {
 // leak into the page.
 func sanitizeModels(raw json.RawMessage) json.RawMessage {
 	var payload struct {
-		Models []map[string]any `json:"models"`
+		Models []map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil || len(payload.Models) == 0 {
 		return json.RawMessage(`{"models":[]}`)
@@ -244,6 +284,9 @@ func sanitizeModels(raw json.RawMessage) json.RawMessage {
 	clean := make([]map[string]any, 0, len(payload.Models))
 	for _, m := range payload.Models {
 		entry := map[string]any{}
+		if model, ok := m["model"].(string); ok {
+			entry["slug"] = model
+		}
 		for _, key := range []string{"slug", "id", "displayName", "description", "family"} {
 			if v, ok := m[key]; ok {
 				switch v.(type) {

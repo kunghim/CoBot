@@ -128,6 +128,10 @@ func notify(method string, params any) {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Println("codex-cli 0.161.0")
+		return
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for scanner.Scan() {
@@ -214,14 +218,35 @@ func handleRequest(req message) {
 		reply(req.ID, map[string]any{"turn": map[string]any{"id": turnID, "status": "inProgress", "items": []any{}}})
 		go runTurn(params.ThreadID, turnID, text)
 	case "turn/interrupt":
+		var p struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+		}
+		_ = json.Unmarshal(req.Params, &p)
+		if p.ThreadID == "" || p.TurnID == "" {
+			send(message{ID: req.ID, Error: map[string]any{"code": -32600, "message": "threadId and turnId required"}})
+			return
+		}
 		reply(req.ID, map[string]any{})
 	case "account/read":
-		reply(req.ID, map[string]any{"auth": map[string]any{"mode": ""}})
+		reply(req.ID, map[string]any{"account": nil, "requiresOpenaiAuth": true})
 	case "model/list":
-		reply(req.ID, map[string]any{"models": []any{
-			map[string]any{"slug": "fake-model", "displayName": "Fake Model"},
+		reply(req.ID, map[string]any{"data": []any{
+			map[string]any{"id": "fake-model", "model": "fake-model", "displayName": "Fake Model"},
 		}})
-	case "account/login/start", "account/login/cancel", "account/logout":
+	case "account/login/start":
+		reply(req.ID, map[string]any{"type": "chatgpt", "loginId": "fake-login", "authUrl": "https://example.invalid/login"})
+	case "account/login/cancel":
+		var p struct {
+			LoginID string `json:"loginId"`
+		}
+		_ = json.Unmarshal(req.Params, &p)
+		if p.LoginID == "" {
+			send(message{ID: req.ID, Error: map[string]any{"code": -32600, "message": "loginId required"}})
+			return
+		}
+		reply(req.ID, map[string]any{})
+	case "account/logout":
 		reply(req.ID, map[string]any{})
 	default:
 		if req.ID != nil {

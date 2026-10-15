@@ -92,7 +92,8 @@ export default async function globalSetup(): Promise<void> {
   if (!boot.ok()) throw new Error(`bootstrap failed: ${boot.status()} ${await boot.text()}`);
   // The CSRF token ships in a JS-readable cookie; the browser client reads it
   // the same way. State-changing calls must echo it in X-CSRF-Token.
-  const csrf = (await api.storageState()).cookies.find((c) => c.name === 'cobot_csrf')?.value;
+  const bootData = (await boot.json()).data;
+  const csrf = (await api.storageState()).cookies.find((c) => c.name === bootData.csrfCookieName)?.value;
   if (!csrf) throw new Error('cobot_csrf cookie missing after bootstrap');
   const patch = await api.patch('/api/v1/settings', {
     headers: { 'X-CSRF-Token': csrf },

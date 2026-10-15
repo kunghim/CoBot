@@ -53,9 +53,10 @@ export function clearBearer(): void {
   }
 }
 
+let csrfCookieName = 'cobot_csrf';
 function csrfToken(): string {
-  const match = document.cookie.match(/(?:^|;\s*)cobot_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : '';
+  const entry = document.cookie.split(';').map((value) => value.trim()).find((value) => value.startsWith(csrfCookieName + '='));
+  return entry ? decodeURIComponent(entry.slice(csrfCookieName.length + 1)) : '';
 }
 
 export type UnauthorizedListener = () => void;
@@ -123,7 +124,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  getStatus: () => request<import('./types').Status>('GET', '/api/v1/status'),
+  getStatus: async () => {
+    const status = await request<import('./types').Status>('GET', '/api/v1/status');
+    if (status.csrfCookieName) csrfCookieName = status.csrfCookieName;
+    return status;
+  },
   getSettings: () => request<import('./types').Settings>('GET', '/api/v1/settings'),
   updateSettings: (patch: import('./types').SettingsPatch, expectedRevision?: number) =>
     request<import('./types').Settings>('PATCH', '/api/v1/settings', {
@@ -132,11 +137,12 @@ export const api = {
     }),
   getSnapshot: () => request<import('./types').Snapshot>('GET', '/api/v1/snapshot'),
   exchangeBootstrap: async (secret: string) => {
-    const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string }>(
+    const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string; csrfCookieName: string }>(
       'POST',
       '/api/v1/session/bootstrap',
       { secret },
     );
+    csrfCookieName = result.csrfCookieName;
     // Only the desktop shell keeps the bearer; browser sessions stay cookies.
     if (result.bearerToken && desktopBridge()) {
       try {
@@ -189,7 +195,7 @@ export const api = {
 
   // Engine account and models (M2).
   getEngine: () => request<import('./types').EngineStatus>('GET', '/api/v1/engine'),
-  engineLogin: () => request<{ loginStarted: boolean }>('POST', '/api/v1/auth/login', {}),
+  engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),

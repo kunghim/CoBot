@@ -135,7 +135,10 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 				if serr != nil || session.ProviderThreadID == "" {
 					continue
 				}
-				if ierr := rt.server.InterruptTurn(ctx, session.ProviderThreadID); ierr != nil {
+				if run.ProviderTurnID == "" {
+					continue
+				}
+				if ierr := rt.server.InterruptTurn(ctx, session.ProviderThreadID, run.ProviderTurnID); ierr != nil {
 					s.logger.Warn("interrupt in-flight run on shutdown", "botId", run.BotID, "error", ierr)
 				}
 			}

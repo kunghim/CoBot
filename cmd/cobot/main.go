@@ -131,7 +131,10 @@ func runServe(args []string) int {
 	fmt.Printf("  web link:  %s/#cobot-bootstrap=%s\n", core.Endpoint, core.StartupBootstrap)
 	fmt.Println("  (the link is one-time and expires in 60 seconds; a second `cobot serve` mints a fresh one)")
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-core.StopRequested:
+	}
 	fmt.Println("shutting down: stopping new work and waiting for in-flight requests (max 10s)...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

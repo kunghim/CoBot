@@ -31,6 +31,8 @@ export interface EngineStatus {
   checkedAt?: string;
 }
 
+export interface EngineLogin { type: 'chatgpt'; loginId: string; authUrl: string }
+
 /** GET /models: engine-provided, sanitized model list. */
 export interface EngineModel {
   slug?: string;

@@ -26,11 +26,12 @@ import (
 // the tests do not depend on net/http/cookiejar, which is missing from this
 // machine's Go distribution.
 type client struct {
-	t       *testing.T
-	base    string
-	http    *http.Client
-	cookies map[string]string
-	csrf    string
+	t           *testing.T
+	base        string
+	http        *http.Client
+	cookies     map[string]string
+	csrf        string
+	sessionName string
 }
 
 func newClient(t *testing.T, base string) *client {
@@ -44,6 +45,12 @@ func (c *client) applyCookies(resp *http.Response) {
 			continue
 		}
 		c.cookies[ck.Name] = ck.Value
+		if strings.HasPrefix(ck.Name, "cobot_session_") {
+			c.sessionName = ck.Name
+		}
+		if strings.HasPrefix(ck.Name, "cobot_csrf_") {
+			c.csrf = ck.Value
+		}
 	}
 }
 
@@ -127,7 +134,9 @@ func authorize(t *testing.T, core *bootstrap.Core, c *client) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("bootstrap exchange failed: %d %v", resp.StatusCode, body)
 	}
-	c.csrf = c.cookies["cobot_csrf"]
+	data := body["data"].(map[string]any)
+	c.sessionName = data["sessionCookieName"].(string)
+	c.csrf = c.cookies[data["csrfCookieName"].(string)]
 	if c.csrf == "" {
 		t.Fatal("csrf cookie missing after bootstrap")
 	}
@@ -253,7 +262,7 @@ func TestAuthGuards(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("second bootstrap: %d", resp.StatusCode)
 	}
-	core.Sessions.Delete(c2.cookies["cobot_session"])
+	core.Sessions.Delete(c2.cookies[c2.sessionName])
 	if resp, _ := c2.do("GET", "/api/v1/settings", nil, nil); resp.StatusCode != 401 {
 		t.Fatalf("revoked session = %d, want 401", resp.StatusCode)
 	}
@@ -288,7 +297,7 @@ func TestSnapshotAndEventStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Cookie", "cobot_session="+c.cookies["cobot_session"])
+	req.Header.Set("Cookie", c.sessionName+"="+c.cookies[c.sessionName])
 	streamResp, err := c.http.Do(req)
 	if err != nil {
 		t.Fatal(err)

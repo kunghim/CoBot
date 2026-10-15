@@ -73,6 +73,11 @@ const (
 	UpdateTask       CollaborationRequestTool = "update_task"
 )
 
+// Defines values for EngineLoginType.
+const (
+	Chatgpt EngineLoginType = "chatgpt"
+)
+
 // Defines values for EngineStatusStatus.
 const (
 	EngineStatusStatusError         EngineStatusStatus = "error"
@@ -261,9 +266,11 @@ type BootstrapResult struct {
 	BearerExpiresAt *time.Time `json:"bearerExpiresAt,omitempty"`
 
 	// BearerToken Desktop-shell bearer (30 min, renewable); browser flow ignores it
-	BearerToken      *string   `json:"bearerToken,omitempty"`
-	SessionExpiresAt time.Time `json:"sessionExpiresAt"`
-	UserId           string    `json:"userId"`
+	BearerToken       *string   `json:"bearerToken,omitempty"`
+	CsrfCookieName    string    `json:"csrfCookieName"`
+	SessionCookieName string    `json:"sessionCookieName"`
+	SessionExpiresAt  time.Time `json:"sessionExpiresAt"`
+	UserId            string    `json:"userId"`
 }
 
 // Bot defines model for Bot.
@@ -303,6 +310,16 @@ type CreateTaskRequest struct {
 	RequestId          openapi_types.UUID `json:"requestId"`
 	Title              string             `json:"title"`
 }
+
+// EngineLogin defines model for EngineLogin.
+type EngineLogin struct {
+	AuthUrl string          `json:"authUrl"`
+	LoginId string          `json:"loginId"`
+	Type    EngineLoginType `json:"type"`
+}
+
+// EngineLoginType defines model for EngineLogin.Type.
+type EngineLoginType string
 
 // EngineStatus defines model for EngineStatus.
 type EngineStatus struct {
@@ -479,17 +496,19 @@ type Snapshot struct {
 
 // Status defines model for Status.
 type Status struct {
-	Authorized   bool              `json:"authorized"`
-	DataRoot     string            `json:"dataRoot"`
-	Endpoint     string            `json:"endpoint"`
-	Engine       EngineStatus      `json:"engine"`
-	Environment  StatusEnvironment `json:"environment"`
-	InstanceId   string            `json:"instanceId"`
-	Product      string            `json:"product"`
-	Profile      StatusProfile     `json:"profile"`
-	ServiceEpoch string            `json:"serviceEpoch"`
-	StartedAt    time.Time         `json:"startedAt"`
-	Version      string            `json:"version"`
+	Authorized        bool              `json:"authorized"`
+	CsrfCookieName    string            `json:"csrfCookieName"`
+	DataRoot          string            `json:"dataRoot"`
+	Endpoint          string            `json:"endpoint"`
+	Engine            EngineStatus      `json:"engine"`
+	Environment       StatusEnvironment `json:"environment"`
+	InstanceId        string            `json:"instanceId"`
+	Product           string            `json:"product"`
+	Profile           StatusProfile     `json:"profile"`
+	ServiceEpoch      string            `json:"serviceEpoch"`
+	SessionCookieName string            `json:"sessionCookieName"`
+	StartedAt         time.Time         `json:"startedAt"`
+	Version           string            `json:"version"`
 }
 
 // StatusEnvironment defines model for Status.Environment.

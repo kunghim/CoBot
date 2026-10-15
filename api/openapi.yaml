@@ -213,6 +213,14 @@ paths:
       responses:
         "202":
           description: Login flow started; completion arrives via events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/EngineLogin" }
         "401":
           $ref: "#/components/responses/Error"
         "503":
@@ -1837,6 +1845,13 @@ components:
               type: object
               additionalProperties: true
         requestId: { type: string }
+    EngineLogin:
+      type: object
+      required: [type, loginId, authUrl]
+      properties:
+        type: { type: string, enum: [chatgpt] }
+        loginId: { type: string }
+        authUrl: { type: string, format: uri }
     EngineStatus:
       type: object
       required: [status, loggedIn]
@@ -1855,8 +1870,10 @@ components:
     Status:
       type: object
       required:
-        [product, version, profile, environment, dataRoot, endpoint, instanceId, serviceEpoch, startedAt, authorized, engine]
+        [product, version, profile, environment, dataRoot, endpoint, instanceId, serviceEpoch, startedAt, authorized, engine, sessionCookieName, csrfCookieName]
       properties:
+        sessionCookieName: { type: string }
+        csrfCookieName: { type: string }
         product: { type: string }
         version: { type: string }
         profile: { type: string, enum: [development, production] }
@@ -1870,8 +1887,10 @@ components:
         engine: { $ref: "#/components/schemas/EngineStatus" }
     BootstrapResult:
       type: object
-      required: [sessionExpiresAt, userId]
+      required: [sessionExpiresAt, userId, sessionCookieName, csrfCookieName]
       properties:
+        sessionCookieName: { type: string }
+        csrfCookieName: { type: string }
         sessionExpiresAt: { type: string, format: date-time }
         userId: { type: string }
         bearerToken:

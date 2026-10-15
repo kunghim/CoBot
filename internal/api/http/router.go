@@ -40,6 +40,7 @@ type Server struct {
 	// EngineEpochOfTeam reports the live engine epoch for a team, so a bridge
 	// left behind by a restarted connection can be refused.
 	EngineEpochOfTeam func(teamID string) string
+	RequestShutdown   func()
 }
 
 // Handler builds the full HTTP handler.
@@ -54,6 +55,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/snapshot", s.handleSnapshot)
 	mux.HandleFunc("GET /api/v1/events", s.handleEvents)
 	mux.HandleFunc("POST /internal/v1/session/link", s.handleInternalLink)
+	mux.HandleFunc("POST /internal/v1/service/stop", s.handleInternalStop)
 
 	// Engine (Codex) surface: status, official login, models.
 	mux.HandleFunc("GET /api/v1/engine", s.handleEngine)

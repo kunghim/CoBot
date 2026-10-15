@@ -75,7 +75,7 @@ func TestRealCodexHandshake(t *testing.T) {
 		t.Fatalf("model/list: %v", err)
 	}
 	var models struct {
-		Models []map[string]any `json:"models"`
+		Models []map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(modelsRaw, &models); err != nil {
 		t.Fatalf("decode models: %v (%s)", err, string(modelsRaw))
@@ -86,7 +86,7 @@ func TestRealCodexHandshake(t *testing.T) {
 		return
 	}
 	for _, m := range models.Models {
-		t.Logf("model: %v", m["slug"])
+		t.Logf("model: %v", m["model"])
 	}
 }
 
@@ -96,10 +96,9 @@ func redactAccount(raw json.RawMessage) string {
 		return "<unparseable>"
 	}
 	safe := map[string]any{}
-	for _, key := range []string{"auth", "mode", "planType", "chatgpt", "type"} {
-		if v, ok := m[key]; ok {
-			safe[key] = v
-		}
+	safe["requiresOpenaiAuth"] = m["requiresOpenaiAuth"]
+	if account, ok := m["account"].(map[string]any); ok {
+		safe["accountType"] = account["type"]
 	}
 	out, _ := json.Marshal(safe)
 	return string(out)

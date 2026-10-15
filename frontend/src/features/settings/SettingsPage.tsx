@@ -60,6 +60,7 @@ export default function SettingsPage() {
   const [logoutError, setLogoutError] = useState('');
 
   const [loginPending, setLoginPending] = useState(false);
+  const [authUrl, setAuthUrl] = useState('');
   const [loginTimedOut, setLoginTimedOut] = useState(false);
   const [engineActionError, setEngineActionError] = useState('');
 
@@ -87,8 +88,8 @@ export default function SettingsPage() {
     const deadline = Date.now() + 120_000;
     const interval = window.setInterval(() => {
       if (Date.now() >= deadline) {
-        setLoginPending(false);
         setLoginTimedOut(true);
+        window.clearInterval(interval);
         return;
       }
       void refetchEngine.current();
@@ -101,6 +102,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (engine.data?.loggedIn) {
       setLoginPending(false);
+      setAuthUrl('');
       setLoginTimedOut(false);
     }
   }, [engine.data?.loggedIn]);
@@ -168,8 +170,9 @@ export default function SettingsPage() {
   const startLogin = () => {
     setEngineActionError('');
     login.mutate(undefined, {
-      onSuccess: () => {
+      onSuccess: (result) => {
         setLoginPending(true);
+        setAuthUrl(result.authUrl);
         setLoginTimedOut(false);
       },
       onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
@@ -181,6 +184,7 @@ export default function SettingsPage() {
     loginCancel.mutate(undefined, {
       onSuccess: () => {
         setLoginPending(false);
+        setAuthUrl('');
         void refetchEngine.current();
       },
       onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
@@ -285,6 +289,7 @@ export default function SettingsPage() {
             )}
             {loginPending && (
               <>
+                {authUrl && <a href={authUrl} target="_blank" rel="noreferrer" className="text-sm underline">{t('engine.openLogin')}</a>}
                 <span className="text-sm text-neutral-500" role="status">
                   {t('engine.waitingLogin')}
                 </span>

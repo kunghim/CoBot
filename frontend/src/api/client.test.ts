@@ -70,4 +70,17 @@ describe('ApiClient wire handling', () => {
     );
     await expect(api.getSettings()).rejects.toBeInstanceOf(ApiError);
   });
+
+  it('reads only the active profile CSRF cookie advertised by status', async () => {
+    document.cookie = 'cobot_csrf_profile_a=csrf-a';
+    document.cookie = 'cobot_csrf_profile_b=csrf-b';
+    const fetchMock = vi.fn(async (path: string) => new Response(JSON.stringify({
+      data: path.endsWith('/status') ? { csrfCookieName: 'cobot_csrf_profile_b' } : { revision: 3 }, requestId: 'scope',
+    }), {status:200}));
+    vi.stubGlobal('fetch',fetchMock);
+    await api.getStatus();
+    await api.updateSettings({ language: 'en' }, 2);
+    const headers = (fetchMock.mock.calls[1] as unknown as [string,RequestInit])[1].headers as Record<string,string>;
+    expect(headers['X-CSRF-Token']).toBe('csrf-b');
+  });
 });

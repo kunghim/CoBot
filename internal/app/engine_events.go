@@ -391,7 +391,10 @@ func (a *App) InterruptRun(ctx context.Context, runID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := rt.server.InterruptTurn(ctx, session.ProviderThreadID); err != nil {
+	if run.ProviderTurnID == "" {
+		return "", domain.Conflict("error.run.not_active", map[string]any{"status": "starting"})
+	}
+	if err := rt.server.InterruptTurn(ctx, session.ProviderThreadID, run.ProviderTurnID); err != nil {
 		return "", domain.EngineUnavailable("error.engine.interrupt_failed", nil, err)
 	}
 	// The authoritative terminal state arrives with turn/completed.

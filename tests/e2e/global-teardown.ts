@@ -14,6 +14,7 @@ export default async function globalTeardown(): Promise<void> {
   // so surface it instead of discarding it.
   const output = (globalThis as any).__cobotE2EOutput?.();
   if (output) {
-    console.log('\n=== cobot core output (e2e) ===\n' + output + '\n=== end core output ===\n');
+    const safe = output.replace(/(#cobot-bootstrap=)[a-f0-9]+/g, '$1<redacted>');
+    console.log('\n=== cobot core output (e2e) ===\n' + safe + '\n=== end core output ===\n');
   }
 }

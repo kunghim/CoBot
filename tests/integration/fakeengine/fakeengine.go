@@ -94,7 +94,10 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (s
 	return turnID, nil
 }
 
-func (s *Server) InterruptTurn(ctx context.Context, threadID string) error {
+func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) error {
+	if threadID == "" || turnID == "" {
+		return fmt.Errorf("interrupt requires threadId and turnId")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.interrupted = append(s.interrupted, threadID)
@@ -114,14 +117,21 @@ func (s *Server) ReplyApproval(ctx context.Context, requestID json.RawMessage, r
 }
 
 func (s *Server) AccountRead(ctx context.Context) (json.RawMessage, error) {
-	return json.RawMessage(`{"auth":{"mode":"chatgpt"}}`), nil
+	return json.RawMessage(`{"account":{"type":"chatgpt"}}`), nil
 }
 
-func (s *Server) AccountLoginStart(ctx context.Context) error  { return nil }
-func (s *Server) AccountLoginCancel(ctx context.Context) error { return nil }
+func (s *Server) AccountLoginStart(ctx context.Context) (engine.LoginInfo, error) {
+	return engine.LoginInfo{Type: "chatgpt", LoginID: "fake-login", AuthURL: "https://example.invalid/login"}, nil
+}
+func (s *Server) AccountLoginCancel(ctx context.Context, loginID string) error {
+	if loginID == "" {
+		return fmt.Errorf("loginId required")
+	}
+	return nil
+}
 
 func (s *Server) ModelList(ctx context.Context) (json.RawMessage, error) {
-	return json.RawMessage(`{"models":[{"slug":"fake-model","displayName":"Fake Model"}]}`), nil
+	return json.RawMessage(`{"data":[{"id":"fake-model","model":"fake-model","displayName":"Fake Model"}],"nextCursor":null}`), nil
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

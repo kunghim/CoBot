@@ -259,8 +259,11 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (s
 }
 
 // InterruptTurn asks the engine to stop the thread's current turn.
-func (s *Server) InterruptTurn(ctx context.Context, threadID string) error {
-	if err := s.client.Call(ctx, "turn/interrupt", map[string]any{"threadId": threadID}, nil); err != nil {
+func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) error {
+	if threadID == "" || turnID == "" {
+		return errors.New("interrupt requires thread and turn identity")
+	}
+	if err := s.client.Call(ctx, "turn/interrupt", map[string]any{"threadId": threadID, "turnId": turnID}, nil); err != nil {
 		return fmt.Errorf("turn/interrupt: %w", err)
 	}
 	return nil
@@ -287,16 +290,23 @@ func (s *Server) AccountRead(ctx context.Context) (json.RawMessage, error) {
 }
 
 // AccountLoginStart begins the official private-environment login flow.
-func (s *Server) AccountLoginStart(ctx context.Context) error {
-	if err := s.client.Call(ctx, "account/login/start", map[string]any{"type": "chatgpt"}, nil); err != nil {
-		return fmt.Errorf("account/login/start: %w", err)
+func (s *Server) AccountLoginStart(ctx context.Context) (engine.LoginInfo, error) {
+	var out engine.LoginInfo
+	if err := s.client.Call(ctx, "account/login/start", map[string]any{"type": "chatgpt"}, &out); err != nil {
+		return out, fmt.Errorf("account/login/start: %w", err)
 	}
-	return nil
+	if out.Type != "chatgpt" || out.LoginID == "" || out.AuthURL == "" {
+		return engine.LoginInfo{}, errors.New("incomplete browser login response")
+	}
+	return out, nil
 }
 
 // AccountLoginCancel aborts a pending login.
-func (s *Server) AccountLoginCancel(ctx context.Context) error {
-	if err := s.client.Call(ctx, "account/login/cancel", map[string]any{}, nil); err != nil {
+func (s *Server) AccountLoginCancel(ctx context.Context, loginID string) error {
+	if loginID == "" {
+		return errors.New("loginId is required")
+	}
+	if err := s.client.Call(ctx, "account/login/cancel", map[string]any{"loginId": loginID}, nil); err != nil {
 		return fmt.Errorf("account/login/cancel: %w", err)
 	}
 	return nil
@@ -304,11 +314,35 @@ func (s *Server) AccountLoginCancel(ctx context.Context) error {
 
 // ModelList returns the engine's available models (non-secret).
 func (s *Server) ModelList(ctx context.Context) (json.RawMessage, error) {
-	var out json.RawMessage
-	if err := s.client.Call(ctx, "model/list", map[string]any{}, &out); err != nil {
-		return nil, fmt.Errorf("model/list: %w", err)
+	all := []json.RawMessage{}
+	cursor := ""
+	seen := map[string]bool{}
+	for {
+		params := map[string]any{}
+		if cursor != "" {
+			params["cursor"] = cursor
+		}
+		var page struct {
+			Data       *[]json.RawMessage `json:"data"`
+			NextCursor *string            `json:"nextCursor"`
+		}
+		if err := s.client.Call(ctx, "model/list", params, &page); err != nil {
+			return nil, fmt.Errorf("model/list: %w", err)
+		}
+		if page.Data == nil {
+			return nil, errors.New("model/list response missing data")
+		}
+		all = append(all, (*page.Data)...)
+		if page.NextCursor == nil || *page.NextCursor == "" {
+			break
+		}
+		cursor = *page.NextCursor
+		if seen[cursor] || len(seen) >= 100 {
+			return nil, errors.New("model/list invalid pagination")
+		}
+		seen[cursor] = true
 	}
-	return out, nil
+	return json.Marshal(map[string]any{"data": all})
 }
 
 // Shutdown stops the process this server owns: stdin close, bounded wait,

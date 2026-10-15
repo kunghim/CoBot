@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"net"
 	"net/http"
@@ -82,7 +83,14 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		principal, err := s.resolvePrincipal(r)
+		// A fresh one-time secret establishes a new page identity. A stale
+		// cookie/bearer must not prevent its redemption after restart.
+		bootstrap := r.Method == http.MethodPost && r.URL.Path == "/api/v1/session/bootstrap"
+		var principal auth.Principal
+		var err error
+		if !bootstrap {
+			principal, err = s.resolvePrincipal(r)
+		}
 		if err != nil {
 			writeError(w, r, err)
 			return
@@ -166,7 +174,7 @@ func (s *Server) resolvePrincipal(r *http.Request) (auth.Principal, error) {
 		}
 		return auth.Principal{}, domain.Unauthorized("error.unauthorized.bad_bearer")
 	}
-	if c, err := r.Cookie(SessionCookieName); err == nil && c.Value != "" {
+	if c, err := r.Cookie(s.sessionCookieName()); err == nil && c.Value != "" {
 		if sess, ok := s.Sessions.Get(c.Value); ok {
 			_ = sess
 			return auth.NewPrincipalUser(c.Value), nil
@@ -184,9 +192,16 @@ const SessionCookieName = "cobot_session"
 // CSRFCookieName is the JS-readable counterpart of the CSRF header token.
 const CSRFCookieName = "cobot_csrf"
 
-func setSessionCookies(w http.ResponseWriter, sess *auth.Session, secure bool) {
+func (s *Server) cookieSuffix() string {
+	digest := sha256.Sum256([]byte(s.App.InstanceID))
+	return hex.EncodeToString(digest[:8])
+}
+func (s *Server) sessionCookieName() string { return SessionCookieName + "_" + s.cookieSuffix() }
+func (s *Server) csrfCookieName() string    { return CSRFCookieName + "_" + s.cookieSuffix() }
+
+func (s *Server) setSessionCookies(w http.ResponseWriter, sess *auth.Session, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName,
+		Name:     s.sessionCookieName(),
 		Value:    sess.ID,
 		Path:     "/",
 		HttpOnly: true,
@@ -195,7 +210,7 @@ func setSessionCookies(w http.ResponseWriter, sess *auth.Session, secure bool) {
 		Expires:  sess.ExpiresAt,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     CSRFCookieName,
+		Name:     s.csrfCookieName(),
 		Value:    sess.CSRF,
 		Path:     "/",
 		HttpOnly: false,
@@ -205,9 +220,9 @@ func setSessionCookies(w http.ResponseWriter, sess *auth.Session, secure bool) {
 	})
 }
 
-func clearSessionCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: SessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
-	http.SetCookie(w, &http.Cookie{Name: CSRFCookieName, Value: "", Path: "/", MaxAge: -1, SameSite: http.SameSiteStrictMode})
+func (s *Server) clearSessionCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookieName(), Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: s.csrfCookieName(), Value: "", Path: "/", MaxAge: -1, SameSite: http.SameSiteStrictMode})
 }
 
 func requireUser(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {

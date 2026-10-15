@@ -36,16 +36,23 @@ type Server interface {
 	// StartTurn dispatches one user turn and returns the provider turn id;
 	// completion arrives as notifications, not as this call's result.
 	StartTurn(ctx context.Context, threadID, text string, model string) (turnID string, err error)
-	InterruptTurn(ctx context.Context, threadID string) error
+	InterruptTurn(ctx context.Context, threadID, turnID string) error
 	// ReplyApproval answers a pending native approval request with the exact
 	// response shape the engine expects (decision / permissions).
 	ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error
 	AccountRead(ctx context.Context) (json.RawMessage, error)
-	AccountLoginStart(ctx context.Context) error
-	AccountLoginCancel(ctx context.Context) error
+	AccountLoginStart(ctx context.Context) (LoginInfo, error)
+	AccountLoginCancel(ctx context.Context, loginID string) error
 	ModelList(ctx context.Context) (json.RawMessage, error)
 	Shutdown(ctx context.Context) error
 	Epoch() string
+}
+
+// LoginInfo is the pending official browser authorization, never a credential.
+type LoginInfo struct {
+	Type    string `json:"type"`
+	LoginID string `json:"loginId"`
+	AuthURL string `json:"authUrl"`
 }
 
 // ApprovalRequest is a normalized native tool approval arriving from the

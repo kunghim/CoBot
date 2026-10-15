@@ -38,11 +38,12 @@ func (s *Server) handleEngineLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	if err := s.App.StartEngineLogin(r.Context()); err != nil {
+	login, err := s.App.StartEngineLogin(r.Context())
+	if err != nil {
 		writeError(w, r, domain.EngineUnavailable("error.engine.login_start_failed", nil, err))
 		return
 	}
-	writeData(w, r, http.StatusAccepted, map[string]any{"loginStarted": true})
+	writeData(w, r, http.StatusAccepted, login)
 }
 
 func (s *Server) handleEngineLoginCancel(w http.ResponseWriter, r *http.Request) {

@@ -969,6 +969,13 @@ export interface components {
             };
             requestId: string;
         };
+        EngineLogin: {
+            /** @enum {string} */
+            type: "chatgpt";
+            loginId: string;
+            /** Format: uri */
+            authUrl: string;
+        };
         EngineStatus: {
             /** @enum {string} */
             status: "not_configured" | "ready" | "error" | "starting";
@@ -980,6 +987,8 @@ export interface components {
             errorKey?: string;
         };
         Status: {
+            sessionCookieName: string;
+            csrfCookieName: string;
             product: string;
             version: string;
             /** @enum {string} */
@@ -996,6 +1005,8 @@ export interface components {
             engine: components["schemas"]["EngineStatus"];
         };
         BootstrapResult: {
+            sessionCookieName: string;
+            csrfCookieName: string;
             /** Format: date-time */
             sessionExpiresAt: string;
             userId: string;
@@ -1349,7 +1360,11 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["EngineLogin"];
+                    };
+                };
             };
             401: components["responses"]["Error"];
             503: components["responses"]["Error"];

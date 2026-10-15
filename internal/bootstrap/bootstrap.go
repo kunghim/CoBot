@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	apihttp "github.com/kunghim/CoBot/internal/api/http"
@@ -44,17 +45,18 @@ type Options struct {
 
 // Core is a running product instance.
 type Core struct {
-	Paths       platform.Paths
-	Config      config.File
-	DB          *sql.DB
-	App         *app.App
-	Sessions    *auth.SessionStore
-	Bearer      *auth.BearerStore
-	Issuer      *auth.BootstrapIssuer
-	Logger      *slog.Logger
-	Endpoint    string
-	AdminSecret string
-	StartedAt   time.Time
+	Paths         platform.Paths
+	Config        config.File
+	DB            *sql.DB
+	App           *app.App
+	Sessions      *auth.SessionStore
+	Bearer        *auth.BearerStore
+	Issuer        *auth.BootstrapIssuer
+	Logger        *slog.Logger
+	Endpoint      string
+	AdminSecret   string
+	StartedAt     time.Time
+	StopRequested <-chan struct{}
 
 	// StartupBootstrap is a fresh one-time page secret minted at start; the
 	// serve command prints it as a fragment link. It expires in 60 seconds.
@@ -202,6 +204,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	application.ControlFactory = func(cwd string) (*codex.Server, error) {
 		return newServer(cwd, engine.Callbacks{
 			OnNotification: func(n engine.Notification) {
+				if n.Method == "account/login/completed" {
+					go application.EngineLoginCompleted(n.Raw)
+				}
 				if n.Method == "account/updated" || n.Method == "account/login/completed" {
 					application.EngineStatusInvalidated()
 				}
@@ -257,20 +262,23 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	if err != nil {
 		logger.Warn("frontend assets unavailable; API-only mode", "error", err)
 	}
+	stopRequested := make(chan struct{})
+	var requestStopOnce sync.Once
 	apiServer := &apihttp.Server{
-		App:            application,
-		Paths:          paths,
-		Sessions:       sessions,
-		Bearer:         bearer,
-		Issuer:         issuer,
-		Hub:            hub,
-		AdminSecret:    adminSecret,
-		AllowedOrigins: allowed,
-		Endpoint:       endpoint,
-		Version:        opts.Version,
-		StartedAt:      info.StartedAt,
-		Logger:         logger,
-		Assets:         assets,
+		RequestShutdown: func() { requestStopOnce.Do(func() { close(stopRequested) }) },
+		App:             application,
+		Paths:           paths,
+		Sessions:        sessions,
+		Bearer:          bearer,
+		Issuer:          issuer,
+		Hub:             hub,
+		AdminSecret:     adminSecret,
+		AllowedOrigins:  allowed,
+		Endpoint:        endpoint,
+		Version:         opts.Version,
+		StartedAt:       info.StartedAt,
+		Logger:          logger,
+		Assets:          assets,
 
 		CollaborationTokens: collabTokens,
 		Dispatcher:          dispatcher,
@@ -286,6 +294,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	}
 
 	core := &Core{
+		StopRequested:    stopRequested,
 		Paths:            paths,
 		Config:           cfg,
 		DB:               db,
