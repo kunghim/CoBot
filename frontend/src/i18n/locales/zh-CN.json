@@ -296,6 +296,8 @@
     "readOnly": "只读记录；想沟通请在会话中给相关成员发消息"
   },
   "engine": {
+    "hookTrusted": "原生租约 hook 已受信任。覆盖范围取决于 Codex 工具路径，已开始的命令无法撤销。",
+    "hookUnavailable": "原生租约 hook 未启用或状态尚未核实。请在 CoBot 私有 Codex 环境通过 /hooks 审查，步骤见 README。核实前不声明原生工具受此门禁保护。",
     "openLogin": "打开官方登录页面",
     "login": "登录 Codex",
     "cancelLogin": "取消登录",

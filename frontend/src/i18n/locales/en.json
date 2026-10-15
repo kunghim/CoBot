@@ -300,6 +300,8 @@
     "readOnly": "Read-only record; message the member in the conversation to talk"
   },
   "engine": {
+    "hookTrusted": "The native lease hook is trusted. Coverage depends on Codex tool paths; running commands cannot be revoked.",
+    "hookUnavailable": "The native lease hook is not active or its status could not be verified. Review it with /hooks in CoBot's private Codex environment; see README. Native tools are not covered by this guard until verified.",
     "openLogin": "Open official sign-in page",
     "login": "Sign in to Codex",
     "cancelLogin": "Cancel sign-in",

@@ -12,6 +12,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -60,12 +63,21 @@ func NewBridge(environment platform.Environment, version string, extraOrigins []
 func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	name := "cobot"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	core, err := bootstrap.Start(ctx, bootstrap.Options{
 		Environment:  b.environment,
 		DataRoot:     dataRoot,
 		Version:      b.version,
 		ConsoleLog:   true,
 		ExtraOrigins: b.extraOrigins,
+		HelperBinary: filepath.Join(filepath.Dir(executable), name),
 	})
 	if err == nil {
 		b.core = core

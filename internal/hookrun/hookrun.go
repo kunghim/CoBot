@@ -90,7 +90,10 @@ func Run(ctx context.Context, stdin io.Reader, stdout io.Writer, teamDir, leaseD
 		return writeResult(stdout, Result{Status: "error", Covered: true, Reason: "empty_command"}, ExitFailed)
 	}
 
-	if spec.SideEffect && leaseDir != "" && botID != "" {
+	if spec.SideEffect {
+		if leaseDir == "" || botID == "" || instanceID == "" {
+			return writeResult(stdout, Result{Status: "refused", Covered: true, Reason: "lease_identity_missing"}, ExitRefused)
+		}
 		if _, reason, _ := platform.ReadLeaseDir(leaseDir, botID, instanceID, time.Now()); reason != platform.LeaseReasonOK {
 			return writeResult(stdout, Result{Status: "refused", Covered: true, Reason: "lease_" + reason}, ExitRefused)
 		}

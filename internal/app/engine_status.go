@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -75,6 +76,11 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		return info
 	}
 	info.Status = "ready"
+	if server, err := a.control(ctx); err == nil {
+		hookCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		info.Capabilities = append(info.Capabilities, "codexHook:"+server.NativeHookStatus(hookCtx, a.Paths.WorkspacesDir(), filepath.Join(a.Paths.CodexHome(), "hooks.json")))
+		cancel()
+	}
 	info.LoggedIn = account.LoggedIn
 	info.AuthMode = account.AuthMode
 	if info.LoggedIn {

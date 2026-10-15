@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
+	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -41,6 +43,7 @@ type Options struct {
 	LogLevel        slog.Level
 	DevServerOrigin string   // extra allowed origin for the Vite dev server
 	ExtraOrigins    []string // e.g. the desktop shell asset origin
+	HelperBinary    string   // desktop's same-version cobot companion; empty for the CLI itself
 }
 
 // Core is a running product instance.
@@ -72,6 +75,18 @@ type Core struct {
 
 // Start brings up the core: lock, storage, migrations, HTTP listener.
 func Start(ctx context.Context, opts Options) (*Core, error) {
+	helper := opts.HelperBinary
+	if helper == "" {
+		var err error
+		helper, err = os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("resolve CoBot helper: %w", err)
+		}
+	}
+	helper, err := filepath.Abs(helper)
+	if err != nil {
+		return nil, err
+	}
 	paths, err := platform.Resolve(opts.Environment, opts.DataRoot)
 	if err != nil {
 		return nil, err
@@ -99,6 +114,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	fail := func(err error) (*Core, error) {
 		lock.Release()
 		return nil, err
+	}
+	if info, err := os.Stat(helper); err != nil || info.IsDir() {
+		return fail(fmt.Errorf("CoBot helper is missing or not a file: %s", helper))
 	}
 
 	db, err := sqlite.Open(paths.DatabaseFile())
@@ -179,6 +197,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
+	if err := hookrun.EnsureNativeConfig(paths, helper); err != nil {
+		// Never overwrite user hooks or bypass native trust to force coverage.
+		logger.Warn("native hook registration unavailable", "error", err)
+	}
 	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
 		settings, err := application.GetSettings(startCtx)
 		if err != nil {
@@ -232,7 +254,6 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	if err := application.ReconcileAfterRestart(ctx); err != nil {
 		return nil, fmt.Errorf("reconcile after restart: %w", err)
 	}
-	scheduler.Start()
 
 	// Collaboration composition: the token store is the bridge credential
 	// authority, and the dispatcher is the single permission path for MCP
@@ -243,15 +264,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// The bridge is this same executable: the engine spawns `cobot mcp`, so
 	// the binary must be the running one, not a PATH lookup that could pick a
 	// different version.
-	mcpBinary, err := os.Executable()
-	if err != nil {
-		listener.Close()
-		closeLog()
-		db.Close()
-		return fail(fmt.Errorf("resolve self executable for MCP bridge: %w", err))
-	}
-	application.MCPBinary = mcpBinary
+	application.MCPBinary = helper
 	application.MCPEndpoint = endpoint
+	// Resume queued work only after every adapter dependency is ready.
+	scheduler.Start()
 
 	issuer := auth.NewBootstrapIssuer(auth.DefaultBootstrapTTL)
 	sessions := auth.NewSessionStore(auth.DefaultSessionTTL)

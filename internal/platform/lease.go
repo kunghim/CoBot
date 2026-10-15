@@ -37,6 +37,7 @@ type Lease struct {
 	TeamID     string    `json:"teamId"`
 	InstanceID string    `json:"instanceId"`
 	Epoch      string    `json:"epoch,omitempty"`
+	RunID      string    `json:"runId,omitempty"` // only a currently live host execution
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 

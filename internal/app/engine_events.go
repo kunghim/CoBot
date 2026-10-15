@@ -9,6 +9,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -28,7 +29,17 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 
 	switch n.Method {
 	case "turn/started":
-		s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
+		if runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID); runID != "" && s.app.Paths.Root != "" {
+			if run, err := sqlite.GetRun(ctx, s.app.DB, runID); err == nil && (run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval) {
+				err := hookrun.WriteNativeBinding(s.app.Paths.Root, hookrun.NativeBinding{
+					ThreadID: n.ThreadID, TurnID: n.TurnID, BotID: run.BotID, RunID: run.ID,
+					EngineEpoch: source.server.Epoch(), InstanceID: s.app.InstanceID, ServiceEpoch: s.app.ServiceEpoch,
+				})
+				if err != nil {
+					s.logger.Warn("native hook turn binding unavailable", "error", err)
+				}
+			}
+		}
 	case "item/completed":
 		if n.ItemType == "agentMessage" && n.TurnID != "" {
 			epoch := source.server.Epoch()
@@ -56,6 +67,17 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		s.finishRun(ctx, teamID, source, n)
 	case "account/updated", "account/login/completed":
 		s.app.invalidateEngineStatus()
+	case "hook/completed":
+		var result struct {
+			Run struct {
+				EventName string `json:"eventName"`
+				Status    string `json:"status"`
+				ID        string `json:"id"`
+			} `json:"run"`
+		}
+		if json.Unmarshal(n.Raw, &result) == nil {
+			s.logger.Info("native hook completed", "teamId", teamID, "threadId", n.ThreadID, "turnId", n.TurnID, "hookId", result.Run.ID, "event", result.Run.EventName, "status", result.Run.Status)
+		}
 	default:
 		// Other notifications (deltas, progress) are transient by contract.
 	}
@@ -214,6 +236,9 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 	}
 	if s.app.CollaborationTokens != nil {
 		s.app.CollaborationTokens.RevokeRun(run.ID)
+	}
+	if s.app.Paths.Root != "" {
+		hookrun.RemoveNativeBinding(s.app.Paths.Root, n.ThreadID, n.TurnID)
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: botID, ResourceID: run.ID})
 	messageResource := assistantID

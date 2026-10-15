@@ -23,14 +23,17 @@ func (a *App) RefreshLeases(ctx context.Context) int {
 	now := time.Now().UTC()
 	written := 0
 	for _, bot := range bots {
-		if a.CollaborationTokens != nil {
-			if run, err := sqlite.FindActiveRun(ctx, a.DB, bot.ID); err == nil && run.EngineEpoch != "" && run.EngineEpoch == a.EngineEpochOfTeam(bot.TeamID) && (run.Status == "starting" || run.Status == "running" || run.Status == "waiting_approval") {
+		var runID string
+		if run, err := sqlite.FindActiveRun(ctx, a.DB, bot.ID); err == nil && run.EngineEpoch != "" && run.EngineEpoch == a.EngineEpochOfTeam(bot.TeamID) && (run.Status == "starting" || run.Status == "running" || run.Status == "waiting_approval") {
+			runID = run.ID
+			if a.CollaborationTokens != nil {
 				a.CollaborationTokens.RefreshRun(bot.ID, run.EngineEpoch, run.ID)
 			}
 		}
 		lease := platform.Lease{
 			BotID: bot.ID, TeamID: bot.TeamID, InstanceID: a.InstanceID,
 			Epoch: a.EngineEpochOfTeam(bot.TeamID), UpdatedAt: now,
+			RunID: runID,
 		}
 		if err := platform.WriteLease(a.Paths.Root, lease); err != nil {
 			a.Logger.Warn("write lease", "botId", bot.ID, "error", err)
@@ -54,6 +57,9 @@ func (a *App) TouchLease(ctx context.Context, botID string) {
 	lease := platform.Lease{
 		BotID: bot.ID, TeamID: bot.TeamID, InstanceID: a.InstanceID,
 		Epoch: a.EngineEpochOfTeam(bot.TeamID), UpdatedAt: time.Now().UTC(),
+	}
+	if run, err := sqlite.FindActiveRun(ctx, a.DB, botID); err == nil && run.EngineEpoch != "" && run.EngineEpoch == lease.Epoch && (run.Status == "starting" || run.Status == "running" || run.Status == "waiting_approval") {
+		lease.RunID = run.ID
 	}
 	if err := platform.WriteLease(a.Paths.Root, lease); err != nil && a.Logger != nil {
 		a.Logger.Warn("touch lease", "botId", botID, "error", err)

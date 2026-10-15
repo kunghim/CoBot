@@ -275,6 +275,11 @@ export default function SettingsPage() {
               {errorMessage(t, engineInfo.errorKey)}
             </p>
           )}
+		  {engineInfo?.capabilities?.some((value) => value.startsWith('codexHook:')) && (
+		    <p className="mt-2 text-sm text-neutral-500" role="status">
+		      {t(engineInfo.capabilities.includes('codexHook:trusted') ? 'engine.hookTrusted' : 'engine.hookUnavailable')}
+		    </p>
+		  )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {!loggedIn && engineInfo?.status === 'ready' && !loginPending && (

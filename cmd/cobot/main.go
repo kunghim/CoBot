@@ -224,8 +224,13 @@ func runMCP(args []string) int {
 // for. The result is one JSON object on stdout; see internal/hookrun.
 func runHook(args []string) int {
 	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
+	native := fs.Bool("native-codex", false, "handle Codex PreToolUse with a host-bound lease")
+	root := fs.String("data-root", "", "explicit CoBot profile for the native hook")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *native {
+		return hookrun.RunNativeCodex(os.Stdin, os.Stdout, *root)
 	}
 	return hookrun.Run(
 		context.Background(), os.Stdin, os.Stdout,
