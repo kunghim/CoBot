@@ -38,6 +38,15 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	if source.ID == target.ID {
 		return nil, domain.InvalidRequest("error.message.to_self", nil)
 	}
+	if taskID != "" {
+		task, err := sqlite.GetTask(ctx, a.DB, taskID)
+		if err != nil {
+			return nil, sqlite.NormalizeError(err)
+		}
+		if task.TeamID != source.TeamID {
+			return nil, domain.Forbidden("error.message.other_team", nil)
+		}
+	}
 	team, _, err := sqlite.GetTeam(ctx, a.DB, source.TeamID)
 	if err != nil {
 		return nil, sqlite.NormalizeError(err)
@@ -53,7 +62,7 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	}
 	if requestID != "" {
 		if existing, err := sqlite.FindMessageByRequestID(ctx, a.DB, source.TeamID, requestID); err == nil {
-			if hashBlocks(existing.Blocks) != hashBlocks(blocks) {
+			if existing.BotID != target.ID || existing.SourceBotID != source.ID || existing.Kind != domain.MessageKindCollaboration || existing.RunID != taskID || hashBlocks(existing.Blocks) != hashBlocks(blocks) {
 				return nil, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": requestID})
 			}
 			queued, _ := sqlite.CountQueuedDeliveries(ctx, a.DB, target.ID)
@@ -94,6 +103,7 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: source.TeamID,
 		TargetBotID: target.ID, Status: domain.DeliveryQueued, ChainID: chainID,
+		TaskID: taskID, SourceRunID: principal.RunID,
 	}); err != nil {
 		return nil, err
 	}

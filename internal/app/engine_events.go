@@ -197,6 +197,14 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 	nextStatus := domain.BotStatusIdle
 	if queued, err := sqlite.CountQueuedDeliveries(ctx, tx, botID); err == nil && queued > 0 {
 		nextStatus = domain.BotStatusQueued
+		if eligible, err := sqlite.ListDispatchableDeliveries(ctx, tx, botID, 1); err == nil && len(eligible) == 0 {
+			nextStatus = domain.BotStatusWaitingInput
+		}
+	} else {
+		var questions int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'`, botID).Scan(&questions); err == nil && questions > 0 {
+			nextStatus = domain.BotStatusWaitingInput
+		}
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
 		return

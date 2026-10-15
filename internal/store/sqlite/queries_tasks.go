@@ -105,6 +105,17 @@ func UpdateTaskStatus(ctx context.Context, db *sql.DB, taskID, status, blockedRe
 		return domain.Task{}, err
 	}
 	defer tx.Rollback()
+	updated, err := UpdateTaskStatusTx(ctx, tx, taskID, status, blockedReason, expectedRevision)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Task{}, err
+	}
+	return updated, nil
+}
+
+func UpdateTaskStatusTx(ctx context.Context, tx *sql.Tx, taskID, status, blockedReason string, expectedRevision int64) (domain.Task, error) {
 	task, err := GetTask(ctx, tx, taskID)
 	if err != nil {
 		return domain.Task{}, err
@@ -116,10 +127,7 @@ func UpdateTaskStatus(ctx context.Context, db *sql.DB, taskID, status, blockedRe
 		status, blockedReason, time.Now().UTC().Format(time.RFC3339Nano), taskID); err != nil {
 		return domain.Task{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Task{}, err
-	}
-	return GetTask(ctx, db, taskID)
+	return GetTask(ctx, tx, taskID)
 }
 
 // ChangeTaskOwner swaps the owner inside a transaction; callers must have
@@ -437,8 +445,8 @@ func AnswerQuestion(ctx context.Context, tx *sql.Tx, id, answerText, messageID s
 func ListDeliveriesByMessageOfTask(ctx context.Context, q Queryer, taskID, botID string) ([]DeliveryRecord, error) {
 	rows, err := q.QueryContext(ctx, `SELECT d.id, d.message_id, d.team_id, d.target_bot_id, d.status, d.dispatch_key, d.created_at
 		FROM deliveries d JOIN messages m ON m.id = d.message_id
-		WHERE m.run_id = ? AND d.target_bot_id = ?
-		ORDER BY d.created_at ASC`, taskID, botID)
+		WHERE d.task_id = ? AND (? = '' OR d.target_bot_id = ?)
+		ORDER BY d.created_at ASC`, taskID, botID, botID)
 	if err != nil {
 		return nil, err
 	}

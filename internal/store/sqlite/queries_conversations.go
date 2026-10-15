@@ -158,15 +158,21 @@ type DeliveryRecord struct {
 	DispatchKey string
 	ChainID     string
 	RunID       string
+	TaskID      string
+	SourceRunID string
+	Kind        string
 	CreatedAt   time.Time
 }
 
 // InsertDeliveryRow writes a delivery row.
 func InsertDeliveryRow(ctx context.Context, tx *sql.Tx, record DeliveryRecord) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := tx.ExecContext(ctx, `INSERT INTO deliveries (id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		record.ID, record.MessageID, record.TeamID, record.TargetBotID, record.Status, record.DispatchKey, record.ChainID, now, now)
+	if record.Kind == "" {
+		record.Kind = "message"
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO deliveries (id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, task_id, source_run_id, kind, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		record.ID, record.MessageID, record.TeamID, record.TargetBotID, record.Status, record.DispatchKey, record.ChainID, record.TaskID, record.SourceRunID, record.Kind, now, now)
 	if err != nil {
 		return fmt.Errorf("insert delivery: %w", err)
 	}
@@ -174,12 +180,12 @@ func InsertDeliveryRow(ctx context.Context, tx *sql.Tx, record DeliveryRecord) e
 }
 
 // deliveryColumns is the shared projection of the deliveries table.
-const deliveryColumns = `id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, run_id, created_at`
+const deliveryColumns = `id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, run_id, task_id, source_run_id, kind, created_at`
 
 func scanDelivery(row interface{ Scan(...any) error }) (DeliveryRecord, error) {
 	var r DeliveryRecord
 	var created string
-	err := row.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &r.ChainID, &r.RunID, &created)
+	err := row.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &r.ChainID, &r.RunID, &r.TaskID, &r.SourceRunID, &r.Kind, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DeliveryRecord{}, ErrNotFound
 	}
@@ -214,6 +220,39 @@ func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit in
 }
 
 // SetDeliveryStatus transitions one delivery with optimistic state check.
+// ListDispatchableDeliveries preserves FIFO among eligible input. A waiting
+// question parks only related automatic work, so an unrelated user message
+// behind it is still allowed without implicitly answering that question.
+func ListDispatchableDeliveries(ctx context.Context, q Queryer, botID string, limit int) ([]DeliveryRecord, error) {
+	rows, err := q.QueryContext(ctx, `SELECT `+deliveryColumns+` FROM deliveries
+		WHERE target_bot_id = ? AND status = ? AND (
+		EXISTS (SELECT 1 FROM messages m WHERE m.id = deliveries.message_id AND m.kind = ?) OR
+		NOT EXISTS (SELECT 1 FROM questions q WHERE q.status = 'open' AND (
+		(q.task_id = '' AND q.requester_bot_id = deliveries.target_bot_id) OR
+		(deliveries.task_id != '' AND q.task_id = deliveries.task_id))))
+		ORDER BY created_at ASC,id ASC LIMIT ?`, botID, domain.DeliveryQueued, domain.MessageKindUser, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DeliveryRecord
+	for rows.Next() {
+		r, err := scanDelivery(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func HasBlockingQuestion(ctx context.Context, q Queryer, botID, taskID string) (bool, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE status = 'open' AND
+		((task_id = '' AND requester_bot_id = ?) OR (? != '' AND task_id = ?))`, botID, taskID, taskID).Scan(&n)
+	return n > 0, err
+}
+
 func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?`,
 		status, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {

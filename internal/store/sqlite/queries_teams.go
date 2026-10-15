@@ -453,6 +453,7 @@ func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error)
 // OpenWorkCounts is the "unfinished work" census that gates archive and
 // delete decisions (B08/B09).
 type OpenWorkCounts struct {
+	OpenQuestions    int64 `json:"openQuestions"`
 	ActiveRuns       int64 `json:"activeRuns"`
 	PendingApprovals int64 `json:"pendingApprovals"`
 	OfferedTransfers int64 `json:"offeredTransfers"`
@@ -468,11 +469,12 @@ func TeamOpenWork(ctx context.Context, q Queryer, teamID string) (OpenWorkCounts
 		(SELECT COUNT(*) FROM approvals WHERE team_id = ? AND request_state = 'pending'),
 		(SELECT COUNT(*) FROM transfers t JOIN tasks k ON k.id = t.task_id WHERE k.team_id = ? AND t.status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE team_id = ? AND status NOT IN ('done', 'cancelled')),
-		(SELECT COUNT(*) FROM deliveries WHERE team_id = ? AND status IN (?, ?))`,
+		(SELECT COUNT(*) FROM deliveries WHERE team_id = ? AND status IN (?, ?)),
+        (SELECT COUNT(*) FROM questions WHERE team_id = ? AND status = 'open')`,
 		teamID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
 		teamID, teamID, teamID, teamID,
-		domain.DeliveryQueued, domain.DeliveryWaitingDependency).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries)
+		domain.DeliveryQueued, domain.DeliveryWaitingDependency, teamID).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}
@@ -487,11 +489,12 @@ func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, 
 		(SELECT COUNT(*) FROM approvals WHERE requester_bot_id = ? AND request_state = 'pending'),
 		(SELECT COUNT(*) FROM transfers WHERE (from_bot_id = ? OR to_bot_id = ?) AND status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND status NOT IN ('done', 'cancelled')),
-		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?))`,
+		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?)),
+        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open')`,
 		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
 		botID, botID, botID, botID,
-		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries)
+		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}

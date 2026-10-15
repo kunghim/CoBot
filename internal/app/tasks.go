@@ -221,7 +221,7 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 	}
 	return sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: task.TeamID,
-		TargetBotID: task.OwnerID, Status: status, ChainID: chainID,
+		TargetBotID: task.OwnerID, Status: status, ChainID: chainID, TaskID: task.ID, Kind: "task_assignment",
 	})
 }
 
@@ -248,6 +248,9 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	}
 	if expectedRevision > 0 && task.Revision != expectedRevision {
 		return domain.Task{}, domain.RevisionConflict("error.task.revision_conflict", map[string]any{"expected": expectedRevision, "actual": task.Revision})
+	}
+	if task.Status == domain.TaskDone || task.Status == domain.TaskCancelled {
+		return domain.Task{}, domain.Conflict("error.task.terminal", nil)
 	}
 	if task.OwnerID == newOwnerID {
 		return task, nil
@@ -312,6 +315,9 @@ func (a *App) cancelUndeliveriesForTaskLocked(ctx context.Context, tx *sql.Tx, t
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				return err
 			}
+			if err := sqlite.SetMessageDeliveryStatus(ctx, tx, delivery.MessageID, domain.DeliveryCancelled); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -338,64 +344,85 @@ func (a *App) assertOwnerRunEnded(ctx context.Context, ownerID, taskID string) e
 // done requires evidence, review requires evidence, and only the owner moves
 // doing/review; captain or user may cancel.
 func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64) (domain.Task, error) {
-	task, err := sqlite.GetTask(ctx, a.DB, taskID)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	defer tx.Rollback()
+	task, err := sqlite.GetTask(ctx, tx, taskID)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
 	}
-	if expectedRevision > 0 && task.Revision != expectedRevision {
-		return domain.Task{}, domain.RevisionConflict("error.task.revision_conflict", map[string]any{"expected": expectedRevision, "actual": task.Revision})
-	}
-	if err := a.authorizeTaskWrite(ctx, principal, task, status); err != nil {
+	if err := a.authorizeTaskWrite(ctx, tx, principal, task, status); err != nil {
 		return domain.Task{}, err
 	}
-	// Cancelling is the captain's or the user's call; the owner does its own
-	// work but never silently kills the task (review B16, plan 3.4).
-	if status == domain.TaskCancelled && principal.Kind == auth.KindBot {
-		isLeader, lerr := a.isLeaderOf(ctx, task.TeamID, principal.BotID)
-		if lerr != nil {
-			return domain.Task{}, lerr
-		}
-		if !isLeader {
-			return domain.Task{}, domain.Forbidden("error.task.cancel_captain_only", nil)
-		}
+	if status == domain.TaskDone {
+		return domain.Task{}, domain.InvalidRequest("error.task.done_needs_confirmation", nil)
 	}
-	switch status {
-	case domain.TaskDoing, domain.TaskReview:
-		has, err := sqlite.HasEvidence(ctx, a.DB, task.ID)
+	if !validTaskTransition(task.Status, status) {
+		return domain.Task{}, domain.InvalidRequest("error.task.invalid_transition", map[string]any{"from": task.Status, "to": status})
+	}
+	if status == domain.TaskReview {
+		has, err := sqlite.HasEvidence(ctx, tx, task.ID)
 		if err != nil {
 			return domain.Task{}, err
 		}
-		if status == domain.TaskReview && !has {
+		if !has {
 			return domain.Task{}, domain.InvalidRequest("error.task.review_needs_evidence", nil)
 		}
-	case domain.TaskDone:
-		// done only through confirm, which checks evidence and the confirmer.
-		return domain.Task{}, domain.InvalidRequest("error.task.done_needs_confirmation", nil)
 	}
-	updated, err := sqlite.UpdateTaskStatus(ctx, a.DB, task.ID, status, blockedReason, expectedRevision)
+	updated, err := sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, status, blockedReason, expectedRevision)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
 	}
+	if status == domain.TaskCancelled {
+		if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, ""); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Task{}, err
+	}
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: updated.Revision})
 	a.Hub.Publish()
+	if a.Scheduler != nil {
+		a.Scheduler.Wake(task.OwnerID)
+	}
 	return updated, nil
+}
+
+func validTaskTransition(from, to string) bool {
+	switch from {
+	case domain.TaskTodo:
+		return to == domain.TaskTodo || to == domain.TaskDoing || to == domain.TaskCancelled
+	case domain.TaskDoing:
+		return to == domain.TaskDoing || to == domain.TaskReview || to == domain.TaskCancelled
+	case domain.TaskReview:
+		return to == domain.TaskReview || to == domain.TaskDoing || to == domain.TaskCancelled
+	default:
+		return false
+	}
 }
 
 // authorizeTaskWrite enforces the background permission rules; the UI never
 // decides.
-func (a *App) authorizeTaskWrite(ctx context.Context, principal auth.Principal, task domain.Task, newStatus string) error {
+func (a *App) authorizeTaskWrite(ctx context.Context, q sqlite.Queryer, principal auth.Principal, task domain.Task, newStatus string) error {
 	switch principal.Kind {
 	case auth.KindUser:
 		return nil
 	case auth.KindBot:
-		isLeader, err := a.isLeaderOf(ctx, task.TeamID, principal.BotID)
+		team, _, err := sqlite.GetTeam(ctx, q, task.TeamID)
+		isLeader := team.LeaderID == principal.BotID
 		if err != nil {
 			return err
 		}
 		if isLeader {
 			return nil
 		}
-		if principal.BotID != task.OwnerID {
+		if newStatus == domain.TaskCancelled {
+			return domain.Forbidden("error.task.cancel_captain_only", nil)
+		}
+		if principal.TeamID != task.TeamID || principal.BotID != task.OwnerID {
 			return domain.Forbidden("error.task.owner_only", nil)
 		}
 		return nil
@@ -453,14 +480,20 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 // ConfirmTask moves a task to done; the captain or the user confirms against
 // matching evidence. A chat message never does this by itself.
 func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error) {
-	task, err := sqlite.GetTask(ctx, a.DB, taskID)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	defer tx.Rollback()
+	task, err := sqlite.GetTask(ctx, tx, taskID)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
 	}
 	switch principal.Kind {
 	case auth.KindUser:
 	case auth.KindBot:
-		isLeader, err := a.isLeaderOf(ctx, task.TeamID, principal.BotID)
+		team, _, err := sqlite.GetTeam(ctx, tx, task.TeamID)
+		isLeader := team.LeaderID == principal.BotID
 		if err != nil {
 			return domain.Task{}, sqlite.NormalizeError(err)
 		}
@@ -473,7 +506,7 @@ func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID 
 	if task.Status != domain.TaskReview {
 		return domain.Task{}, domain.InvalidRequest("error.task.confirm_needs_review", map[string]any{"status": task.Status})
 	}
-	evidence, err := sqlite.ListEvidence(ctx, a.DB, task.ID)
+	evidence, err := sqlite.ListEvidence(ctx, tx, task.ID)
 	if err != nil {
 		return domain.Task{}, err
 	}
@@ -491,59 +524,56 @@ func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID 
 			}
 		}
 	}
-	updated, err := sqlite.UpdateTaskStatus(ctx, a.DB, task.ID, domain.TaskDone, "", expectedRevision)
+	updated, err := sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, domain.TaskDone, "", expectedRevision)
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: updated.Revision})
-	a.Hub.Publish()
-	// A done task may release dependents that were waiting on it.
-	if err := a.activateDependentDeliveries(ctx, task.ID); err != nil {
-		a.Logger.Warn("activate dependents failed", "taskId", task.ID, "error", err)
+	activated, err := a.activateDependentDeliveriesLocked(ctx, tx, task.ID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Task{}, err
+	}
+	a.recordTaskUpdated(ctx, updated)
+	for _, dependent := range activated {
+		a.recordTaskUpdated(ctx, dependent)
+		if a.Scheduler != nil {
+			a.Scheduler.Wake(dependent.OwnerID)
+		}
 	}
 	return updated, nil
 }
 
-// activateDependentDeliveries promotes waiting_dependency deliveries whose
-// dependencies are now all done.
-func (a *App) activateDependentDeliveries(ctx context.Context, doneTaskID string) error {
-	dependentIDs, err := sqlite.ListDependentTasks(ctx, a.DB, doneTaskID)
+// Completion and dependent activation commit together, so a restart cannot
+// leave a done dependency with permanently parked successor deliveries.
+func (a *App) activateDependentDeliveriesLocked(ctx context.Context, tx *sql.Tx, doneTaskID string) ([]domain.Task, error) {
+	ids, err := sqlite.ListDependentTasks(ctx, tx, doneTaskID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for _, taskID := range dependentIDs {
-		ready, err := a.dependenciesSatisfied(ctx, a.DB, taskID)
+	var activated []domain.Task
+	for _, id := range ids {
+		task, err := sqlite.GetTask(ctx, tx, id)
 		if err != nil {
-			return err
-		}
-		if !ready {
-			continue
-		}
-		task, err := sqlite.GetTask(ctx, a.DB, taskID)
-		if err != nil {
-			return err
+			return nil, err
 		}
 		if task.Status != domain.TaskTodo {
 			continue
 		}
-		tx, err := a.DB.BeginTx(ctx, nil)
+		ready, err := a.dependenciesSatisfied(ctx, tx, id)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if err := sqlite.ActivateWaitingDeliveries(ctx, tx, task.ID, task.OwnerID); err != nil {
-			tx.Rollback()
-			return err
+		if !ready {
+			continue
 		}
-		if err := tx.Commit(); err != nil {
-			return err
+		if err := sqlite.ActivateWaitingDeliveries(ctx, tx, id, task.OwnerID); err != nil {
+			return nil, err
 		}
-		_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: task.Revision})
-		if a.Scheduler != nil {
-			a.Scheduler.Wake(task.OwnerID)
-		}
+		activated = append(activated, task)
 	}
-	a.Hub.Publish()
-	return nil
+	return activated, nil
 }
 
 // ListTasks projects a team's tasks; the caller decides the owner scope.

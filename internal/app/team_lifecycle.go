@@ -23,7 +23,7 @@ func openWorkError(scope string, c sqlite.OpenWorkCounts) error {
 	return domain.Conflict("error."+scope+".open_work", map[string]any{
 		"activeRuns": c.ActiveRuns, "pendingApprovals": c.PendingApprovals,
 		"offeredTransfers": c.OfferedTransfers, "openTasks": c.OpenTasks,
-		"queuedDeliveries": c.QueuedDeliveries,
+		"queuedDeliveries": c.QueuedDeliveries, "openQuestions": c.OpenQuestions,
 	})
 }
 
@@ -74,12 +74,27 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err != nil {
 		return domain.Team{}, err
 	}
-	if work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 {
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 {
 		return domain.Team{}, openWorkError("team", work)
 	}
-	archived, err := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusArchived, "", expectedRevision)
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	work, err = sqlite.TeamOpenWork(ctx, tx, teamID)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 {
+		return domain.Team{}, openWorkError("team", work)
+	}
+	archived, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusArchived, "", expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
 	}
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamArchived, TeamID: teamID, ResourceID: teamID, Revision: archived.Revision})
 	a.Hub.Publish()
@@ -136,7 +151,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if err != nil {
 		return domain.Team{}, err
 	}
-	if work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
 		return domain.Team{}, openWorkError("team", work)
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -152,7 +167,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if err != nil {
 		return domain.Team{}, err
 	}
-	if work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
 		return domain.Team{}, openWorkError("team", work)
 	}
 	if _, err := sqlite.CancelQueuedDeliveriesByTeam(ctx, tx, teamID, ""); err != nil {
@@ -201,7 +216,7 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 	if err != nil {
 		return domain.Bot{}, err
 	}
-	if work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
 		return domain.Bot{}, openWorkError("bot", work)
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -209,6 +224,13 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 		return domain.Bot{}, err
 	}
 	defer tx.Rollback()
+	work, err = sqlite.BotOpenWork(ctx, tx, botID)
+	if err != nil {
+		return domain.Bot{}, err
+	}
+	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+		return domain.Bot{}, openWorkError("bot", work)
+	}
 	if _, err := sqlite.CancelQueuedDeliveriesByTeam(ctx, tx, bot.TeamID, botID); err != nil {
 		return domain.Bot{}, err
 	}

@@ -64,7 +64,7 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 	}
 	if in.RequestID != "" {
 		if existing, err := sqlite.FindMessageByRequestID(ctx, a.DB, team.ID, in.RequestID); err == nil {
-			if hashBlocks(existing.Blocks) != hashBlocks(blocks) {
+			if existing.BotID != bot.ID || existing.Kind != domain.MessageKindUser || hashBlocks(existing.Blocks) != hashBlocks(blocks) {
 				return SendMessageResult{}, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": in.RequestID})
 			}
 			queued, _ := sqlite.CountQueuedDeliveries(ctx, a.DB, bot.ID)

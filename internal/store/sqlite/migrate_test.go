@@ -4,11 +4,108 @@ import (
 	"context"
 	"io/fs"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/testutil"
 )
+
+func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open(filepath.Join(dir, "v7.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldSource := map[string]string{}
+	for _, path := range files {
+		name := strings.TrimPrefix(path, "migrations/")
+		if name < "00008" {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldSource[name] = string(raw)
+		}
+	}
+	old, err := NewMigratorWithFS(db, testutil.NewMapFS(oldSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	backups := filepath.Join(dir, "backups")
+	if err := old.MigrateToLatest(ctx, backups); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	team := domain.Team{ID: "team", Name: "kept team", LeaderID: "bot", ProfileInstance: "instance"}
+	bot := domain.Bot{ID: "bot", TeamID: team.ID, Name: "kept bot", RoleID: "leader", Status: domain.BotStatusIdle, IsLeader: true}
+	if err := InsertTeamStaged(ctx, tx, team, dir, dir, []domain.Bot{bot}); err != nil {
+		t.Fatal(err)
+	}
+	task := domain.Task{ID: "task", TeamID: team.ID, OwnerID: bot.ID, Title: "kept task", Status: domain.TaskTodo, Revision: 1}
+	if err := InsertTask(ctx, tx, task); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []domain.Message{
+		{ID: "assignment", TeamID: team.ID, BotID: bot.ID, Kind: domain.MessageKindSystem, RunID: task.ID, Blocks: []byte(`[]`)},
+		{ID: "answer", TeamID: team.ID, BotID: bot.ID, Kind: domain.MessageKindUser, RunID: "question", Blocks: []byte(`[]`)},
+		{ID: "ordinary", TeamID: team.ID, BotID: bot.ID, Kind: domain.MessageKindUser, RunID: task.ID, Blocks: []byte(`[]`)},
+	} {
+		if err := InsertMessage(ctx, tx, m); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO deliveries(id,message_id,team_id,target_bot_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, "d-"+m.ID, m.ID, team.ID, bot.ID, domain.DeliveryQueued, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := InsertQuestion(ctx, tx, domain.Question{ID: "question", TeamID: team.ID, RequesterBotID: bot.ID, TaskID: task.ID, Question: "kept question", Status: domain.QuestionAnswered, Revision: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE questions SET answer_message_id='answer' WHERE id='question'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	current, err := NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := current.MigrateToLatest(ctx, backups); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string][]string{"d-assignment": {"task", "task_assignment"}, "d-answer": {"task", "question_answer"}, "d-ordinary": {"", "message"}} {
+		delivery, err := GetDelivery(ctx, db, id)
+		if err != nil || delivery.TaskID != want[0] || delivery.Kind != want[1] {
+			t.Fatalf("backfill %s: %+v / %v", id, delivery, err)
+		}
+	}
+	snapshots, err := filepath.Glob(filepath.Join(backups, "cobot-v7-*.sqlite"))
+	if err != nil || len(snapshots) != 1 {
+		t.Fatal("missing consistent v7 backup", err)
+	}
+	backup, err := Open(snapshots[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backup.Close()
+	var count int
+	if err := backup.QueryRow(`SELECT count(*) FROM messages`).Scan(&count); err != nil || count != 3 {
+		t.Fatal("backup lost pre-upgrade business facts", err)
+	}
+}
 
 func TestMigrateFreshDatabase(t *testing.T) {
 	ctx := context.Background()

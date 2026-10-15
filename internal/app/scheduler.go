@@ -269,8 +269,33 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		return err
 	}
 
-	queue, err := sqlite.ListQueuedDeliveries(ctx, s.app.DB, botID, 1)
+	queue, err := sqlite.ListDispatchableDeliveries(ctx, s.app.DB, botID, 1)
 	if err != nil || len(queue) == 0 {
+		if err == nil {
+			var questions int
+			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'`, botID).Scan(&questions); e != nil {
+				return e
+			}
+			queued, e := sqlite.CountQueuedDeliveries(ctx, s.app.DB, botID)
+			if e != nil {
+				return e
+			}
+			state := domain.BotStatusIdle
+			if questions > 0 || queued > 0 {
+				state = domain.BotStatusWaitingInput
+			}
+			if bot.Status != state {
+				tx, e := s.app.DB.BeginTx(ctx, nil)
+				if e != nil {
+					return e
+				}
+				defer tx.Rollback()
+				if e := sqlite.SetBotRunState(ctx, tx, botID, state, ""); e != nil {
+					return e
+				}
+				return tx.Commit()
+			}
+		}
 		return err
 	}
 	record := queue[0]
@@ -315,6 +340,51 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		tx.Rollback()
 		return nil
 	}
+	if _, err := sqlite.GetBot(ctx, tx, botID); err != nil {
+		tx.Rollback()
+		if errors.Is(err, sqlite.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	message, err := sqlite.GetMessage(ctx, tx, record.MessageID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	if delivery.TaskID != "" {
+		task, err := sqlite.GetTask(ctx, tx, delivery.TaskID)
+		if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
+			tx.Rollback()
+			return err
+		}
+		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
+			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
+				tx.Rollback()
+				return err
+			}
+			if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryCancelled); err != nil {
+				tx.Rollback()
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
+			s.Wake(botID)
+			return nil
+		}
+	}
+	if message.Kind != domain.MessageKindUser {
+		blocked, err := sqlite.HasBlockingQuestion(ctx, tx, botID, delivery.TaskID)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if blocked {
+			tx.Rollback()
+			return nil
+		}
+	}
 	// The chain budget is evaluated in the same transaction as the claim:
 	// counting a wake and becoming eligible to run are one decision, so a
 	// crash between them can neither lose nor double-count a wake.
@@ -356,11 +426,6 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		}
 		s.app.Hub.Publish()
 		return nil // waiting on a user decision, or cancelled by the gate
-	}
-	message, err := sqlite.GetMessage(ctx, tx, record.MessageID)
-	if err != nil {
-		tx.Rollback()
-		return err
 	}
 	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryDispatching); err != nil {
 		tx.Rollback()
@@ -406,10 +471,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// The context is rebuilt on every dispatch so the bot sees the current
 	// team, member list and task instead of trusting a stale model memory.
 	// A task-assignment message carries its task id in run_id.
-	taskID := ""
-	if message.Kind == domain.MessageKindSystem {
-		taskID = message.RunID
-	}
+	taskID := delivery.TaskID
 	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + message.RenderText()
 	s.app.TouchLease(ctx, bot.ID)
 	turnID, err := server.StartTurn(ctx, threadID, input, settings.DefaultModel)

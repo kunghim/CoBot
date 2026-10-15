@@ -56,6 +56,9 @@ func (a *App) AskUser(ctx context.Context, principal auth.Principal, in AskUserI
 		return domain.Question{}, err
 	}
 	defer tx.Rollback()
+	if _, err := sqlite.GetBot(ctx, tx, bot.ID); err != nil {
+		return domain.Question{}, sqlite.NormalizeError(err)
+	}
 	if err := sqlite.InsertQuestion(ctx, tx, item); err != nil {
 		return domain.Question{}, err
 	}
@@ -115,6 +118,7 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: question.TeamID,
 		TargetBotID: question.RequesterBotID, Status: domain.DeliveryQueued, ChainID: chain.ID,
+		TaskID: question.TaskID, Kind: "question_answer",
 	}); err != nil {
 		return domain.Question{}, err
 	}
@@ -134,9 +138,7 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventQuestionAnswered, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: question.ID})
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventMessageCreated, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: message.ID})
 	a.Hub.Publish()
-	if a.Scheduler != nil {
-		a.Scheduler.Wake(question.RequesterBotID)
-	}
+	a.wakeQuestionWork(ctx, question)
 	return answered, nil
 }
 
@@ -182,5 +184,21 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	}
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventQuestionAnswered, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: question.ID})
 	a.Hub.Publish()
+	a.wakeQuestionWork(ctx, question)
 	return sqlite.GetQuestion(ctx, a.DB, questionID)
+}
+
+func (a *App) wakeQuestionWork(ctx context.Context, question domain.Question) {
+	if a.Scheduler == nil {
+		return
+	}
+	if question.TaskID == "" {
+		a.Scheduler.Wake(question.RequesterBotID)
+		return
+	}
+	if bots, err := sqlite.ListBots(ctx, a.DB, question.TeamID); err == nil {
+		for _, bot := range bots {
+			a.Scheduler.Wake(bot.ID)
+		}
+	}
 }
