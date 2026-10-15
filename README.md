@@ -35,7 +35,7 @@ go build -o .tmp/bin/cobot ./cmd/cobot
 # 同 profile 重复启动不会开第二个调度器：报告已运行实例并打印新的授权链接
 ```
 
-测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）；`cd tests/e2e && npx playwright test`（浏览器 E2E：真实核心 + 假引擎，5 条）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
+测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）；`cd tests/e2e && npx playwright test`（浏览器 E2E：真实核心 + 假引擎，5 个 spec 文件共 6 条）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
 
 其他子命令：`cobot mcp`（引擎拉起的单成员 MCP stdio 桥，环境变量见 `internal/collaboration`）；`cobot hook`（stdin JSON 的 hook 适配器，只执行团队 `.cobot/hooks.json` 显式配置的命令，副作用先过本地租约）。
 
@@ -77,7 +77,7 @@ Go 1.25、React 18 + TypeScript + Vite 6、TanStack Query、Tailwind CSS 4、i18
 
 | 平台/形态 | 状态 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 · 本机 Web 核心 | 已验证 | 开发与全部验收在此完成：`scripts/check.ps1`、Go 单元/集成、5 条浏览器 E2E |
+| Windows 10/11 x64 · 本机 Web 核心 | 已验证 | 开发与全部验收在此完成：`scripts/check.ps1`、Go 单元/集成、6 条浏览器 E2E |
 | Windows · 独立 server 发行物 | 已构建校验 | `scripts/build.ps1 -Target server` 产出单文件（内嵌前端/迁移/角色），附 sha256 |
 | Windows · 桌面壳（Wails/WebView2） | 待测 | 代码保留且随构建编译；原生运行/安装未验证 |
 | macOS（Web 核心 / 桌面壳） | 待测 | 无法在本机验证；未做签名与公证 |
