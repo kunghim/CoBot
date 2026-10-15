@@ -92,9 +92,15 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 		}
 		return SendMessageResult{}, err
 	}
+	// A user message opens a new causal chain (G02). It never clears a chain
+	// that is still running; that one keeps its own budget.
+	chain, err := a.openChainLocked(ctx, tx, team.ID, message.ID, "")
+	if err != nil {
+		return SendMessageResult{}, err
+	}
 	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: deliveryID, MessageID: message.ID, TeamID: team.ID,
-		TargetBotID: bot.ID, Status: domain.DeliveryQueued,
+		TargetBotID: bot.ID, Status: domain.DeliveryQueued, ChainID: chain.ID,
 	}); err != nil {
 		return SendMessageResult{}, err
 	}

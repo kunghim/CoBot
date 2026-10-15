@@ -157,7 +157,7 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready); err != nil {
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, ""); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -193,8 +193,10 @@ func (a *App) dependenciesSatisfied(ctx context.Context, q sqlite.Queryer, taskI
 
 // enqueueAssignmentLocked creates the one task-assignment delivery for an
 // owner inside the caller's transaction. The status reflects whether the
-// dependencies allow the bot to start.
-func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task domain.Task, ready bool) error {
+// dependencies allow the bot to start. chainID carries the causal chain this
+// assignment belongs to: a hand-over continues the chain that produced the
+// work, while a fresh user-directed assignment carries none.
+func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task domain.Task, ready bool, chainID string) error {
 	status := domain.DeliveryQueued
 	if !ready {
 		status = domain.DeliveryWaitingDependency
@@ -213,7 +215,7 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 	}
 	return sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: task.TeamID,
-		TargetBotID: task.OwnerID, Status: status,
+		TargetBotID: task.OwnerID, Status: status, ChainID: chainID,
 	})
 }
 
@@ -269,7 +271,7 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready); err != nil {
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, ""); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {

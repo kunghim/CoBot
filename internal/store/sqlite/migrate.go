@@ -23,7 +23,7 @@ func Migrations() fs.FS { return migrationsFS }
 
 // MaxSupportedVersion is the highest migration this build understands. A
 // database ahead of it must be refused instead of silently downgraded.
-const MaxSupportedVersion = 3
+const MaxSupportedVersion = 4
 
 // Migrator wraps the goose provider bound to the product connection.
 type Migrator struct {

@@ -122,7 +122,13 @@ func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, tran
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready); err != nil {
+	// The hand-over wake belongs to the chain that produced the work, so a
+	// long task cannot reset its budget simply by changing hands.
+	chainID, err := sqlite.ChainOfTask(ctx, tx, task.ID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {

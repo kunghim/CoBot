@@ -80,9 +80,20 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 		}
 		return nil, err
 	}
+	// The wake this causes belongs to the causal chain the sender is working
+	// in. The lookup runs on the caller's transaction: the pool is a single
+	// connection, so a query on a.DB from inside an open tx would deadlock.
+	chainID := chainOfRunLocked(ctx, tx, source.ID)
+	if chainID == "" {
+		chain, cerr := a.openChainLocked(ctx, tx, source.TeamID, message.ID, source.ID)
+		if cerr != nil {
+			return nil, cerr
+		}
+		chainID = chain.ID
+	}
 	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: source.TeamID,
-		TargetBotID: target.ID, Status: domain.DeliveryQueued,
+		TargetBotID: target.ID, Status: domain.DeliveryQueued, ChainID: chainID,
 	}); err != nil {
 		return nil, err
 	}

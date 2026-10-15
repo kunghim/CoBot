@@ -95,7 +95,8 @@
       "collaboration": "Collaboration confirmation",
       "recruitment": "Recruitment confirmation",
       "recovery": "Recovery",
-      "merge": "Merge confirmation"
+      "merge": "Merge confirmation",
+      "chain": "Chain confirmation"
     },
     "requester": "Requested by: {{name}}",
     "reason": "Reason",
@@ -125,6 +126,8 @@
       "allow_thread_session": "Always allow (this thread session)",
       "decline": "Decline",
       "permissions.deny": "Deny",
+      "chain_continue": "Continue",
+      "chain_stop": "Stop this chain",
       "unknown": "Unknown option"
     }
   },
@@ -359,6 +362,7 @@
     "error.transfer.not_offered": "This transfer is {{status}} and cannot be accepted",
     "error.transfer.owner_changed": "The task owner changed, so the transfer is stale",
     "error.transfer.task_changed": "The task changed, so the transfer is stale",
-    "error.transfer.already_offered": "This task already has a pending transfer"
+    "error.transfer.already_offered": "This task already has a pending transfer",
+    "error.chain.binding_missing": "This chain confirmation is missing its chain binding; refresh and retry"
   }
 }

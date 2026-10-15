@@ -95,7 +95,8 @@
       "collaboration": "协作确认",
       "recruitment": "招募确认",
       "recovery": "中断恢复",
-      "merge": "合并确认"
+      "merge": "合并确认",
+      "chain": "协作链确认"
     },
     "requester": "发起者：{{name}}",
     "reason": "理由",
@@ -125,6 +126,8 @@
       "allow_thread_session": "总是允许（本线程会话）",
       "decline": "拒绝",
       "permissions.deny": "拒绝",
+      "chain_continue": "继续推进",
+      "chain_stop": "停止该链",
       "unknown": "未知选项"
     }
   },
@@ -359,6 +362,7 @@
     "error.transfer.not_offered": "该转交当前状态为 {{status}}，无法接受",
     "error.transfer.owner_changed": "任务负责人已变更，转交已失效",
     "error.transfer.task_changed": "任务已被修改，转交已失效",
-    "error.transfer.already_offered": "该任务已有进行中的转交"
+    "error.transfer.already_offered": "该任务已有进行中的转交",
+    "error.chain.binding_missing": "协作链确认缺少链信息，请刷新后重试"
   }
 }

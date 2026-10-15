@@ -171,9 +171,40 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		tx.Rollback()
 		return nil // cancelled meanwhile
 	}
-	if err := sqlite.SetDeliveryStatus(ctx, tx, record.ID, domain.DeliveryDispatching); err != nil {
+	// The chain budget is evaluated in the same transaction as the claim:
+	// counting a wake and becoming eligible to run are one decision, so a
+	// crash between them can neither lose nor double-count a wake.
+	gate, action, chainEvents, err := s.app.EvaluateChainGate(ctx, tx, delivery)
+	if err != nil {
 		tx.Rollback()
 		return err
+	}
+	if gate != ChainGateAllowed {
+		// The claim is abandoned, so anything the gate decided must survive
+		// (the confirmation card, the stopped-chain sweep) is written in its
+		// own transaction — inside the claim it would be rolled back along
+		// with the claim, and the gate would ask again on every wake.
+		tx.Rollback()
+		if action != ChainActionNone {
+			wtx, werr := s.app.DB.BeginTx(ctx, nil)
+			if werr != nil {
+				return werr
+			}
+			evs, perr := s.app.PersistChainAction(ctx, wtx, action, delivery)
+			if perr != nil {
+				wtx.Rollback()
+				return perr
+			}
+			if cerr := wtx.Commit(); cerr != nil {
+				return cerr
+			}
+			chainEvents = append(chainEvents, evs...)
+		}
+		for _, ev := range chainEvents {
+			s.app.recordEvent(ctx, ev)
+		}
+		s.app.Hub.Publish()
+		return nil // waiting on a user decision, or cancelled by the gate
 	}
 	message, err := sqlite.GetMessage(ctx, tx, record.MessageID)
 	if err != nil {
@@ -185,6 +216,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		return err
 	}
 	if err := sqlite.InsertRun(ctx, tx, run); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := sqlite.ClaimDeliveryRun(ctx, tx, record.ID, run.ID); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -237,6 +272,9 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return err
+	}
+	for _, ev := range chainEvents {
+		s.app.recordEvent(ctx, ev)
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: run.ID})
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: message.ID})

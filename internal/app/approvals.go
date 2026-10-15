@@ -77,6 +77,24 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 		return sqlite.GetApproval(ctx, a.DB, approvalID)
 	}
 
+	// A chain confirmation has a product side effect: continue grants exactly
+	// this chain one more wake when it was over limit, stop cancels this
+	// chain's undelivered work and interrupts its executions. Neither one
+	// talks to an engine.
+	if approval.Type == domain.ApprovalChain {
+		if err := a.ApplyChainDecision(ctx, approval, optionID); err != nil {
+			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "chain_decision_failed")
+			a.publishApprovalUpdated(ctx, approval)
+			return domain.Approval{}, err
+		}
+		outcome := "chain_continued"
+		if optionID == domain.ChainOptionStop {
+			outcome = "chain_stopped"
+		}
+		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, outcome)
+		a.publishApprovalUpdated(ctx, approval)
+		return sqlite.GetApproval(ctx, a.DB, approvalID)
+	}
 	// A recruitment approval has a product side effect instead of an engine
 	// reply: only an approval creates the member, so a rejected or expired
 	// request never leaves a runnable bot behind.

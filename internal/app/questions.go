@@ -94,9 +94,15 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
 		return domain.Question{}, err
 	}
+	// The user's answer is fresh input, so it opens a new causal chain (G02)
+	// instead of spending the chain that asked the question.
+	chain, chainErr := a.openChainLocked(ctx, tx, question.TeamID, message.ID, "")
+	if chainErr != nil {
+		return domain.Question{}, chainErr
+	}
 	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: question.TeamID,
-		TargetBotID: question.RequesterBotID, Status: domain.DeliveryQueued,
+		TargetBotID: question.RequesterBotID, Status: domain.DeliveryQueued, ChainID: chain.ID,
 	}); err != nil {
 		return domain.Question{}, err
 	}

@@ -156,19 +156,38 @@ type DeliveryRecord struct {
 	TargetBotID string
 	Status      string
 	DispatchKey string
+	ChainID     string
+	RunID       string
 	CreatedAt   time.Time
 }
 
 // InsertDeliveryRow writes a delivery row.
 func InsertDeliveryRow(ctx context.Context, tx *sql.Tx, record DeliveryRecord) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := tx.ExecContext(ctx, `INSERT INTO deliveries (id, message_id, team_id, target_bot_id, status, dispatch_key, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		record.ID, record.MessageID, record.TeamID, record.TargetBotID, record.Status, record.DispatchKey, now, now)
+	_, err := tx.ExecContext(ctx, `INSERT INTO deliveries (id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		record.ID, record.MessageID, record.TeamID, record.TargetBotID, record.Status, record.DispatchKey, record.ChainID, now, now)
 	if err != nil {
 		return fmt.Errorf("insert delivery: %w", err)
 	}
 	return nil
+}
+
+// deliveryColumns is the shared projection of the deliveries table.
+const deliveryColumns = `id, message_id, team_id, target_bot_id, status, dispatch_key, chain_id, run_id, created_at`
+
+func scanDelivery(row interface{ Scan(...any) error }) (DeliveryRecord, error) {
+	var r DeliveryRecord
+	var created string
+	err := row.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &r.ChainID, &r.RunID, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DeliveryRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return DeliveryRecord{}, err
+	}
+	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	return r, nil
 }
 
 // ListQueuedDeliveries returns the FIFO queue of one bot.
@@ -176,7 +195,7 @@ func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit in
 	if limit <= 0 {
 		limit = 50
 	}
-	rows, err := q.QueryContext(ctx, `SELECT id, message_id, team_id, target_bot_id, status, dispatch_key, created_at
+	rows, err := q.QueryContext(ctx, `SELECT `+deliveryColumns+`
 		FROM deliveries WHERE target_bot_id = ? AND status = ? ORDER BY created_at ASC, id ASC LIMIT ?`,
 		botID, domain.DeliveryQueued, limit)
 	if err != nil {
@@ -185,12 +204,10 @@ func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit in
 	defer rows.Close()
 	var out []DeliveryRecord
 	for rows.Next() {
-		var r DeliveryRecord
-		var created string
-		if err := rows.Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &created); err != nil {
+		r, err := scanDelivery(rows)
+		if err != nil {
 			return nil, err
 		}
-		r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -207,18 +224,18 @@ func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error
 
 // GetDelivery reads one delivery.
 func GetDelivery(ctx context.Context, q Queryer, id string) (DeliveryRecord, error) {
-	var r DeliveryRecord
-	var created string
-	err := q.QueryRowContext(ctx, `SELECT id, message_id, team_id, target_bot_id, status, dispatch_key, created_at
-		FROM deliveries WHERE id = ?`, id).Scan(&r.ID, &r.MessageID, &r.TeamID, &r.TargetBotID, &r.Status, &r.DispatchKey, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return DeliveryRecord{}, ErrNotFound
+	return scanDelivery(q.QueryRowContext(ctx, `SELECT `+deliveryColumns+` FROM deliveries WHERE id = ?`, id))
+}
+
+// ClaimDeliveryRun links a claimed delivery to the run that will execute it
+// and moves it to dispatching. Chain attribution and later reconciliation both
+// read this link.
+func ClaimDeliveryRun(ctx context.Context, tx *sql.Tx, deliveryID, runID string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, run_id = ?, updated_at = ? WHERE id = ?`,
+		domain.DeliveryDispatching, runID, time.Now().UTC().Format(time.RFC3339Nano), deliveryID); err != nil {
+		return fmt.Errorf("claim delivery: %w", err)
 	}
-	if err != nil {
-		return DeliveryRecord{}, err
-	}
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-	return r, nil
+	return nil
 }
 
 // CountQueuedDeliveries counts a bot's queued items (busy indicator).
