@@ -737,11 +737,6 @@ type PatchTeamJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
-// RetryTeamJSONBody defines parameters for RetryTeam.
-type RetryTeamJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
-}
-
 // ListActivityParams defines parameters for ListActivity.
 type ListActivityParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -776,6 +771,11 @@ type RebuildTeamMarkerJSONBody struct {
 type RestoreTeamJSONBody struct {
 	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
 	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// RetryTeamJSONBody defines parameters for RetryTeam.
+type RetryTeamJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ListTasksParams defines parameters for ListTasks.
@@ -856,9 +856,6 @@ type CreateTeamJSONRequestBody CreateTeamJSONBody
 // PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
 type PatchTeamJSONRequestBody PatchTeamJSONBody
 
-// RetryTeamJSONRequestBody defines body for RetryTeam for application/json ContentType.
-type RetryTeamJSONRequestBody RetryTeamJSONBody
-
 // ArchiveTeamJSONRequestBody defines body for ArchiveTeam for application/json ContentType.
 type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
@@ -873,6 +870,9 @@ type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody
+
+// RetryTeamJSONRequestBody defines body for RetryTeam for application/json ContentType.
+type RetryTeamJSONRequestBody RetryTeamJSONBody
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest

@@ -289,12 +289,19 @@ func truncate(s string, max int) string {
 	return s[:max] + "…"
 }
 
-// onServerExit marks the team degraded: pending approvals of this epoch are
-// invalidated, active runs become unknown (not assumed stopped), and no
-// automatic restart happens.
-func (s *Scheduler) onServerExit(teamID string, err error) {
+// onServerExitRuntime marks the team degraded when THIS runtime dies: pending
+// approvals of its epoch are invalidated, active runs become unknown (not
+// assumed stopped), and no automatic restart happens. The runtime identity
+// check keeps a stale loser's exit (a raced EnsureTeamServer that lost, then
+// got shut down) from deleting the winner or invalidating the live
+// connection's cards (review B).
+func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err error) {
 	s.mu.Lock()
-	rt := s.teams[teamID]
+	if rt == nil || rt.server == nil || s.teams[teamID] != rt {
+		s.mu.Unlock()
+		s.logger.Warn("ignoring engine exit from a superseded runtime", "teamId", teamID, "error", err)
+		return
+	}
 	delete(s.teams, teamID)
 	s.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -326,7 +333,7 @@ func (s *Scheduler) onServerExit(teamID string, err error) {
 	// Pending approvals bound to the dead connection can never be answered
 	// from it; invalidate them now instead of leaving cards that only fail
 	// later (review B14, F04).
-	if rt != nil {
+	if rt != nil && rt.server != nil {
 		epoch := rt.server.Epoch()
 		// Collect this connection's pending cards first — the invalidate step
 		// removes them from the pending set — then expire their responses and

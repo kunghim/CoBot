@@ -64,6 +64,16 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	if principal.Kind != auth.KindUser {
 		return domain.Approval{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// An option this build deliberately no longer expresses (the disabled
+	// acceptForSession on a pre-upgrade card) cannot be answered: refuse
+	// BEFORE the CAS so the card keeps its state and nothing pretends a
+	// reply was sent (review B).
+	if optionID == "acceptForSession" {
+		pre, gerr := sqlite.GetApproval(ctx, a.DB, approvalID)
+		if gerr == nil && pre.Type == domain.ApprovalNativeTool {
+			return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", map[string]any{"optionId": optionID})
+		}
+	}
 	approval, err := sqlite.DecideApproval(ctx, a.DB, approvalID, optionID, comment, principal.UserID, expectedRevision)
 	if err != nil {
 		return domain.Approval{}, sqlite.NormalizeError(err)

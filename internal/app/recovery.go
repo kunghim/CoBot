@@ -39,9 +39,6 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(runs) == 0 && len(native) == 0 {
-		return nil // a clean first start stays quiet
-	}
 
 	var runIDs, approvalIDs []string
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -128,6 +125,9 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 			a.ResumeBudgetPausedBots(ctx)
 		}
 	}
+	if len(runs) == 0 && len(native) == 0 {
+		return nil // a clean first start stays quiet
+	}
 
 	// Events and per-approval projections happen after the transaction: the
 	// pool is a single connection.
@@ -172,7 +172,9 @@ func (a *App) replayStuckChainDecisions(ctx context.Context) error {
 			}
 			a.Logger.Warn("replaying a chain decision whose side effect was interrupted", "chainId", chain.ID, "option", card.Decision.OptionID)
 			if err := a.ApplyChainDecision(ctx, card, card.Decision.OptionID); err != nil {
-				return err
+				// One bad card must not brick startup: report it, leave the
+				// chain in its current state for a human, keep reconciling.
+				a.Logger.Error("chain decision replay failed", "chainId", chain.ID, "error", err)
 			}
 			break
 		}

@@ -62,19 +62,22 @@ type Scheduler struct {
 	// booked to the team as risk_eval.
 	evalMu sync.Mutex
 	evals  map[string]*riskEval
+	// leaseDone is closed when the lease loop exits, so Stop joins it.
+	leaseDone chan struct{}
 }
 
 // NewScheduler creates a scheduler bound to one app.
 func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 	return &Scheduler{
-		app:     a,
-		factory: factory,
-		logger:  a.Logger,
-		teams:   map[string]*teamRuntime{},
-		evals:   map[string]*riskEval{},
-		wake:    make(chan string, 256),
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		app:       a,
+		factory:   factory,
+		logger:    a.Logger,
+		teams:     map[string]*teamRuntime{},
+		evals:     map[string]*riskEval{},
+		leaseDone: make(chan struct{}),
+		wake:      make(chan string, 256),
+		stop:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}
 }
 
@@ -95,6 +98,7 @@ func (s *Scheduler) Start() {
 		}
 	}()
 	go func() {
+		defer close(s.leaseDone)
 		leaseTicker := time.NewTicker(platform.LeaseInterval)
 		defer leaseTicker.Stop()
 		for {
@@ -112,6 +116,9 @@ func (s *Scheduler) Start() {
 func (s *Scheduler) Stop(ctx context.Context) error {
 	s.stopOnce.Do(func() { close(s.stop) })
 	<-s.done
+	// Both loops must be gone before the caller closes the database: a late
+	// lease write racing DB.Close would be swallowed or worse (review B).
+	<-s.leaseDone
 	s.mu.Lock()
 	teams := s.teams
 	s.teams = map[string]*teamRuntime{}
@@ -437,7 +444,7 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 			OnApproval:     func(req engine.ApprovalRequest) { s.onApproval(teamID, req) },
 			OnNotification: func(n engine.Notification) { s.onNotification(teamID, n) },
 			OnExit: func(err error) {
-				s.onServerExit(teamID, err)
+				s.onServerExitRuntime(teamID, rt, err)
 			},
 		},
 	})

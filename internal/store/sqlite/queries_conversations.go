@@ -317,16 +317,22 @@ func FindActiveRun(ctx context.Context, q Queryer, botID string) (domain.Run, er
 
 // ---- approvals ----
 
-// InsertApproval stores a pending approval request.
+// InsertApproval stores an approval request. The state defaults to pending;
+// callers that seed an already-decided record (crash-window tests) may pass
+// it explicitly instead.
 func InsertApproval(ctx context.Context, tx *sql.Tx, a domain.Approval) error {
 	options, err := jsonMarshal(a.Options)
 	if err != nil {
 		return err
 	}
+	state := a.RequestState
+	if state == "" {
+		state = domain.ApprovalStatePending
+	}
 	created := a.CreatedAt.UTC().Format(time.RFC3339Nano)
 	_, err = tx.ExecContext(ctx, `INSERT INTO approvals (id, team_id, requester_bot_id, run_id, engine_request_id, engine_epoch, type, method, summary, reason, options, request_state, created_at, revision)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.TeamID, a.RequesterBotID, a.RunID, string(a.EngineRequestID), a.EngineEpoch, a.Type, a.Method, a.Summary, a.Reason, string(options), domain.ApprovalStatePending, created, a.Revision)
+		a.ID, a.TeamID, a.RequesterBotID, a.RunID, string(a.EngineRequestID), a.EngineEpoch, a.Type, a.Method, a.Summary, a.Reason, string(options), state, created, a.Revision)
 	if err != nil {
 		return fmt.Errorf("insert approval: %w", err)
 	}

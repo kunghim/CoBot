@@ -237,14 +237,30 @@ export interface paths {
         /** One team with members */
         get: operations["getTeam"];
         put?: never;
-        /** Retry a team whose staged creation failed */
-        post: operations["retryTeam"];
+        post?: never;
         /** Soft-delete an archived team with no unfinished work; user files are never touched */
         delete: operations["deleteTeam"];
         options?: never;
         head?: never;
         /** Rename a team */
         patch: operations["patchTeam"];
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a team whose staged creation failed */
+        post: operations["retryTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/teams/{id}/archive": {
@@ -1551,39 +1567,6 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
-    retryTeam: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Retried team */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Team"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
     deleteTeam: {
         parameters: {
             query?: {
@@ -1645,6 +1628,39 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             404: components["responses"]["Error"];
+        };
+    };
+    retryTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Retried team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Team"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     archiveTeam: {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
@@ -24,8 +25,16 @@ func (a *App) WriteReplaySave(ctx context.Context, scope, principal, key, argsHa
 	defer tx.Rollback()
 	if err := sqlite.SaveIdempotency(ctx, tx, scope, principal, key, argsHash, response); err != nil {
 		if isUniqueViolation(err) {
+			// A concurrent identical call saved first; its copy answers both.
+			_ = tx.Rollback()
 			return nil
 		}
+		return err
+	}
+	// Bound the table: replay rows older than the retry horizon are dead
+	// weight (review B: the table must not grow forever).
+	cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `DELETE FROM idempotency WHERE created_at < ?`, cutoff); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -51,13 +51,19 @@ func GetChain(ctx context.Context, q Queryer, id string) (domain.Chain, error) {
 	return scanChain(q.QueryRowContext(ctx, `SELECT `+chainColumns+` FROM chains WHERE id = ?`, id))
 }
 
-// ListChains pages a team's chains, newest first.
+// ListChains pages a team's chains, newest first. An empty teamID means
+// every team (the startup replay needs a profile-wide view); status filters
+// on top of either scope.
 func ListChains(ctx context.Context, q Queryer, teamID, status string, limit int) ([]domain.Chain, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	query := `SELECT ` + chainColumns + ` FROM chains WHERE team_id = ?`
-	args := []any{teamID}
+	query := `SELECT ` + chainColumns + ` FROM chains WHERE 1 = 1`
+	var args []any
+	if teamID != "" {
+		query += ` AND team_id = ?`
+		args = append(args, teamID)
+	}
 	if status != "" {
 		query += ` AND status = ?`
 		args = append(args, status)

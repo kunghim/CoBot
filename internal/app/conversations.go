@@ -104,8 +104,12 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 	}); err != nil {
 		return SendMessageResult{}, err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusQueued, ""); err != nil {
-		return SendMessageResult{}, err
+	// Enqueueing a user message never clears a live run's projection
+	// (review B minor13).
+	if _, ferr := sqlite.FindActiveRun(ctx, tx, bot.ID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
+		if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusQueued, ""); err != nil {
+			return SendMessageResult{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return SendMessageResult{}, err

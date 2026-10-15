@@ -502,9 +502,14 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		return ToolResult{Status: StatusWaiting, Data: map[string]any{"approvalId": approval.ID}}
 
 	case "remember":
+		// Both spellings from the plan table (content/taskId) and the
+		// implementation (body/sourceTaskId) are accepted, so the tool is
+		// usable whichever name the caller follows.
 		var args struct {
 			Body         string `json:"body"`
+			Content      string `json:"content"`
 			SourceTaskID string `json:"sourceTaskId"`
+			TaskID       string `json:"taskId"`
 			RequestID    string `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
@@ -513,7 +518,15 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
-		mem, err := d.app.RememberMemory(ctx, principal, args.Body, args.SourceTaskID)
+		body := args.Body
+		if body == "" {
+			body = args.Content
+		}
+		sourceTask := args.SourceTaskID
+		if sourceTask == "" {
+			sourceTask = args.TaskID
+		}
+		mem, err := d.app.RememberMemory(ctx, principal, body, sourceTask)
 		if err != nil {
 			return errorResult(err)
 		}

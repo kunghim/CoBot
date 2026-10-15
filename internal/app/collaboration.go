@@ -97,8 +97,12 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 	}); err != nil {
 		return nil, err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, target.ID, domain.BotStatusQueued, ""); err != nil {
-		return nil, err
+	// A busy member keeps its working projection: enqueueing must not clear
+	// current_run_id of a run that is still live (review B minor13).
+	if _, ferr := sqlite.FindActiveRun(ctx, tx, target.ID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
+		if err := sqlite.SetBotRunState(ctx, tx, target.ID, domain.BotStatusQueued, ""); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -264,14 +268,17 @@ func (a *App) SubmitMergeRequest(ctx context.Context, principal auth.Principal, 
 	if err != nil {
 		return domain.Approval{}, err
 	}
-	summary := "合并 " + candidateRef + " → " + targetRef
+	// The summary is an i18n key (never prose in one language); the reason
+	// carries only neutral technical values so the candidate stays visible
+	// without storing translatable sentences (review A).
+	reason := "candidate=" + candidateRef + " target=" + targetRef
 	if executionDirectory != "" {
-		summary += "（工作位置：" + executionDirectory + "）"
+		reason += " dir=" + executionDirectory
 	}
 	approval := domain.Approval{
 		ID: domain.NewID(), TeamID: task.TeamID, RequesterBotID: principal.BotID,
 		RunID: "", EngineRequestID: bound, Type: domain.ApprovalMerge,
-		Summary: summary, Reason: "任务《" + task.Title + "》请求合并该候选版本",
+		Summary: "approval.card.merge", Reason: reason,
 		Options: []domain.ApprovalOption{
 			{ID: "approve", MessageKey: "approval.option.merge.approve"},
 			{ID: "reject", MessageKey: "approval.option.merge.reject"},
@@ -335,7 +342,9 @@ func (a *App) BuildContext(ctx context.Context, bot domain.Bot, taskID string) s
 		}
 	}
 	if taskID != "" {
-		if task, err := sqlite.GetTask(ctx, a.DB, taskID); err == nil {
+		// Only this member's own team's task may enter the context (review
+		// B major6); a foreign id is treated as absent, never rendered.
+		if task, err := sqlite.GetTask(ctx, a.DB, taskID); err == nil && task.TeamID == bot.TeamID {
 			fmt.Fprintf(&b, "\n# 当前任务\n标题：%s\n完成标准：%s\n状态：%s\n",
 				task.Title, task.AcceptanceCriteria, task.Status)
 			if evidence, err := sqlite.ListEvidence(ctx, a.DB, task.ID); err == nil && len(evidence) > 0 {

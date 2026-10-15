@@ -750,6 +750,7 @@ func TestTurnStartUnknownLocksBot(t *testing.T) {
 	ctx := context.Background()
 
 	// Arm the failure before dispatch spins the team server.
+	settingsBefore, _ := h.app.GetSettings(ctx)
 	h.onFake = func(fake *fakeengine.Server) {
 		fake.BeforeStartTurn = func() error { return errors.New("connection reset") }
 	}
@@ -768,6 +769,15 @@ func TestTurnStartUnknownLocksBot(t *testing.T) {
 	detail, _ := h.app.ListConversation(ctx, h.user, bot.ID, "", 10)
 	if detail["queuedCount"].(int) != 0 {
 		t.Fatal("queue must reflect the failed dispatch")
+	}
+	// C10: the failure lands as an actionable reason on the run, and the
+	// engine error never rewrites the user's configuration.
+	if run, ok := detail["activeRun"].(domain.Run); !ok || run.ErrorKey != "error.engine.turn_unknown" {
+		t.Fatalf("unknown run must carry error.engine.turn_unknown, got %+v", detail["activeRun"])
+	}
+	settingsAfter, _ := h.app.GetSettings(ctx)
+	if settingsAfter.DefaultModel != settingsBefore.DefaultModel || settingsAfter.EnginePath != settingsBefore.EnginePath {
+		t.Fatal("an engine failure must not modify settings")
 	}
 	// Bot is locked: a new message queues but must not start a turn.
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "再试"}); err != nil {

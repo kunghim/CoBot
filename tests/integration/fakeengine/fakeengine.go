@@ -26,6 +26,7 @@ type Server struct {
 	// Scripted behavior.
 	BeforeStartTurn func() error
 	StartTurnErr    error
+	ReplyErr        error
 	ResumeErr       error
 	threads         map[string]bool
 	startedTurns    []StartedTurn
@@ -100,9 +101,14 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID string) error {
 	return nil
 }
 
+// ReplyErr (set by tests) simulates a failed RPC delivery so the product's
+// "decision kept, response unknown" path (F03) is exercised for real.
 func (s *Server) ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.ReplyErr != nil {
+		return s.ReplyErr
+	}
 	s.replied = append(s.replied, Reply{RequestID: requestID, Response: response})
 	return nil
 }

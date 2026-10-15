@@ -120,7 +120,10 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	}
 	// The asking member keeps its working projection if it is mid-run
 	// (review B13): answering enqueues, it never clears a live run.
-	if _, ferr := sqlite.FindActiveRun(ctx, tx, question.RequesterBotID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
+	if _, ferr := sqlite.FindActiveRun(ctx, tx, question.RequesterBotID); ferr != nil {
+		if !errors.Is(ferr, sqlite.ErrNotFound) {
+			return domain.Question{}, ferr // a real DB error, never "assume idle"
+		}
 		if err := sqlite.SetBotRunState(ctx, tx, question.RequesterBotID, domain.BotStatusQueued, ""); err != nil {
 			return domain.Question{}, err
 		}
