@@ -149,7 +149,7 @@ function TeamRow({
 
   return (
     <li className="rounded-md">
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <button
           type="button"
           onClick={onToggle}
@@ -175,7 +175,7 @@ function TeamRow({
       {expanded && (
         <ul className="ml-6 mt-0.5 space-y-0.5">
           {orderBotsLeaderFirst(bots).map((bot) => (
-            <li key={bot.id} className="flex items-center">
+            <li key={bot.id} className="flex flex-wrap items-center">
               <span className="min-w-0 flex-1">
                 <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
               </span>
@@ -244,17 +244,15 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
   const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
 
   return (
-    <span className="flex shrink-0 items-center gap-0.5">
-      {/* A refusal must be VISIBLE, not screen-reader-only: deleting a team
-          that still has work otherwise looks like a dead button (review C). */}
+    <>
+      {/* A refusal gets its own full-width line: inside the240px header row
+          it would be truncated (review C re-review). */}
       {errorText && (
-        <span
-          role="alert"
-          className="max-w-44 truncate text-[10px] text-red-600 dark:text-red-400"
-        >
+        <span role="alert" className="w-full text-[10px] leading-4 text-red-600 dark:text-red-400">
           {errorText}
         </span>
       )}
+      <span className="flex shrink-0 items-center gap-0.5">
       {(team.status === 'error' || team.status === 'creating') && (
         <button
           type="button"
@@ -311,7 +309,8 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
           </button>
         </>
       )}
-    </span>
+      </span>
+    </>
   );
 }
 
@@ -323,12 +322,7 @@ function DeleteMemberButton({ bot }: { bot: Bot }) {
   const remove = useDeleteBot();
   const [errorText, setErrorText] = useState('');
   return (
-    <span className="flex shrink-0 items-center gap-1">
-      {errorText && (
-        <span role="alert" className="max-w-40 truncate text-[10px] text-red-600 dark:text-red-400">
-          {errorText}
-        </span>
-      )}
+    <>
       <button
         type="button"
         onClick={(event) => {
@@ -343,6 +337,11 @@ function DeleteMemberButton({ bot }: { bot: Bot }) {
       >
         <Trash2 size={11} aria-hidden="true" />
       </button>
-    </span>
+      {errorText && (
+        <span role="alert" className="w-full text-[10px] leading-4 text-red-600 dark:text-red-400">
+          {errorText}
+        </span>
+      )}
+    </>
   );
 }

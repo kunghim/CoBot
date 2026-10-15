@@ -140,7 +140,8 @@
     "card": {
       "chain_risk": "The work will continue in this direction — please confirm",
       "chain_over_limit": "This chain used up its wake budget — confirm to grant exactly one more wake",
-      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it"
+      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it",
+      "merge": "Requests merging a candidate version; verify the candidate and evidence — CoBot never runs Git itself"
     },
     "option": {
       "allow_once": "Allow once",

@@ -51,11 +51,19 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         aria-label={t('panel.tablist')}
         className="flex gap-1 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800"
         onKeyDown={(event) => {
-          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-          event.preventDefault();
           const index = TABS.indexOf(tab);
-          const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : (index - 1 + TABS.length) % TABS.length;
+          let next: number;
+          if (event.key === 'ArrowRight') next = (index + 1) % TABS.length;
+          else if (event.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
+          else if (event.key === 'Home') next = 0;
+          else if (event.key === 'End') next = TABS.length - 1;
+          else return;
+          event.preventDefault();
           setTab(TABS[next]);
+          // Roving tabindex: focus follows the selection (review C).
+          requestAnimationFrame(() => {
+            document.getElementById(`workpanel-tab-${TABS[next]}`)?.focus();
+          });
         }}
       >
         {TABS.map((id) => (

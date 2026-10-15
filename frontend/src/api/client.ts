@@ -253,7 +253,7 @@ export const api = {
   rebindDirectory: (teamId: string, body: { directory: string; adoptMarker?: boolean; expectedRevision?: number }) =>
     request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/directory/rebind`, body),
   retryTeam: (teamId: string) =>
-    request<import('./types').CreateTeamResult>('POST', `/api/v1/teams/${teamId}/retry`, {}),
+    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/retry`, {}),
 
   // Activity, memories, directories, authorizations (M5).
   listActivity: (teamId: string, limit?: number) =>

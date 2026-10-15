@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
+import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 
 describe('approval pager math', () => {
   it('keeps the index inside the stack as cards disappear', () => {
@@ -43,5 +43,24 @@ describe('approval option labels', () => {
   it('never produces a blank button label', () => {
     expect(optionFallbackText({ id: 'accept' })).toBe('accept');
     expect(optionFallbackText({ id: 'accept', text: '允许' })).toBe('允许');
+  });
+});
+
+describe('approvalSummaryText', () => {
+  const t = (key: string) => `zh:${key}`; // a real catalog resolves keys; raw pass-through never reaches t
+
+  it('renders product-stored i18n keys through t()', () => {
+    expect(approvalSummaryText(t, 'approval.card.chain_risk')).toBe('zh:approval.card.chain_risk');
+    expect(approvalSummaryText(t, 'approval.card.recovery')).toBe('zh:approval.card.recovery');
+  });
+
+  it('passes engine-provided summaries through untranslated', () => {
+    expect(approvalSummaryText(t, 'rm -rf /tmp/cache')).toBe('rm -rf /tmp/cache');
+    expect(approvalSummaryText(t, '合并 something')).toBe('合并 something');
+  });
+
+  it('falls back to the raw key when a key is missing in the catalog', () => {
+    const bare = (key: string) => key; // no translation available
+    expect(approvalSummaryText(bare, 'approval.card.unknown')).toBe('approval.card.unknown');
   });
 });
