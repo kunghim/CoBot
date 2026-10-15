@@ -95,6 +95,8 @@ func (b *Bridge) register(server *mcp.Server) {
 		{"ask_user", "向用户提问；返回 waiting 项并请结束当前工作"},
 		{"request_member", "请求用户批准引入指定角色成员（仅队长）"},
 		{"request_merge", "请求用户批准合并指定候选版本（绑定 SHA 与证据）"},
+		{"remember", "记录你的工作方法或偏好（只存方法：不存任务证据、秘密或大段源码；同来源同正文不会重建）"},
+		{"search_memory", "检索你自己的记忆（按归属过滤，默认最多 10 条、共 6000 字符）"},
 	}
 	for _, tool := range tools {
 		tool := tool

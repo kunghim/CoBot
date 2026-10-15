@@ -363,6 +363,10 @@
     "error.transfer.owner_changed": "任务负责人已变更，转交已失效",
     "error.transfer.task_changed": "任务已被修改，转交已失效",
     "error.transfer.already_offered": "该任务已有进行中的转交",
-    "error.chain.binding_missing": "协作链确认缺少链信息，请刷新后重试"
+    "error.chain.binding_missing": "协作链确认缺少链信息，请刷新后重试",
+    "error.memory.body_required": "记忆内容不能为空",
+    "error.memory.too_long": "记忆过长，最多 {{max}} 个字符",
+    "error.memory.looks_secret": "内容疑似秘密（密钥/密码），拒绝写入记忆；请只记录工作方法与偏好",
+    "error.memory.duplicate": "相同的记忆已存在，不会重复记录"
   }
 }

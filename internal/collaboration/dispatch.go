@@ -31,6 +31,8 @@ type App interface {
 	BotOf(ctx context.Context, botID string) (domain.Bot, error)
 	CaptainOf(ctx context.Context, teamID string) (string, error)
 	SubmitMergeRequest(ctx context.Context, principal auth.Principal, taskID, candidateRef, targetRef, executionDirectory string, evidenceIDs []string) (domain.Approval, error)
+	RememberMemory(ctx context.Context, principal auth.Principal, body, sourceTaskID string) (domain.Memory, error)
+	SearchMemories(ctx context.Context, principal auth.Principal, query string, limit int) (map[string]any, error)
 }
 
 // Dispatcher validates a bot's identity and routes one tool call onto the
@@ -443,6 +445,38 @@ func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, cal
 			return errorResult(err)
 		}
 		return ToolResult{Status: StatusWaiting, Data: map[string]any{"approvalId": approval.ID}}
+
+	case "remember":
+		var args struct {
+			Body         string `json:"body"`
+			SourceTaskID string `json:"sourceTaskId"`
+			RequestID    string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		mem, err := d.app.RememberMemory(ctx, principal, args.Body, args.SourceTaskID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"memory": mem}}
+
+	case "search_memory":
+		var args struct {
+			Query string `json:"query"`
+			Limit int    `json:"limit"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		result, err := d.app.SearchMemories(ctx, principal, args.Query, args.Limit)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusOK, Data: result}
 
 	default:
 		return rejected("invalid_request", "error.tool.unknown", map[string]any{"tool": call.Name})

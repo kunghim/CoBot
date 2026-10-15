@@ -363,6 +363,10 @@
     "error.transfer.owner_changed": "The task owner changed, so the transfer is stale",
     "error.transfer.task_changed": "The task changed, so the transfer is stale",
     "error.transfer.already_offered": "This task already has a pending transfer",
-    "error.chain.binding_missing": "This chain confirmation is missing its chain binding; refresh and retry"
+    "error.chain.binding_missing": "This chain confirmation is missing its chain binding; refresh and retry",
+    "error.memory.body_required": "Memory body cannot be empty",
+    "error.memory.too_long": "Memory is too long: at most {{max}} characters",
+    "error.memory.looks_secret": "The body looks like a secret (key/password) and was refused; store working methods and preferences only",
+    "error.memory.duplicate": "The same memory already exists and is not recorded twice"
   }
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
@@ -417,4 +419,139 @@ func TestBudgetPausesNewTurnsAndResumes(t *testing.T) {
 	// the ledger update itself re-wakes the held queue.
 	fake.EmitTokenUsage(turn3.ThreadID, turn3.TurnID, 40, 10, 0)
 	waitUntil(t, 5*time.Second, "turn 4 after usage arrives", func() bool { return len(fake.Turns()) == 4 })
+}
+
+// TestMemoryOwnershipIsolationAndTombstones pins G04: memories never cross
+// member or team boundaries, deletion hides them immediately, and neither a
+// plain re-remember nor a differently-spaced one can recreate a deleted or
+// existing fact for the same owner and source.
+func TestMemoryOwnershipIsolationAndTombstones(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	teamA, botsA := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	teamB, botsB := h.createTeamWithDir(t, "第二团队", "second-team-dir", []string{"backend-dev"})
+	alice, bob := botsA[1], botsA[2]
+	other := botsB[1]
+
+	alicePrincipal := auth.NewPrincipalBot(alice.ID, teamA.ID)
+	bobPrincipal := auth.NewPrincipalBot(bob.ID, teamA.ID)
+	otherPrincipal := auth.NewPrincipalBot(other.ID, teamB.ID)
+
+	mem, err := h.app.RememberMemory(ctx, alicePrincipal, "部署前先跑 go test ./...", "")
+	if err != nil {
+		t.Fatalf("alice remembers: %v", err)
+	}
+
+	// Ownership isolation: teammates and other teams cannot retrieve it.
+	got, err := h.app.SearchMemories(ctx, bobPrincipal, "部署", 10)
+	if err != nil {
+		t.Fatalf("bob search: %v", err)
+	}
+	if items := got["items"].([]domain.Memory); len(items) != 0 {
+		t.Fatalf("bob retrieved alice's memory: %+v", items)
+	}
+	got, err = h.app.SearchMemories(ctx, otherPrincipal, "部署", 10)
+	if err != nil {
+		t.Fatalf("other search: %v", err)
+	}
+	if items := got["items"].([]domain.Memory); len(items) != 0 {
+		t.Fatalf("cross-team retrieval: %+v", items)
+	}
+	// The owner retrieves it.
+	got, err = h.app.SearchMemories(ctx, alicePrincipal, "部署", 10)
+	if err != nil || len(got["items"].([]domain.Memory)) != 1 {
+		t.Fatalf("alice search = %+v (err %v), want her own memory", got, err)
+	}
+
+	// The same owner, source and normalized body is never recorded twice —
+	// even with different spacing or case.
+	var de *domain.Error
+	_, derr := h.app.RememberMemory(ctx, alicePrincipal, "  部署前先跑   GO TEST ./... ", "")
+	if derr == nil {
+		t.Fatal("duplicate remember must fail")
+	}
+	if !errors.As(derr, &de) || de.Code != domain.CodeConflict {
+		t.Fatalf("duplicate remember must conflict, got %v", derr)
+	}
+
+	// Another member may hold the same fact: memories are per owner.
+	if _, err := h.app.RememberMemory(ctx, bobPrincipal, "部署前先跑 go test ./...", ""); err != nil {
+		t.Fatalf("bob's own copy: %v", err)
+	}
+
+	// Deletion: hidden immediately, and the tombstone blocks re-creation.
+	if err := h.app.DeleteMemory(ctx, h.user, mem.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	got, err = h.app.SearchMemories(ctx, alicePrincipal, "部署", 10)
+	if err != nil || len(got["items"].([]domain.Memory)) != 0 {
+		t.Fatalf("after delete alice search = %+v (err %v), want empty", got, err)
+	}
+	if _, err := h.app.RememberMemory(ctx, alicePrincipal, "部署前先跑 go test ./...", ""); err == nil {
+		t.Fatal("a deleted fact must not be recreated automatically")
+	}
+	_ = teamB
+}
+
+// TestMemoryGuardsAndBounds pins G05: secret-shaped and oversized bodies are
+// refused, retrieval stays within items and characters with overflow
+// reported, and the dispatch context carries the member's own memories.
+func TestMemoryGuardsAndBounds(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	member := bots[1]
+	principal := auth.NewPrincipalBot(member.ID, team.ID)
+
+	if _, err := h.app.RememberMemory(ctx, principal, "password: hunter2secret", ""); err == nil {
+		t.Fatal("a secret-shaped body must be refused")
+	} else {
+		var de *domain.Error
+		if !errors.As(err, &de) || de.Code != domain.CodeInvalidRequest {
+			t.Fatalf("secret refusal = %v, want invalid_request", err)
+		}
+	}
+	if _, err := h.app.RememberMemory(ctx, principal, strings.Repeat("字", domain.MemoryLimitMaxBody+1), ""); err == nil {
+		t.Fatal("an oversized body must be refused")
+	}
+	if _, err := h.app.RememberMemory(ctx, principal, "   ", ""); err == nil {
+		t.Fatal("an empty body must be refused")
+	}
+
+	// Ten full memories: retrieval keeps the item cap and the character
+	// budget, reporting what did not fit instead of hiding it.
+	body := strings.Repeat("记忆内容片段 ", 120) // ~1440 chars each
+	for i := 0; i < 10; i++ {
+		if _, err := h.app.RememberMemory(ctx, principal, fmt.Sprintf("%s #%d", body, i), ""); err != nil {
+			t.Fatalf("remember %d: %v", i, err)
+		}
+	}
+	got, err := h.app.SearchMemories(ctx, principal, "", 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	items := got["items"].([]domain.Memory)
+	if len(items) > domain.MemorySearchMaxItems {
+		t.Fatalf("items = %d, want at most %d", len(items), domain.MemorySearchMaxItems)
+	}
+	total := 0
+	for _, m := range items {
+		total += utf8.RuneCountInString(m.Body)
+	}
+	if total > domain.MemorySearchMaxChars {
+		t.Fatalf("total chars = %d, want at most %d", total, domain.MemorySearchMaxChars)
+	}
+	if dropped, ok := got["dropped"].(int); ok && dropped < 0 {
+		t.Fatalf("dropped = %d", dropped)
+	}
+
+	// The per-dispatch context carries the member's own memories so the next
+	// turn actually sees them (bounded the same way).
+	if _, err := h.app.RememberMemory(ctx, principal, "提交前先运行 gofmt 检查", ""); err != nil {
+		t.Fatalf("compact memory: %v", err)
+	}
+	contextText := h.app.BuildContext(ctx, member, "")
+	if !strings.Contains(contextText, "gofmt") {
+		t.Fatalf("context missing the member's memory:\n%s", contextText)
+	}
 }

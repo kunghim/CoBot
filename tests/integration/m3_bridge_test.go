@@ -19,6 +19,7 @@ var collaborationTools = []string{
 	"create_task", "propose_task", "assign_task", "update_task",
 	"submit_evidence", "report_completion", "confirm_task",
 	"offer_transfer", "accept_transfer", "ask_user", "request_member", "request_merge",
+	"remember", "search_memory",
 }
 
 // TestMCPBridgeProtocol drives the real stdio bridge over an in-memory MCP

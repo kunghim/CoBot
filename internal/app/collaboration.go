@@ -326,6 +326,14 @@ func (a *App) BuildContext(ctx context.Context, bot domain.Bot, taskID string) s
 			}
 		}
 	}
+	// The member's own recent memories ride along bounded like any other
+	// retrieval (G05): methods and preferences, newest first.
+	if mems := a.memoriesForContext(ctx, bot.TeamID, bot.ID); len(mems.Items) > 0 {
+		b.WriteString("\n# 你的记忆（工作方法与偏好）\n")
+		for _, m := range mems.Items {
+			fmt.Fprintf(&b, "- %s\n", m.Body)
+		}
+	}
 	if taskID != "" {
 		if task, err := sqlite.GetTask(ctx, a.DB, taskID); err == nil {
 			fmt.Fprintf(&b, "\n# 当前任务\n标题：%s\n完成标准：%s\n状态：%s\n",
