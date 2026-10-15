@@ -13,6 +13,7 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
+	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
@@ -70,16 +71,22 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 	}
 }
 
-// Start launches the dispatch loop until Stop.
+// Start launches the dispatch loop until Stop. The loop also ticks the local
+// leases (H06): while this process runs, every live member's lease stays
+// fresh; after Stop they age out and external helpers refuse side effects.
 func (s *Scheduler) Start() {
 	go func() {
 		defer close(s.done)
+		leaseTicker := time.NewTicker(platform.LeaseInterval)
+		defer leaseTicker.Stop()
 		for {
 			select {
 			case <-s.stop:
 				return
 			case botID := <-s.wake:
 				s.dispatchSafely(botID)
+			case <-leaseTicker.C:
+				s.app.RefreshLeases(context.Background())
 			}
 		}
 	}()
@@ -307,6 +314,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: message.ID})
 	s.app.Hub.Publish()
 	s.logger.Info("run started", "botId", bot.ID, "runId", run.ID, "threadId", threadID)
+
+	// The engine may spawn this bot's MCP bridge at any moment inside the
+	// turn; the lease must already be fresh when it asks to act (H06).
+	s.app.TouchLease(ctx, bot.ID)
 	return nil
 }
 
@@ -541,6 +552,11 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 	extra[prefix+".env"] = map[string]string{
 		auth.BridgeEnvEndpoint: s.app.MCPEndpoint,
 		auth.BridgeEnvToken:    token,
+		// The bridge needs to know which member it acts for and where the
+		// local leases live, so a stale executor refuses side effects even
+		// without HTTP (H06).
+		auth.BridgeEnvBotID:    bot.ID,
+		auth.BridgeEnvLeaseDir: s.app.LeaseDir(),
 	}
 	// The tools are CoBot's own structured collaboration surface, so they
 	// never need a user approval round trip; the core enforces permissions.

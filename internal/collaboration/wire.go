@@ -1,6 +1,10 @@
 package collaboration
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/kunghim/CoBot/internal/auth"
+)
 
 // Tool statuses mirror the wire contract: accepted means the fact is
 // persisted, never that a turn completed.
@@ -48,3 +52,24 @@ type WaitResult struct {
 	QuestionID string `json:"questionId"`
 	Status     string `json:"status"`
 }
+
+// IsSideEffectTool reports whether a tool changes product state. From
+// outside the core — the spawned bridge, a hook process — an executor whose
+// local lease is stale must not run these; read tools always pass (H06).
+func IsSideEffectTool(name string) bool {
+	switch name {
+	case "send_message", "create_task", "propose_task", "assign_task", "update_task",
+		"submit_evidence", "report_completion", "confirm_task", "offer_transfer",
+		"accept_transfer", "ask_user", "request_member", "request_merge", "remember":
+		return true
+	default:
+		return false
+	}
+}
+
+// Bridge env aliases for the lease gate (the bridge reads them from its own
+// environment, like the endpoint and token).
+const (
+	BridgeEnvBotID    = auth.BridgeEnvBotID
+	BridgeEnvLeaseDir = auth.BridgeEnvLeaseDir
+)

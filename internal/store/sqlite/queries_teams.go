@@ -476,3 +476,30 @@ func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, 
 	}
 	return c, nil
 }
+
+// LeaseBot is the identity needed to write one member's local lease.
+type LeaseBot struct {
+	ID     string
+	TeamID string
+}
+
+// ListLeaseBots returns every live member of an active team — exactly the
+// members whose leases the running core keeps fresh (H06).
+func ListLeaseBots(ctx context.Context, q Queryer) ([]LeaseBot, error) {
+	rows, err := q.QueryContext(ctx, `SELECT b.id, b.team_id FROM bots b
+		JOIN teams t ON t.id = b.team_id
+		WHERE b.deleted_at = '' AND t.status = ?`, domain.TeamStatusActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LeaseBot
+	for rows.Next() {
+		var b LeaseBot
+		if err := rows.Scan(&b.ID, &b.TeamID); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}

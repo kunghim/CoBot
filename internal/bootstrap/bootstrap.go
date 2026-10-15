@@ -23,6 +23,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
+	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -206,6 +207,19 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 				}
 			},
 		})
+	}
+	// The local event ledger mirrors every recorded event to disk (H08).
+	// Startup drains whatever previous runs left into the database — by event
+	// id, so nothing duplicates — before reconciliation classifies state.
+	sink, sinkErr := eventsink.Open(paths.Root, instanceID)
+	if sinkErr != nil {
+		return nil, fmt.Errorf("open event ledger: %w", sinkErr)
+	}
+	application.Events = sink
+	if imported, ierr := application.ImportEventFiles(ctx); ierr != nil {
+		return nil, fmt.Errorf("import event files: %w", ierr)
+	} else if imported > 0 {
+		logger.Info("imported events from local ledger", "count", imported)
 	}
 	// Classify whatever the previous process left behind before the loop can
 	// claim anything: unknown runs, unknown deliveries, dead-connection

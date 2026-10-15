@@ -17,6 +17,14 @@ import (
 // Environment names the bridge reads. The core passes these when it hands a
 // thread to the engine; they live here so the application layer can build the
 // thread config without importing the collaboration package.
+// BridgeEnvBotID and BridgeEnvLeaseDir tell the spawned bridge which member
+// it acts for and where the local leases live, so it can refuse side effects
+// from a stale executor without depending on HTTP (H06).
+const (
+	BridgeEnvBotID    = "COBOT_BOT_ID"
+	BridgeEnvLeaseDir = "COBOT_LEASE_DIR"
+)
+
 const (
 	BridgeEnvEndpoint = "COBOT_ENDPOINT"
 	BridgeEnvToken    = "COBOT_BOT_TOKEN"

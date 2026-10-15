@@ -18,9 +18,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/bootstrap"
 	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/platform"
 )
 
@@ -37,6 +39,8 @@ func main() {
 		os.Exit(runServe(os.Args[2:]))
 	case "mcp":
 		os.Exit(runMCP(os.Args[2:]))
+	case "hook":
+		os.Exit(runHook(os.Args[2:]))
 	case "version", "--version", "-v":
 		fmt.Println(version)
 	case "help", "--help", "-h":
@@ -56,6 +60,7 @@ Usage:
               [--log-level debug|info|warn|error]
   cobot version
   cobot mcp                      # MCP stdio bridge for one bot (spawned by the engine)
+  cobot hook                     # run one configured hook from stdin JSON (H07)
 
 The core binds loopback only. `+"`serve`"+` prints a one-time startup link for
 browser authorization; a second serve on the same profile reports the running
@@ -207,4 +212,21 @@ func runMCP(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// runHook executes one user-configured hook from a stdin JSON request (H07).
+// It never invents hook names: an unconfigured name is reported uncovered,
+// and only commands present in the team's .cobot/hooks.json run. Side-effect
+// hooks additionally require a fresh local lease for the member they act
+// for. The result is one JSON object on stdout; see internal/hookrun.
+func runHook(args []string) int {
+	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	return hookrun.Run(
+		context.Background(), os.Stdin, os.Stdout,
+		os.Getenv("COBOT_TEAM_DIR"), os.Getenv(auth.BridgeEnvLeaseDir),
+		os.Getenv(auth.BridgeEnvBotID), os.Getenv("COBOT_INSTANCE_ID"),
+	)
 }

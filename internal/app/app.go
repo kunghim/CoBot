@@ -12,12 +12,15 @@ import (
 	"sync"
 	"time"
 
+	"errors"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
+	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"sync/atomic"
 )
 
 // App is the application service shared by HTTP handlers, the MCP dispatcher
@@ -43,6 +46,11 @@ type App struct {
 	MCPBinary string
 	// MCPEndpoint is the loopback address the bridge calls back on.
 	MCPEndpoint string
+
+	// Events is the local durable event ledger (H08). Nil disables file
+	// appending; the database stays the primary store either way.
+	Events        *eventsink.Sink
+	eventGapNoted atomic.Bool
 
 	engineStatusMu    sync.Mutex
 	engineStatusCache *EngineStatusInfo
@@ -148,21 +156,53 @@ func (a *App) ListEvents(ctx context.Context, principal auth.Principal, scope do
 	return evs, sqlite.NormalizeError(err)
 }
 
-// recordEvent appends a durable event in its own short transaction and
-// returns only after commit, so subscribers never observe uncommitted state.
+// recordEvent appends a durable event in its own short transaction, then
+// mirrors it into the local ledger file (H08). Subscribers never observe
+// uncommitted state; a saturated ledger records one gap event instead of
+// deleting un-imported evidence.
 func (a *App) recordEvent(ctx context.Context, ev domain.Event) error {
-	tx, err := a.DB.BeginTx(ctx, nil)
+	stored, err := a.insertEvent(ctx, ev)
 	if err != nil {
-		return fmt.Errorf("begin event tx: %w", err)
-	}
-	defer tx.Rollback()
-	if _, err := sqlite.InsertEvent(ctx, tx, a.InstanceID, ev); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit event: %w", err)
+	if a.Events == nil {
+		return nil
+	}
+	if appendErr := a.Events.Append(stored); appendErr != nil {
+		if errors.Is(appendErr, eventsink.ErrOverCapacity) && a.eventGapNoted.CompareAndSwap(false, true) {
+			// The file budget is spent on un-imported evidence: the gap is
+			// recorded in the database (the durable store), never by
+			// deleting the evidence that is still only on disk (H08).
+			if _, gapErr := a.insertEvent(ctx, domain.Event{
+				ID: domain.NewID(), Type: domain.EventLogGap, ResourceID: "events",
+				Payload: mustJSON(map[string]any{"reason": "over_capacity"}),
+			}); gapErr == nil {
+				a.Hub.Publish()
+			}
+		}
+		if a.Logger != nil {
+			a.Logger.Warn("append event to local ledger", "error", appendErr)
+		}
 	}
 	return nil
+}
+
+// insertEvent is recordEvent without the ledger mirror; it exists so the gap
+// event itself never recurses into appending.
+func (a *App) insertEvent(ctx context.Context, ev domain.Event) (domain.Event, error) {
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Event{}, fmt.Errorf("begin event tx: %w", err)
+	}
+	defer tx.Rollback()
+	stored, err := sqlite.InsertEvent(ctx, tx, a.InstanceID, ev)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Event{}, fmt.Errorf("commit event: %w", err)
+	}
+	return stored, nil
 }
 
 func mustJSON(v any) json.RawMessage {

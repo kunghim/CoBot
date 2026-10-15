@@ -25,6 +25,13 @@ type Event struct {
 // renamed, because clients match on the wire string.
 const (
 	EventSettingsUpdated = "settings.updated"
+	// EventLogGap records that local event files ran past their budget with
+	// un-imported evidence: the evidence stays on disk and the gap is
+	// visible instead of silent (H08).
+	EventLogGap = "log.gap"
+	// EventLogQuarantined records that a corrupt ledger file was isolated
+	// after its valid lines were imported (H08).
+	EventLogQuarantined = "log.quarantined"
 )
 
 // Scope filters an event query by team and/or bot. Empty means "all visible

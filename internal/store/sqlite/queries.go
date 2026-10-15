@@ -129,7 +129,11 @@ func InsertEvent(ctx context.Context, tx *sql.Tx, instanceID string, ev domain.E
 	if len(payload) == 0 {
 		payload = json.RawMessage(`{}`)
 	}
-	createdAt := time.Now().UTC()
+	// An imported event keeps its original timestamp; a fresh one gets now.
+	createdAt := ev.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO events (id, instance_id, type, team_id, bot_id, resource_id, revision, payload, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -218,4 +222,27 @@ func NormalizeError(err error) error {
 		return domain.Conflict("error.database_busy", nil)
 	}
 	return err
+}
+
+// ImportEventRow inserts an event by its explicit id, ignoring duplicates:
+// the same event arriving from the live stream and again from a ledger file
+// is one row (H08). It reports whether the row was new.
+func ImportEventRow(ctx context.Context, db *sql.DB, ev domain.Event) (bool, error) {
+	payload := ev.Payload
+	if len(payload) == 0 {
+		payload = json.RawMessage(`{}`)
+	}
+	createdAt := ev.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	res, err := db.ExecContext(ctx, `INSERT INTO events (id, instance_id, type, team_id, bot_id, resource_id, revision, payload, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO NOTHING`,
+		ev.ID, ev.InstanceID, ev.Type, ev.TeamID, ev.BotID, ev.ResourceID, ev.Revision, string(payload), createdAt.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return false, fmt.Errorf("import event: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }

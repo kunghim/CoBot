@@ -15,6 +15,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/platform"
 )
 
 // BridgeEnv names the environment a spawned bridge reads. The core passes the
@@ -117,6 +118,19 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 	token := os.Getenv(BridgeEnvToken)
 	if token == "" {
 		return toolFailure(StatusUnavailable, "error.unauthorized.missing_token", nil), nil, nil
+	}
+	// H06: this process may outlive the core that spawned it (an orphaned
+	// engine keeps its bridge). Side effects then depend on a local lease
+	// the core stops refreshing; reads still work so the model can inspect
+	// state and report honestly.
+	if IsSideEffectTool(name) {
+		if dir := os.Getenv(BridgeEnvLeaseDir); dir != "" {
+			if botID := os.Getenv(BridgeEnvBotID); botID != "" {
+				if _, reason, _ := platform.ReadLeaseDir(dir, botID, "", time.Now()); reason != platform.LeaseReasonOK {
+					return toolFailure(StatusRejected, "error.lease."+reason, nil), nil, nil
+				}
+			}
+		}
 	}
 	body, err := json.Marshal(map[string]any{
 		"tool":      name,
