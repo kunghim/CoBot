@@ -235,4 +235,46 @@ func TestAskUserDeliversAnswerToAsker(t *testing.T) {
 	}
 }
 
+// TestUserReadsWholeCollaborationRecord pins the user's collaboration page:
+// reading a named member returns everything that member sent or received, in
+// both directions. A (member, member) pairing would only match a
+// self-addressed message, which the product never creates.
+func TestUserReadsWholeCollaborationRecord(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	a, b := bots[1], bots[2]
+
+	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(a.ID, team.ID), b.ID, "帮我准备测试环境", "", "req-collab-1"); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	// The user reads A's page: the outgoing message is there.
+	sent, err := h.app.ListCollaboration(ctx, h.user, a.ID, 0)
+	if err != nil {
+		t.Fatalf("user read of A: %v", err)
+	}
+	if len(sent) != 1 || sent[0].SourceBotID != a.ID || sent[0].BotID != b.ID {
+		t.Fatalf("A's record = %+v, want the A->B message", sent)
+	}
+
+	// The user reads B's page: the same message arrived there.
+	received, err := h.app.ListCollaboration(ctx, h.user, b.ID, 0)
+	if err != nil {
+		t.Fatalf("user read of B: %v", err)
+	}
+	if len(received) != 1 || received[0].SourceBotID != a.ID {
+		t.Fatalf("B's record = %+v, want the A->B message", received)
+	}
+
+	// A bot still reads the pairwise segment with its own peer.
+	byA, err := h.app.ListCollaboration(ctx, auth.NewPrincipalBot(a.ID, team.ID), b.ID, 0)
+	if err != nil {
+		t.Fatalf("bot read of peer: %v", err)
+	}
+	if len(byA) != 1 {
+		t.Fatalf("A's peer segment = %+v, want the one message", byA)
+	}
+}
+
 var de *domain.Error

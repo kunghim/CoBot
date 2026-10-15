@@ -101,14 +101,22 @@ func ListMessages(ctx context.Context, q Queryer, botID string, before string, l
 
 // ListCollaborationMessages returns exchanges between the given bot and one
 // peer, oldest first. Both directions are included so either collaboration
-// page can show the same read-only segment.
+// page can show the same read-only segment. An empty peerBotID means the
+// bot's whole record: every message it sent or received, which is what the
+// user reads on a member's collaboration page.
 func ListCollaborationMessages(ctx context.Context, q Queryer, botID, peerBotID string, limit int) ([]domain.Message, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
-	query := `SELECT ` + messageColumns + ` FROM messages
-		WHERE kind = ? AND ((source_bot_id = ? AND bot_id = ?) OR (source_bot_id = ? AND bot_id = ?))`
-	args := []any{domain.MessageKindCollaboration, botID, peerBotID, peerBotID, botID}
+	query := `SELECT ` + messageColumns + ` FROM messages WHERE kind = ?`
+	args := []any{domain.MessageKindCollaboration}
+	if peerBotID == "" {
+		query += ` AND (source_bot_id = ? OR bot_id = ?)`
+		args = append(args, botID, botID)
+	} else {
+		query += ` AND ((source_bot_id = ? AND bot_id = ?) OR (source_bot_id = ? AND bot_id = ?))`
+		args = append(args, botID, peerBotID, peerBotID, botID)
+	}
 	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
 	args = append(args, limit)
 	rows, err := q.QueryContext(ctx, query, args...)

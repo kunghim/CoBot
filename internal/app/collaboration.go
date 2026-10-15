@@ -120,16 +120,20 @@ func (a *App) CaptainOf(ctx context.Context, teamID string) (string, error) {
 	return team.LeaderID, nil
 }
 
-// ListCollaboration projects the read-only exchange between two bots of the
-// same team for either side.
+// ListCollaboration projects a read-only collaboration record. A bot reads
+// the exchange with one same-team peer; the user reads a named member's whole
+// record (everything the member sent or received).
 func (a *App) ListCollaboration(ctx context.Context, principal auth.Principal, peerBotID string, limit int) ([]domain.Message, error) {
-	var botID string
+	var botID, peer string
 	switch principal.Kind {
 	case auth.KindUser:
-		botID = peerBotID // the user reads a named member's record
+		// Passing an empty peer asks the store for the member's whole record;
+		// a (member, member) pair would only ever match a self-addressed
+		// message, which the product never creates.
+		botID, peer = peerBotID, ""
 	case auth.KindBot:
-		botID = principal.BotID
-		peer, err := sqlite.GetBot(ctx, a.DB, peerBotID)
+		botID, peer = principal.BotID, peerBotID
+		peerRow, err := sqlite.GetBot(ctx, a.DB, peerBotID)
 		if err != nil {
 			return nil, sqlite.NormalizeError(err)
 		}
@@ -137,13 +141,13 @@ func (a *App) ListCollaboration(ctx context.Context, principal auth.Principal, p
 		if err != nil {
 			return nil, sqlite.NormalizeError(err)
 		}
-		if peer.TeamID != self.TeamID {
+		if peerRow.TeamID != self.TeamID {
 			return nil, domain.Forbidden("error.message.other_team", nil)
 		}
 	default:
 		return nil, domain.Unauthorized("error.unauthorized.principal_required")
 	}
-	return sqlite.ListCollaborationMessages(ctx, a.DB, botID, peerBotID, limit)
+	return sqlite.ListCollaborationMessages(ctx, a.DB, botID, peer, limit)
 }
 
 // RequestMember asks the user to add a member of a given role. It creates a
