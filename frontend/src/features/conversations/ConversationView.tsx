@@ -23,6 +23,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
 
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState('');
+  // Cancel/interrupt failures are surfaced too: a failed retract must never
+  // look like a successful one (review C).
+  const [actionError, setActionError] = useState('');
   const [stopping, setStopping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +55,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     const text = draft.trim();
     if (text === '' || blockReasonKey) return;
     setSendError('');
+    setActionError('');
     send.mutate(text, {
       onSuccess: () => setDraft(''),
       onError: (error) => setSendError(apiErrorMessage(t, error)),
@@ -95,7 +99,12 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
                 isLastUser={lastUserMessage?.id === message.id}
                 showCancel={lastQueuedMessage?.id === message.id}
                 cancelPending={cancel.isPending}
-                onCancelQueued={() => cancel.mutate(message.id)}
+                onCancelQueued={() => {
+                  setActionError('');
+                  cancel.mutate(message.id, {
+                    onError: (error) => setActionError(apiErrorMessage(t, error)),
+                  });
+                }}
               />
             </li>
           ))}
@@ -134,7 +143,12 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
               onClick={() => {
                 if (!activeRun.id) return;
                 setStopping(true);
-                interrupt.mutate(activeRun.id, { onError: () => setStopping(false) });
+                interrupt.mutate(activeRun.id, {
+                  onError: (error) => {
+                    setStopping(false);
+                    setActionError(apiErrorMessage(t, error));
+                  },
+                });
               }}
               disabled={stopping || interrupt.isPending}
               title={t('conversation.interrupt')}
@@ -162,9 +176,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             {t(blockReasonKey, { status: team.status })}
           </p>
         )}
-        {sendError && (
+        {(sendError || actionError) && (
           <p className="text-xs text-red-600" role="alert">
-            {sendError}
+            {sendError || actionError}
           </p>
         )}
       </div>

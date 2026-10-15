@@ -39,19 +39,34 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
           onClick={onCollapse}
           title={t('nav.toggleWorkPanel')}
           aria-label={t('nav.toggleWorkPanel')}
+          aria-expanded={true}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
         >
           <X size={16} aria-hidden="true" />
         </button>
       </div>
 
-      <div role="tablist" aria-label={t('approvals.historyTitle')} className="flex gap-1 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800">
+      <div
+        role="tablist"
+        aria-label={t('panel.tablist')}
+        className="flex gap-1 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800"
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+          event.preventDefault();
+          const index = TABS.indexOf(tab);
+          const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : (index - 1 + TABS.length) % TABS.length;
+          setTab(TABS[next]);
+        }}
+      >
         {TABS.map((id) => (
           <button
             key={id}
+            id={`workpanel-tab-${id}`}
             type="button"
             role="tab"
             aria-selected={tab === id}
+            aria-controls="workpanel-tabpanel"
+            tabIndex={tab === id ? 0 : -1}
             onClick={() => setTab(id)}
             className={`rounded-md px-2 py-1 text-xs transition-colors ${
               tab === id
@@ -64,7 +79,12 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        id="workpanel-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`workpanel-tab-${tab}`}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
         {!context && <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
         {context && tab === 'tasks' && (
           <div key={context.team.id}>

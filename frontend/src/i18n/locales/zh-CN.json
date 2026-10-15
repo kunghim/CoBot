@@ -3,6 +3,8 @@
   "nav": {
     "home": "首页",
     "settings": "设置",
+    "teamList": "团队列表",
+    "workPanel": "工作面板",
     "toggleTeamList": "收起/展开团队列表",
     "toggleWorkPanel": "收起/展开工作面板"
   },
@@ -12,6 +14,7 @@
     "selectBot": "从左侧选择一个成员开始对话"
   },
   "team": {
+    "retry": "重试创建",
     "archive": "归档团队",
     "restore": "恢复团队",
     "delete": "删除团队",
@@ -132,6 +135,11 @@
     }
   },
   "approval": {
+    "card": {
+      "chain_risk": "下一步将继续推进当前任务，请确认是否按当前方向继续",
+      "chain_over_limit": "协作链的唤醒次数已用尽，确认后最多再继续一次",
+      "recovery": "上次执行在进程退出后状态未知，请选择处理方式"
+    },
     "option": {
       "allow_once": "允许一次",
       "allow_thread_session": "总是允许（本线程会话）",
@@ -149,6 +157,8 @@
     "empty": "暂无动态",
     "loadFailed": "动态加载失败",
     "type": {
+      "team.created": "团队已创建",
+      "bot.added": "成员已加入",
       "message.created": "消息已创建",
       "message.updated": "消息状态更新",
       "run.updated": "执行状态更新",
@@ -184,6 +194,7 @@
   },
   "panel": {
     "noSelection": "先在左侧选择一个成员",
+    "tablist": "工作面板页面",
     "notReadyYet": "即将在后续里程碑提供",
     "tabs": {
       "tasks": "任务",
@@ -386,6 +397,8 @@
     "error.task.team_required": "缺少 teamId 参数",
     "error.task.title_required": "任务标题不能为空",
     "error.task.captain_only": "只有队长可以为成员创建任务",
+    "error.task.cancel_captain_only": "只有队长或用户可以取消任务",
+    "error.bot.revision_conflict": "成员已被其他入口修改，请刷新后重试",
     "error.task.owner_only": "只有任务负责人可以执行该操作",
     "error.task.owner_or_captain": "只有负责人或队长可以执行该操作",
     "error.task.parent_unknown": "父任务不存在",

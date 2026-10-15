@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApprovals, useDecideApproval } from '../../api/queries';
 import type { ApprovalOption } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
-import { clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
+import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 
 export default function ApprovalCardStack({
   teamId,
@@ -78,7 +78,7 @@ export default function ApprovalCardStack({
           {t('approvals.requester', { name: requesterName })}
         </p>
         <pre className="whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
-          {approval.summary}
+          {approvalSummaryText(t, approval.summary)}
         </pre>
         {approval.reason && (
           <p className="text-sm">

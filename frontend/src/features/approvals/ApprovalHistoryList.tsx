@@ -5,7 +5,7 @@
 import { useTranslation } from 'react-i18next';
 import { useApprovals } from '../../api/queries';
 import type { Approval, ApprovalOption } from '../../api/types';
-import { optionFallbackText, optionLabelKeys } from './pager';
+import { approvalSummaryText, optionFallbackText, optionLabelKeys } from './pager';
 
 export default function ApprovalHistoryList({ teamId }: { teamId: string }) {
   const { t, i18n } = useTranslation();
@@ -33,7 +33,7 @@ export default function ApprovalHistoryList({ teamId }: { teamId: string }) {
             {t(`approvals.type.${approval.type}`, { defaultValue: t('approvals.title') })}
           </p>
           <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-neutral-700 dark:text-neutral-300">
-            {approval.summary}
+            {approvalSummaryText(t, approval.summary)}
           </pre>
           <HistoryFields approval={approval} formatTime={formatTime} />
         </li>

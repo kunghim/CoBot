@@ -28,7 +28,7 @@ type Feedback = 'idle' | 'saved' | 'failed';
  * engine-provided model list.
  */
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const status = useStatus();
   const settings = useSettings(true);
   const update = useUpdateSettings();
@@ -56,6 +56,8 @@ export default function SettingsPage() {
   const authorizations = useAuthorizations(true);
   const revoke = useRevokeAuthorization();
   const [revokeError, setRevokeError] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
 
   const [loginPending, setLoginPending] = useState(false);
   const [loginTimedOut, setLoginTimedOut] = useState(false);
@@ -151,6 +153,13 @@ export default function SettingsPage() {
         onError: (err) => {
           setModelFeedback('failed');
           setModelErrorText(apiErrorMessage(t, err));
+          // Roll the select back to the persisted value: the UI must never
+          // keep showing a model that was not saved (review C).
+          const persisted = settings.data;
+          if (persisted) {
+            if (field === 'defaultModel') setDefaultModel(persisted.defaultModel);
+            else setEvalModel(persisted.evalModel);
+          }
         },
       },
     );
@@ -470,7 +479,7 @@ export default function SettingsPage() {
                   <span className="min-w-0">
                     <span className="block truncate font-mono text-xs">{item.botId.slice(0, 8)}</span>
                     <span className="block text-[11px] text-neutral-500">
-                      {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString()}
+                      {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
                     </span>
                   </span>
                   <button
@@ -496,10 +505,27 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {logoutError && (
+          <p className="text-sm text-red-600" role="alert">
+            {logoutError}
+          </p>
+        )}
+
         <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
           <button
             type="button"
-            onClick={() => void api.logout().then(() => window.location.reload())}
+            onClick={() => {
+              setLogoutError('');
+              setLoggingOut(true);
+              void api
+                .logout()
+                .then(() => window.location.reload())
+                .catch((error) => {
+                  setLoggingOut(false);
+                  setLogoutError(apiErrorMessage(t, error));
+                });
+            }}
+            disabled={loggingOut}
             className="text-sm text-neutral-500 underline-offset-2 hover:underline"
           >
             {t('settings.logout')}

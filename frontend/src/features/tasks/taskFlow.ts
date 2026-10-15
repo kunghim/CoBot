@@ -65,7 +65,7 @@ export function ownerLabel(ownerId: string, bots: Bot[], userLabel: string): str
 /** Dependency chips: resolved titles first (same board), raw short ids for
  * anything the list does not contain. */
 export function dependencyLabels(task: Task, tasks: Task[]): string[] {
-  return task.dependencyIds.map((id) => {
+  return (task.dependencyIds ?? []).map((id) => {
     const found = tasks.find((candidate) => candidate.id === id);
     return found ? found.title : id.slice(0, 8);
   });

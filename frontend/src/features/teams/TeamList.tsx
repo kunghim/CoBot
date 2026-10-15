@@ -3,9 +3,9 @@
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, ChevronDown, ChevronRight, Plus, Trash2, Undo2, Users, X } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, Plus, RotateCw, Trash2, Undo2, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRestoreTeam, useTeams } from '../../api/queries';
+import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRestoreTeam, useRetryTeam, useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -69,6 +69,7 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
           onClick={onCollapse}
           title={t('nav.toggleTeamList')}
           aria-label={t('nav.toggleTeamList')}
+          aria-expanded={true}
           className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
         >
           <X size={18} aria-hidden="true" />
@@ -238,15 +239,35 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
   const archive = useArchiveTeam();
   const restore = useRestoreTeam();
   const remove = useDeleteTeam();
+  const retry = useRetryTeam();
   const [errorText, setErrorText] = useState('');
   const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
 
   return (
     <span className="flex shrink-0 items-center gap-0.5">
+      {/* A refusal must be VISIBLE, not screen-reader-only: deleting a team
+          that still has work otherwise looks like a dead button (review C). */}
       {errorText && (
-        <span className="sr-only" role="alert">
+        <span
+          role="alert"
+          className="max-w-44 truncate text-[10px] text-red-600 dark:text-red-400"
+        >
           {errorText}
         </span>
+      )}
+      {(team.status === 'error' || team.status === 'creating') && (
+        <button
+          type="button"
+          onClick={() => {
+            setErrorText('');
+            retry.mutate(team.id, { onError: fail });
+          }}
+          title={t('team.retry')}
+          aria-label={t('team.retry')}
+          className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+        >
+          <RotateCw size={12} aria-hidden="true" />
+        </button>
       )}
       {team.status === 'active' && (
         <button
@@ -295,21 +316,33 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
 }
 
 // DeleteMemberButton removes a member that carries no unfinished work (B08).
+// A server refusal (unfinished tasks, runs, approvals) is shown inline: the
+// most common outcome must never be a silent no-op (review C).
 function DeleteMemberButton({ bot }: { bot: Bot }) {
   const { t } = useTranslation();
   const remove = useDeleteBot();
+  const [errorText, setErrorText] = useState('');
   return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        remove.mutate({ botId: bot.id });
-      }}
-      title={t('team.deleteMember')}
-      aria-label={t('team.deleteMember')}
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-red-100 hover:text-red-700 dark:text-neutral-600 dark:hover:bg-red-950 dark:hover:text-red-300"
-    >
-      <Trash2 size={11} aria-hidden="true" />
-    </button>
+    <span className="flex shrink-0 items-center gap-1">
+      {errorText && (
+        <span role="alert" className="max-w-40 truncate text-[10px] text-red-600 dark:text-red-400">
+          {errorText}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setErrorText('');
+          remove.mutate({ botId: bot.id }, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
+        }}
+        disabled={remove.isPending}
+        title={t('team.deleteMember')}
+        aria-label={t('team.deleteMember')}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:text-neutral-600 dark:hover:bg-red-950 dark:hover:text-red-300"
+      >
+        <Trash2 size={11} aria-hidden="true" />
+      </button>
+    </span>
   );
 }

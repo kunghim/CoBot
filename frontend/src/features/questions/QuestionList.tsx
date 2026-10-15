@@ -14,6 +14,13 @@ export default function QuestionList({ teamId }: { teamId: string }) {
   if (questions.isError) {
     return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('questions.loadFailed')}</p>;
   }
+  if (questions.isPending) {
+    return (
+      <p className="px-3 py-1 text-[11px] text-neutral-400" role="status">
+        {t('status.loading')}
+      </p>
+    );
+  }
   const items = questions.data?.items ?? [];
   if (items.length === 0) return null;
 

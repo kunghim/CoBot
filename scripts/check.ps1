@@ -19,6 +19,10 @@ Write-Host "==> contract generation (must be committed clean)"
 Write-Host "==> generated-file drift"
 git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "generated contract files differ from the committed ones; run scripts/generate.ps1 and commit" }
+# Only NEW untracked files count as drift here; staged/working changes to
+# tracked files are what the git diff above already verified.
+$untracked = git status --porcelain -- api/openapi.yaml internal/contract frontend/src/api/generated | Where-Object { $_.StartsWith('??') }
+if ($untracked) { throw "generated contract files include untracked changes: $untracked" }
 
 # The frontend must be built first: internal/webui/dist is generated and
 # gitignored, and go:embed all:dist fails on a clean checkout otherwise.

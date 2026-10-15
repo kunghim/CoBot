@@ -10,10 +10,12 @@ import { useSelectedBot } from './SelectedBotContext';
 function IconButton({
   label,
   onClick,
+  expanded,
   children,
 }: {
   label: string;
   onClick?: () => void;
+  expanded?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -22,6 +24,7 @@ function IconButton({
       onClick={onClick}
       title={label}
       aria-label={label}
+      aria-expanded={expanded}
       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
     >
       {children}
@@ -59,7 +62,7 @@ export default function Layout() {
   }, [teams.data, botId, setBotId]);
 
   return (
-    <div className="flex h-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="relative flex h-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       {/* Primary icon rail: logo + home on top, settings at the bottom. */}
       <nav
         aria-label={t('app.title')}
@@ -103,7 +106,7 @@ export default function Layout() {
       {/* Team list panel: team tree plus the new-team action. */}
       {listOpen && (
         <aside
-          aria-label={t('nav.toggleTeamList')}
+          aria-label={t('nav.teamList')}
           className="absolute left-14 z-10 h-full w-64 border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 lg:static lg:z-auto"
         >
           <TeamList onCollapse={() => setListOpen(false)} />
@@ -111,7 +114,7 @@ export default function Layout() {
       )}
       {!listOpen && (
         <div className="flex w-11 shrink-0 items-start justify-center pt-3">
-          <IconButton label={t('nav.toggleTeamList')} onClick={() => setListOpen(true)}>
+          <IconButton label={t('nav.toggleTeamList')} expanded={listOpen} onClick={() => setListOpen(true)}>
             <PanelLeftOpen size={18} aria-hidden="true" />
           </IconButton>
         </div>
@@ -121,7 +124,7 @@ export default function Layout() {
       <main className="relative flex min-w-0 flex-1 flex-col">
         {!panelOpen && (
           <div className="absolute right-2 top-2 z-10">
-            <IconButton label={t('nav.toggleWorkPanel')} onClick={() => setPanelOpen(true)}>
+            <IconButton label={t('nav.toggleWorkPanel')} expanded={panelOpen} onClick={() => setPanelOpen(true)}>
               <PanelRightOpen size={18} aria-hidden="true" />
             </IconButton>
           </div>
@@ -133,7 +136,7 @@ export default function Layout() {
           collaboration, memories). */}
       {panelOpen && (
         <aside
-          aria-label={t('nav.toggleWorkPanel')}
+          aria-label={t('nav.workPanel')}
           // On narrow screens the panel overlays the conversation (like the
           // team list); below lg it is static in-flow. It must never be
           // "open" yet unreachable, which the old hidden-lg:block did on
@@ -148,7 +151,7 @@ export default function Layout() {
           where the floating button inside main covers it). */}
       {!panelOpen && (
         <div className="flex w-11 shrink-0 items-start justify-center pt-3 lg:hidden">
-          <IconButton label={t('nav.toggleWorkPanel')} onClick={() => setPanelOpen(true)}>
+          <IconButton label={t('nav.toggleWorkPanel')} expanded={panelOpen} onClick={() => setPanelOpen(true)}>
             <PanelRightOpen size={18} aria-hidden="true" />
           </IconButton>
         </div>

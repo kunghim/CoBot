@@ -91,11 +91,45 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
     };
 
     if (!bearerToken()) {
-      const source = new EventSource(`/api/v1/events?after=${lastSeq}`);
-      source.addEventListener('cobot.event', (message) => handleFrame((message as MessageEvent).data));
+      let source: EventSource | null = null;
+      let retryTimer = 0;
+      const connect = () => {
+        if (stopped) return;
+        // lastSeq is shared with handleFrame: every reconnect resumes from
+        // the cursor instead of replaying from zero (review C).
+        source = new EventSource(`/api/v1/events?after=${lastSeq}`);
+        source.addEventListener('cobot.event', (message) => handleFrame((message as MessageEvent).data));
+        source.onerror = () => {
+          if (stopped) return;
+          source?.close();
+          // The browser cannot read the error status from EventSource, so the
+          // session is probed once before reconnecting: an expired session
+          // becomes a re-auth, a transient blip retries with backoff.
+          void fetch('/api/v1/status', { credentials: 'include' })
+            .then(async (resp) => {
+              if (stopped) return;
+              if (resp.status === 401) {
+                reportUnauthorized();
+                return;
+              }
+              const body = (await resp.json().catch(() => null)) as { data?: { authorized?: boolean } } | null;
+              if (stopped) return;
+              if (!body?.data?.authorized) {
+                reportUnauthorized();
+                return;
+              }
+              retryTimer = window.setTimeout(connect, 1500);
+            })
+            .catch(() => {
+              if (!stopped) retryTimer = window.setTimeout(connect, 1500);
+            });
+        };
+      };
+      connect();
       return () => {
         stopped = true;
-        source.close();
+        window.clearTimeout(retryTimer);
+        source?.close();
       };
     }
 
@@ -482,6 +516,14 @@ export function useDeleteBot() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({
     mutationFn: ({ botId, expectedRevision }: { botId: string; expectedRevision?: number }) => api.deleteBot(botId, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRetryTeam() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: (teamId: string) => api.retryTeam(teamId),
     onSuccess: invalidate,
   });
 }

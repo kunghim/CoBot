@@ -3,6 +3,8 @@
   "nav": {
     "home": "Home",
     "settings": "Settings",
+    "teamList": "Team list",
+    "workPanel": "Work panel",
     "toggleTeamList": "Collapse/expand team list",
     "toggleWorkPanel": "Collapse/expand work panel"
   },
@@ -12,6 +14,7 @@
     "selectBot": "Pick a member on the left to start a conversation"
   },
   "team": {
+    "retry": "Retry creation",
     "archive": "Archive team",
     "restore": "Restore team",
     "delete": "Delete team",
@@ -71,6 +74,8 @@
     "messageRequired": "Message cannot be empty",
     "sendFailed": "Failed to send",
     "queuedBanner": "{{count}} message(s) received, queued",
+    "queuedBanner_one": "{{count}} message received, queued",
+    "queuedBanner_other": "{{count}} messages received, queued",
     "cancelQueued": "Cancel queued message",
     "interrupt": "Stop",
     "interruptRequested": "Stop requested; waiting for the engine",
@@ -132,6 +137,11 @@
     }
   },
   "approval": {
+    "card": {
+      "chain_risk": "The work will continue in this direction — please confirm",
+      "chain_over_limit": "This chain used up its wake budget — confirm to grant exactly one more wake",
+      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it"
+    },
     "option": {
       "allow_once": "Allow once",
       "allow_thread_session": "Always allow (this thread session)",
@@ -149,6 +159,8 @@
     "empty": "No activity yet",
     "loadFailed": "Failed to load activity",
     "type": {
+      "team.created": "Team created",
+      "bot.added": "Member added",
       "message.created": "Message created",
       "message.updated": "Message status changed",
       "run.updated": "Run state changed",
@@ -184,6 +196,7 @@
   },
   "panel": {
     "noSelection": "Pick a member on the left first",
+    "tablist": "Work panel pages",
     "notReadyYet": "Coming in a later milestone",
     "tabs": {
       "tasks": "Tasks",
@@ -210,6 +223,8 @@
       "cancelled": "Cancelled"
     },
     "dependencies": "{{count}} dependencies",
+    "dependencies_one": "{{count}} dependency",
+    "dependencies_other": "{{count}} dependencies",
     "dependenciesTitle": "Depends on:",
     "acceptance": "Acceptance",
     "blocked": "Blocked",
@@ -386,6 +401,8 @@
     "error.task.team_required": "Missing teamId parameter",
     "error.task.title_required": "Task title cannot be empty",
     "error.task.captain_only": "Only the captain can create tasks for members",
+    "error.task.cancel_captain_only": "Only the captain or the user can cancel a task",
+    "error.bot.revision_conflict": "The member changed elsewhere; refresh and retry",
     "error.task.owner_only": "Only the task owner can do this",
     "error.task.owner_or_captain": "Only the owner or the captain can do this",
     "error.task.parent_unknown": "Parent task not found",

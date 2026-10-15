@@ -33,3 +33,13 @@ const BUILTIN_OPTION_KEYS: Record<string, string> = {
   decline: 'approval.option.decline',
   deny: 'approval.option.permissions.deny',
 };
+
+/** approvalSummaryText renders a stored summary. Product cards store an
+ * i18n key (never prose in one language); engine summaries are model text
+ * and pass through unchanged. */
+export function approvalSummaryText(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  summary: string,
+): string {
+  return summary.startsWith('approval.') ? t(summary, { defaultValue: summary }) : summary;
+}
