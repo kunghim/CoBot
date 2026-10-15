@@ -62,3 +62,29 @@ jobs:
         run: npm run build --prefix frontend
       - name: Compile desktop shell with desktop tag (static check only)
         run: go build -tags desktop ./cmd/cobot-desktop
+
+  browser-e2e:
+    name: browser E2E (ubuntu, real core + fake engine)
+    runs-on: ubuntu-latest
+    needs: web-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Install E2E dependencies
+        run: npm ci
+        working-directory: tests/e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: tests/e2e
+      - name: Run browser E2E specs
+        run: npx playwright test
+        working-directory: tests/e2e

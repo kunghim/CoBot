@@ -17,6 +17,11 @@ echo "==> contract generation (must be committed clean)"
 
 echo "==> generated-file drift"
 git diff --exit-code -- api/openapi.yaml internal/contract frontend/src/api/generated
+# Also catch brand-new generated files that git diff would not show.
+untracked=$(git status --porcelain -- api/openapi.yaml internal/contract frontend/src/api/generated | grep '^??' || true)
+if [ -n "$untracked" ]; then
+  echo "generated contract files include untracked changes:" && echo "$untracked" && exit 1
+fi
 
 # Frontend first: internal/webui/dist is generated and gitignored, so
 # go:embed all:dist fails on a clean checkout until vite has run.
