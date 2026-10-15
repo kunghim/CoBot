@@ -35,6 +35,15 @@ type App struct {
 	// assigned during composition so tests can inject a fake factory.
 	Scheduler *Scheduler
 
+	// CollaborationTokens is the bridge credential authority. Tokens are
+	// minted when a thread starts and are only valid for this core lifetime.
+	CollaborationTokens *auth.TokenStore
+	// MCPBinary is the cobot executable the engine spawns as the bridge. It
+	// is the same binary the core runs from, resolved at startup.
+	MCPBinary string
+	// MCPEndpoint is the loopback address the bridge calls back on.
+	MCPEndpoint string
+
 	engineStatusMu    sync.Mutex
 	engineStatusCache *EngineStatusInfo
 

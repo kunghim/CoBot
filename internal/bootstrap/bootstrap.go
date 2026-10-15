@@ -17,6 +17,7 @@ import (
 	apihttp "github.com/kunghim/CoBot/internal/api/http"
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/config"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
@@ -208,6 +209,25 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	}
 	scheduler.Start()
 
+	// Collaboration composition: the token store is the bridge credential
+	// authority, and the dispatcher is the single permission path for MCP
+	// tools. Both live in the core; the bridge holds no database handle.
+	collabTokens := auth.NewTokenStore(0)
+	application.CollaborationTokens = collabTokens
+	dispatcher := collaboration.NewDispatcher(application, collabTokens)
+	// The bridge is this same executable: the engine spawns `cobot mcp`, so
+	// the binary must be the running one, not a PATH lookup that could pick a
+	// different version.
+	mcpBinary, err := os.Executable()
+	if err != nil {
+		listener.Close()
+		closeLog()
+		db.Close()
+		return fail(fmt.Errorf("resolve self executable for MCP bridge: %w", err))
+	}
+	application.MCPBinary = mcpBinary
+	application.MCPEndpoint = endpoint
+
 	issuer := auth.NewBootstrapIssuer(auth.DefaultBootstrapTTL)
 	sessions := auth.NewSessionStore(auth.DefaultSessionTTL)
 	bearer := auth.NewBearerStore(auth.DefaultBearerTTL)
@@ -231,6 +251,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		StartedAt:      info.StartedAt,
 		Logger:         logger,
 		Assets:         assets,
+
+		CollaborationTokens: collabTokens,
+		Dispatcher:          dispatcher,
+		EngineEpochOfTeam:   application.EngineEpochOfTeam,
 	}
 
 	startupSecret, err := issuer.Issue()

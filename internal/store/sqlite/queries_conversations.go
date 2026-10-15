@@ -16,16 +16,35 @@ func jsonUnmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 
 // ---- messages ----
 
+// messageColumns is the shared projection of the messages table.
+const messageColumns = `id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, source_bot_id, created_at`
+
+func scanMessage(row interface{ Scan(...any) error }) (domain.Message, error) {
+	var m domain.Message
+	var blocks, created string
+	err := row.Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &m.SourceBotID, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Message{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Message{}, fmt.Errorf("scan message: %w", err)
+	}
+	m.Blocks = []byte(blocks)
+	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
+	return m, nil
+}
+
 // InsertMessage writes a message; when requestID is non-empty the unique
-// index enforces one message per (team, requestId).
+// index enforces one message per (team, requestId). Collaboration messages
+// carry source_bot_id so both ends of the exchange are recorded.
 func InsertMessage(ctx context.Context, tx *sql.Tx, msg domain.Message) error {
 	created := msg.CreatedAt.UTC()
 	if created.IsZero() {
 		created = time.Now().UTC()
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO messages (id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		msg.ID, msg.TeamID, msg.BotID, msg.Kind, string(msg.Blocks), msg.RequestID, msg.DeliveryStatus, msg.RunID, created.Format(time.RFC3339Nano))
+	_, err := tx.ExecContext(ctx, `INSERT INTO messages (id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, source_bot_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		msg.ID, msg.TeamID, msg.BotID, msg.Kind, string(msg.Blocks), msg.RequestID, msg.DeliveryStatus, msg.RunID, msg.SourceBotID, created.Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("insert message: %w", err)
 	}
@@ -34,20 +53,7 @@ func InsertMessage(ctx context.Context, tx *sql.Tx, msg domain.Message) error {
 
 // GetMessage reads one message.
 func GetMessage(ctx context.Context, q Queryer, id string) (domain.Message, error) {
-	var m domain.Message
-	var blocks, created string
-	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
-		FROM messages WHERE id = ?`, id).
-		Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Message{}, ErrNotFound
-	}
-	if err != nil {
-		return domain.Message{}, fmt.Errorf("get message: %w", err)
-	}
-	m.Blocks = []byte(blocks)
-	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-	return m, nil
+	return scanMessage(q.QueryRowContext(ctx, `SELECT `+messageColumns+` FROM messages WHERE id = ?`, id))
 }
 
 // FindMessageByRequestID returns the message stored for an idempotent retry.
@@ -55,30 +61,18 @@ func FindMessageByRequestID(ctx context.Context, q Queryer, teamID, requestID st
 	if requestID == "" {
 		return domain.Message{}, ErrNotFound
 	}
-	var m domain.Message
-	var blocks, created string
-	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
-		FROM messages WHERE team_id = ? AND request_id = ?`, teamID, requestID).
-		Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Message{}, ErrNotFound
-	}
-	if err != nil {
-		return domain.Message{}, err
-	}
-	m.Blocks = []byte(blocks)
-	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-	return m, nil
+	return scanMessage(q.QueryRowContext(ctx, `SELECT `+messageColumns+` FROM messages WHERE team_id = ? AND request_id = ?`, teamID, requestID))
 }
 
-// ListMessages pages one bot conversation, newest last.
+// ListMessages pages one bot's user conversation, newest last. Collaboration
+// messages are excluded: they belong to the collaboration record, never to
+// the user session.
 func ListMessages(ctx context.Context, q Queryer, botID string, before string, limit int) ([]domain.Message, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	query := `SELECT id, team_id, bot_id, kind, blocks, request_id, delivery_status, run_id, created_at
-		FROM messages WHERE bot_id = ?`
-	args := []any{botID}
+	query := `SELECT ` + messageColumns + ` FROM messages WHERE bot_id = ? AND kind != ?`
+	args := []any{botID, domain.MessageKindCollaboration}
 	if before != "" {
 		query += ` AND created_at < ?`
 		args = append(args, before)
@@ -92,16 +86,44 @@ func ListMessages(ctx context.Context, q Queryer, botID string, before string, l
 	defer rows.Close()
 	var out []domain.Message
 	for rows.Next() {
-		var m domain.Message
-		var blocks, created string
-		if err := rows.Scan(&m.ID, &m.TeamID, &m.BotID, &m.Kind, &blocks, &m.RequestID, &m.DeliveryStatus, &m.RunID, &created); err != nil {
+		m, err := scanMessage(rows)
+		if err != nil {
 			return nil, err
 		}
-		m.Blocks = []byte(blocks)
-		m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 		out = append(out, m)
 	}
 	// Reverse to chronological order for the client.
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, rows.Err()
+}
+
+// ListCollaborationMessages returns exchanges between the given bot and one
+// peer, oldest first. Both directions are included so either collaboration
+// page can show the same read-only segment.
+func ListCollaborationMessages(ctx context.Context, q Queryer, botID, peerBotID string, limit int) ([]domain.Message, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	query := `SELECT ` + messageColumns + ` FROM messages
+		WHERE kind = ? AND ((source_bot_id = ? AND bot_id = ?) OR (source_bot_id = ? AND bot_id = ?))`
+	args := []any{domain.MessageKindCollaboration, botID, peerBotID, peerBotID, botID}
+	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := q.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list collaboration messages: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Message
+	for rows.Next() {
+		m, err := scanMessage(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}

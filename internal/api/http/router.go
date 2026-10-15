@@ -9,6 +9,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/platform"
 )
@@ -29,6 +30,16 @@ type Server struct {
 	Logger         *slog.Logger
 	Assets         fs.FS
 	EngineStatus   EngineStatusProvider
+
+	// CollaborationTokens resolves a bridge credential onto a bot identity.
+	// The tokens live in memory in the core; the bridge holds only the one it
+	// was started with.
+	CollaborationTokens *auth.TokenStore
+	// Dispatcher routes an authenticated tool call onto the application.
+	Dispatcher *collaboration.Dispatcher
+	// EngineEpochOfTeam reports the live engine epoch for a team, so a bridge
+	// left behind by a restarted connection can be refused.
+	EngineEpochOfTeam func(teamID string) string
 }
 
 // Handler builds the full HTTP handler.
@@ -69,6 +80,10 @@ func (s *Server) Handler() http.Handler {
 	// Approvals.
 	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
 	mux.HandleFunc("POST /api/v1/approvals/{id}/decisions", s.handleDecideApproval)
+
+	// The MCP bridge's only core route. Bot identity comes from the token, so
+	// a browser session can never reach it.
+	mux.HandleFunc("POST /internal/v1/collaboration", s.handleCollaboration)
 
 	// SPA fallback: any non-/api path renders the frontend entry, which then
 	// routes client-side. Business requests never touch the asset handler.

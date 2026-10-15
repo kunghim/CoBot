@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
@@ -205,7 +206,15 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.thread_failed")
 	}
 	settings, _ := s.app.GetSettings(ctx)
-	turnID, err := server.StartTurn(ctx, threadID, message.RenderText(), settings.DefaultModel)
+	// The context is rebuilt on every dispatch so the bot sees the current
+	// team, member list and task instead of trusting a stale model memory.
+	// A task-assignment message carries its task id in run_id.
+	taskID := ""
+	if message.Kind == domain.MessageKindSystem {
+		taskID = message.RunID
+	}
+	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + message.RenderText()
+	turnID, err := server.StartTurn(ctx, threadID, input, settings.DefaultModel)
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried (D04).
@@ -323,6 +332,20 @@ func (s *Scheduler) ensureTeamServer(ctx context.Context, teamID, cwd string) (e
 	return rt.server, nil
 }
 
+// EngineEpochOfTeam reports the live engine epoch for a team, or "" when no
+// server is running. The HTTP layer uses it to refuse a bridge credential
+// minted by a previous connection.
+func (a *App) EngineEpochOfTeam(teamID string) string {
+	if a.Scheduler == nil {
+		return ""
+	}
+	rt := a.Scheduler.runtime(teamID)
+	if rt == nil || rt.server == nil {
+		return ""
+	}
+	return rt.server.Epoch()
+}
+
 func (s *Scheduler) runtime(teamID string) *teamRuntime {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -360,7 +383,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		ApprovalsReviewer:     "user",
 		Model:                 settings.DefaultModel,
 		DeveloperInstructions: buildInstructions(team, bot, role),
-		Config:                codex.ThreadConfig(nil),
+		Config:                s.threadConfig(ctx, team, bot, server.Epoch()),
 	})
 	if err != nil {
 		return "", err
@@ -384,6 +407,40 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 
 // buildInstructions assembles the first-turn role context. Later BuildContext
 // (tasks/memories/collaboration) extends this per dispatch.
+// threadConfig is the per-thread engine configuration. It merges the
+// platform defaults with this bot's collaboration bridge.
+//
+// The bridge is spawned by the engine as `cobot mcp` with the bot token in
+// its environment. That token is minted per bot and bound to this engine
+// epoch, so a bridge left behind by a restarted connection can no longer act:
+// the core refuses it rather than trusting a stale credential.
+func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot domain.Bot, engineEpoch string) map[string]any {
+	extra := map[string]any{}
+	if s.app.MCPBinary == "" || s.app.MCPEndpoint == "" || s.app.CollaborationTokens == nil {
+		// No bridge available (for example a test factory); the tools simply
+		// are not offered rather than being offered and always failing.
+		return codex.ThreadConfig(extra)
+	}
+	token, err := s.app.CollaborationTokens.Issue(bot.ID, team.ID, engineEpoch)
+	if err != nil {
+		s.logger.Error("mint bot token failed; collaboration tools disabled", "botId", bot.ID, "error", err)
+		return codex.ThreadConfig(extra)
+	}
+	prefix := "mcp_servers.cobot"
+	extra[prefix+".enabled"] = true
+	extra[prefix+".command"] = s.app.MCPBinary
+	extra[prefix+".args"] = []string{"mcp"}
+	extra[prefix+".env"] = map[string]string{
+		auth.BridgeEnvEndpoint: s.app.MCPEndpoint,
+		auth.BridgeEnvToken:    token,
+	}
+	// The tools are CoBot's own structured collaboration surface, so they
+	// never need a user approval round trip; the core enforces permissions.
+	extra[prefix+".required"] = true
+	extra[prefix+".default_tools_approval_mode"] = "auto"
+	return codex.ThreadConfig(extra)
+}
+
 func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string {
 	var b strings.Builder
 	b.WriteString(role.Instructions)

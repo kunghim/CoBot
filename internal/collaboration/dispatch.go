@@ -1,0 +1,481 @@
+package collaboration
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/kunghim/CoBot/internal/app"
+	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/domain"
+)
+
+// App is the slice of application services the collaboration tools need. It
+// is an interface so the dispatcher stays testable and never reaches into the
+// database itself.
+type App interface {
+	SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
+	CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in app.CreateTaskInput) (domain.Task, error)
+	ListTasks(ctx context.Context, principal auth.Principal, teamID, ownerID string, limit int) ([]domain.Task, error)
+	GetTaskDetail(ctx context.Context, principal auth.Principal, taskID string) (map[string]any, error)
+	AssignTask(ctx context.Context, principal auth.Principal, taskID, newOwnerID string, expectedRevision int64) (domain.Task, error)
+	UpdateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64) (domain.Task, error)
+	SubmitEvidence(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string, candidateRef, testResult, reviewResult string) (domain.Evidence, error)
+	ConfirmTask(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error)
+	OfferTransfer(ctx context.Context, principal auth.Principal, taskID, toBotID, note string) (domain.Transfer, error)
+	AcceptTransfer(ctx context.Context, principal auth.Principal, transferID string) (domain.Task, error)
+	AskUser(ctx context.Context, principal auth.Principal, in app.AskUserInput) (domain.Question, error)
+	RequestMember(ctx context.Context, principal auth.Principal, roleID, reason string) (domain.Approval, error)
+	RoleLibrary(ctx context.Context) ([]map[string]any, error)
+	BuildBotContext(ctx context.Context, principal auth.Principal, taskID string) (string, error)
+	BotOf(ctx context.Context, botID string) (domain.Bot, error)
+	CaptainOf(ctx context.Context, teamID string) (string, error)
+	SubmitMergeRequest(ctx context.Context, principal auth.Principal, taskID, candidateRef, targetRef, executionDirectory string, evidenceIDs []string) (domain.Approval, error)
+}
+
+// Dispatcher validates a bot's identity and routes one tool call onto the
+// application layer. Both the user API and the MCP API end up in the same app
+// methods, so the permission rules live in exactly one place.
+type Dispatcher struct {
+	app    App
+	tokens *auth.TokenStore
+}
+
+// NewDispatcher wires the dispatcher to the application services and the
+// in-memory token store.
+func NewDispatcher(application App, tokens *auth.TokenStore) *Dispatcher {
+	return &Dispatcher{app: application, tokens: tokens}
+}
+
+// ResolveToken maps a bridge credential onto a bot principal.
+func (d *Dispatcher) ResolveToken(token string) (auth.Principal, auth.BotBinding, error) {
+	binding, err := d.tokens.Resolve(token)
+	if err != nil {
+		return auth.Principal{}, auth.BotBinding{}, err
+	}
+	return auth.NewPrincipalBot(binding.BotID, binding.TeamID), binding, nil
+}
+
+// dispatchTimeout bounds every bridge-driven call so a stuck application call
+// can never hang the engine's tool loop.
+const dispatchTimeout = 30 * time.Second
+
+// ToolCall is one MCP tool invocation arriving from the bridge.
+type ToolCall struct {
+	Name      string
+	Arguments json.RawMessage
+}
+
+func decodeArgs(raw json.RawMessage, dst any) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	return json.Unmarshal(raw, dst)
+}
+
+// toolError maps a product error onto the wire contract's rejected status.
+func toolError(err error) *ToolError {
+	if err == nil {
+		return nil
+	}
+	var te *ToolError
+	if ok := asToolError(err, &te); ok {
+		return te
+	}
+	de := domain.AsError(err)
+	status := StatusRejected
+	switch de.Code {
+	case domain.CodeEngineUnavailable, domain.CodeCapabilityMissing:
+		status = StatusUnavailable
+	case domain.CodeConflict, domain.CodeRevisionConflict, domain.CodeIdempotencyConflict:
+		status = StatusRejected
+	}
+	return &ToolError{Status: status, Code: string(de.Code), MessageKey: de.MessageKey, Params: de.Params}
+}
+
+func asToolError(err error, target **ToolError) bool {
+	te, ok := err.(*ToolError)
+	if ok {
+		*target = te
+	}
+	return ok
+}
+
+// CallTool routes one tool by name. Every write tool requires an idempotency
+// key; read tools do not.
+func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
+	ctx, cancel := context.WithTimeout(ctx, dispatchTimeout)
+	defer cancel()
+
+	switch call.Name {
+	case "get_context":
+		var args struct {
+			TaskID string `json:"taskId"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		text, err := d.app.BuildBotContext(ctx, principal, args.TaskID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusOK, Data: map[string]any{"context": text}}
+
+	case "list_tasks":
+		var args struct {
+			Status string `json:"status"`
+			Limit  int    `json:"limit"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		bot, err := d.requireBot(ctx, principal)
+		if err != nil {
+			return errorResult(err)
+		}
+		tasks, err := d.app.ListTasks(ctx, principal, bot.TeamID, "", args.Limit)
+		if err != nil {
+			return errorResult(err)
+		}
+		if args.Status != "" {
+			filtered := tasks[:0]
+			for _, t := range tasks {
+				if t.Status == args.Status {
+					filtered = append(filtered, t)
+				}
+			}
+			tasks = filtered
+		}
+		return ToolResult{Status: StatusOK, Data: map[string]any{"tasks": tasks}}
+
+	case "get_task":
+		var args struct {
+			TaskID string `json:"taskId"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil || args.TaskID == "" {
+			return rejected("invalid_request", "error.task.id_required", nil)
+		}
+		detail, err := d.app.GetTaskDetail(ctx, principal, args.TaskID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusOK, Data: detail}
+
+	case "list_roles":
+		items, err := d.app.RoleLibrary(ctx)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusOK, Data: map[string]any{"roles": items}}
+
+	case "send_message":
+		var args struct {
+			TargetBotID string `json:"targetBotId"`
+			Text        string `json:"text"`
+			TaskID      string `json:"taskId"`
+			RequestID   string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		result, err := d.app.SendMessageFromBot(ctx, principal, args.TargetBotID, args.Text, args.TaskID, args.RequestID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: result}
+
+	case "create_task":
+		var args struct {
+			Title              string   `json:"title"`
+			Description        string   `json:"description"`
+			AcceptanceCriteria string   `json:"acceptanceCriteria"`
+			OwnerID            string   `json:"ownerId"`
+			ParentID           string   `json:"parentId"`
+			DependencyIDs      []string `json:"dependencyIds"`
+			RequestID          string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		bot, err := d.requireBot(ctx, principal)
+		if err != nil {
+			return errorResult(err)
+		}
+		task, err := d.app.CreateTask(ctx, principal, true, app.CreateTaskInput{
+			TeamID: bot.TeamID, OwnerID: args.OwnerID, Title: args.Title,
+			Description: args.Description, AcceptanceCriteria: args.AcceptanceCriteria,
+			ParentID: args.ParentID, DependencyIDs: args.DependencyIDs, RequestID: args.RequestID,
+		})
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "propose_task":
+		// A member cannot create a task; it forms a proposal message the
+		// captain acts on, so the permission rule stays real.
+		var args struct {
+			Title              string `json:"title"`
+			Description        string `json:"description"`
+			AcceptanceCriteria string `json:"acceptanceCriteria"`
+			RequestID          string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		bot, err := d.requireBot(ctx, principal)
+		if err != nil {
+			return errorResult(err)
+		}
+		team, err := d.captainOf(ctx, bot.TeamID)
+		if err != nil {
+			return errorResult(err)
+		}
+		proposal := "任务提议\n标题：" + args.Title + "\n描述：" + args.Description + "\n完成标准：" + args.AcceptanceCriteria
+		result, err := d.app.SendMessageFromBot(ctx, principal, team, proposal, "", args.RequestID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: result}
+
+	case "assign_task":
+		var args struct {
+			TaskID           string `json:"taskId"`
+			OwnerID          string `json:"ownerId"`
+			ExpectedRevision int64  `json:"expectedRevision"`
+			RequestID        string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.AssignTask(ctx, principal, args.TaskID, args.OwnerID, args.ExpectedRevision)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "update_task":
+		var args struct {
+			TaskID           string `json:"taskId"`
+			Status           string `json:"status"`
+			BlockedReason    string `json:"blockedReason"`
+			ExpectedRevision int64  `json:"expectedRevision"`
+			RequestID        string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.UpdateTaskStatus(ctx, principal, args.TaskID, args.Status, args.BlockedReason, args.ExpectedRevision)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "submit_evidence":
+		var args struct {
+			TaskID       string   `json:"taskId"`
+			Summary      string   `json:"summary"`
+			ArtifactRefs []string `json:"artifactRefs"`
+			CandidateRef string   `json:"candidateRef"`
+			TestResult   string   `json:"testResult"`
+			ReviewResult string   `json:"reviewResult"`
+			RequestID    string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		evidence, err := d.app.SubmitEvidence(ctx, principal, args.TaskID, args.Summary, args.ArtifactRefs, args.CandidateRef, args.TestResult, args.ReviewResult)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"evidence": evidence}}
+
+	case "report_completion":
+		// Reporting completion moves the task to review; only the confirmer
+		// can mark it done, so a bot can never self-certify.
+		var args struct {
+			TaskID           string   `json:"taskId"`
+			EvidenceIDs      []string `json:"evidenceIds"`
+			ExpectedRevision int64    `json:"expectedRevision"`
+			RequestID        string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.UpdateTaskStatus(ctx, principal, args.TaskID, domain.TaskReview, "", args.ExpectedRevision)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "confirm_task":
+		var args struct {
+			TaskID           string   `json:"taskId"`
+			EvidenceIDs      []string `json:"evidenceIds"`
+			ExpectedRevision int64    `json:"expectedRevision"`
+			RequestID        string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.ConfirmTask(ctx, principal, args.TaskID, args.EvidenceIDs, args.ExpectedRevision)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "offer_transfer":
+		var args struct {
+			TaskID    string `json:"taskId"`
+			ToBotID   string `json:"toBotId"`
+			Note      string `json:"note"`
+			RequestID string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		transfer, err := d.app.OfferTransfer(ctx, principal, args.TaskID, args.ToBotID, args.Note)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"transfer": transfer}}
+
+	case "accept_transfer":
+		var args struct {
+			TransferID string `json:"transferId"`
+			RequestID  string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.AcceptTransfer(ctx, principal, args.TransferID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "ask_user":
+		var args struct {
+			Question  string   `json:"question"`
+			Options   []string `json:"options"`
+			TaskID    string   `json:"taskId"`
+			RequestID string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		question, err := d.app.AskUser(ctx, principal, app.AskUserInput{
+			Question: args.Question, Options: args.Options, TaskID: args.TaskID,
+		})
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID}}
+
+	case "request_member":
+		var args struct {
+			RoleID    string `json:"roleId"`
+			Reason    string `json:"reason"`
+			RequestID string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		approval, err := d.app.RequestMember(ctx, principal, args.RoleID, args.Reason)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusWaiting, Data: map[string]any{"approvalId": approval.ID}}
+
+	case "request_merge":
+		var args struct {
+			TaskID             string   `json:"taskId"`
+			CandidateRef       string   `json:"candidateRef"`
+			TargetRef          string   `json:"targetRef"`
+			ExecutionDirectory string   `json:"executionDirectory"`
+			EvidenceIDs        []string `json:"evidenceIds"`
+			RequestID          string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		approval, err := d.app.SubmitMergeRequest(ctx, principal, args.TaskID, args.CandidateRef, args.TargetRef, args.ExecutionDirectory, args.EvidenceIDs)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusWaiting, Data: map[string]any{"approvalId": approval.ID}}
+
+	default:
+		return rejected("invalid_request", "error.tool.unknown", map[string]any{"tool": call.Name})
+	}
+}
+
+func rejected(code, messageKey string, params map[string]any) ToolResult {
+	return ToolResult{Status: StatusRejected, Error: &ToolError{Status: StatusRejected, Code: code, MessageKey: messageKey, Params: params}}
+}
+
+func errorResult(err error) ToolResult {
+	te := toolError(err)
+	return ToolResult{Status: te.Status, Error: te}
+}
+
+// requireBot resolves the caller's bot row, proving the token still maps to a
+// live member.
+func (d *Dispatcher) requireBot(ctx context.Context, principal auth.Principal) (domain.Bot, error) {
+	if principal.Kind != auth.KindBot {
+		return domain.Bot{}, domain.Forbidden("error.forbidden.bot_only", nil)
+	}
+	return d.app.BotOf(ctx, principal.BotID)
+}
+
+func (d *Dispatcher) captainOf(ctx context.Context, teamID string) (string, error) {
+	return d.app.CaptainOf(ctx, teamID)
+}
+
+// contextWithTimeout is a small helper so every bridge-driven call is bounded
+// even when the caller supplies no deadline.
+func contextWithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := parent.Deadline(); ok {
+		return context.WithCancel(parent)
+	}
+	return context.WithTimeout(parent, d)
+}

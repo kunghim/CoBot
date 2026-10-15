@@ -34,6 +34,7 @@ type Message struct {
 	RequestID      string          `json:"requestId,omitempty"`
 	DeliveryStatus string          `json:"deliveryStatus,omitempty"`
 	RunID          string          `json:"runId,omitempty"`
+	SourceBotID    string          `json:"sourceBotId,omitempty"`
 	CreatedAt      time.Time       `json:"createdAt"`
 }
 

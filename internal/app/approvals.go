@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -71,6 +72,30 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	response, err := engineResponseFor(approval.Type, approval.Method, optionID)
 	if err != nil {
 		// Recorded decision stands; nothing engine-bound to deliver.
+		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseExpired, "not_engine_bound")
+		a.publishApprovalUpdated(ctx, approval)
+		return sqlite.GetApproval(ctx, a.DB, approvalID)
+	}
+
+	// A recruitment approval has a product side effect instead of an engine
+	// reply: only an approval creates the member, so a rejected or expired
+	// request never leaves a runnable bot behind.
+	if approval.Type == domain.ApprovalRecruitment && optionID == "approve" {
+		roleID := ""
+		_ = json.Unmarshal(approval.EngineRequestID, &roleID)
+		if _, addErr := a.AddBot(ctx, principal, approval.TeamID, roleID); addErr != nil {
+			// The decision stays recorded; the failure is reported honestly.
+			_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseUnknown, "recruitment_failed")
+			a.publishApprovalUpdated(ctx, approval)
+			return domain.Approval{}, addErr
+		}
+		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseSent, "member_added")
+		a.publishApprovalUpdated(ctx, approval)
+		return sqlite.GetApproval(ctx, a.DB, approvalID)
+	}
+	if response == nil {
+		// Non-engine cards (merge, recruitment rejection) have no protocol
+		// reply to deliver.
 		_ = sqlite.SetApprovalResponseState(ctx, a.DB, approvalID, domain.ResponseExpired, "not_engine_bound")
 		a.publishApprovalUpdated(ctx, approval)
 		return sqlite.GetApproval(ctx, a.DB, approvalID)

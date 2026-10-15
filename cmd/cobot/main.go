@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/bootstrap"
+	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/platform"
 )
@@ -33,6 +35,8 @@ func main() {
 	switch os.Args[1] {
 	case "serve":
 		os.Exit(runServe(os.Args[2:]))
+	case "mcp":
+		os.Exit(runMCP(os.Args[2:]))
 	case "version", "--version", "-v":
 		fmt.Println(version)
 	case "help", "--help", "-h":
@@ -51,6 +55,7 @@ Usage:
   cobot serve [--profile development|production] [--data-root <path>] [--listen host:port]
               [--log-level debug|info|warn|error]
   cobot version
+  cobot mcp                      # MCP stdio bridge for one bot (spawned by the engine)
 
 The core binds loopback only. `+"`serve`"+` prints a one-time startup link for
 browser authorization; a second serve on the same profile reports the running
@@ -175,4 +180,31 @@ func mintLinkForRunningInstance(env platform.Environment, dataRoot string) strin
 		return ""
 	}
 	return envelope.Data.Endpoint + "/#cobot-bootstrap=" + envelope.Data.BootstrapSecret
+}
+
+// runMCP serves the MCP stdio bridge for exactly one bot. The engine spawns
+// it with the endpoint and the bot token in the environment; the token proves
+// which bot is calling, so the bridge itself carries no identity. It never
+// opens the database and holds no delivery queue: every call goes to the core,
+// which owns the facts.
+func runMCP(args []string) int {
+	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	endpoint := os.Getenv(collaboration.BridgeEnvEndpoint)
+	token := os.Getenv(collaboration.BridgeEnvToken)
+	if endpoint == "" || token == "" {
+		fmt.Fprintln(os.Stderr, "cobot mcp: "+collaboration.BridgeEnvEndpoint+" and "+collaboration.BridgeEnvToken+
+			" must be set by the engine; this subcommand is not meant to be run by hand")
+		return 2
+	}
+	// A dedicated logger on stderr keeps stdout clean for the MCP stream.
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	bridge := collaboration.NewBridge(endpoint, token, logger)
+	if err := bridge.Run(context.Background()); err != nil && !errors.Is(err, io.EOF) {
+		fmt.Fprintln(os.Stderr, "cobot mcp:", err)
+		return 1
+	}
+	return 0
 }

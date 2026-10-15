@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -192,7 +193,9 @@ func TestSendMessageDispatchAndAssistantReply(t *testing.T) {
 	fake := h.fakeFor(t, team.ID)
 	waitUntil(t, 5*time.Second, "turn started", func() bool { return len(fake.Turns()) == 1 })
 	turn := fake.Turns()[0]
-	if turn.Text != "你好，队长" {
+	// M3 prepends a fresh context block to every turn, so the user's text is
+	// the tail of the input rather than the whole of it.
+	if !strings.HasSuffix(turn.Text, "你好，队长") {
 		t.Fatalf("engine received %q", turn.Text)
 	}
 
@@ -270,7 +273,7 @@ func TestQueuedFIFOAndCancel(t *testing.T) {
 
 	fake.EmitTurnCompleted(fake.Turns()[0].ThreadID, fake.Turns()[0].TurnID, "completed", "已处理第一条")
 	waitUntil(t, 5*time.Second, "second turn", func() bool { return len(fake.Turns()) == 2 })
-	if fake.Turns()[1].Text != "第二条" {
+	if !strings.HasSuffix(fake.Turns()[1].Text, "第二条") {
 		t.Fatalf("FIFO violated: got %q", fake.Turns()[1].Text)
 	}
 	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "已处理第二条")
