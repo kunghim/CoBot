@@ -2,9 +2,10 @@
 // members, then calls POST /teams. "Choose folder" opens the operating
 // system's folder chooser (through the desktop bridge, or the local core in
 // the browser); a path can still be typed or pasted. The chosen directory is
-// checked at once with the same rules creation uses. Backend validation
-// errors (duplicate/nested directory, member limit, unknown role...) surface
-// through their messageKey with params.
+// checked at once with the same rules creation uses; a folder another team
+// claims cannot be used. Backend validation errors (duplicate/nested
+// directory, member limit, unknown role...) surface through their messageKey
+// with params.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, FolderOpen, Lock } from 'lucide-react';
@@ -41,7 +42,6 @@ export default function CreateTeamDialog({
   const [selectedRoles, setSelectedRoles] = useState<ReadonlySet<string>>(() => new Set());
   const [errorText, setErrorText] = useState('');
   const [verdict, setVerdict] = useState<DirectoryCheckResult | null>(null);
-  const [adoptMarker, setAdoptMarker] = useState(false);
   const [checking, setChecking] = useState(false);
   const [picking, setPicking] = useState(false);
   const checkedPath = useRef('');
@@ -59,7 +59,6 @@ export default function CreateTeamDialog({
     setSelectedRoles(new Set());
     setErrorText('');
     setVerdict(null);
-    setAdoptMarker(false);
     checkedPath.current = '';
   }, [open]);
 
@@ -77,7 +76,7 @@ export default function CreateTeamDialog({
   const offered = scenario
     ? scenario.roleIds.map((id) => library.find((role) => role.id === id)).filter((role) => role !== undefined)
     : library.filter((role) => role.id !== 'leader');
-  const canSubmit = name.trim() !== '' && directory.trim() !== '' && !create.isPending;
+  const canSubmit = name.trim() !== '' && directory.trim() !== '' && verdict?.ok !== false && !create.isPending;
 
   // The check uses the same rules creation uses, so a duplicate, nested or
   // foreign-marked directory shows before submit, not only as a late error.
@@ -90,10 +89,7 @@ export default function CreateTeamDialog({
     setErrorText('');
     api
       .checkDirectory(trimmed)
-      .then((result) => {
-        setVerdict(result);
-        setAdoptMarker(false);
-      })
+      .then((result) => setVerdict(result))
       .catch((error) => setErrorText(apiErrorMessage(t, error)))
       .finally(() => setChecking(false));
   };
@@ -128,7 +124,7 @@ export default function CreateTeamDialog({
     if (!canSubmit) return;
     setErrorText('');
     create.mutate(
-      { name: name.trim(), directory: directory.trim(), initialRoleIds: [...selectedRoles], adoptMarker },
+      { name: name.trim(), directory: directory.trim(), initialRoleIds: [...selectedRoles] },
       {
         onSuccess: (result) => onCreated(result.team.leaderId, result.team.id),
         onError: (error) => setErrorText(apiErrorMessage(t, error)),
@@ -236,21 +232,11 @@ export default function CreateTeamDialog({
                   ? t('team.directoryDuplicate', { teamName: verdict.teamName ?? '' })
                   : verdict.nested
                     ? t('team.directoryNested', { teamName: verdict.teamName ?? '' })
-                    : t('status.error')}
-              {verdict.markerPresent && (
-                <span className="block">
-                  {t('team.directoryMarker', { instanceId: verdict.markerInstance ?? '' })}
-                  <label className="mt-1 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={adoptMarker}
-                      onChange={() => setAdoptMarker((value) => !value)}
-                      className="h-4 w-4 rounded border-neutral-300"
-                    />
-                    {t('team.adoptMarker')}
-                  </label>
-                </span>
-              )}
+                    : verdict.claimed
+                      ? verdict.teamName
+                        ? t('team.directoryClaimed', { teamName: verdict.teamName })
+                        : t('team.directoryClaimedUnknown')
+                      : t('status.error')}
             </p>
           )}
         </div>

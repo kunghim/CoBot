@@ -278,61 +278,115 @@ func TestTeamDeleteSoftRemovesAndKeepsUserFiles(t *testing.T) {
 			t.Fatal("deleted team must release its directory binding")
 		}
 	}
-	// ...but the user's marker file on disk is untouched.
-	markerPath := filepath.Join(h.teamDir, ".cobot", "team.json")
-	if _, err := os.Stat(markerPath); err != nil {
-		t.Fatalf("marker must survive team deletion: %v", err)
+	// ...together with the team's own marker, so the folder is free for a
+	// new team; the user's files stay.
+	if _, err := os.Stat(filepath.Join(h.teamDir, ".cobot", "team.json")); !os.IsNotExist(err) {
+		t.Fatalf("deleted team must remove its own marker, stat err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.teamDir, ".cobot")); err != nil {
+		t.Fatalf("the rest of .cobot must stay: %v", err)
+	}
+	again, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "重建团队", Directory: h.teamDir})
+	if err != nil || again.Status != domain.TeamStatusActive {
+		t.Fatalf("a new team in the freed folder = %+v, %v", again, err)
 	}
 }
 
-// TestMarkerAdoptIsExplicit pins B04: a directory that already carries a
-// team marker — copied, moved, or from an unknown instance — is refused
-// until the user explicitly adopts it, and adopting rewrites the marker for
-// the new owner instance.
-func TestMarkerAdoptIsExplicit(t *testing.T) {
+// TestClaimedFolderIsRefused pins B04: one project belongs to one team for
+// life. A folder whose marker names a team this instance cannot see is
+// refused by name and never taken over, while a stale marker left by a team
+// this instance deleted claims nothing.
+func TestClaimedFolderIsRefused(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 
-	foreignDir := filepath.Join(filepath.Dir(h.teamDir), "marker-adopt-dir")
-	if err := os.MkdirAll(filepath.Join(foreignDir, ".cobot"), 0o755); err != nil {
-		t.Fatal(err)
+	writeMarker := func(dir, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(dir, ".cobot"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".cobot", "team.json"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	marker := []byte(`{"instanceId":"foreign-instance","teamId":"copied-team"}`)
-	if err := os.WriteFile(filepath.Join(foreignDir, ".cobot", "team.json"), marker, 0o644); err != nil {
-		t.Fatal(err)
+	refusal := func(dir string) *domain.Error {
+		t.Helper()
+		_, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "认领测试", Directory: dir})
+		var de *domain.Error
+		if !errors.As(err, &de) || de.Code != domain.CodeConflict {
+			t.Fatalf("creating in %s = %v, want a conflict", dir, err)
+		}
+		return de
 	}
 
-	_, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{
-		Name: "接管测试", Directory: foreignDir, InitialRoleIDs: []string{"backend-dev"},
-	})
-	var de *domain.Error
-	if !errors.As(err, &de) || de.Code != domain.CodeInvalidRequest {
-		t.Fatalf("creating over a foreign marker = %v, want invalid marker_adopt_required", err)
+	named := filepath.Join(filepath.Dir(h.teamDir), "claimed-named")
+	writeMarker(named, `{"instanceId":"other-instance","teamId":"t1","teamName":"别处的团队"}`)
+	if de := refusal(named); de.MessageKey != "error.team.directory_claimed_external" || de.Params["teamName"] != "别处的团队" {
+		t.Fatalf("named claim refusal = %s %+v", de.MessageKey, de.Params)
 	}
-	if de.Params["instanceId"] != "foreign-instance" {
-		t.Fatalf("refusal params = %+v, want the marker's instance id", de.Params)
+	unnamed := filepath.Join(filepath.Dir(h.teamDir), "claimed-unnamed")
+	writeMarker(unnamed, `not json`)
+	if de := refusal(unnamed); de.MessageKey != "error.team.directory_claimed_unknown" {
+		t.Fatalf("unreadable claim refusal = %s", de.MessageKey)
+	}
+	if data, _ := os.ReadFile(filepath.Join(unnamed, ".cobot", "team.json")); string(data) != "not json" {
+		t.Fatal("a refused claim must never be overwritten")
 	}
 
-	// The explicit choice adopts the directory and rewrites the claim.
-	team, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{
-		Name: "接管测试", Directory: foreignDir, InitialRoleIDs: []string{"backend-dev"},
-		AdoptMarker: true,
-	})
+	stale := filepath.Join(filepath.Dir(h.teamDir), "stale-marker")
+	writeMarker(stale, `{"instanceId":"`+h.app.InstanceID+`","teamId":"deleted-long-ago"}`)
+	team, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "旧标记", Directory: stale})
 	if err != nil {
-		t.Fatalf("adopt create: %v", err)
-	}
-	if team.Status == domain.TeamStatusDeleted {
-		t.Fatal("adopted team must be live")
-	}
-	data, err := os.ReadFile(filepath.Join(foreignDir, ".cobot", "team.json"))
-	if err != nil {
-		t.Fatalf("read adopted marker: %v", err)
+		t.Fatalf("a stale marker of this instance must not block: %v", err)
 	}
 	var written app.TeamMarker
-	if err := json.Unmarshal(data, &written); err != nil {
-		t.Fatalf("parse marker: %v", err)
+	data, _ := os.ReadFile(filepath.Join(stale, ".cobot", "team.json"))
+	if err := json.Unmarshal(data, &written); err != nil || written.TeamID != team.ID || written.TeamName != "旧标记" {
+		t.Fatalf("marker after create = %s (%v)", data, err)
 	}
-	if written.InstanceID != h.app.InstanceID {
-		t.Fatalf("adopted marker instance = %q, want this profile %q", written.InstanceID, h.app.InstanceID)
+}
+
+// TestTeamFollowsItsFolder pins the lifelong binding: a team whose folder is
+// gone becomes directory_missing and refuses work; once the folder is back
+// at the same path it resumes by itself, and a lost marker is rewritten.
+func TestTeamFollowsItsFolder(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	status := func() string {
+		t.Helper()
+		current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return current.Status
+	}
+
+	away := h.teamDir + "-away"
+	if err := os.Rename(h.teamDir, away); err != nil {
+		t.Fatal(err)
+	}
+	h.app.CheckTeamDirectories(ctx)
+	if got := status(); got != domain.TeamStatusDirectoryMissing {
+		t.Fatalf("status with the folder gone = %s", got)
+	}
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: "hi", RequestID: "missing-folder"}); err == nil {
+		t.Fatal("a team without its folder must refuse work")
+	}
+
+	if err := os.Rename(away, h.teamDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(h.teamDir, ".cobot", "team.json")); err != nil {
+		t.Fatal(err)
+	}
+	h.app.CheckTeamDirectories(ctx)
+	if got := status(); got != domain.TeamStatusActive {
+		t.Fatalf("status with the folder back = %s", got)
+	}
+	var marker app.TeamMarker
+	data, err := os.ReadFile(filepath.Join(h.teamDir, ".cobot", "team.json"))
+	if err != nil || json.Unmarshal(data, &marker) != nil || marker.TeamID != team.ID {
+		t.Fatalf("lost marker must be rewritten: %s (%v)", data, err)
 	}
 }

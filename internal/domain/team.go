@@ -2,8 +2,9 @@ package domain
 
 import "time"
 
-// Team lifecycle states. Archived pauses dispatch; directory_missing pauses
-// the team until the user rebinds; error keeps a retryable creation failure.
+// Team lifecycle states. Archived pauses dispatch; directory_missing keeps
+// the team read-only while its lifelong folder is gone and clears itself when
+// the folder is back; error keeps a retryable creation failure.
 const (
 	TeamStatusCreating         = "creating"
 	TeamStatusActive           = "active"

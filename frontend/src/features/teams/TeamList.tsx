@@ -148,9 +148,11 @@ function TeamRow({
   const badgeKey = teamBadgeKey(team.status);
   const leader = bots.find((bot) => bot.isLeader);
   const leaderDirectory = leader ? team.directory : '';
+  // A team whose folder is gone stays visible, greyed and read-only.
+  const missing = team.status === 'directory_missing';
 
   return (
-    <li className="rounded-md">
+    <li className={`rounded-md ${missing ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-center gap-1">
         <button
           type="button"
@@ -167,7 +169,7 @@ function TeamRow({
           <span
             className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
             role="status"
-            title={t(badgeKey)}
+            title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}
           >
             {t(badgeKey)}
           </span>
@@ -181,7 +183,7 @@ function TeamRow({
               <span className="min-w-0 flex-1">
                 <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
               </span>
-              {!bot.isLeader && <DeleteMemberButton bot={bot} />}
+              {!bot.isLeader && !missing && <DeleteMemberButton bot={bot} />}
             </li>
           ))}
         </ul>

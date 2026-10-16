@@ -166,8 +166,7 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 				(r.Method == http.MethodDelete && !strings.Contains(r.URL.Path, "/memories/")) ||
 				strings.HasSuffix(r.URL.Path, "/decisions") || strings.HasSuffix(r.URL.Path, "/confirm") ||
 				strings.HasSuffix(r.URL.Path, "/archive") || strings.HasSuffix(r.URL.Path, "/restore") ||
-				strings.HasSuffix(r.URL.Path, "/directory/rebind") || strings.HasSuffix(r.URL.Path, "/retry") ||
-				strings.HasSuffix(r.URL.Path, "/directory/rebuild-marker") ||
+				strings.HasSuffix(r.URL.Path, "/retry") ||
 				strings.HasSuffix(r.URL.Path, "/answers") || strings.Contains(r.URL.Path, "/questions/") ||
 				(strings.Contains(r.URL.Path, "/transfers/") && strings.HasSuffix(r.URL.Path, "/accept"))
 			revision, hasRevision := body["expectedRevision"].(float64)

@@ -59,6 +59,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   }, [messages.length, bot.id]);
 
   const blockReasonKey = sendBlockReasonKey(team.status);
+  // While the team's folder is gone the conversation is read-only: history
+  // stays readable, every action is disabled.
+  const readOnly = team.status === 'directory_missing';
   const lastUserMessage = [...messages].reverse().find((message) => message.kind === 'user') ?? null;
   const lastQueuedMessage =
     [...messages].reverse().find((message) => message.kind === 'user' && message.deliveryStatus === 'queued') ?? null;
@@ -106,6 +109,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             {t('status.error')}
           </p>
         )}
+        <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
         <ul className="space-y-2">
           {messages.map((message) => (
             <li key={message.id}>
@@ -124,6 +128,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             </li>
           ))}
         </ul>
+        </fieldset>
       </div>
 
       <div className="space-y-2 border-t border-neutral-200 p-3 dark:border-neutral-800">
@@ -133,6 +138,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </p>
         )}
 
+        <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0 space-y-2">
         <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
 
         <div className="flex items-end gap-2">
@@ -188,6 +194,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             <Send size={16} aria-hidden="true" />
           </button>
         </div>
+        </fieldset>
 
         {blockReasonKey && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">

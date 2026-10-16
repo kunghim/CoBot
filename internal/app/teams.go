@@ -24,10 +24,6 @@ type CreateTeamInput struct {
 	InitialRoleIDs   []string
 	RequestID        string
 	ExpectedRevision int64
-	// AdoptMarker confirms the user's explicit choice to claim a directory
-	// that already carries a team marker (B04): without it the product
-	// refuses rather than adopting or overwriting another claim.
-	AdoptMarker bool
 }
 
 // TeamMarker is the on-disk identification file inside <teamDir>/.cobot.
@@ -37,6 +33,7 @@ type TeamMarker struct {
 	InstanceID    string `json:"instanceId"`
 	Profile       string `json:"profile"`
 	TeamID        string `json:"teamId"`
+	TeamName      string `json:"teamName,omitempty"`
 	Directory     string `json:"directory"`
 }
 
@@ -91,15 +88,10 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 		return domain.Team{}, nil, domain.InvalidRequest("error.team.directory_reserved", map[string]any{"reserved": reserved})
 	}
 
-	// A marker in an unbound directory claims the folder for some team —
-	// this profile's deleted one, a moved original, or a copy (B04). Never
-	// adopt it silently: only an explicit adoptMarker overwrites it.
-	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
-		return domain.Team{}, nil, merr
-	} else if present && !in.AdoptMarker {
-		return domain.Team{}, nil, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
-			"instanceId": marker.InstanceID, "directory": canon.Display,
-		})
+	// One project belongs to one team for its whole life: a folder another
+	// team still claims is refused, never taken over (B04).
+	if err := a.refuseClaimedDirectory(ctx, canon.Display); err != nil {
+		return domain.Team{}, nil, err
 	}
 
 	// Uniqueness and nesting run inside the transaction's read phase.
@@ -225,20 +217,11 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 // findNestedBinding returns a team whose bound directory contains or is
 // contained by the candidate, comparing component-wise on canonical keys.
 func (a *App) findNestedBinding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir) (*domain.Team, error) {
-	return a.findNestedBindingExcluding(ctx, tx, candidate, "")
-}
-
-// findNestedBindingExcluding ignores one team's own binding, which a rebind
-// must do: moving a team must not conflict with where it lives today.
-func (a *App) findNestedBindingExcluding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir, excludeTeamID string) (*domain.Team, error) {
 	bindings, err := sqlite.ListDirectoryBindings(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 	for _, binding := range bindings {
-		if binding.TeamID == excludeTeamID {
-			continue
-		}
 		other := platform.CanonicalDir{Key: binding.DirectoryKey, Display: binding.Directory}
 		if other.Contains(candidate) || candidate.Contains(other) {
 			team, _, err := sqlite.GetTeam(ctx, tx, binding.TeamID)
@@ -266,6 +249,7 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 		InstanceID:    a.InstanceID,
 		Profile:       string(a.Paths.Environment),
 		TeamID:        team.ID,
+		TeamName:      team.Name,
 		Directory:     canon.Display,
 	}
 	data, err := json.MarshalIndent(marker, "", "  ")
@@ -349,69 +333,6 @@ func (a *App) RetryTeamCreation(ctx context.Context, principal auth.Principal, t
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID})
 	a.Hub.Publish()
 	return activated, nil
-}
-
-// RebuildMarker recreates the identification marker after the user deleted
-// .cobot, reporting (never deleting) lost resources.
-func (a *App) RebuildMarker(ctx context.Context, principal auth.Principal, teamID string) (map[string]any, error) {
-	cached, unlock, writeErr := beginWrite[map[string]any](ctx, a, principal)
-	defer unlock()
-	if writeErr != nil {
-		return nil, writeErr
-	}
-	if cached != nil {
-		return *cached, nil
-	}
-
-	if principal.Kind != auth.KindUser {
-		return nil, domain.Forbidden("error.forbidden.user_only", nil)
-	}
-	team, directory, err := sqlite.GetTeam(ctx, a.DB, teamID)
-	if err != nil {
-		return nil, sqlite.NormalizeError(err)
-	}
-	canon, err := platform.CanonicalDirFrom(directory)
-	if err != nil {
-		return nil, domain.InvalidRequest("error.team.directory_invalid", nil)
-	}
-	cobotDir := filepath.Join(canon.Display, ".cobot")
-	lostResources := false
-	if entries, err := os.ReadDir(cobotDir); err != nil {
-		lostResources = true
-	} else {
-		for _, entry := range entries {
-			if entry.Name() != "team.json" && entry.Name() != "context" && entry.Name() != "resources" {
-				lostResources = true
-			}
-		}
-	}
-	intent := map[string]any{"rebuilt": false, "resourcesLost": lostResources, "state": "unknown"}
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	fresh, _, err := sqlite.GetTeam(ctx, tx, teamID)
-	if err != nil {
-		return nil, err
-	}
-	if principal.Write != nil && principal.Write.ExpectedRevision > 0 && fresh.Revision != principal.Write.ExpectedRevision {
-		return nil, domain.RevisionConflict("error.team.revision_conflict", nil)
-	}
-	if err := a.saveWriteResult(ctx, tx, principal, intent); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
-		return nil, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
-	}
-	result := map[string]any{"rebuilt": true, "resourcesLost": lostResources, "state": "completed"}
-	if err := a.finishWriteIntent(ctx, principal, result); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 // AddBot appends one member of an existing role to an active team; the user
@@ -551,4 +472,110 @@ func (a *App) VerifyTeamDirectory(teamID string) bool {
 	}
 	info, err := os.Stat(directory)
 	return err == nil && info.IsDir()
+}
+
+// markerClaim reports which team still claims a folder through its marker,
+// or nil when nobody does. A marker written by this instance for a team that
+// was deleted is stale and claims nothing. Any other marker — another CoBot
+// instance or profile, a copied folder, an unreadable file — is a live claim
+// this instance cannot verify, so it is respected.
+func (a *App) markerClaim(ctx context.Context, dir string) (map[string]any, error) {
+	marker, present, err := readTeamMarker(dir)
+	if err != nil || !present {
+		return nil, err
+	}
+	if marker.InstanceID == a.InstanceID && marker.TeamID != "" {
+		team, _, err := sqlite.GetTeam(ctx, a.DB, marker.TeamID)
+		if errors.Is(err, sqlite.ErrNotFound) || (err == nil && team.Status == domain.TeamStatusDeleted) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"teamId": team.ID, "teamName": team.Name, "external": false}, nil
+	}
+	return map[string]any{"teamId": marker.TeamID, "teamName": marker.TeamName, "external": true}, nil
+}
+
+// refuseClaimedDirectory rejects a folder another team still claims, naming
+// that team; the marker is the only trace of teams in other CoBot instances.
+func (a *App) refuseClaimedDirectory(ctx context.Context, dir string) error {
+	claim, err := a.markerClaim(ctx, dir)
+	if err != nil || claim == nil {
+		return err
+	}
+	if claim["external"] == true {
+		key := "error.team.directory_claimed_external"
+		if claim["teamName"] == "" {
+			key = "error.team.directory_claimed_unknown"
+		}
+		return domain.Conflict(key, map[string]any{"teamName": claim["teamName"], "directory": dir})
+	}
+	return domain.Conflict("error.team.directory_bound", map[string]any{"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir})
+}
+
+// removeOwnMarker deletes the team marker when it still names this team of
+// this instance, so the folder is free for a new team. The rest of .cobot
+// and every project file stay.
+func (a *App) removeOwnMarker(dir, teamID string) {
+	if dir == "" {
+		return
+	}
+	marker, present, err := readTeamMarker(dir)
+	if err != nil || !present || marker.InstanceID != a.InstanceID || marker.TeamID != teamID {
+		return
+	}
+	_ = os.Remove(filepath.Join(dir, ".cobot", "team.json"))
+}
+
+// CheckTeamDirectories keeps each team's state honest about its folder. A
+// team bound for life to a folder that is gone becomes directory_missing:
+// it stays visible read-only and receives no work. When the folder is back
+// at the same path the team becomes active again on its own. A lost marker in
+// a folder the team still owns is rewritten; a marker naming another team is
+// never overwritten.
+func (a *App) CheckTeamDirectories(ctx context.Context) {
+	teams, err := sqlite.ListTeams(ctx, a.DB)
+	if err != nil {
+		return
+	}
+	changed := false
+	for _, team := range teams {
+		if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusDirectoryMissing {
+			continue
+		}
+		info, statErr := os.Stat(team.Directory)
+		present := team.Directory != "" && statErr == nil && info.IsDir()
+		if present {
+			if marker, has, err := readTeamMarker(team.Directory); err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID)) {
+				if canon, err := platform.CanonicalDirFrom(team.Directory); err == nil && (!has || marker.TeamName != team.Name) {
+					if err := a.prepareTeamResources(ctx, team, canon); err != nil && a.Logger != nil {
+						a.Logger.Warn("rewrite team marker", "teamId", team.ID, "error", err)
+					}
+				}
+			} else if has && a.Logger != nil {
+				a.Logger.Warn("team folder carries another team's marker; left untouched", "teamId", team.ID, "directory", team.Directory)
+			}
+		}
+		switch {
+		case !present && team.Status == domain.TeamStatusActive:
+			if updated, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusDirectoryMissing, team.Directory, 0); err == nil {
+				a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID, Revision: updated.Revision})
+				changed = true
+			}
+		case present && team.Status == domain.TeamStatusDirectoryMissing:
+			if updated, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusActive, "", 0); err == nil {
+				a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID, Revision: updated.Revision})
+				changed = true
+				if a.Scheduler != nil {
+					for _, bot := range mustListBots(ctx, a, team.ID) {
+						a.Scheduler.Wake(bot.ID)
+					}
+				}
+			}
+		}
+	}
+	if changed {
+		a.Hub.Publish()
+	}
 }

@@ -452,9 +452,6 @@ paths:
                 initialRoleIds:
                   type: array
                   items: { type: string }
-                adoptMarker:
-                  type: boolean
-                  description: Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently.
       responses:
         "201":
           description: Team created (staged, then activated)
@@ -726,33 +723,6 @@ paths:
           description: Member added
         "409":
           $ref: "#/components/responses/Error"
-  /api/v1/teams/{id}/directory/rebuild-marker:
-    post:
-      operationId: rebuildTeamMarker
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Recreate the .cobot identification marker and report losses
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, expectedRevision]
-              properties:
-                requestId: { type: string, format: uuid }
-                expectedRevision: { type: integer, format: int64, minimum: 1 }
-      responses:
-        "200":
-          description: Marker rebuilt
   /api/v1/bots/{id}/messages:
     get:
       operationId: listMessages
@@ -1553,7 +1523,7 @@ paths:
       summary: Show the native folder chooser on this machine and return the chosen path
       description: >-
         Blocks until the user chooses or cancels. The path is only a
-        suggestion; team creation and rebind validate it as usual.
+        suggestion; team creation validates it as usual.
       requestBody:
         required: true
         content:
@@ -1588,7 +1558,7 @@ paths:
       operationId: checkDirectory
       security:
         - SessionCookie: []
-      summary: Validate a directory for team creation or rebind without touching anything
+      summary: Validate a directory for team creation without touching anything
       requestBody:
         required: true
         content:
@@ -1616,47 +1586,12 @@ paths:
                           ok: { type: boolean }
                           duplicate: { type: boolean }
                           nested: { type: boolean }
-                          markerPresent: { type: boolean }
-                          adoptRequired: { type: boolean }
+                          claimed:
+                            type: boolean
+                            description: Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it.
+                          teamId: { type: string }
+                          teamName: { type: string }
         "400":
-          $ref: "#/components/responses/Error"
-  /api/v1/teams/{id}/directory/rebind:
-    post:
-      operationId: rebindDirectory
-      security:
-        - SessionCookie: []
-      summary: Move a team's working directory through the same conflict rules as creation
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, directory, expectedRevision]
-              properties:
-                requestId: { type: string, format: uuid }
-                directory: { type: string }
-                adoptMarker: { type: boolean }
-                expectedRevision: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Rebound team
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/Team" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "409":
           $ref: "#/components/responses/Error"
   /api/v1/authorizations:
     get:

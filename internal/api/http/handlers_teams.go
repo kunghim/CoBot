@@ -12,7 +12,6 @@ type createTeamRequest struct {
 	Name           string   `json:"name"`
 	Directory      string   `json:"directory"`
 	InitialRoleIDs []string `json:"initialRoleIds"`
-	AdoptMarker    bool     `json:"adoptMarker,omitempty"`
 }
 
 func (s *Server) handleListTeams(w http.ResponseWriter, r *http.Request) { s.handlePage(w, r, "teams") }
@@ -29,7 +28,6 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	team, bots, err := s.App.CreateTeam(r.Context(), principal, app.CreateTeamInput{
 		Name: req.Name, Directory: req.Directory, InitialRoleIDs: req.InitialRoleIDs, RequestID: req.RequestID,
-		AdoptMarker: req.AdoptMarker,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -93,27 +91,6 @@ func (s *Server) handleRetryTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, http.StatusOK, team)
-}
-
-func (s *Server) handleRebuildMarker(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	var req struct {
-		RequestID        string `json:"requestId"`
-		ExpectedRevision int64  `json:"expectedRevision"`
-	}
-	if err := decodeBody(w, r, &req); err != nil {
-		writeError(w, r, err)
-		return
-	}
-	result, err := s.App.RebuildMarker(r.Context(), principal, r.PathValue("id"))
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, result)
 }
 
 func (s *Server) handleListRoles(w http.ResponseWriter, r *http.Request) {

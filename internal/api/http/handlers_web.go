@@ -5,7 +5,7 @@ import (
 )
 
 // The Web completeness surface (M5): activity feed, member memories,
-// directory picker/check, live authorizations, and directory rebind. Every
+// directory picker/check and live authorizations. Every
 // handler is user-only and delegates to the same application methods the
 // rest of the product uses.
 
@@ -107,31 +107,4 @@ func (s *Server) handleRevokeAuthorization(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"revoked": true})
-}
-
-func (s *Server) handleRebindDirectory(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	var req struct {
-		RequestID        string `json:"requestId"`
-		Directory        string `json:"directory"`
-		AdoptMarker      bool   `json:"adoptMarker,omitempty"`
-		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
-	}
-	if err := decodeBody(w, r, &req); err != nil {
-		writeError(w, r, err)
-		return
-	}
-	var expected int64
-	if req.ExpectedRevision != nil {
-		expected = *req.ExpectedRevision
-	}
-	team, err := s.App.RebindTeamDirectory(r.Context(), principal, r.PathValue("id"), req.Directory, req.AdoptMarker, expected)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, team)
 }

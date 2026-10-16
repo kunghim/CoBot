@@ -184,9 +184,8 @@ export interface DirectoryCheckResult {
   ok: boolean;
   duplicate: boolean;
   nested: boolean;
-  markerPresent: boolean;
-  adoptRequired: boolean;
-  markerInstance?: string;
+  /** Another team, possibly in another CoBot instance, claims the folder. */
+  claimed: boolean;
   teamId?: string;
   teamName?: string;
 }

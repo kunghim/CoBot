@@ -63,7 +63,7 @@ type Scheduler struct {
 	workers   sync.WaitGroup
 	busy      map[string]bool
 	pending   map[string]bool
-	teamLocks sync.Map // team id -> *sync.Mutex; serializes start/rebind
+	teamLocks sync.Map // team id -> *sync.Mutex; serializes runtime start/stop
 
 	// Risk evaluations in flight, keyed by their engine thread (G03). They
 	// are not members, never enter provider_sessions, and their usage is
@@ -95,6 +95,10 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 // Leases tick on their own goroutine (review B9): a slow engine call inside
 // dispatch must never starve the 2-second refresh, or every member's bridge
 // would start refusing side effects while the core is healthy (H06).
+// directoryCheckInterval bounds how long a team keeps receiving work after
+// its folder disappeared, and how soon it resumes once the folder is back.
+const directoryCheckInterval = 10 * time.Second
+
 func (s *Scheduler) Start() {
 	go func() {
 		defer close(s.done)
@@ -111,12 +115,19 @@ func (s *Scheduler) Start() {
 		defer close(s.leaseDone)
 		leaseTicker := time.NewTicker(platform.LeaseInterval)
 		defer leaseTicker.Stop()
+		// Team folders are re-checked on a short interval, so a moved or
+		// unplugged project pauses its team and a returned one resumes it.
+		directoryTicker := time.NewTicker(directoryCheckInterval)
+		defer directoryTicker.Stop()
+		s.app.CheckTeamDirectories(s.ctx)
 		for {
 			select {
 			case <-s.stop:
 				return
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(s.ctx)
+			case <-directoryTicker.C:
+				s.app.CheckTeamDirectories(s.ctx)
 			}
 		}
 	}()

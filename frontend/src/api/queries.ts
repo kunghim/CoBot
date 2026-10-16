@@ -204,7 +204,7 @@ export function useTeams(enabled = true) {
 export function useCreateTeam() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; directory: string; initialRoleIds: string[]; adoptMarker?: boolean }) => api.createTeam(input),
+    mutationFn: (input: { name: string; directory: string; initialRoleIds: string[] }) => api.createTeam(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.teams });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
@@ -522,15 +522,6 @@ export function useRetryTeam() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({
     mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision: number }) => api.retryTeam(teamId, expectedRevision),
-    onSuccess: invalidate,
-  });
-}
-
-export function useRebindDirectory() {
-  const invalidate = useInvalidateTeamScope();
-  return useMutation({
-    mutationFn: ({ teamId, directory, adoptMarker, expectedRevision }: { teamId: string; directory: string; adoptMarker?: boolean; expectedRevision: number }) =>
-      api.rebindDirectory(teamId, { directory, adoptMarker, expectedRevision }),
     onSuccess: invalidate,
   });
 }

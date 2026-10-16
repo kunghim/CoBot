@@ -17,8 +17,8 @@ import (
 
 // The Web-facing completeness surface (M5): team activity, the directory
 // picker/check that keeps the Web client from needing arbitrary file access,
-// live bridge authorizations with real revocation, and an explicit directory
-// rebind that goes through the same conflict rules as creation.
+// and live bridge authorizations with real revocation. A team keeps its
+// folder for life; there is no rebind.
 
 // ListTeamActivity projects a team's newest events for the 动态 tab. The Web
 // user sees the whole team's record, newest first.
@@ -79,10 +79,10 @@ func (a *App) RevokeAuthorization(ctx context.Context, principal auth.Principal,
 	return nil
 }
 
-// CheckDirectory validates a directory for team creation or rebind without
+// CheckDirectory validates a directory for team creation without
 // touching anything: canonical form, existence, reserved paths, duplicate
-// and nested bindings, and a foreign/unknown marker that would need an
-// explicit adoption (B04).
+// and nested bindings, and a marker of a team this instance cannot see,
+// which creation refuses the same way (B04).
 func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw string) (map[string]any, error) {
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
@@ -96,7 +96,7 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 	}
 	result := map[string]any{
 		"canonical": canon.Display, "key": canon.Key, "ok": true,
-		"duplicate": false, "nested": false, "markerPresent": false, "adoptRequired": false,
+		"duplicate": false, "nested": false, "claimed": false,
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -119,13 +119,15 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 		result["teamId"] = conflict.ID
 		result["teamName"] = conflict.Name
 	}
-	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
-		return nil, merr
-	} else if present {
-		result["markerPresent"] = true
-		result["markerInstance"] = marker.InstanceID
-		if marker.InstanceID != a.InstanceID {
-			result["adoptRequired"] = true
+	// A marker of a team this instance cannot see (another CoBot, a copied
+	// folder) still claims the folder; creation refuses it the same way.
+	if result["ok"] == true {
+		if claim, err := a.markerClaim(ctx, canon.Display); err != nil {
+			return nil, err
+		} else if claim != nil {
+			result["ok"] = false
+			result["claimed"] = true
+			result["teamName"] = claim["teamName"]
 		}
 	}
 	return result, nil
@@ -133,7 +135,7 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 
 // PickDirectory shows the native folder chooser on this machine for the
 // Web page, which cannot learn a real path from the browser's own picker.
-// The result is only a suggestion: creation and rebind still validate it.
+// The result is only a suggestion: creation still validates it.
 func (a *App) PickDirectory(ctx context.Context, principal auth.Principal) (map[string]any, error) {
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
@@ -191,138 +193,4 @@ func (a *App) ListDirectoryChildren(ctx context.Context, principal auth.Principa
 	}
 	sort.Strings(children)
 	return map[string]any{"path": canon.Display, "children": children}, nil
-}
-
-// RebindTeamDirectory moves a team's working directory through the same
-// conflict rules creation uses, then rewrites the marker for the new folder
-// and updates the binding atomically. The old directory keeps its marker and
-// files: nothing is deleted on a move (B04/B09).
-func (a *App) RebindTeamDirectory(ctx context.Context, principal auth.Principal, teamID, raw string, adoptMarker bool, expectedRevision int64) (domain.Team, error) {
-	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
-	defer unlock()
-	if writeErr != nil {
-		return domain.Team{}, writeErr
-	}
-	if cached != nil {
-		team, _, err := sqlite.GetTeam(ctx, a.DB, cached.ID)
-		return team, err
-	}
-
-	if principal.Kind != auth.KindUser {
-		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
-	}
-	// Serialize binding changes with runtime creation and delivery claims.
-	// No engine RPC is performed while a SQL transaction is held.
-	if a.Scheduler != nil {
-		lock := a.Scheduler.teamLock(teamID)
-		lock.Lock()
-		defer lock.Unlock()
-	}
-	team, _, err := sqlite.GetTeam(ctx, a.DB, teamID)
-	if err != nil {
-		return domain.Team{}, sqlite.NormalizeError(err)
-	}
-	if team.Status == domain.TeamStatusDeleted {
-		return domain.Team{}, domain.NotFound("error.not_found", nil)
-	}
-	if expectedRevision > 0 && team.Revision != expectedRevision {
-		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": team.Revision})
-	}
-	canon, err := platform.CanonicalDirFrom(raw)
-	if err != nil {
-		return domain.Team{}, domain.InvalidRequest("error.team.directory_invalid", map[string]any{"detail": err.Error()})
-	}
-	if info, err := os.Stat(canon.Display); err != nil || !info.IsDir() {
-		return domain.Team{}, domain.InvalidRequest("error.team.directory_missing", map[string]any{"directory": canon.Display})
-	}
-	if reserved, ok := platform.IsReservedDir(a.Paths.Reserved(), canon); ok {
-		return domain.Team{}, domain.InvalidRequest("error.team.directory_reserved", map[string]any{"reserved": reserved})
-	}
-	if runs, err := sqlite.ListActiveRunsByTeam(ctx, a.DB, teamID); err != nil {
-		return domain.Team{}, err
-	} else if len(runs) != 0 {
-		return domain.Team{}, domain.Conflict("error.team.active_runs", nil)
-	}
-	if a.Scheduler != nil {
-		if rt := a.Scheduler.runtime(teamID); rt != nil {
-			if err := rt.server.Shutdown(ctx); err != nil {
-				return domain.Team{}, domain.EngineUnavailable("error.engine.shutdown_failed", nil, err)
-			}
-			a.Scheduler.mu.Lock()
-			if a.Scheduler.teams[teamID] == rt {
-				delete(a.Scheduler.teams, teamID)
-			}
-			a.Scheduler.mu.Unlock()
-		}
-	}
-	if marker, present, merr := readTeamMarker(canon.Display); merr != nil {
-		return domain.Team{}, merr
-	} else if present && (marker.InstanceID != a.InstanceID || marker.TeamID != teamID) && !adoptMarker {
-		return domain.Team{}, domain.InvalidRequest("error.team.marker_adopt_required", map[string]any{
-			"instanceId": marker.InstanceID, "directory": canon.Display,
-		})
-	}
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	defer tx.Rollback()
-	if existing, err := sqlite.FindActiveTeamByDirectoryKey(ctx, tx, canon.Key); err == nil && existing.ID != teamID {
-		return domain.Team{}, domain.Conflict("error.team.directory_bound", map[string]any{
-			"teamId": existing.ID, "teamName": existing.Name, "directory": existing.Directory,
-		})
-	} else if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
-		return domain.Team{}, err
-	}
-	if conflict, err := a.findNestedBindingExcluding(ctx, tx, canon, teamID); err != nil {
-		return domain.Team{}, err
-	} else if conflict != nil {
-		return domain.Team{}, domain.Conflict("error.team.directory_nested", map[string]any{
-			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
-		})
-	}
-	if err := sqlite.UpdateDirectoryBinding(ctx, tx, teamID, canon.Display, canon.Key); err != nil {
-		return domain.Team{}, err
-	}
-	updated, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusCreating, "", expectedRevision)
-	if err != nil {
-		return domain.Team{}, sqlite.NormalizeError(err)
-	}
-	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
-		return domain.Team{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return domain.Team{}, err
-	}
-	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
-		_, _ = sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusError, "resource_preparation_failed", 0)
-		return domain.Team{}, domain.Conflict("error.team.prepare_failed", nil)
-	}
-	updated, err = sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusActive, "", 0)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	// Reachability is verified after the binding moved and the transaction
-	// closed: a folder that cannot be stat'ed is reported honestly rather
-	// than left claiming active (the single-connection pool never nests a
-	// query inside an open transaction).
-	if !a.VerifyTeamDirectory(teamID) {
-		if missing, merr := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusDirectoryMissing, canon.Display, 0); merr == nil {
-			updated = missing
-		}
-	}
-	// Best-effort Git exclude for the new folder; a non-Git folder is valid.
-	if excludePath, err := platform.GitExcludePath(canon.Display); err == nil {
-		_ = platform.EnsureLocalCobotExclude(excludePath)
-	}
-	a.recordEvent(ctx, domain.Event{Type: "team.directory_rebound", TeamID: teamID, ResourceID: teamID, Revision: updated.Revision})
-	if a.Scheduler != nil {
-		if bots, err := sqlite.ListBots(ctx, a.DB, teamID); err == nil {
-			for _, bot := range bots {
-				a.Scheduler.Wake(bot.ID)
-			}
-		}
-	}
-	a.Hub.Publish()
-	return updated, nil
 }

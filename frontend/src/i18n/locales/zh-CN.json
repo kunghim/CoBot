@@ -22,8 +22,8 @@
     "directoryOk": "目录可用：{{path}}",
     "directoryDuplicate": "该目录已被团队「{{teamName}}」绑定",
     "directoryNested": "该目录与团队「{{teamName}}」的目录存在包含关系",
-    "directoryMarker": "目录里已有团队标记（实例 {{instanceId}}）",
-    "adoptMarker": "确认以新团队接管该目录",
+    "directoryClaimed": "该目录已被团队「{{teamName}}」使用，不能再创建新团队",
+    "directoryClaimedUnknown": "该目录已被另一个 CoBot 环境中的团队使用，不能再创建新团队",
     "new": "新建团队",
     "createTitle": "新建团队",
     "chooseDirectory": "选择目录",
@@ -35,7 +35,6 @@
     "name": "团队名称",
     "namePlaceholder": "例如：后端开发",
     "directory": "工作目录",
-    "browse": "浏览目录…",
     "submit": "创建",
     "cancel": "取消",
     "creating": "创建中…",
@@ -48,7 +47,7 @@
       "creating": "创建中",
       "archived": "已归档",
       "error": "创建失败",
-      "directory_missing": "目录缺失"
+      "directory_missing": "目录不在"
     },
     "status": {
       "idle": "空闲",
@@ -59,17 +58,11 @@
       "interrupted": "已中断",
       "unknown": "待核对"
     },
-    "tools": {"add": "添加成员", "rebind": "更换目录", "rebuild": "重建标记"},
+    "tools": {"add": "添加成员"},
     "closeTool": "关闭团队操作",
     "roleLabel": "成员角色",
     "chooseRole": "选择角色",
-    "directoryLabel": "团队目录",
-    "rebuildExplanation": "重新创建团队标记和资源目录，无法找回此前删除的资源。",
-    "memberAdded": "成员已添加",
-    "directoryRebound": "目录已更换",
-    "markerRebuilt": "标记已重建",
-    "rebuiltResourcesLost": "标记已重建，此前删除的资源未恢复。",
-    "rebuildUnconfirmed": "重建结果尚不确定，请先检查目录，再决定是否发起新操作。"
+    "memberAdded": "成员已添加"
   },
   "scenario": {
     "software": { "name": "软件开发" }
@@ -95,7 +88,7 @@
     "activeRun": "正在执行：{{status}}",
     "blocked": {
       "archived": "团队已归档，暂时无法发送消息",
-      "directory_missing": "团队工作目录缺失，暂时无法发送消息",
+      "directory_missing": "团队的项目目录不在原位置，放回后会自动恢复；在此之前只能查看",
       "notActive": "团队当前状态为 {{status}}，无法发送消息"
     },
     "delivery": {
@@ -425,6 +418,8 @@
     "error.team.directory_reserved": "该目录属于 CoBot 保留目录：{{reserved}}",
     "error.team.directory_bound": "该目录已被团队「{{teamName}}」绑定",
     "error.team.directory_bound_race": "该目录刚刚被其他操作绑定，请刷新后重试",
+    "error.team.directory_claimed_external": "该目录已被另一个 CoBot 环境中的团队「{{teamName}}」使用，不能再创建新团队",
+    "error.team.directory_claimed_unknown": "该目录已被另一个 CoBot 环境中的团队使用，不能再创建新团队",
     "error.team.directory_nested": "该目录与团队「{{teamName}}」的目录存在包含关系",
     "error.team.member_limit": "请求 {{requested}} 名成员，超过上限 {{limit}}",
     "error.team.unknown_role": "未知角色：{{roleId}}",
@@ -503,7 +498,6 @@
     "error.memory.too_long": "记忆过长，最多 {{max}} 个字符",
     "error.memory.looks_secret": "内容疑似秘密（密钥/密码），拒绝写入记忆；请只记录工作方法与偏好",
     "error.memory.duplicate": "相同的记忆已存在，不会重复记录",
-    "error.team.marker_adopt_required": "目录里已有团队标记（实例 {{instanceId}}），不会自动接管；确认以新团队接管该目录请重试并勾选接管",
     "error.team.not_archived": "团队当前状态为 {{status}}，请先归档再删除",
     "error.team.open_work": "团队仍有未完成工作：执行 {{activeRuns}}、待处理审批 {{pendingApprovals}}、在途转交 {{offeredTransfers}}、未完成任务 {{openTasks}}、未送投递 {{queuedDeliveries}}",
     "error.bot.leader_delete": "队长不能删除；请先处理团队本身",

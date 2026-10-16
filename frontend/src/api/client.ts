@@ -185,7 +185,7 @@ export const api = {
 
   // Teams, roles and members (M2).
   listTeams: (cursor?: string) => request<import('./types').TeamListResult>('GET', '/api/v1/teams' + pageQuery({ cursor })),
-  createTeam: (body: { name: string; directory: string; initialRoleIds: string[]; adoptMarker?: boolean }) =>
+  createTeam: (body: { name: string; directory: string; initialRoleIds: string[] }) =>
     request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
   getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
   addBot: (teamId: string, roleId: string) =>
@@ -288,15 +288,12 @@ export const api = {
     request<import('./types').Team>('DELETE', `/api/v1/teams/${teamId}`, { expectedRevision }),
   deleteBot: (botId: string, expectedRevision?: number) =>
     request<import('./types').Bot>('DELETE', `/api/v1/bots/${botId}`, { expectedRevision }),
-  rebindDirectory: (teamId: string, body: { directory: string; adoptMarker?: boolean; expectedRevision?: number }) =>
-    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/directory/rebind`, body),
   retryTeam: (teamId: string, expectedRevision: number) =>
     request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/retry`, { expectedRevision }),
 
   // Activity, memories, directories, authorizations (M5).
   listActivity: (teamId: string, viewBotId?: string, cursor?: string) => request<{ items: import('./types').ActivityItem[]; nextCursor: string }>('GET', `/api/v1/teams/${teamId}/activity` + pageQuery({ viewBotId, cursor })),
   listMemories: (botId: string, cursor?: string) => request<import('./types').MemoryListResult>('GET', `/api/v1/bots/${botId}/memories` + pageQuery({ cursor })),
-  rebuildMarker: (teamId: string, expectedRevision: number) => request<{ rebuilt: boolean; resourcesLost: boolean; state: string }>('POST', `/api/v1/teams/${teamId}/directory/rebuild-marker`, { expectedRevision }),
   deleteMemory: (botId: string, memoryId: string) =>
     request<{ deleted: boolean }>('DELETE', `/api/v1/bots/${botId}/memories/${memoryId}`),
   pickDirectory: () => request<{ path: string; cancelled: boolean }>('POST', '/api/v1/directories/pick', {}),

@@ -348,23 +348,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/teams/{id}/directory/rebuild-marker": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Recreate the .cobot identification marker and report losses */
-        post: operations["rebuildTeamMarker"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/bots/{id}/messages": {
         parameters: {
             query?: never;
@@ -719,7 +702,7 @@ export interface paths {
         put?: never;
         /**
          * Show the native folder chooser on this machine and return the chosen path
-         * @description Blocks until the user chooses or cancels. The path is only a suggestion; team creation and rebind validate it as usual.
+         * @description Blocks until the user chooses or cancels. The path is only a suggestion; team creation validates it as usual.
          */
         post: operations["pickDirectory"];
         delete?: never;
@@ -737,25 +720,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate a directory for team creation or rebind without touching anything */
+        /** Validate a directory for team creation without touching anything */
         post: operations["checkDirectory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/teams/{id}/directory/rebind": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Move a team's working directory through the same conflict rules as creation */
-        post: operations["rebindDirectory"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1655,8 +1621,6 @@ export interface operations {
                     name: string;
                     directory: string;
                     initialRoleIds?: string[];
-                    /** @description Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently. */
-                    adoptMarker?: boolean;
                 };
             };
         };
@@ -1923,35 +1887,6 @@ export interface operations {
                 content?: never;
             };
             409: components["responses"]["Error"];
-        };
-    };
-    rebuildTeamMarker: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Marker rebuilt */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
         };
     };
     listMessages: {
@@ -2718,50 +2653,15 @@ export interface operations {
                             ok?: boolean;
                             duplicate?: boolean;
                             nested?: boolean;
-                            markerPresent?: boolean;
-                            adoptRequired?: boolean;
+                            /** @description Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it. */
+                            claimed?: boolean;
+                            teamId?: string;
+                            teamName?: string;
                         };
                     };
                 };
             };
             400: components["responses"]["Error"];
-        };
-    };
-    rebindDirectory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    directory: string;
-                    adoptMarker?: boolean;
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Rebound team */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Team"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            409: components["responses"]["Error"];
         };
     };
     listAuthorizations: {

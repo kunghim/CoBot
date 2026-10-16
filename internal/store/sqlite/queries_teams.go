@@ -306,8 +306,8 @@ func ListDirectoryBindings(ctx context.Context, q Queryer) ([]DirectoryBinding, 
 }
 
 // SetTeamStatusTx is SetTeamStatus inside the caller's transaction, so a
-// rebind can move the binding and update lifecycle state atomically (the
-// pool is a single connection; a nested tx here would deadlock).
+// lifecycle change commits with the rest of its writes (the pool is a single
+// connection; a nested tx here would deadlock).
 func SetTeamStatusTx(ctx context.Context, tx *sql.Tx, teamID, status, detail string, expectedRevision int64) (domain.Team, error) {
 	var revision int64
 	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
@@ -543,19 +543,4 @@ func ListLeaseBots(ctx context.Context, q Queryer) ([]LeaseBot, error) {
 		out = append(out, b)
 	}
 	return out, rows.Err()
-}
-
-// UpdateDirectoryBinding points a team at a new canonical directory (M5
-// rebind). The old row is replaced inside the caller's transaction, so a
-// team is bound to exactly one directory at every instant.
-func UpdateDirectoryBinding(ctx context.Context, tx *sql.Tx, teamID, directory, key string) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := tx.ExecContext(ctx, `DELETE FROM directory_bindings WHERE team_id = ?`, teamID); err != nil {
-		return fmt.Errorf("clear directory binding: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_bindings (team_id, directory_key, directory, created_at) VALUES (?, ?, ?, ?)`,
-		teamID, key, directory, now); err != nil {
-		return fmt.Errorf("insert directory binding: %w", err)
-	}
-	return nil
 }

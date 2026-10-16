@@ -174,8 +174,9 @@ func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID 
 }
 
 // DeleteTeam soft-deletes an archived team that has no unfinished work: the
-// application rows stay for audit, the directory binding is removed, and the
-// user's files (including the marker) are never deleted. Queued deliveries
+// application rows stay for audit, the directory binding is removed together
+// with this team's own marker, so the folder is free for a new team. The
+// user's files are never deleted. Queued deliveries
 // are cancelled because their team is going away; their rows stay too.
 func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
 	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
@@ -190,7 +191,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	team, _, err := sqlite.GetTeam(ctx, a.DB, teamID)
+	team, directory, err := sqlite.GetTeam(ctx, a.DB, teamID)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
@@ -249,6 +250,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 			a.CollaborationTokens.RevokeOfBot(bot.ID)
 		}
 	}
+	a.removeOwnMarker(directory, teamID)
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamDeleted, TeamID: teamID, ResourceID: teamID, Revision: deleted.Revision})
 	a.Hub.Publish()
 	return deleted, nil

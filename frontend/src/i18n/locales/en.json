@@ -22,8 +22,8 @@
     "directoryOk": "Directory usable: {{path}}",
     "directoryDuplicate": "Already bound to team {{teamName}}",
     "directoryNested": "Nested with the directory of team {{teamName}}",
-    "directoryMarker": "This directory carries a team marker (instance {{instanceId}})",
-    "adoptMarker": "Adopt it as a new team",
+    "directoryClaimed": "This folder is already used by team “{{teamName}}”; a new team cannot be created here",
+    "directoryClaimedUnknown": "This folder is already used by a team in another CoBot environment; a new team cannot be created here",
     "new": "New team",
     "createTitle": "New team",
     "chooseDirectory": "Choose folder",
@@ -35,7 +35,6 @@
     "name": "Team name",
     "namePlaceholder": "e.g. Backend development",
     "directory": "Working directory",
-    "browse": "Browse…",
     "submit": "Create",
     "cancel": "Cancel",
     "creating": "Creating…",
@@ -48,7 +47,7 @@
       "creating": "Creating",
       "archived": "Archived",
       "error": "Failed",
-      "directory_missing": "Directory missing"
+      "directory_missing": "Folder missing"
     },
     "status": {
       "idle": "Idle",
@@ -59,17 +58,11 @@
       "interrupted": "Interrupted",
       "unknown": "Needs verification"
     },
-    "tools": {"add": "Add member", "rebind": "Change directory", "rebuild": "Rebuild marker"},
+    "tools": {"add": "Add member"},
     "closeTool": "Close team action",
     "roleLabel": "Member role",
     "chooseRole": "Select a role",
-    "directoryLabel": "Team directory",
-    "rebuildExplanation": "Recreate the team marker and resource folders. Previously deleted resources cannot be restored.",
-    "memberAdded": "Member added",
-    "directoryRebound": "Directory changed",
-    "markerRebuilt": "Marker rebuilt",
-    "rebuiltResourcesLost": "Marker rebuilt. Deleted resources were not restored.",
-    "rebuildUnconfirmed": "Rebuild outcome is unknown. Check the directory before trying a new operation."
+    "memberAdded": "Member added"
   },
   "scenario": {
     "software": { "name": "Software development" }
@@ -97,7 +90,7 @@
     "activeRun": "Running: {{status}}",
     "blocked": {
       "archived": "The team is archived; messages cannot be sent",
-      "directory_missing": "The team directory is missing; messages cannot be sent",
+      "directory_missing": "The team's project folder is not where it was. The team resumes by itself once the folder is back; until then it is read-only",
       "notActive": "The team is currently {{status}}; messages cannot be sent"
     },
     "delivery": {
@@ -429,6 +422,8 @@
     "error.team.directory_reserved": "Directory is reserved by CoBot: {{reserved}}",
     "error.team.directory_bound": "Directory already bound to team “{{teamName}}”",
     "error.team.directory_bound_race": "Directory was just bound elsewhere; refresh and retry",
+    "error.team.directory_claimed_external": "This folder is already used by team “{{teamName}}” in another CoBot environment; a new team cannot be created here",
+    "error.team.directory_claimed_unknown": "This folder is already used by a team in another CoBot environment; a new team cannot be created here",
     "error.team.directory_nested": "Directory overlaps the directory of team “{{teamName}}”",
     "error.team.member_limit": "Requested {{requested}} members, limit is {{limit}}",
     "error.team.unknown_role": "Unknown role: {{roleId}}",
@@ -507,7 +502,6 @@
     "error.memory.too_long": "Memory is too long: at most {{max}} characters",
     "error.memory.looks_secret": "The body looks like a secret (key/password) and was refused; store working methods and preferences only",
     "error.memory.duplicate": "The same memory already exists and is not recorded twice",
-    "error.team.marker_adopt_required": "This directory already carries a team marker (instance {{instanceId}}) and is never adopted silently; retry with adopt-marker to claim it as a new team",
     "error.team.not_archived": "Team status is {{status}}; archive the team before deleting it",
     "error.team.open_work": "The team still has unfinished work: runs {{activeRuns}}, pending approvals {{pendingApprovals}}, in-flight transfers {{offeredTransfers}}, open tasks {{openTasks}}, undelivered {{queuedDeliveries}}",
     "error.bot.leader_delete": "The captain cannot be deleted; remove the team instead",

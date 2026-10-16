@@ -3,8 +3,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -198,70 +196,6 @@ func TestApprovalFactSurvivesLateStartReply(t *testing.T) {
 	h.app.DB.QueryRow("SELECT count(*) FROM messages WHERE run_id = ? AND kind = ?", run.ID, domain.MessageKindAssistant).Scan(&count)
 	if count != 1 {
 		t.Fatalf("duplicate completion wrote %d answers", count)
-	}
-}
-
-type writeAtStartupCwd struct {
-	*fakeengine.Server
-	cwd string
-}
-
-func (s *writeAtStartupCwd) StartTurn(ctx context.Context, thread, text, model string) (string, error) {
-	id, err := s.Server.StartTurn(ctx, thread, text, model)
-	if err == nil {
-		err = os.WriteFile(filepath.Join(s.cwd, "runtime-probe.txt"), []byte(text), 0600)
-	}
-	return id, err
-}
-
-func TestDirectoryRebindRejectsLiveRunAndReplacesRuntime(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	h.app.Scheduler.Stop(ctx)
-	var servers []*fakeengine.Server
-	s := app.NewScheduler(h.app, func(spec app.ServerSpec) (engine.Server, error) {
-		fake := fakeengine.New(spec.Callbacks, domain.NewEpochID())
-		servers = append(servers, fake)
-		return &writeAtStartupCwd{fake, spec.Cwd}, nil
-	})
-	h.app.Scheduler = s
-	s.Start()
-	defer s.Stop(ctx)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
-	send := func(key string) {
-		t.Helper()
-		sent, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: key, RequestID: key})
-		if err != nil {
-			t.Fatal(err)
-		}
-		waitUntil(t, 3*time.Second, "accepted "+key, func() bool {
-			m, e := sqlite.GetMessage(ctx, h.app.DB, sent.Message.ID)
-			return e == nil && m.DeliveryStatus == domain.DeliveryAccepted
-		})
-	}
-	send("before")
-	newDir := filepath.Join(t.TempDir(), "new-workdir")
-	if err := os.Mkdir(newDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.RebindTeamDirectory(ctx, h.user, team.ID, newDir, false, team.Revision); err == nil {
-		t.Fatal("rebound with a live execution")
-	}
-	old := servers[0]
-	turn := old.Turns()[0]
-	old.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "done")
-	if _, err := h.app.RebindTeamDirectory(ctx, h.user, team.ID, newDir, false, team.Revision); err != nil {
-		t.Fatal(err)
-	}
-	send("after")
-	if len(servers) != 2 || old.ShutdownCalls != 1 {
-		t.Fatal("old runtime reused")
-	}
-	if b, err := os.ReadFile(filepath.Join(newDir, "runtime-probe.txt")); err != nil || !strings.HasSuffix(string(b), "after") {
-		t.Fatalf("new cwd not used: %s / %v", b, err)
-	}
-	if b, _ := os.ReadFile(filepath.Join(team.Directory, "runtime-probe.txt")); !strings.HasSuffix(string(b), "before") {
-		t.Fatal("old directory was written after rebind")
 	}
 }
 

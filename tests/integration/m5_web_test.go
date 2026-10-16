@@ -13,7 +13,6 @@ import (
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
-	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // userPost drives a user route with the bearer token, mirroring userGet.
@@ -127,9 +126,9 @@ func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 // TestWebSurfaceDirectoriesAndRebind covers the Web directory picker checks
 // and the explicit rebind: conflicts and foreign markers are refused the
 // same way creation refuses them, and a clean move rewrites the marker.
-func TestWebSurfaceDirectoriesAndRebind(t *testing.T) {
+func TestWebSurfaceDirectories(t *testing.T) {
 	h := newM2Harness(t)
-	team, _ := h.createTeam(t, []string{"backend-dev"})
+	h.createTeam(t, []string{"backend-dev"})
 
 	// Listing children returns names only.
 	child := filepath.Join(h.teamDir, "child-sub")
@@ -168,41 +167,20 @@ func TestWebSurfaceDirectoriesAndRebind(t *testing.T) {
 		t.Fatalf("check verdict = %v, want duplicate for the bound directory", check)
 	}
 
-	// Rebind to a clean directory: the marker is rewritten for this
-	// instance and the binding moves.
-	newDir := h.teamDir + "-moved"
-	if err := os.MkdirAll(newDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	status, payload = h.userPost(t, "/api/v1/teams/"+team.ID+"/directory/rebind", map[string]any{"directory": newDir, "expectedRevision": team.Revision})
-	if status != http.StatusOK {
-		t.Fatalf("rebind status = %d body=%v", status, payload)
-	}
-	bound, _, err := sqlite.GetTeam(context.Background(), h.app.DB, team.ID)
-	if err != nil {
-		t.Fatalf("get team: %v", err)
-	}
-	if !strings.Contains(bound.Directory, "moved") {
-		t.Fatalf("team directory = %q, want the moved folder", bound.Directory)
-	}
-	data, err := os.ReadFile(newDir + "/.cobot/team.json")
-	if err != nil {
-		t.Fatalf("marker after rebind: %v", err)
-	}
-	if !strings.Contains(string(data), h.app.InstanceID) {
-		t.Fatal("rebind must rewrite the marker for this instance")
-	}
-
-	// A foreign marker on the target is refused without adoption.
+	// A folder another instance's team claims is reported, not offered.
 	foreign := h.teamDir + "-foreign"
 	if err := os.MkdirAll(foreign+"/.cobot", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(foreign+"/.cobot/team.json", []byte(`{"instanceId":"someone-else"}`), 0o644); err != nil {
+	if err := os.WriteFile(foreign+"/.cobot/team.json", []byte(`{"instanceId":"someone-else","teamName":"别人的团队"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	status, _ = h.userPost(t, "/api/v1/teams/"+team.ID+"/directory/rebind", map[string]any{"directory": foreign})
-	if status != http.StatusBadRequest {
-		t.Fatalf("foreign-marker rebind status = %d, want 400", status)
+	status, payload = h.userPost(t, "/api/v1/directories/check", map[string]any{"path": foreign})
+	if status != http.StatusOK {
+		t.Fatalf("check status = %d body=%v", status, payload)
+	}
+	claimed := payload["data"].(map[string]any)
+	if claimed["ok"] != false || claimed["claimed"] != true || claimed["teamName"] != "别人的团队" {
+		t.Fatalf("claimed verdict = %v", claimed)
 	}
 }

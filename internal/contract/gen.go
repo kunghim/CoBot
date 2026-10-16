@@ -822,8 +822,6 @@ type ListTeamsParams struct {
 
 // CreateTeamJSONBody defines parameters for CreateTeam.
 type CreateTeamJSONBody struct {
-	// AdoptMarker Explicit confirmation to claim a directory that already carries a team marker (copied/moved/foreign instance); without it the request is refused instead of adopting silently.
-	AdoptMarker    *bool              `json:"adoptMarker,omitempty"`
 	Directory      string             `json:"directory"`
 	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
 	Name           string             `json:"name"`
@@ -862,20 +860,6 @@ type ArchiveTeamJSONBody struct {
 type AddBotJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 	RoleId    string             `json:"roleId"`
-}
-
-// RebindDirectoryJSONBody defines parameters for RebindDirectory.
-type RebindDirectoryJSONBody struct {
-	AdoptMarker      *bool              `json:"adoptMarker,omitempty"`
-	Directory        string             `json:"directory"`
-	ExpectedRevision int64              `json:"expectedRevision"`
-	RequestId        openapi_types.UUID `json:"requestId"`
-}
-
-// RebuildTeamMarkerJSONBody defines parameters for RebuildTeamMarker.
-type RebuildTeamMarkerJSONBody struct {
-	ExpectedRevision int64              `json:"expectedRevision"`
-	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
@@ -984,12 +968,6 @@ type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
 // AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
 type AddBotJSONRequestBody AddBotJSONBody
-
-// RebindDirectoryJSONRequestBody defines body for RebindDirectory for application/json ContentType.
-type RebindDirectoryJSONRequestBody RebindDirectoryJSONBody
-
-// RebuildTeamMarkerJSONRequestBody defines body for RebuildTeamMarker for application/json ContentType.
-type RebuildTeamMarkerJSONRequestBody RebuildTeamMarkerJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody

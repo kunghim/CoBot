@@ -78,7 +78,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/teams/{id}/activity", s.handleListActivity)
 	mux.HandleFunc("GET /api/v1/bots/{id}/memories", s.handleListMemories)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)
-	mux.HandleFunc("POST /api/v1/teams/{id}/directory/rebind", s.handleRebindDirectory)
 	mux.HandleFunc("GET /api/v1/directories", s.handleListDirectories)
 	mux.HandleFunc("POST /api/v1/directories/pick", s.handlePickDirectory)
 	mux.HandleFunc("POST /api/v1/directories/check", s.handleCheckDirectory)
@@ -86,7 +85,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/authorizations/{id}/revoke", s.handleRevokeAuthorization)
 	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)
 	mux.HandleFunc("POST /api/v1/teams/{id}/retry", s.handleRetryTeam)
-	mux.HandleFunc("POST /api/v1/teams/{id}/directory/rebuild-marker", s.handleRebuildMarker)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
 
 	// Conversations and runs.
