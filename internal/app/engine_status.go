@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -64,6 +65,12 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		return info
 	}
 	info.Version = version
+	if !codex.VersionSupported(version) {
+		info.Status = "error"
+		info.ErrorKey = "error.engine.version_unsupported"
+		a.cacheEngineStatus(info)
+		return info
+	}
 	probe := codex.Probe(ctx, binary, version)
 	info.Protocol = probe.Protocol
 	info.Capabilities = probe.Capabilities
@@ -79,13 +86,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	}
 	info.Status = "ready"
 	if server, err := a.control(ctx); err == nil {
-		hookCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		hookState := "unavailable"
-		if command, err := hookrun.NativeCommand(a.MCPBinary, a.Paths.Root); err == nil {
-			hookState = server.NativeHookStatus(hookCtx, a.Paths.WorkspacesDir(), filepath.Join(a.Paths.CodexHome(), "hooks.json"), command)
-		}
-		info.Capabilities = append(info.Capabilities, "codexHook:"+hookState)
-		cancel()
+		info.Capabilities = append(info.Capabilities, "codexHook:"+a.nativeHookState(ctx, server))
 	}
 	info.LoggedIn = account.LoggedIn
 	info.AuthMode = account.AuthMode
@@ -96,6 +97,48 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	}
 	a.cacheEngineStatus(info)
 	return a.withHookFailures(info)
+}
+
+// nativeHookState reports CoBot's guard and, when Codex only waits for
+// review, records native trust itself: the guard is CoBot's own definition in
+// CoBot's private CODEX_HOME, so asking the user to review it in a terminal
+// adds no safety. Trust is recorded only after the hooks file is verified as
+// exactly CoBot's; an edited file or a project hook is never trusted here.
+func (a *App) nativeHookState(ctx context.Context, server *codex.Server) string {
+	hookCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	command, err := hookrun.NativeCommand(a.MCPBinary, a.Paths.Root)
+	if err != nil {
+		return "unavailable"
+	}
+	cwd, source := a.Paths.WorkspacesDir(), filepath.Join(a.Paths.CodexHome(), "hooks.json")
+	logger := a.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	state := server.NativeHookStatus(hookCtx, cwd, source, command)
+	if state != "review_required" {
+		return state
+	}
+	if err := hookrun.VerifyNativeConfig(a.Paths, a.MCPBinary); err != nil {
+		logger.Warn("native hook left for review: hooks file is not CoBot's own", "error", err)
+		return state
+	}
+	trusted, err := server.TrustNativeHook(hookCtx, cwd, source, command)
+	if err != nil {
+		logger.Warn("native hook trust failed", "error", err)
+		return state
+	}
+	logger.Info("native hook trusted", "state", trusted)
+	return trusted
+}
+
+// RetryEngineCheck drops the cached projection and re-runs the self-check,
+// including native hook trust; the settings page offers it when a check
+// failed.
+func (a *App) RetryEngineCheck(ctx context.Context) EngineStatusInfo {
+	a.invalidateEngineStatus()
+	return a.EngineStatus(ctx)
 }
 
 // EngineStatusCached returns the last known projection without probing or

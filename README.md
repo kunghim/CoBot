@@ -118,9 +118,9 @@ Running `cobot serve` again opens a fresh link to the running instance.
 Then:
 
 1. **Settings:** sign in to Codex. CoBot uses its own private Codex environment, so you sign
-   in once inside CoBot. Then pick a default model.
-   Settings also shows whether CoBot's native safety hook is trusted. Codex requires you to
-   review it once with `/hooks`; see [CONTRIBUTING.md](CONTRIBUTING.md).
+   in once inside CoBot; the login is kept across restarts. Then pick a default model.
+   CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
+   both, with a button to authorize again if that failed.
 2. **New team:** choose a working directory and the members you want.
 3. **Message the leader** with what you want built.
 

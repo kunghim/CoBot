@@ -15,6 +15,23 @@ func (s *Server) handleEngine(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, http.StatusOK, engineProjection(info))
 }
 
+// handleEngineCheck re-runs the engine self-check, including native hook
+// trust, for the settings page's retry button.
+func (s *Server) handleEngineCheck(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireUser(w, r); !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	info := s.App.RetryEngineCheck(r.Context())
+	writeData(w, r, http.StatusOK, engineProjection(info))
+}
+
 func engineProjection(info app.EngineStatusInfo) EngineStatus {
 	return EngineStatus{
 		Status:       info.Status,

@@ -192,6 +192,38 @@ paths:
                         $ref: "#/components/schemas/EngineStatus"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/engine/check:
+    post:
+      operationId: checkEngine
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Re-run the Codex self-check, including native hook trust
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Fresh engine status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/EngineStatus"
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/auth/login:
     post:
       operationId: engineLogin

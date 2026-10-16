@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
 import {
-  queryKeys,
   useAuthorizations,
   useEngine,
+  useEngineCheck,
   useEngineLogin,
   useEngineLoginCancel,
   useEngineLogout,
@@ -32,16 +31,15 @@ export default function SettingsPage() {
   const status = useStatus();
   const settings = useSettings(true);
   const update = useUpdateSettings();
-  const queryClient = useQueryClient();
 
   const engine = useEngine();
   const login = useEngineLogin();
   const loginCancel = useEngineLoginCancel();
   const logout = useEngineLogout();
+  const check = useEngineCheck();
   const models = useEngineModels(engine.data?.status === 'ready');
 
   const [language, setLanguage] = useState('zh-CN');
-  const [enginePath, setEnginePath] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
   const [evalModel, setEvalModel] = useState('');
   const [memberLimit, setMemberLimit] = useState(6);
@@ -68,7 +66,6 @@ export default function SettingsPage() {
     const s = settings.data;
     if (!s) return;
     setLanguage(s.language);
-    setEnginePath(s.enginePath);
     setDefaultModel(s.defaultModel);
     setEvalModel(s.evalModel);
     setMemberLimit(s.memberLimit);
@@ -117,7 +114,6 @@ export default function SettingsPage() {
   const save = () => {
     const patch: SettingsPatch = {
       language: language as SettingsPatch['language'],
-      enginePath,
       memberLimit,
       chainLimit,
       budgetScope: budgetScope as SettingsPatch['budgetScope'],
@@ -129,10 +125,6 @@ export default function SettingsPage() {
         onSuccess: () => {
           setFeedback('saved');
           setErrorKey('');
-          // A saved engine path must be re-probed before the status is
-          // trusted again; the models list belongs to the same probe.
-          void queryClient.invalidateQueries({ queryKey: queryKeys.engine });
-          void queryClient.invalidateQueries({ queryKey: queryKeys.models });
         },
         onError: (err) => {
           setFeedback('failed');
@@ -213,6 +205,12 @@ export default function SettingsPage() {
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
   const loggedIn = engineInfo?.loggedIn ?? false;
+  const engineTone: Tone = !engineInfo ? 'idle' : engineInfo.status === 'ready' ? 'ok' : engineInfo.status === 'starting' ? 'idle' : 'bad';
+  const hookState = engineInfo?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
+  const recheck = () => {
+    setEngineActionError('');
+    check.mutate(undefined, { onError: (err) => setEngineActionError(apiErrorMessage(t, err)) });
+  };
 
   const modelOptions = (current: string): EngineModel[] => {
     const list = models.data?.models ?? [];
@@ -259,13 +257,17 @@ export default function SettingsPage() {
           <h2 id="settings-engine" className="text-sm font-semibold">
             {t('settings.engine')}
           </h2>
-          <p className="mt-2 text-sm text-neutral-500" role="status">
-            {t('settings.engineStatus')}: {engineStatusText}
-            {engineInfo?.version ? ` (${engineInfo.version})` : ''} ·{' '}
-            {loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}
+          <p className="mt-2 flex items-center gap-2 text-sm" role="status">
+            <StatusDot tone={engineTone} />
+            <span className="w-16 shrink-0 text-neutral-500">Codex</span>
+            <span>
+              {engineStatusText}
+              {engineInfo?.version ? ` · ${engineInfo.version}` : ''}
+              {engineInfo?.status === 'ready' ? ` · ${loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}` : ''}
+            </span>
           </p>
           {engineInfo?.binaryPath && (
-            <p className="mt-1 break-all font-mono text-xs text-neutral-400">
+            <p className="mt-1 break-all pl-[5.5rem] font-mono text-xs text-neutral-400">
               {t('settings.engineBinary')}: {engineInfo.binaryPath}
               {engineInfo.protocol ? ` · ${t('settings.engineProtocol')}: ${engineInfo.protocol}` : ''}
             </p>
@@ -275,11 +277,28 @@ export default function SettingsPage() {
               {errorMessage(t, engineInfo.errorKey)}
             </p>
           )}
-		  {engineInfo?.capabilities?.some((value) => value.startsWith('codexHook:')) && (
-		    <p className="mt-2 text-sm text-neutral-500" role="status">
-		      {t(engineInfo.capabilities.includes('codexHook:trusted') ? 'engine.hookTrusted' : 'engine.hookUnavailable')}
-		    </p>
-		  )}
+          {engineInfo?.status === 'ready' && (
+            <div className="mt-3">
+              <p className="flex flex-wrap items-center gap-2 text-sm" role="status">
+                <StatusDot tone={hookState === 'trusted' ? 'ok' : hookState === 'failed' ? 'bad' : 'warn'} />
+                <span className="w-16 shrink-0 text-neutral-500">{t('engine.hook')}</span>
+                <span>{t(hookState === 'trusted' ? 'engine.hookTrusted' : hookState === 'failed' ? 'engine.hookFailed' : 'engine.hookUntrusted')}</span>
+                {hookState !== 'trusted' && (
+                  <button
+                    type="button"
+                    onClick={recheck}
+                    disabled={check.isPending}
+                    className="rounded-md border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    {check.isPending ? t('engine.hookRetrying') : t('engine.hookRetry')}
+                  </button>
+                )}
+              </p>
+              <p className="mt-1 pl-[5.5rem] text-xs text-neutral-400">
+                {t(hookState === 'trusted' ? 'engine.hookTrustedHint' : hookState === 'failed' ? 'engine.hookFailedHint' : 'engine.hookUntrustedHint')}
+              </p>
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {!loggedIn && engineInfo?.status === 'ready' && !loginPending && (
@@ -329,17 +348,6 @@ export default function SettingsPage() {
               {engineActionError}
             </p>
           )}
-
-          <label className="mt-4 block text-sm">
-            <span className="text-neutral-500">{t('settings.enginePath')}</span>
-            <input
-              value={enginePath}
-              onChange={(e) => setEnginePath(e.target.value)}
-              placeholder="codex"
-              className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 font-mono text-sm dark:border-neutral-700"
-            />
-            <span className="mt-1 block text-xs text-neutral-400">{t('settings.enginePathHint')}</span>
-          </label>
 
           {models.data && (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -544,4 +552,17 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+type Tone = 'ok' | 'warn' | 'bad' | 'idle';
+
+const toneClass: Record<Tone, string> = {
+  ok: 'bg-green-500',
+  warn: 'bg-amber-500',
+  bad: 'bg-red-500',
+  idle: 'bg-neutral-400',
+};
+
+function StatusDot({ tone }: { tone: Tone }) {
+  return <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${toneClass[tone]}`} />;
 }

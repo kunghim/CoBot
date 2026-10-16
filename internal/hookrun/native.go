@@ -103,8 +103,9 @@ func RunNativeCodex(stdin io.Reader, stdout io.Writer, root string) int {
 const nativeDescription = "CoBot native lease guard (generated; review in Codex /hooks)"
 
 // EnsureNativeConfig registers only in CoBot's private Codex home. It never
-// writes trust state. Codex skips an untrusted definition until normal /hooks
-// review. A foreign or user-modified hooks file is preserved, never merged.
+// writes trust state itself; the app records trust through the engine after
+// VerifyNativeConfig. A foreign or user-modified hooks file is preserved,
+// never merged.
 func EnsureNativeConfig(paths platform.Paths, binary string) error {
 	command, err := NativeCommand(binary, paths.Root)
 	if err != nil {
@@ -161,6 +162,37 @@ func EnsureNativeConfig(paths platform.Paths, binary string) error {
 	}
 	hash := sha256.Sum256(data)
 	return writeAtomic(ownerPath, []byte(hex.EncodeToString(hash[:])))
+}
+
+// VerifyNativeConfig confirms the private hooks file is exactly the guard
+// CoBot generated for this binary and data root, matching its ownership
+// record. Only then may CoBot record native trust on the user's behalf; an
+// edited or foreign file is left for the user to review.
+func VerifyNativeConfig(paths platform.Paths, binary string) error {
+	command, err := NativeCommand(binary, paths.Root)
+	if err != nil {
+		return err
+	}
+	actual, err := os.ReadFile(filepath.Join(paths.CodexHome(), "hooks.json"))
+	if err != nil {
+		return err
+	}
+	owner, err := os.ReadFile(filepath.Join(paths.CodexHome(), ".cobot-hook-definition.sha256"))
+	if err != nil {
+		return err
+	}
+	hash := sha256.Sum256(actual)
+	if strings.TrimSpace(string(owner)) != hex.EncodeToString(hash[:]) {
+		return errors.New("private Codex hooks.json was edited")
+	}
+	expected, err := json.MarshalIndent(nativeDefinition(command), "", "  ")
+	if err != nil {
+		return err
+	}
+	if string(actual) != string(expected) {
+		return errors.New("private Codex hooks.json is not the current CoBot guard")
+	}
+	return nil
 }
 
 func nativeDefinition(command string) map[string]any {

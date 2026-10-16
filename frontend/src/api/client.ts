@@ -225,6 +225,7 @@ export const api = {
 
   // Engine account and models (M2).
   getEngine: () => request<import('./types').EngineStatus>('GET', '/api/v1/engine'),
+  checkEngine: () => request<import('./types').EngineStatus>('POST', '/api/v1/engine/check', {}),
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),

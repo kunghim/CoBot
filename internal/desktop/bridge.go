@@ -72,12 +72,13 @@ func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 		name += ".exe"
 	}
 	core, err := bootstrap.Start(ctx, bootstrap.Options{
-		Environment:  b.environment,
-		DataRoot:     dataRoot,
-		Version:      b.version,
-		ConsoleLog:   true,
-		ExtraOrigins: b.extraOrigins,
-		HelperBinary: filepath.Join(filepath.Dir(executable), name),
+		Environment:     b.environment,
+		DataRoot:        dataRoot,
+		Version:         b.version,
+		ConsoleLog:      true,
+		ExtraOrigins:    b.extraOrigins,
+		HelperBinary:    filepath.Join(filepath.Dir(executable), name),
+		EngineSelfCheck: true,
 	})
 	if err == nil {
 		b.core = core

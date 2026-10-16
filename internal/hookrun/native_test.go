@@ -143,3 +143,31 @@ func TestSideEffectHookRequiresCompleteLeaseIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyNativeConfigAcceptsOnlyCoBotsGuard(t *testing.T) {
+	paths := platform.Paths{Root: t.TempDir()}
+	binary := filepath.Join(paths.Root, "CoBot app", "cobot.exe")
+	if err := VerifyNativeConfig(paths, binary); err == nil {
+		t.Fatal("verified a missing hooks file")
+	}
+	if err := EnsureNativeConfig(paths, binary); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyNativeConfig(paths, binary); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyNativeConfig(paths, filepath.Join(paths.Root, "other", "cobot.exe")); err == nil {
+		t.Fatal("verified a guard generated for another binary")
+	}
+	path := filepath.Join(paths.CodexHome(), "hooks.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyNativeConfig(paths, binary); err == nil {
+		t.Fatal("verified an edited hooks file")
+	}
+}

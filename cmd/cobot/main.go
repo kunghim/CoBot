@@ -112,6 +112,7 @@ func runServe(args []string) int {
 		ConsoleLog:      true,
 		LogLevel:        level,
 		DevServerOrigin: *devOrigin,
+		EngineSelfCheck: true,
 	})
 	if err != nil {
 		var already *platform.ErrAlreadyRunning

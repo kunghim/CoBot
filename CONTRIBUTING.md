@@ -39,18 +39,30 @@ database before migrating. Restore a stopped, matching database/profile
 backup to roll back; do not run an old binary on a newer schema. Do not copy
 only the main SQLite file while WAL writers are active.
 
-The native lease hook must be reviewed through Codex's normal `/hooks`
-flow in CoBot's private environment. Registration does not grant trust:
-Codex skips hooks that are unreviewed or have changed. Settings reports
-whether this hook is trusted or unavailable. Coverage is limited to native
-paths that actually invoke it; hooks do not revoke commands already running
-or provide complete isolation.
+At startup CoBot locates Codex on `PATH`, requires at least the verified
+version (`MinSupportedVersion`), and reports the result in Settings, which
+only displays it. The settings API still accepts `enginePath`; tests use it
+to point at a fake engine, and the UI does not expose it.
 
-To review it, finish any running work, then start Codex against CoBot's
-private environment and type `/hooks`. Check that the command points to your
-CoBot helper and current data root before trusting it. Never use flags that
-bypass trust. The example sets the variables for this shell only and restores
-them afterwards; replace both paths with your own absolute paths.
+Codex skips hooks that are untrusted or have changed. CoBot registers its
+native lease hook only in its private Codex environment and then records
+trust itself through the app-server (`hooks/list`, then `config/batchWrite`
+of `hooks.state.<key>.trusted_hash`), the same record `/hooks` writes. It
+does so only when the private `hooks.json` is byte-for-byte the guard CoBot
+generated and matches its ownership record, and only for that one entry:
+project hooks in team directories, managed hooks and edited files are never
+trusted automatically. Upgrades re-trust the new definition the same way.
+Settings shows whether the hook is authorized and offers a retry. Coverage
+is limited to native paths that actually invoke it; hooks do not revoke
+commands already running or provide complete isolation.
+
+If automatic trust is refused (for example because the private hooks file
+was edited), you can still review it manually: finish any running work,
+start Codex against CoBot's private environment and type `/hooks`. Check
+that the command points to your CoBot helper and current data root before
+trusting it. Never use flags that bypass trust. The example sets the
+variables for this shell only and restores them afterwards; replace both
+paths with your own absolute paths.
 
 ```powershell
 $cobotRoot = 'C:\your\cobot-data-root'

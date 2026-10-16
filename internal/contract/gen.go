@@ -744,6 +744,11 @@ type CheckDirectoryJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// CheckEngineJSONBody defines parameters for CheckEngine.
+type CheckEngineJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // StreamEventsParams defines parameters for StreamEvents.
 type StreamEventsParams struct {
 	After  *int64  `form:"after,omitempty" json:"after,omitempty"`
@@ -926,6 +931,9 @@ type SendMessageJSONRequestBody SendMessageJSONBody
 
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
+
+// CheckEngineJSONRequestBody defines body for CheckEngine for application/json ContentType.
+type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody

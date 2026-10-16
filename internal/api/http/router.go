@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Engine (Codex) surface: status, official login, models.
 	mux.HandleFunc("GET /api/v1/engine", s.handleEngine)
+	mux.HandleFunc("POST /api/v1/engine/check", s.handleEngineCheck)
 	mux.HandleFunc("POST /api/v1/auth/login", s.handleEngineLogin)
 	mux.HandleFunc("POST /api/v1/auth/login/cancel", s.handleEngineLoginCancel)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleEngineLogout)

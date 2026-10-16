@@ -44,6 +44,10 @@ type Options struct {
 	DevServerOrigin string   // extra allowed origin for the Vite dev server
 	ExtraOrigins    []string // e.g. the desktop shell asset origin
 	HelperBinary    string   // desktop's same-version cobot companion; empty for the CLI itself
+	// EngineSelfCheck probes Codex right after startup and records native
+	// hook trust, so users never configure either by hand. Product entry
+	// points enable it; tests leave it off and drive the engine themselves.
+	EngineSelfCheck bool
 }
 
 // Core is a running product instance.
@@ -342,6 +346,12 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// no dispatch worker may outlive a failed Start call.
 	startupComplete = true
 	scheduler.Start()
+	if opts.EngineSelfCheck {
+		go func() {
+			info := application.EngineStatus(ctx)
+			logger.Info("engine self-check", "status", info.Status, "version", info.Version, "binary", info.BinaryPath, "loggedIn", info.LoggedIn, "errorKey", info.ErrorKey, "capabilities", info.Capabilities)
+		}()
+	}
 	go func() {
 		if err := core.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server stopped", "error", err)

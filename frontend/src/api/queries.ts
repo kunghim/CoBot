@@ -310,6 +310,19 @@ export function useEngineLogout() {
   });
 }
 
+/** POST /engine/check: re-runs the self-check, including native hook trust,
+ * and replaces the cached engine projection with the fresh one. */
+export function useEngineCheck() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.checkEngine(),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.engine, data);
+      void qc.invalidateQueries({ queryKey: queryKeys.models });
+    },
+  });
+}
+
 /** GET /models: only meaningful while the engine is ready; the endpoint
  * spawns the control server, so callers enable it conditionally. */
 export function useEngineModels(enabled: boolean) {

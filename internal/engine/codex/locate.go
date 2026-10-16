@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/engine"
@@ -42,6 +43,39 @@ func Locate(configuredPath string) (string, error) {
 		return "", fmt.Errorf("%w (not on PATH and no configured path)", ErrNotFound)
 	}
 	return found, nil
+}
+
+// VersionSupported reports whether a `codex --version` result is at least
+// MinSupportedVersion. Pre-release suffixes count as their release, and an
+// unparsable version is unsupported.
+func VersionSupported(version string) bool {
+	parse := func(v string) ([3]int, bool) {
+		var out [3]int
+		core, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(v), "v"), "-")
+		parts := strings.Split(core, ".")
+		if len(parts) != 3 {
+			return out, false
+		}
+		for i, part := range parts {
+			n, err := strconv.Atoi(part)
+			if err != nil || n < 0 {
+				return out, false
+			}
+			out[i] = n
+		}
+		return out, true
+	}
+	have, ok := parse(version)
+	want, _ := parse(MinSupportedVersion)
+	if !ok {
+		return false
+	}
+	for i := range have {
+		if have[i] != want[i] {
+			return have[i] > want[i]
+		}
+	}
+	return true
 }
 
 // ProbeVersion runs `codex --version` and returns the CLI version string.
