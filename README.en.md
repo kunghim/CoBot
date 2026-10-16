@@ -7,10 +7,17 @@ tasks, conversations, approvals, and shared context while external agents
 perform the work. Coding is the first use case; the product is intended to
 support office work, learning, and creative work as it grows.
 
-The first version is under repair and acceptance testing. Windows Web is
-the current acceptance target. Windows desktop runtime/installation and
-macOS runtime/packaging remain unverified. See the tracked acceptance
-documents under `docs/` for evidence and limitations.
+The Windows local Web version is ready for trial use. Real Codex workflows
+and two rounds of developing CoBot with CoBot have been verified, including
+files, collaboration, approvals, upgrades, and recovery. The final checks
+include 53 frontend tests, 14 browser E2E tests, and core race tests. Findings
+from three independent reviews were fixed and re-reviewed.
+
+[Acceptance results](docs/首版验收复核-2026-10-15.md) distinguish automated,
+real-model, and untested scenarios; this does not claim exhaustive testing
+of all 94 items. **Windows desktop installation/runtime, macOS native
+runtime/packaging, and signing/notarization remain unverified.** See the
+[repair record](docs/首版修复记录-2026-10-15.md) for evidence and limitations.
 
 ## Develop and check
 
