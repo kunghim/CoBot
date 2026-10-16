@@ -744,6 +744,11 @@ type CheckDirectoryJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// PickDirectoryJSONBody defines parameters for PickDirectory.
+type PickDirectoryJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // CheckEngineJSONBody defines parameters for CheckEngine.
 type CheckEngineJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -931,6 +936,9 @@ type SendMessageJSONRequestBody SendMessageJSONBody
 
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
+
+// PickDirectoryJSONRequestBody defines body for PickDirectory for application/json ContentType.
+type PickDirectoryJSONRequestBody PickDirectoryJSONBody
 
 // CheckEngineJSONRequestBody defines body for CheckEngine for application/json ContentType.
 type CheckEngineJSONRequestBody CheckEngineJSONBody

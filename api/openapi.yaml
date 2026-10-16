@@ -371,8 +371,27 @@ paths:
                               properties:
                                 id: { type: string }
                                 nameKey: { type: string }
+                                summaryKey: { type: string }
                                 name: { type: string }
                                 contentVersion: { type: string }
+                                scenarios:
+                                  type: array
+                                  items: { type: string }
+                          scenarios:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, nameKey, name, roleIds, defaultRoleIds]
+                              properties:
+                                id: { type: string }
+                                nameKey: { type: string }
+                                name: { type: string }
+                                roleIds:
+                                  type: array
+                                  items: { type: string }
+                                defaultRoleIds:
+                                  type: array
+                                  items: { type: string }
         "401":
           $ref: "#/components/responses/Error"
   /api/v1/teams:
@@ -1522,6 +1541,47 @@ paths:
                             type: array
                             items: { type: string }
         "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories/pick:
+    post:
+      operationId: pickDirectory
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Show the native folder chooser on this machine and return the chosen path
+      description: >-
+        Blocks until the user chooses or cancels. The path is only a
+        suggestion; team creation and rebind validate it as usual.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chosen path, or cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [path, cancelled]
+                        properties:
+                          path: { type: string }
+                          cancelled: { type: boolean }
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
           $ref: "#/components/responses/Error"
   /api/v1/directories/check:
     post:

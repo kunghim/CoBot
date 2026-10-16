@@ -708,6 +708,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/directories/pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Show the native folder chooser on this machine and return the chosen path
+         * @description Blocks until the user chooses or cancels. The path is only a suggestion; team creation and rebind validate it as usual.
+         */
+        post: operations["pickDirectory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/directories/check": {
         parameters: {
             query?: never;
@@ -1571,8 +1591,17 @@ export interface operations {
                             items?: {
                                 id?: string;
                                 nameKey?: string;
+                                summaryKey?: string;
                                 name?: string;
                                 contentVersion?: string;
+                                scenarios?: string[];
+                            }[];
+                            scenarios?: {
+                                id: string;
+                                nameKey: string;
+                                name: string;
+                                roleIds: string[];
+                                defaultRoleIds: string[];
                             }[];
                         };
                     };
@@ -2624,6 +2653,40 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+        };
+    };
+    pickDirectory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Chosen path, or cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            path: string;
+                            cancelled: boolean;
+                        };
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
         };
     };
     checkDirectory: {

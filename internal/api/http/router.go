@@ -80,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)
 	mux.HandleFunc("POST /api/v1/teams/{id}/directory/rebind", s.handleRebindDirectory)
 	mux.HandleFunc("GET /api/v1/directories", s.handleListDirectories)
+	mux.HandleFunc("POST /api/v1/directories/pick", s.handlePickDirectory)
 	mux.HandleFunc("POST /api/v1/directories/check", s.handleCheckDirectory)
 	mux.HandleFunc("GET /api/v1/authorizations", s.handleListAuthorizations)
 	mux.HandleFunc("POST /api/v1/authorizations/{id}/revoke", s.handleRevokeAuthorization)

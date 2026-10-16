@@ -5,7 +5,7 @@ import { authorize } from './helpers';
 
 test('official login exposes the browser link and cancel uses its loginId', async ({page,context}) => {
   await authorize(context);
-  await page.goto('/settings');
+  await page.goto('/settings/engine');
   await page.getByRole('button',{name:/登录 Codex|Sign in to Codex/i}).click();
   await expect(page.getByRole('link',{name:/打开官方登录页面|Open official sign-in page/i})).toHaveAttribute('href','https://example.invalid/login');
   await page.getByRole('button',{name:/取消登录|Cancel sign-in/i}).click();

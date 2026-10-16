@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/dirpicker"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -128,6 +129,31 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 		}
 	}
 	return result, nil
+}
+
+// PickDirectory shows the native folder chooser on this machine for the
+// Web page, which cannot learn a real path from the browser's own picker.
+// The result is only a suggestion: creation and rebind still validate it.
+func (a *App) PickDirectory(ctx context.Context, principal auth.Principal) (map[string]any, error) {
+	if principal.Kind != auth.KindUser {
+		return nil, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	title := "Select team working directory"
+	if settings, err := a.GetSettings(ctx); err == nil && settings.Language == "zh-CN" {
+		title = "选择团队工作目录"
+	}
+	path, err := dirpicker.Pick(ctx, title)
+	switch {
+	case errors.Is(err, dirpicker.ErrCancelled):
+		return map[string]any{"path": "", "cancelled": true}, nil
+	case errors.Is(err, dirpicker.ErrBusy):
+		return nil, domain.Conflict("error.directory.picker_busy", nil)
+	case errors.Is(err, dirpicker.ErrUnavailable):
+		return nil, domain.CapabilityMissing("error.directory.picker_unavailable", nil, err)
+	case err != nil:
+		return nil, domain.CapabilityMissing("error.directory.picker_failed", nil, err)
+	}
+	return map[string]any{"path": path, "cancelled": false}, nil
 }
 
 // ListDirectoryChildren lists a directory's immediate subdirectories for the

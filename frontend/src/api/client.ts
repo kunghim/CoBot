@@ -299,6 +299,7 @@ export const api = {
   rebuildMarker: (teamId: string, expectedRevision: number) => request<{ rebuilt: boolean; resourcesLost: boolean; state: string }>('POST', `/api/v1/teams/${teamId}/directory/rebuild-marker`, { expectedRevision }),
   deleteMemory: (botId: string, memoryId: string) =>
     request<{ deleted: boolean }>('DELETE', `/api/v1/bots/${botId}/memories/${memoryId}`),
+  pickDirectory: () => request<{ path: string; cancelled: boolean }>('POST', '/api/v1/directories/pick', {}),
   listDirectories: (path?: string) =>
     request<import('./types').DirectoryListResult>('GET', `/api/v1/directories${path ? `?path=${encodeURIComponent(path)}` : ''}`),
   checkDirectory: (path: string) =>

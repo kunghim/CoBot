@@ -7,7 +7,7 @@ import { useRoles } from '../../api/queries';
 import type { TeamWithBots } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useDialogFocus } from '../../components/useDialogFocus';
-import { desktopBridge } from '../../platform/native-bridge';
+import { pickDirectory } from '../../platform/pickDirectory';
 
 type Action = 'add' | 'rebind' | 'rebuild';
 
@@ -20,6 +20,7 @@ export default function TeamTools({ item }: { item: TeamWithBots }) {
   const [directory, setDirectory] = useState('');
   const [adoptMarker, setAdoptMarker] = useState(false);
   const [notice, setNotice] = useState('');
+  const [pickError, setPickError] = useState('');
   const roles = useRoles(action === 'add');
   const mutate = useMutation({
     mutationFn: async (chosen: Action) => {
@@ -32,7 +33,7 @@ export default function TeamTools({ item }: { item: TeamWithBots }) {
     onSuccess: (messageKey) => { setNotice(t(messageKey)); setAction(null); void qc.invalidateQueries(); },
   });
   const dialogRef = useDialogFocus(action !== null, () => setAction(null), mutate.isPending);
-  const open = (chosen: Action) => { setAction(chosen); setRoleId(''); setDirectory(team.directory); setAdoptMarker(false); setNotice(''); mutate.reset(); };
+  const open = (chosen: Action) => { setAction(chosen); setRoleId(''); setDirectory(team.directory); setAdoptMarker(false); setNotice(''); setPickError(''); mutate.reset(); };
   const available: Action[] = team.status === 'active' ? ['add', 'rebind', 'rebuild'] : team.status === 'directory_missing' || team.status === 'error' ? ['rebind', 'rebuild'] : [];
   const icon = { add: UserPlus, rebind: FolderInput, rebuild: FileCheck };
   return <div className="mt-1 space-y-1 pl-6">
@@ -45,7 +46,8 @@ export default function TeamTools({ item }: { item: TeamWithBots }) {
         {action === 'add' && roles.isError && <p role="alert" className="text-xs text-red-600">{t('team.loadFailed')}</p>}
         {action === 'rebind' && <>
           <label className="block text-sm">{t('team.directoryLabel')}<input value={directory} onChange={(event) => setDirectory(event.target.value)} className="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-2 dark:border-neutral-700" /></label>
-          {desktopBridge() && <button type="button" className="text-xs underline" onClick={() => { void desktopBridge()!.OpenDirectory().then((path) => { if (path) setDirectory(path); }); }}>{t('team.browse')}</button>}
+          <button type="button" className="text-xs underline" onClick={() => { setPickError(''); pickDirectory().then((path) => { if (path) setDirectory(path); }).catch((error) => setPickError(apiErrorMessage(t, error))); }}>{t('team.browse')}</button>
+          {pickError && <p role="alert" className="text-xs text-red-600">{pickError}</p>}
           <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={adoptMarker} onChange={(event) => setAdoptMarker(event.target.checked)} />{t('team.adoptMarker')}</label>
         </>}
         {action === 'rebuild' && <p className="text-sm text-neutral-500">{t('team.rebuildExplanation')}</p>}

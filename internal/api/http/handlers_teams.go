@@ -125,7 +125,7 @@ func (s *Server) handleListRoles(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	writeData(w, r, http.StatusOK, map[string]any{"items": items, "nextCursor": ""})
+	writeData(w, r, http.StatusOK, map[string]any{"items": items, "scenarios": s.App.RoleScenarios(), "nextCursor": ""})
 }
 
 // pathTeamID is a tiny helper for handlers that only need the id.

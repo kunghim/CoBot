@@ -42,6 +42,26 @@ func (s *Server) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, http.StatusOK, result)
 }
 
+func (s *Server) handlePickDirectory(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.App.PickDirectory(r.Context(), principal)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, result)
+}
+
 func (s *Server) handleCheckDirectory(w http.ResponseWriter, r *http.Request) {
 	principal, ok := requireUser(w, r)
 	if !ok {

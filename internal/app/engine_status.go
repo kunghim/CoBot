@@ -390,9 +390,27 @@ func (a *App) RoleLibrary(ctx context.Context) ([]map[string]any, error) {
 		out = append(out, map[string]any{
 			"id":             role.ID,
 			"nameKey":        role.NameKey,
+			"summaryKey":     strings.TrimSuffix(role.NameKey, ".name") + ".summary",
 			"name":           role.Name,
 			"contentVersion": role.ContentVersion,
+			"scenarios":      roles.ScenariosOf(role.ID),
 		})
 	}
 	return out, nil
+}
+
+// RoleScenarios returns the built-in scenarios that group the role library
+// for team creation, with the members each one preselects.
+func (a *App) RoleScenarios() []map[string]any {
+	out := make([]map[string]any, 0, len(roles.Scenarios))
+	for _, scenario := range roles.Scenarios {
+		out = append(out, map[string]any{
+			"id":             scenario.ID,
+			"nameKey":        scenario.NameKey,
+			"name":           scenario.Name,
+			"roleIds":        scenario.RoleIDs,
+			"defaultRoleIds": scenario.DefaultRoleIDs,
+		})
+	}
+	return out
 }

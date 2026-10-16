@@ -65,12 +65,24 @@ export interface CreateTeamResult {
 export interface Role {
   id: string;
   nameKey: string;
+  summaryKey?: string;
   name: string;
   contentVersion?: string;
+  scenarios?: string[];
+}
+
+/** A built-in scenario groups roles and preselects its usual members. */
+export interface RoleScenario {
+  id: string;
+  nameKey: string;
+  name: string;
+  roleIds: string[];
+  defaultRoleIds: string[];
 }
 
 export interface RoleListResult {
   items: Role[];
+  scenarios?: RoleScenario[];
   nextCursor: string;
 }
 

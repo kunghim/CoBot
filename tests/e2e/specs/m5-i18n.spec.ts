@@ -12,13 +12,13 @@ test('language setting switches the UI and persists', async ({ page }) => {
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: /设置|Settings/ })).toBeVisible();
 
+  // Settings save on change; there is no separate Save button.
   const languageSelect = page.getByRole('combobox', { name: /语言|Language/i });
   await languageSelect.selectOption('en');
-  await page.getByRole('button', { name: /保存|Save/i }).click();
 
   // The page re-renders in English: the same labels change language.
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole('heading', { name: 'Live authorizations' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Security' })).toBeVisible();
 
   // The choice persists across a reload.
   await page.reload();
@@ -27,6 +27,5 @@ test('language setting switches the UI and persists', async ({ page }) => {
 
   // Switch back so the rest of the suite keeps its Chinese defaults.
   await page.getByRole('combobox', { name: 'Language' }).selectOption('zh-CN');
-  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: /设置/ })).toBeVisible({ timeout: 15000 });
 });

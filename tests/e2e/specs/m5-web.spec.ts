@@ -20,8 +20,8 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/团队名称|team name/i).fill('m5团队');
   await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
-  // The browser path validates through the same rules creation uses.
-  await dialog.getByRole('button', { name: /检查目录|check directory/i }).click();
+  // A typed path validates on Enter through the same rules creation uses.
+  await dialog.getByLabel(/工作目录|directory/i).press('Enter');
   await expect(dialog.getByText(/目录可用|directory usable/i)).toBeVisible({ timeout: 10000 });
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   await expect(page.getByText('m5团队').first()).toBeVisible({ timeout: 15000 });
