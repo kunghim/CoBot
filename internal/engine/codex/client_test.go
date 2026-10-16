@@ -29,6 +29,37 @@ func readJSONLine(r io.Reader) map[string]any {
 	return out
 }
 
+func TestBlockedWriteHonorsDeadlineAndCloseDoesNotWaitForWriter(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	defer inR.Close()
+	defer outR.Close()
+	defer outW.Close()
+	client := NewClient(inW, outR, ClientHooks{})
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	called := make(chan error, 1)
+	go func() { called <- client.Call(ctx, "blocked", nil, nil) }()
+	select {
+	case err := <-called:
+		if err == nil {
+			t.Fatal("blocked write succeeded")
+		}
+	case <-time.After(time.Second):
+		// Closing the underlying pipe releases the original defective writer
+		// too, so this regression fails without leaking its goroutine.
+		_ = inW.Close()
+		t.Fatal("Call ignored its write deadline")
+	}
+	closed := make(chan struct{})
+	go func() { _ = client.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close waited for a blocked write")
+	}
+}
+
 func TestClientCallAndResult(t *testing.T) {
 	clientStdinR, clientStdinW := io.Pipe()
 	serverStdoutR, serverStdoutW := io.Pipe()

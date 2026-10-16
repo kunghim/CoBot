@@ -69,7 +69,7 @@ func TestMissingFilePreviewReadsExactItemWithoutBlockingReader(t *testing.T) {
 func TestUnsupportedServerRequestsDoNotBecomeCommandApprovals(t *testing.T) {
 	for _, method := range []string{"mcpServer/elicitation/request", "unknown/request"} {
 		var output bytes.Buffer
-		client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{})}
+		client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{}), writeGate: make(chan struct{}, 1)}
 		approval := false
 		server := &Server{client: client, callbacks: engine.Callbacks{OnApproval: func(engine.ApprovalRequest) { approval = true }}}
 		server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: method, Params: json.RawMessage(`{}`)})

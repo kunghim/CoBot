@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // RPCError is a JSON-RPC error returned by the app-server.
@@ -54,14 +55,17 @@ type InboundRequest struct {
 
 // Client speaks line-delimited JSON-RPC with an app-server process.
 type Client struct {
-	stdin   io.WriteCloser
-	nextID  atomic.Int64
-	mu      sync.Mutex
-	writeMu sync.Mutex // guards stdin writes; never held while waiting on responses
-	pending map[string]*pendingCall
-	closed  chan struct{}
-	exitErr error
-	wg      sync.WaitGroup
+	stdin     io.WriteCloser
+	nextID    atomic.Int64
+	mu        sync.Mutex
+	writeGate chan struct{} // serializes frames, without holding the state mutex
+	closeOnce sync.Once
+	closeErr  error
+	failOnce  sync.Once
+	pending   map[string]*pendingCall
+	closed    chan struct{}
+	exitErr   error
+	wg        sync.WaitGroup
 
 	onRequest func(InboundRequest)
 	onNotify  func(method string, params json.RawMessage)
@@ -86,6 +90,7 @@ func NewClient(stdin io.WriteCloser, stdout io.Reader, hooks ClientHooks) *Clien
 		stdin:     stdin,
 		pending:   map[string]*pendingCall{},
 		closed:    make(chan struct{}),
+		writeGate: make(chan struct{}, 1),
 		onRequest: hooks.OnRequest,
 		onNotify:  hooks.OnNotify,
 		onExit:    hooks.OnExit,
@@ -148,24 +153,24 @@ func (c *Client) resolve(msg rpcMessage) {
 }
 
 func (c *Client) fail(err error) {
-	c.mu.Lock()
-	if c.exitErr == nil {
-		c.exitErr = err
-	}
-	for key, p := range c.pending {
-		if !p.done {
-			p.done = true
-			p.result <- rpcMessage{Error: &RPCError{Message: err.Error()}}
+	first := false
+	c.failOnce.Do(func() {
+		first = true
+		c.mu.Lock()
+		if c.exitErr == nil {
+			c.exitErr = err
 		}
-		delete(c.pending, key)
-	}
-	c.mu.Unlock()
-	select {
-	case <-c.closed:
-	default:
+		for key, p := range c.pending {
+			if !p.done {
+				p.done = true
+				p.result <- rpcMessage{Error: &RPCError{Message: err.Error()}}
+			}
+			delete(c.pending, key)
+		}
+		c.mu.Unlock()
 		close(c.closed)
-	}
-	if c.onExit != nil {
+	})
+	if first && c.onExit != nil {
 		c.onExit(err)
 	}
 }
@@ -195,7 +200,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, out any) e
 	c.pending[key] = p
 	c.mu.Unlock()
 
-	if err := c.write(data); err != nil {
+	if err := c.writeContext(ctx, data); err != nil {
 		c.mu.Lock()
 		delete(c.pending, key)
 		c.mu.Unlock()
@@ -257,28 +262,56 @@ func (c *Client) Notify(method string, params any) error {
 }
 
 func (c *Client) write(data []byte) error {
+	return c.writeContext(context.Background(), data)
+}
+
+func (c *Client) writeContext(ctx context.Context, data []byte) error {
+	// A blocked/partial frame cannot safely be retried on this transport.
+	// Closing its pipe on cancellation unblocks the writer and forces the
+	// host to reconcile uncertain executions rather than reuse a broken stream.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.closed:
+		return c.Err()
+	case c.writeGate <- struct{}{}:
+	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.exitErr != nil {
-		return fmt.Errorf("codex app-server unavailable: %w", c.exitErr)
+		err := c.exitErr
+		c.mu.Unlock()
+		<-c.writeGate
+		return fmt.Errorf("codex app-server unavailable: %w", err)
 	}
-	if _, err := c.stdin.Write(append(data, '\n')); err != nil {
-		return fmt.Errorf("write to codex app-server: %w", err)
+	c.mu.Unlock()
+	result := make(chan error, 1)
+	go func() {
+		defer func() { <-c.writeGate }()
+		_, err := c.stdin.Write(append(data, '\n'))
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		if err != nil {
+			return fmt.Errorf("write to codex app-server: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		_ = c.Close()
+		go c.fail(ctx.Err())
+		return ctx.Err()
+	case <-c.closed:
+		_ = c.Close()
+		return c.Err()
 	}
-	return nil
 }
 
 // Close ends the stdin stream; the caller still owns process termination.
 func (c *Client) Close() error {
-	c.mu.Lock()
-	if c.exitErr != nil {
-		c.mu.Unlock()
-		return nil
-	}
-	c.mu.Unlock()
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
-	return c.stdin.Close()
+	c.closeOnce.Do(func() { c.closeErr = c.stdin.Close() })
+	return c.closeErr
 }
 
 // Wait blocks until the read loop observed process exit.
