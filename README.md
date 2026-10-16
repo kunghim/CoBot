@@ -1,5 +1,7 @@
 # CoBot
 
+简体中文 · [English](README.en.md) · [Contributing](CONTRIBUTING.md)
+
 开源、本地运行的多 Agent 协作应用：CoBot 组织角色、任务、沟通与审批，业务操作交给外部 Agent。首版先做编程，目标是用 CoBot 开发 CoBot，后续面向办公、学习、创作等场景。
 
 **当前阶段：首版修复中，尚未通过真实 Web 完整验收。** M1～M5 已有实现，常规自动化检查通过；独立审查发现真实引擎接线、状态与协作闭环问题，正按 [修复计划](docs/首版修复计划-2026-10-15.md) 处理。真实模型及两次自举仍待验收。macOS 客户端与桌面壳原生运行/安装为**待测**。历史证据见 M1～M5 验收记录，当前问题见 [审查报告](docs/首版审查报告-2026-10-15.md)。
@@ -35,9 +37,39 @@ go build -o .tmp/bin/cobot ./cmd/cobot
 # 同 profile 重复启动不会开第二个调度器：报告已运行实例并打印新的授权链接
 ```
 
-测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）；`cd tests/e2e && npx playwright test`（浏览器 E2E：真实核心 + 假引擎，6 个 spec 文件共 9 条，CI browser-e2e job 同步执行）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
+测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）；`cd tests/e2e && npx playwright test`（浏览器 E2E：真实核心 + 假引擎，8 个 spec 文件共 14 条，CI browser-e2e job 同步执行）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
 
 其他子命令：`cobot mcp`（引擎拉起的单成员 MCP stdio 桥，环境变量见 `internal/collaboration`）；`cobot hook`（stdin JSON 的 hook 适配器，只执行团队 `.cobot/hooks.json` 显式配置的命令，副作用先过本地租约）。
+
+## Codex 原生租约 hook
+
+CoBot 在自己的私有 Codex home 注册 `PreToolUse`，调用同版本辅助程序的 `hook --native-codex`。它核对原生 thread/turn 与宿主绑定、服务代际、引擎代际和本地租约；不会执行工具或代替用户批准工具。不会更改日常 Codex home，已有自定义 hooks 文件会保留并报告未接线。
+
+**注册不等于信任。** Codex 0.161.0 会跳过未审查或已变化的定义。先完成当前运行任务，再在 CoBot 私有环境启动 Codex，输入 `/hooks`，核对命令确实指向你的 CoBot 辅助程序及当前数据根，然后通过原生界面信任；不使用绕过信任参数。下面 PowerShell 示例只临时设置当前子进程环境，退出后还原；将数据根和团队目录换成你实际使用的绝对路径。
+
+```powershell
+$cobotRoot = 'C:\your\cobot-data-root'
+$teamDirectory = 'C:\your\team-directory'
+$previousCodexHome = $env:CODEX_HOME
+$previousCodexSQLiteHome = $env:CODEX_SQLITE_HOME
+try {
+    $env:CODEX_HOME = Join-Path $cobotRoot 'engines/codex/home'
+    $env:CODEX_SQLITE_HOME = Join-Path $cobotRoot 'engines/codex/sqlite'
+    # Windows 命令使用 EncodedCommand 避免嵌套 shell 转义；先解码核对，不执行解码结果。
+    $hooks = Get-Content (Join-Path $env:CODEX_HOME 'hooks.json') -Raw | ConvertFrom-Json
+    $command = $hooks.hooks.PreToolUse[0].hooks[0].command
+    [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($command -split ' ')[-1]))
+    codex --no-daemon --no-alt-screen --cd $teamDirectory
+    # 在 Codex 内输入 /hooks，审查后退出。
+} finally {
+    $env:CODEX_HOME = $previousCodexHome
+    $env:CODEX_SQLITE_HOME = $previousCodexSQLiteHome
+}
+```
+
+macOS 可在子 shell 中设置同样两个环境变量后运行 `codex --no-daemon --cd "$teamDirectory"`。`--no-daemon` 避免较长私有路径触发 CLI 后台服务的 socket 长度限制，不改变沙箱或 hook 信任。这个 CLI 入口仅用于审查配置；不通过 CoBot 分派的工具轮次没有宿主绑定，会被 guard 拒绝。
+
+设置页通过真实 `hooks/list` 和本次服务内观察到的执行失败报告状态；原生版本不支持查询、禁用、未信任或接线失败时都不声明保护生效。升级导致命令路径变化后需重新审查。特殊工具路径、被原生跳过或异常的 hook、已经开始的进程均不能保证受控或撤销；它是覆盖范围内的租约门禁，不是硬隔离。
 
 ## 工程版本
 
@@ -77,7 +109,7 @@ Go 1.25、React 18 + TypeScript + Vite 6、TanStack Query、Tailwind CSS 4、i18
 
 | 平台/形态 | 状态 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 · 本机 Web 核心 | 已验证 | 开发与全部验收在此完成：`scripts/check.ps1`、Go 单元/集成、9 条浏览器 E2E |
+| Windows 10/11 x64 · 本机 Web 核心 | 自动化通过，真实验收进行中 | `scripts/check.ps1`、Go 单元/集成、14 条浏览器 E2E；不能据此推断两次真实自举已完成 |
 | Windows · 独立 server 发行物 | 已构建校验 | `scripts/build.ps1 -Target server` 产出单文件（内嵌前端/迁移/角色），附 sha256 |
 | Windows · 桌面壳（Wails/WebView2） | 待测 | 代码保留且随构建编译；原生运行/安装未验证 |
 | macOS（Web 核心 / 桌面壳） | 待测 | 无法在本机验证；未做签名与公证 |
