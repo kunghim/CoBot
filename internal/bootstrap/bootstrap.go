@@ -236,6 +236,15 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			},
 		})
 	}
+	startupComplete := false
+	defer func() {
+		if !startupComplete {
+			_ = listener.Close()
+			_ = closeLog()
+			_ = db.Close()
+			lock.Release()
+		}
+	}()
 	// The local event ledger mirrors every recorded event to disk (H08).
 	// Startup drains whatever previous runs left into the database — by event
 	// id, so nothing duplicates — before reconciliation classifies state.
@@ -267,9 +276,6 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// different version.
 	application.MCPBinary = helper
 	application.MCPEndpoint = endpoint
-	// Resume queued work only after every adapter dependency is ready.
-	scheduler.Start()
-
 	issuer := auth.NewBootstrapIssuer(auth.DefaultBootstrapTTL)
 	sessions := auth.NewSessionStore(auth.DefaultSessionTTL)
 	bearer := auth.NewBearerStore(auth.DefaultBearerTTL)
@@ -304,10 +310,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 
 	startupSecret, err := issuer.Issue()
 	if err != nil {
-		listener.Close()
-		closeLog()
-		db.Close()
-		return fail(err)
+		return nil, err
 	}
 
 	streamContext, stopStreams := context.WithCancel(context.Background())
@@ -335,6 +338,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		scheduler:        scheduler,
 	}
 
+	// Ownership transfers only after all fallible startup work has finished;
+	// no dispatch worker may outlive a failed Start call.
+	startupComplete = true
+	scheduler.Start()
 	go func() {
 		if err := core.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server stopped", "error", err)

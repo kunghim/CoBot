@@ -106,3 +106,36 @@ func TestMissingCompanionDoesNotLeaveLockedProfile(t *testing.T) {
 		t.Fatal("left lock", err)
 	}
 }
+
+func TestEventImportStartupFailureReleasesOwnedResources(t *testing.T) {
+	root := t.TempDir()
+	events := filepath.Join(root, "events")
+	if err := os.MkdirAll(filepath.Join(events, "imported-block.jsonl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	live := filepath.Join(events, "live-block.jsonl")
+	if err := os.WriteFile(live, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opts := bootstrap.Options{Environment: platform.EnvDevelopment, DataRoot: root, Listen: "127.0.0.1:0"}
+	if core, err := bootstrap.Start(context.Background(), opts); err == nil {
+		_ = core.Shutdown(context.Background())
+		t.Fatal("accepted blocked event import")
+	}
+	if _, err := os.Stat(filepath.Join(root, "runtime", "instance.json")); !os.IsNotExist(err) {
+		t.Fatalf("failed startup left discovery file: %v", err)
+	}
+	if _, err := os.Stat(live); err != nil {
+		t.Fatal("lost unimported evidence", err)
+	}
+	if err := os.Remove(filepath.Join(events, "imported-block.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	core, err := bootstrap.Start(context.Background(), opts)
+	if err != nil {
+		t.Fatal("failed startup stranded its profile", err)
+	}
+	if err := core.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
