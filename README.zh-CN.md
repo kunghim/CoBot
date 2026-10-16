@@ -95,8 +95,8 @@ npm ci --prefix frontend
 .tmp/dist/cobot serve                     # 开发 profile，数据在 ~/.cobot-dev
 ```
 
-打开终端里打印的一次性链接（60 秒内、仅一次有效）。需要新链接时，再运行一次 `cobot serve`，
-它会为正在运行的实例打印一个新链接。然后：
+默认浏览器会自动打开 CoBot，直接可用。背后用的是一次性启动链接（60 秒内、仅一次有效，
+终端里也会打印；加 `--no-open` 则只打印不打开）。再运行一次 `cobot serve` 会为正在运行的实例打开一个新链接。然后：
 
 1. **设置**：登录 Codex。CoBot 使用自己的私有 Codex 环境，需要在 CoBot 里登录一次。然后选择默认模型。
    设置页还会显示 CoBot 的原生安全 hook 是否已受信任。Codex 要求你用 `/hooks` 审查一次，

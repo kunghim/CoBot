@@ -61,7 +61,7 @@ try {
     const binary = join(root, '.tmp/bin', `cobot-dev-${process.pid}${process.platform === 'win32' ? '.exe' : ''}`);
     execFileSync(go, ['build', '-o', binary, './cmd/cobot'], { cwd: root, stdio: 'inherit', windowsHide: true });
     log = createWriteStream(join(root, '.tmp', `dev-core-${process.pid}.log`));
-    ownedCore = spawn(binary, ['serve', '--profile', 'development', '--data-root', profile, '--listen', '127.0.0.1:0', '--dev-origin', origin], { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    ownedCore = spawn(binary, ['serve', '--profile', 'development', '--data-root', profile, '--listen', '127.0.0.1:0', '--dev-origin', origin, '--no-open'], { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let partial = '';
     ownedCore.stdout.on('data', (chunk) => {
       partial += chunk.toString();

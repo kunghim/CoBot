@@ -57,14 +57,15 @@ func usage() {
 
 Usage:
   cobot serve [--profile development|production] [--data-root <path>] [--listen host:port]
-              [--log-level debug|info|warn|error]
+              [--log-level debug|info|warn|error] [--no-open]
   cobot version
   cobot mcp                      # MCP stdio bridge for one bot (spawned by the engine)
   cobot hook                     # run one configured hook from stdin JSON (H07)
 
-The core binds loopback only. `+"`serve`"+` prints a one-time startup link for
-browser authorization; a second serve on the same profile reports the running
-instance instead of starting another scheduler.
+The core binds loopback only. `+"`serve`"+` opens the default browser with a
+one-time startup link (also printed; --no-open only prints it); a second serve
+on the same profile opens a fresh link to the running instance instead of
+starting another scheduler.
 `)
 }
 
@@ -75,6 +76,7 @@ func runServe(args []string) int {
 	listen := fs.String("listen", "", "loopback listen address, default 127.0.0.1:0 (ephemeral)")
 	logLevel := fs.String("log-level", "info", "log level: debug, info, warn or error")
 	devOrigin := fs.String("dev-origin", "", "extra allowed browser origin (development Vite server)")
+	noOpen := fs.Bool("no-open", false, "print the startup link without opening a browser")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -117,6 +119,7 @@ func runServe(args []string) int {
 			fmt.Fprintf(os.Stderr, "CoBot is already running for profile %s\n  endpoint: %s\n  (pid %d owns this profile; a second scheduler is never started)\n", env, already.Endpoint, already.PID)
 			if link := mintLinkForRunningInstance(env, *dataRoot); link != "" {
 				fmt.Printf("  fresh web link (one-time, 60s): %s\n", link)
+				launchBrowser(link, *noOpen)
 			}
 			return 3
 		}
@@ -128,8 +131,10 @@ func runServe(args []string) int {
 	fmt.Printf("  profile:   %s\n", env)
 	fmt.Printf("  endpoint:  %s\n", core.Endpoint)
 	fmt.Printf("  data root: %s\n", core.Paths.Root)
-	fmt.Printf("  web link:  %s/#cobot-bootstrap=%s\n", core.Endpoint, core.StartupBootstrap)
+	link := core.Endpoint + "/#cobot-bootstrap=" + core.StartupBootstrap
+	fmt.Printf("  web link:  %s\n", link)
 	fmt.Println("  (the link is one-time and expires in 60 seconds; a second `cobot serve` mints a fresh one)")
+	launchBrowser(link, *noOpen)
 
 	select {
 	case <-ctx.Done():
@@ -144,6 +149,19 @@ func runServe(args []string) int {
 	}
 	fmt.Println("stopped")
 	return 0
+}
+
+// launchBrowser opens the startup link unless the caller (scripts, tests)
+// asked only for the printed link.
+func launchBrowser(link string, noOpen bool) {
+	if noOpen {
+		return
+	}
+	if err := openBrowser(link); err != nil {
+		fmt.Fprintf(os.Stderr, "  could not open a browser (%v); open the link above within 60 seconds\n", err)
+		return
+	}
+	fmt.Println("  opened in your default browser")
 }
 
 // mintLinkForRunningInstance asks the live core for a fresh one-time startup

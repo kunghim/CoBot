@@ -53,7 +53,7 @@ export default async function globalSetup(): Promise<void> {
   process.env.FAKE_CONTROL = fakeControl;
   process.env.COBOT_E2E_FAKE_CONTROL = fakeControl;
 
-  const child = spawn(exe('cobot'), ['serve', '--data-root', profileRoot, '--listen', `127.0.0.1:${port}`], {
+  const child = spawn(exe('cobot'), ['serve', '--data-root', profileRoot, '--listen', `127.0.0.1:${port}`, '--no-open'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   process.once('exit', () => { child.kill(); });

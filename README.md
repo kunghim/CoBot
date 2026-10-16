@@ -112,8 +112,9 @@ npm ci --prefix frontend
 .tmp/dist/cobot serve                     # development profile, data in ~/.cobot-dev
 ```
 
-Open the one-time link printed in the terminal. It is valid for 60 seconds and works once.
-To get a new link, run `cobot serve` again and it will print a fresh one for the running instance.
+Your default browser opens CoBot, already signed in. Behind the scenes it uses a one-time
+startup link (valid 60 seconds, also printed in the terminal; `--no-open` only prints it).
+Running `cobot serve` again opens a fresh link to the running instance.
 Then:
 
 1. **Settings:** sign in to Codex. CoBot uses its own private Codex environment, so you sign
