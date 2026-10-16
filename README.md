@@ -95,9 +95,8 @@ the leader planned the work, a member implemented it, a separate member reviewed
 human approved the exact candidate commit. The second round ran on the upgraded build that
 included the first round's change.
 
-Tested does not mean every edge case is covered. The
-[acceptance record](docs/首版验收复核-2026-10-15.md) (in Chinese) separates automated,
-real-model and untested scenarios for all 94 acceptance items.
+Tested does not mean every edge case is covered. The maintainers track all 94 acceptance
+items and record which parts were verified automatically, with a real model, or not yet.
 
 ## Quick start
 
@@ -138,9 +137,7 @@ Stack: Go · React + TypeScript + Vite · TanStack Query · Tailwind CSS · SQLi
 goose · Wails v2 · HTTP JSON + SSE · MCP Go SDK. The API contract lives in `api/openapi.yaml`,
 and Go and TypeScript types are generated from it.
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md). The Chinese
-[developer guide](docs/开发指南.md) covers build, run and native hook details. The design and
-acceptance documents in [`docs/`](docs/) are currently written in Chinese.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
 ## Roadmap
 

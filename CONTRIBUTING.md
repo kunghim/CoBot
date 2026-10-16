@@ -2,8 +2,7 @@
 
 CoBot is a local multi-agent application with one Go core shared by Web
 and desktop. Keep changes small, observable, and suitable for future use
-cases beyond coding. Please read `AGENTS.md` and the current development,
-directory, and acceptance documents under `docs/` before implementation.
+cases beyond coding. Please read `AGENTS.md` before implementation.
 
 ## Working locally
 
@@ -38,15 +37,47 @@ Before upgrading, stop the service normally and preserve its entire data
 root. Startup runs embedded forward SQL migrations and backs up an existing
 database before migrating. Restore a stopped, matching database/profile
 backup to roll back; do not run an old binary on a newer schema. Do not copy
-only the main SQLite file while WAL writers are active. See
-[upgrade notes](docs/升级说明.md) for details.
+only the main SQLite file while WAL writers are active.
 
 The native lease hook must be reviewed through Codex's normal `/hooks`
-flow in CoBot's private environment
-(step-by-step commands: [开发指南](docs/开发指南.md#codex-原生租约-hook), in Chinese). Registration does not grant trust.
-Settings reports whether this hook is trusted or unavailable. Coverage is
-limited to native paths that actually invoke it; hooks do not revoke
-commands already running or provide complete isolation.
+flow in CoBot's private environment. Registration does not grant trust:
+Codex skips hooks that are unreviewed or have changed. Settings reports
+whether this hook is trusted or unavailable. Coverage is limited to native
+paths that actually invoke it; hooks do not revoke commands already running
+or provide complete isolation.
+
+To review it, finish any running work, then start Codex against CoBot's
+private environment and type `/hooks`. Check that the command points to your
+CoBot helper and current data root before trusting it. Never use flags that
+bypass trust. The example sets the variables for this shell only and restores
+them afterwards; replace both paths with your own absolute paths.
+
+```powershell
+$cobotRoot = 'C:\your\cobot-data-root'
+$teamDirectory = 'C:\your\team-directory'
+$previousCodexHome = $env:CODEX_HOME
+$previousCodexSQLiteHome = $env:CODEX_SQLITE_HOME
+try {
+    $env:CODEX_HOME = Join-Path $cobotRoot 'engines/codex/home'
+    $env:CODEX_SQLITE_HOME = Join-Path $cobotRoot 'engines/codex/sqlite'
+    # On Windows the hook command is base64 EncodedCommand; decode it to inspect, do not run it.
+    $hooks = Get-Content (Join-Path $env:CODEX_HOME 'hooks.json') -Raw | ConvertFrom-Json
+    $command = $hooks.hooks.PreToolUse[0].hooks[0].command
+    [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($command -split ' ')[-1]))
+    codex --no-daemon --no-alt-screen --cd $teamDirectory
+    # Inside Codex, type /hooks, review, then exit.
+} finally {
+    $env:CODEX_HOME = $previousCodexHome
+    $env:CODEX_SQLITE_HOME = $previousCodexSQLiteHome
+}
+```
+
+On macOS, set the same two variables in a subshell and run
+`codex --no-daemon --cd "$teamDirectory"`. `--no-daemon` avoids a socket path
+length limit with long private paths; it does not change sandboxing or hook
+trust. This CLI session is only for reviewing configuration: tool turns not
+dispatched by CoBot have no host binding and are refused by the guard.
+Re-review after an upgrade changes the helper path.
 
 ## Validation
 
@@ -81,9 +112,8 @@ regressions; avoid tests that merely restate implementation details.
 
 Never commit credentials, bootstrap links, runtime databases, engine
 transcripts, raw acceptance logs, or build output. Keep raw evidence under
-the ignored `.tmp/` area and commit a sanitized summary in a tracked root
-document. Subdirectories of `docs/` contain local material and are not
-part of the required source distribution.
+the ignored `.tmp/` area. The `docs/` directory holds maintainers' local
+design and acceptance material and is not tracked by Git.
 
 Report bugs with reproduction steps, platform/tool versions, expected and
 actual behavior, and sanitized logs. Remove private paths/content when

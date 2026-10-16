@@ -79,8 +79,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 最关键的一项是连续两轮 **用 CoBot 开发 CoBot**：每一轮都由队长规划、一名成员实现、另一名成员独立审查，
 再由人批准确切的候选提交；第二轮运行在已经包含第一轮改动的升级版本上。
 
-验证过不代表覆盖了所有边界情况。[验收复核](docs/首版验收复核-2026-10-15.md)把 94 个验收项逐项
-区分为自动化、真实模型和未测。
+验证过不代表覆盖了所有边界情况。维护者对 94 个验收项逐项记录了哪些经过自动化验证、哪些用真实模型验证、哪些尚未验证。
 
 ## 快速开始
 
@@ -101,7 +100,7 @@ npm ci --prefix frontend
 
 1. **设置**：登录 Codex。CoBot 使用自己的私有 Codex 环境，需要在 CoBot 里登录一次。然后选择默认模型。
    设置页还会显示 CoBot 的原生安全 hook 是否已受信任。Codex 要求你用 `/hooks` 审查一次，
-   具体步骤见[开发指南](docs/开发指南.md#codex-原生租约-hook)。
+   具体步骤见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 2. **新建团队**：选择工作目录和需要的成员。
 3. **给队长发消息**，说明你想做什么。
 
@@ -117,7 +116,7 @@ npm ci --prefix frontend
 技术栈：Go · React + TypeScript + Vite · TanStack Query · Tailwind CSS · SQLite（modernc）+ goose ·
 Wails v2 · HTTP JSON + SSE · MCP Go SDK。接口契约在 `api/openapi.yaml`，Go 和 TypeScript 类型均由它生成。
 
-请先阅读[开发指南](docs/开发指南.md)、[CONTRIBUTING.md](CONTRIBUTING.md) 和 [AGENTS.md](AGENTS.md)。设计与验收文档在 [`docs/`](docs/)。
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [AGENTS.md](AGENTS.md)。
 
 ## 路线图
 
