@@ -795,9 +795,20 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	fake2.EmitApproval("req-appr-4", turn2.ThreadID, turn2.TurnID, "old-epoch command")
 	waitUntil(t, 5*time.Second, "second pending", func() bool {
 		items, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
-		return len(items) == 1
+		for _, item := range items {
+			if item.Type == domain.ApprovalNativeTool {
+				return true
+			}
+		}
+		return false
 	})
-	pending2, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+	allPending2, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+	var pending2 []domain.Approval
+	for _, item := range allPending2 {
+		if item.Type == domain.ApprovalNativeTool {
+			pending2 = append(pending2, item)
+		}
+	}
 	// Crash while the approval is still pending: the run is live, so the exit
 	// marks it unknown and the later decision must expire.
 	fake2.EmitExit(errors.New("second crash"))

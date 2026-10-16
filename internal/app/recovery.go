@@ -87,35 +87,14 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		exists, err := sqlite.HasPendingRecoveryForRun(ctx, tx, run.ID)
+		cardID, err := ensureRecoveryCardLocked(ctx, tx, run, deliveryID)
 		if err != nil {
-			return err
-		}
-		if exists {
-			runIDs = append(runIDs, run.ID)
-			continue // the user is already deciding this one
-		}
-		binding, err := json.Marshal(recoveryBinding{RunID: run.ID, BotID: run.BotID, DeliveryID: deliveryID})
-		if err != nil {
-			return err
-		}
-		card := domain.Approval{
-			ID: domain.NewID(), TeamID: run.TeamID, RequesterBotID: run.BotID,
-			EngineRequestID: binding, Type: domain.ApprovalRecovery,
-			Summary: "approval.card.recovery",
-			Reason:  "unresolved_run",
-			Options: []domain.ApprovalOption{
-				{ID: domain.RecoveryOptionContinue, MessageKey: "approval.option.recovery_continue", Text: "继续"},
-				{ID: domain.RecoveryOptionRerun, MessageKey: "approval.option.recovery_rerun", Text: "重跑当前工作"},
-				{ID: domain.RecoveryOptionAbandon, MessageKey: "approval.option.recovery_abandon", Text: "放弃"},
-			},
-			RequestState: domain.ApprovalStatePending,
-		}
-		if err := sqlite.InsertApproval(ctx, tx, card); err != nil {
 			return err
 		}
 		runIDs = append(runIDs, run.ID)
-		approvalIDs = append(approvalIDs, card.ID)
+		if cardID != "" {
+			approvalIDs = append(approvalIDs, cardID)
+		}
 	}
 	// Approvals bound to the previous connection can never be answered (F04
 	// proves a new connection refuses old request ids); invalidating them at
@@ -180,6 +159,32 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 	}
 	a.Hub.Publish()
 	return nil
+}
+
+// Unknown work needs an entry point even when only the engine connection
+// died. Creating the card grants no execution authority; decisions still
+// require verifyRecoveryTurn's exact terminal evidence.
+func ensureRecoveryCardLocked(ctx context.Context, tx *sql.Tx, run domain.Run, deliveryID string) (string, error) {
+	exists, err := sqlite.HasPendingRecoveryForRun(ctx, tx, run.ID)
+	if err != nil || exists {
+		return "", err
+	}
+	binding, err := json.Marshal(recoveryBinding{RunID: run.ID, BotID: run.BotID, DeliveryID: deliveryID})
+	if err != nil {
+		return "", err
+	}
+	card := domain.Approval{ID: domain.NewID(), TeamID: run.TeamID, RequesterBotID: run.BotID, EngineRequestID: binding,
+		Type: domain.ApprovalRecovery, Summary: "approval.card.recovery", Reason: "unresolved_run", RequestState: domain.ApprovalStatePending,
+		Options: []domain.ApprovalOption{
+			{ID: domain.RecoveryOptionContinue, MessageKey: "approval.option.recovery_continue", Text: "继续"},
+			{ID: domain.RecoveryOptionRerun, MessageKey: "approval.option.recovery_rerun", Text: "重跑当前工作"},
+			{ID: domain.RecoveryOptionAbandon, MessageKey: "approval.option.recovery_abandon", Text: "放弃"},
+		},
+	}
+	if err := sqlite.InsertApproval(ctx, tx, card); err != nil {
+		return "", err
+	}
+	return card.ID, nil
 }
 
 // replayStuckChainDecisions re-applies the decided option of every chain

@@ -48,6 +48,12 @@ test('member scope and drafts survive switching between conversations', async ({
   await expect(page.getByRole('textbox', { name: '给 队长 发消息……' })).toHaveValue('captain-draft');
   await backend.click();
   await expect(page.getByRole('textbox', { name: '给 后端开发 发消息……' })).toHaveValue('backend-draft');
+  // User collapse must survive selection auto-reveal and query refreshes.
+  await row.getByRole('button', { name: '收起团队', exact: true }).click();
+  await expect(row.getByRole('button', { name: '展开团队', exact: true })).toBeVisible();
+  await expect(backend).toHaveCount(0);
+  await row.getByRole('button', { name: '展开团队', exact: true }).click();
+  await expect(backend).toBeVisible();
 });
 
 test('task board can load records beyond its first page', async ({ page, context }) => {

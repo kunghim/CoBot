@@ -448,12 +448,14 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 			// completion (or timeout) resolves the chain later.
 			unlock()
 			s.StartRiskEval(ctx, delivery)
+			s.wakeAfterSkippedDelivery(ctx, botID, record.ID)
 			return nil
 		}
 		for _, ev := range chainEvents {
 			s.app.recordEvent(ctx, ev)
 		}
 		s.app.Hub.Publish()
+		s.wakeAfterSkippedDelivery(ctx, botID, record.ID)
 		return nil // waiting on a user decision, or cancelled by the gate
 	}
 	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryDispatching); err != nil {
@@ -538,6 +540,16 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	return nil
 }
 
+// A gate may have parked the previous head after all earlier wake signals
+// were consumed. Give the next eligible input a turn without polling a held
+// chain or repeatedly scheduling the same skipped delivery.
+func (s *Scheduler) wakeAfterSkippedDelivery(ctx context.Context, botID, skippedID string) {
+	items, err := sqlite.ListDispatchableDeliveries(ctx, s.app.DB, botID, 1)
+	if err == nil && len(items) > 0 && items[0].ID != skippedID {
+		s.Wake(botID)
+	}
+}
+
 func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID, botID, errorKey string) error {
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -596,8 +608,17 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, message
 	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusUnknown, runID); err != nil {
 		return err
 	}
+	cardID, err := ensureRecoveryCardLocked(ctx, tx, run, deliveryID)
+	if err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
+	}
+	if cardID != "" {
+		if card, err := sqlite.GetApproval(ctx, s.app.DB, cardID); err == nil {
+			s.app.publishApprovalUpdated(ctx, card)
+		}
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, BotID: botID, ResourceID: runID})
 	s.app.Hub.Publish()

@@ -222,7 +222,8 @@ func (a *App) RequestMember(ctx context.Context, principal auth.Principal, roleI
 	teamID := bot.TeamID
 	approval := domain.Approval{
 		ID: domain.NewID(), TeamID: teamID, RequesterBotID: principal.BotID,
-		Type: domain.ApprovalRecruitment, Summary: role.Name,
+		RunID: principal.RunID,
+		Type:  domain.ApprovalRecruitment, Summary: role.Name,
 		Reason: strings.TrimSpace(reason),
 		Options: []domain.ApprovalOption{
 			{ID: "approve", MessageKey: "approval.option.recruitment.approve"},

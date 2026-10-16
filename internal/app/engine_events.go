@@ -413,6 +413,12 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 		if txErr != nil {
 			continue
 		}
+		fresh, readErr := sqlite.GetRun(ctx, tx, run.ID)
+		if readErr != nil || fresh.Status == domain.RunCompleted || fresh.Status == domain.RunFailed || fresh.Status == domain.RunInterrupted {
+			tx.Rollback()
+			continue
+		}
+		run = fresh
 		if uerr := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown, run.ProviderTurnID, run.EngineEpoch, "error.engine.connection_lost", false); uerr != nil {
 			tx.Rollback()
 			continue
@@ -421,8 +427,23 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 			tx.Rollback()
 			continue
 		}
+		deliveryID, uerr := sqlite.MarkDeliveryUnknownByRun(ctx, tx, run.ID)
+		if uerr != nil {
+			tx.Rollback()
+			continue
+		}
+		cardID, uerr := ensureRecoveryCardLocked(ctx, tx, run, deliveryID)
+		if uerr != nil {
+			tx.Rollback()
+			continue
+		}
 		if cerr := tx.Commit(); cerr != nil {
 			continue
+		}
+		if cardID != "" {
+			if card, err := sqlite.GetApproval(ctx, s.app.DB, cardID); err == nil {
+				s.app.publishApprovalUpdated(ctx, card)
+			}
 		}
 		if s.app.CollaborationTokens != nil {
 			s.app.CollaborationTokens.RevokeRun(run.ID)

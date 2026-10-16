@@ -150,16 +150,24 @@ func (a *App) Snapshot(ctx context.Context, principal auth.Principal) (Snapshot,
 	if principal.Kind != auth.KindUser {
 		return Snapshot{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	settings, err := a.GetSettings(ctx)
+	tx, err := a.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return Snapshot{}, err
 	}
-	seq, err := sqlite.GlobalSeq(ctx, a.DB)
+	defer tx.Rollback()
+	settings, err := sqlite.GetSettings(ctx, tx)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	teams, err := a.ListTeams(ctx, principal)
+	seq, err := sqlite.GlobalSeq(ctx, tx)
 	if err != nil {
+		return Snapshot{}, err
+	}
+	teams, err := listTeamsOn(ctx, tx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return Snapshot{}, err
 	}
 	return Snapshot{

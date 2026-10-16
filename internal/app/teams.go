@@ -490,13 +490,17 @@ func (a *App) ListTeams(ctx context.Context, principal auth.Principal) ([]TeamWi
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
-	teams, err := sqlite.ListTeams(ctx, a.DB)
+	return listTeamsOn(ctx, a.DB)
+}
+
+func listTeamsOn(ctx context.Context, q sqlite.Queryer) ([]TeamWithBots, error) {
+	teams, err := sqlite.ListTeams(ctx, q)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]TeamWithBots, 0, len(teams))
 	for _, team := range teams {
-		bots, err := sqlite.ListBots(ctx, a.DB, team.ID)
+		bots, err := sqlite.ListBots(ctx, q, team.ID)
 		if err != nil {
 			return nil, err
 		}

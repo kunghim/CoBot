@@ -34,13 +34,12 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
 
   const items = teams.data?.items ?? [];
 
-  // The team that owns the selection is always expanded.
+  const selectedTeamId = botId ? findBotContext(items, botId)?.team.id : undefined;
+  // A new selection reveals its team; later manual collapse remains respected.
   useEffect(() => {
-    if (!botId) return;
-    const context = findBotContext(items, botId);
-    if (!context || expanded.has(context.team.id)) return;
-    setExpanded((prev) => new Set(prev).add(context.team.id));
-  }, [botId, items, expanded]);
+    if (!selectedTeamId) return;
+    setExpanded((prev) => prev.has(selectedTeamId) ? prev : new Set(prev).add(selectedTeamId));
+  }, [botId, selectedTeamId]);
 
   const select = (id: string) => {
     setBotId(id);

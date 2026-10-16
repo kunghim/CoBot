@@ -225,7 +225,8 @@ func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit in
 // behind it is still allowed without implicitly answering that question.
 func ListDispatchableDeliveries(ctx context.Context, q Queryer, botID string, limit int) ([]DeliveryRecord, error) {
 	rows, err := q.QueryContext(ctx, `SELECT `+deliveryColumns+` FROM deliveries
-		WHERE target_bot_id = ? AND status = ? AND (
+		WHERE target_bot_id = ? AND status = ?
+		AND NOT EXISTS (SELECT 1 FROM chains c WHERE c.id = deliveries.chain_id AND c.status IN ('awaiting_approval','evaluating')) AND (
 		EXISTS (SELECT 1 FROM messages m WHERE m.id = deliveries.message_id AND m.kind = ?) OR
 		NOT EXISTS (SELECT 1 FROM questions q WHERE q.status = 'open' AND (
 		(q.task_id = '' AND q.requester_bot_id = deliveries.target_bot_id) OR
