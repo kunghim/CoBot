@@ -1,122 +1,155 @@
 # CoBot
 
-简体中文 · [English](README.en.md) · [Contributing](CONTRIBUTING.md)
+**Agents do the work. CoBot runs the team.**
 
-开源、本地运行的多 Agent 协作应用：CoBot 组织角色、任务、沟通与审批，业务操作交给外部 Agent。首版先做编程，目标是用 CoBot 开发 CoBot，后续面向办公、学习、创作等场景。
+English · [简体中文](README.zh-CN.md)
 
-**当前阶段：Windows 本机 Web 可试用，真实主线与两次自举已验证。** 完成了真实 Codex 登录、任务/消息/审批、文件操作、升级恢复及两轮用 CoBot 开发 CoBot；最终自动化53个前端测试、14条浏览器E2E及核心race通过，三方向独立审查发现的问题已修复并复核关闭。[94项验收复核](docs/首版验收复核-2026-10-15.md)逐项区分自动化、真实流程和验证边界；不代表全部故障组合均已实测。**Windows/macOS桌面壳原生安装运行、macOS打包/架构与签名公证仍待测**。修复及证据见[修复记录](docs/首版修复记录-2026-10-15.md)，历史问题见[原审查报告](docs/首版审查报告-2026-10-15.md)。
+> **Status: early preview.** The Windows local Web version is ready to try. Desktop and macOS
+> builds exist but are not yet verified. See [Status](#status).
 
-## 快速开始（开发者）
+CoBot is a local-first app where AI agents work together as a team. The *Co* stands for
+**cooperation**: CoBot doesn't try to be a smarter agent. It is the team structure around your
+agents. It handles roles, tasks, messages, approvals and shared memory, and external agents
+(currently [Codex](https://github.com/openai/codex)) do the actual work: reading code,
+running commands, editing files.
 
-前置：Go 1.25+、Node.js 24+（npm 11+）。最终用户运行 `cobot` 单文件即可，不需要 Node/Go/数据库服务器。
+Coding is the first use case, and CoBot is built with CoBot: its own agent team has already
+planned, implemented, reviewed and delivered real changes to this repository.
 
-```bash
-# 首次：安装前端依赖并生成接口类型（OpenAPI → TS + Go DTO）
-npm ci --prefix frontend
-./scripts/generate.sh          # Windows: powershell -File scripts/generate.ps1
+<!-- TODO: screenshot or short GIF — team list, a member conversation, an approval card -->
 
-# 开发循环：启动 Go 核心(development profile) + Vite，退出时回收进程
-./scripts/dev.sh               # Windows: powershell -File scripts/dev.ps1
-# 打开终端输出的一次性链接（60 秒、单次有效）；丢失后再次运行 cobot serve 会打印新链接
+## Why CoBot
 
-# 全量检查：格式/静态分析、契约生成差异、前端类型与单测、Go 构建与测试
-./scripts/check.sh             # Windows: powershell -File scripts/check.ps1
+A single coding agent works well. Several of them on the same project quickly turn into a mess:
 
-# 构建发行物（输出到 .tmp/dist，附 sha256）
-./scripts/build.sh --target server    # 独立 cobot 可执行文件（内嵌前端/迁移/角色）
-./scripts/build.sh --target desktop   # Wails 桌面壳 + 同版本辅助 cobot（需 wails v2.15.0 CLI）
+- Nobody knows who is doing what, and two agents edit the same thing.
+- "Done" means "the model said it's done".
+- Agents wake each other up in endless loops and burn your budget.
+- When something crashes, you can't tell what actually ran.
+
+CoBot handles this the way a well-run team does: a lead who breaks down work, members with
+clear roles, a task board, written evidence, and a human who signs off on what matters.
+
+## How it works
+
+```mermaid
+flowchart LR
+    U([You]) -->|goal| L[Leader bot]
+    L -->|create_task / send_message| M1[Member bot]
+    L -->|create_task / send_message| M2[Member bot]
+    M1 & M2 -->|submit_evidence / ask_user / request_merge| C[(CoBot core<br/>tasks · messages · approvals)]
+    C -->|deliveries wake the right member| L & M1 & M2
+    C -->|approval cards| U
+    M1 & M2 -. execute in team directory .-> E[[Codex]]
 ```
 
-macOS 桌面脚本将同版本 helper 放入 `CoBot.app/Contents/MacOS`，重新作本机临时签名并生成 ZIP 和校验和；这不包含 Developer ID 签名或公证，仍需 macOS 实机验收。
+1. **Create a team** on a working directory. A leader and members with built-in roles
+   (product manager, backend, frontend, QA, code reviewer) get their own agent sessions.
+2. **Give the leader a goal.** It breaks the goal into tasks with owners, dependencies and
+   acceptance criteria.
+3. **Members collaborate through structured tools** (MCP), not by parsing chat. Every
+   action they take becomes a fact in CoBot's database, and that fact wakes up whoever needs
+   to act next.
+4. **You stay in charge.** Native command and file approvals, merge authorization and
+   risky collaboration loops all come to you as cards.
 
-独立运行核心（不依赖脚本）：
+## Features
 
-```bash
-go build -o .tmp/bin/cobot ./cmd/cobot
-.tmp/bin/cobot serve --profile development            # 默认开发 profile，数据在 ~/.cobot-dev
-.tmp/bin/cobot serve --profile production             # 生产 profile，数据在 ~/.cobot
-.tmp/bin/cobot serve --data-root <path>               # 显式数据根（测试用临时目录）
-# 同 profile 重复启动不会开第二个调度器：报告已运行实例并打印新的授权链接
-```
+- **Structured collaboration.** 19 MCP tools for tasks, messages, evidence, transfers,
+  questions and merge requests. The host binds each call to the member's identity, so a
+  model can't act as someone else.
+- **Evidence before "done".** Only the leader or you can confirm a task, and only with
+  evidence. A merge request is bound to an exact candidate commit, target and matching
+  test/review evidence. If any of those change, the old approval no longer counts.
+- **Human in the loop.** Native approvals show the full command or diff. Agents can ask you
+  questions, and related work waits for your answer.
+- **Runaway control.** Collaboration chains have round limits, risky continuations need
+  your confirmation, and an optional usage budget pauses new work.
+- **Memory.** Each member has its own memory that persists across sessions.
+- **Honest recovery.** After a restart, CoBot reconciles what really happened. If an
+  execution's outcome is unknown, CoBot locks it and shows a recovery card. It never
+  guesses and silently reruns.
+- **Local-first.** CoBot is a single executable that binds to loopback only. Your data stays
+  in `~/.cobot`. Agents run in a private Codex environment with its own login, separate from
+  your everyday Codex setup. No cloud service.
+- **Web UI and desktop shell.** Both run on one shared core. The UI is available in English
+  and Chinese.
 
-测试入口：`go test ./internal/... ./tests/...`（单元 + 真 SQLite 集成，全部使用 `.tmp`/临时数据根，不接触真实用户库）；`npm test --prefix frontend`（Vitest）；`cd tests/e2e && npx playwright test`（浏览器 E2E：真实核心 + 假引擎，8 个 spec 文件共 14 条，CI browser-e2e job 同步执行）。真实 Codex 的 R 类验收单独显式执行，不在默认检查里消耗账号。
+CoBot doesn't run shell commands, manage Git or reimplement an agent loop. That stays with
+the agent you already trust.
 
-其他子命令：`cobot mcp`（引擎拉起的单成员 MCP stdio 桥，环境变量见 `internal/collaboration`）；`cobot hook`（stdin JSON 的 hook 适配器，只执行团队 `.cobot/hooks.json` 显式配置的命令，副作用先过本地租约）。
+## Status
 
-## Codex 原生租约 hook
-
-CoBot 在自己的私有 Codex home 注册 `PreToolUse`，调用同版本辅助程序的 `hook --native-codex`。它核对原生 thread/turn 与宿主绑定、服务代际、引擎代际和本地租约；不会执行工具或代替用户批准工具。不会更改日常 Codex home，已有自定义 hooks 文件会保留并报告未接线。
-
-**注册不等于信任。** Codex 0.161.0 会跳过未审查或已变化的定义。先完成当前运行任务，再在 CoBot 私有环境启动 Codex，输入 `/hooks`，核对命令确实指向你的 CoBot 辅助程序及当前数据根，然后通过原生界面信任；不使用绕过信任参数。下面 PowerShell 示例只临时设置当前子进程环境，退出后还原；将数据根和团队目录换成你实际使用的绝对路径。
-
-```powershell
-$cobotRoot = 'C:\your\cobot-data-root'
-$teamDirectory = 'C:\your\team-directory'
-$previousCodexHome = $env:CODEX_HOME
-$previousCodexSQLiteHome = $env:CODEX_SQLITE_HOME
-try {
-    $env:CODEX_HOME = Join-Path $cobotRoot 'engines/codex/home'
-    $env:CODEX_SQLITE_HOME = Join-Path $cobotRoot 'engines/codex/sqlite'
-    # Windows 命令使用 EncodedCommand 避免嵌套 shell 转义；先解码核对，不执行解码结果。
-    $hooks = Get-Content (Join-Path $env:CODEX_HOME 'hooks.json') -Raw | ConvertFrom-Json
-    $command = $hooks.hooks.PreToolUse[0].hooks[0].command
-    [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($command -split ' ')[-1]))
-    codex --no-daemon --no-alt-screen --cd $teamDirectory
-    # 在 Codex 内输入 /hooks，审查后退出。
-} finally {
-    $env:CODEX_HOME = $previousCodexHome
-    $env:CODEX_SQLITE_HOME = $previousCodexSQLiteHome
-}
-```
-
-macOS 可在子 shell 中设置同样两个环境变量后运行 `codex --no-daemon --cd "$teamDirectory"`。`--no-daemon` 避免较长私有路径触发 CLI 后台服务的 socket 长度限制，不改变沙箱或 hook 信任。这个 CLI 入口仅用于审查配置；不通过 CoBot 分派的工具轮次没有宿主绑定，会被 guard 拒绝。
-
-设置页通过真实 `hooks/list` 和本次服务内观察到的执行失败报告状态；原生版本不支持查询、禁用、未信任或接线失败时都不声明保护生效。升级导致命令路径变化后需重新审查。特殊工具路径、被原生跳过或异常的 hook、已经开始的进程均不能保证受控或撤销；它是覆盖范围内的租约门禁，不是硬隔离。
-
-## 工程版本
-
-Go 1.25、React 18 + TypeScript + Vite 6、TanStack Query、Tailwind CSS 4、i18next（zh-CN/en）、SQLite（modernc）+ goose、Wails v2.15.0、HTTP JSON + fetch SSE。生成工具锁定：oapi-codegen v2.4.1、openapi-typescript 7.13.0（`scripts/generate.*`，禁止浮动 latest）。
-
-## 阅读入口
-
-| 文档 | 用途 |
+| Platform | Status |
 | --- | --- |
-| [编码智能体入口](AGENTS.md) | 直接进入本仓库的阅读顺序、开发边界和提交规则，无需历史聊天 |
-| [首版开发方案](docs/首版开发方案.md) | 编码智能体交接入口：明确功能、默认行为、API/状态、M1～M5步骤与完成条件 |
-| [首版目录架构](docs/首版目录架构.md) | 确定两个入口、一套核心/前端、模块依赖、构建与运行数据位置 |
-| [首版验收清单](docs/首版验收清单.md) | 94项按ID交付的场景、操作、预期结果、测试类型与证据格式 |
-| [需求文档](docs/需求文档.md) | 当前产品共识、功能范围、使用流程、验收条件与未决问题 |
-| [界面布局](docs/界面布局.md) | 首页导航、团队列表、会话、成员工作面板和审批交互 |
-| [接入基线](docs/接入基线.md) | 已处理前提、版本证据摘要及私有状态/Windows沙箱边界，无需历史归档 |
-| [M1验收记录](docs/M1验收记录.md) | M1 阶段实现范围、命令、验收子项状态与已知问题 |
-| [M2验收记录](docs/M2验收记录.md) | M2 阶段团队/引擎执行/审批的实现范围、命令、验收子项状态与本阶段修复的缺陷 |
-| [M3验收记录](docs/M3验收记录.md) | M3 阶段投递/任务/审批闭环与 MCP 桥的实现范围、验收子项与修复缺陷 |
-| [M4验收记录](docs/M4验收记录.md) | M4 阶段协作链/风险评估/记忆/用量预算/恢复/租约/事件落盘的实现范围与验收证据 |
-| [依赖清单](docs/依赖清单.md) | 编译进发行物的 Go 与前端依赖、版本与逐项核实的许可证声明（SBOM 摘要） |
-| [升级说明](docs/升级说明.md) | 升级前备份、自动迁移、回滚边界与签名现状 |
-| [接入实验程序](experiments/app-server/README.md) | 无第三方依赖的复跑程序，不是 CoBot 产品服务 |
+| Windows 10/11 x64, local Web | **Ready to try.** Verified with real Codex end to end |
+| Windows standalone server build | Builds and runs |
+| Windows desktop shell (Wails/WebView2) | Compiles; not yet verified at runtime |
+| macOS (Web / desktop) | Builds; native runtime, signing and notarization not yet verified |
 
-## 文档约定
+With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
+questions, native file approvals and rejections, merge approval feedback, risk checks,
+reconnecting after a dropped connection, graceful shutdown, crash recovery and upgrades.
+The headline test was two consecutive rounds of **CoBot developing CoBot**. In each round
+the leader planned the work, a member implemented it, a separate member reviewed it, and a
+human approved the exact candidate commit. The second round ran on the upgraded build that
+included the first round's change.
 
-- **已确认**：用户明确同意的产品规则或设计方向。
-- **建议**：根据讨论补充的候选做法，未确认前不当成硬要求。
-- **待讨论**：需要继续决定的产品选择。
-- **待技术验证**：设计有方向，目标环境的能力和可靠性尚未证明。
+Tested does not mean every edge case is covered. The
+[acceptance record](docs/首版验收复核-2026-10-15.md) (in Chinese) separates automated,
+real-model and untested scenarios for all 94 acceptance items.
 
-需求文档维护产品共识；编码实施从首版开发方案开始，界面细节见界面布局，旧待定细则由实施默认承接，最新用户明确决定始终优先。不能把旧验证清单重新当成前置阻塞，也不能把工程默认倒写成历史用户已确认。
+## Quick start
 
-`docs`根目录保存可交付的当前文档。其子目录统一英文且不提交Git：`archive/`为历史草案/决策/调研，`prototypes/`为本机原型，`validation/`为原始验收证据；`references/`仅作本机材料区。新clone没有这些目录也可以依据根文档开发。旧已提交资料可从Git历史检索；不以整理为由清理外部项目、原生会话或用户文件。
+**You need:** Go 1.25+, Node.js 24+ (npm 11+), and the [Codex CLI](https://github.com/openai/codex)
+installed (verified with 0.161.0).
 
-## 支持矩阵
+```bash
+git clone https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+./scripts/build.sh --target server        # Windows: powershell -File scripts/build.ps1 -Target server
 
-| 平台/形态 | 状态 | 说明 |
-| --- | --- | --- |
-| Windows 10/11 x64 · 本机 Web 核心 | 可试用，真实主线通过 | 53前端测试、14条浏览器E2E、核心race；真实协作/文件/恢复与两次自举已核对，详细子场景见94项复核 |
-| Windows · 独立 server 发行物 | 已构建并运行校验 | `scripts/build.ps1 -Target server` 产出单文件（内嵌前端/迁移/角色），附 sha256 |
-| Windows · 桌面壳（Wails/WebView2） | 待测 | 代码保留且随构建编译；原生运行/安装未验证 |
-| macOS（Web 核心 / 桌面壳） | 待测 | 无法在本机验证；未做签名与公证 |
-| 浏览器 | Chrome 系已验证（Playwright） | 纯 Web 无桌面依赖；其他 Chromium 内核预期一致 |
+.tmp/dist/cobot serve                     # development profile, data in ~/.cobot-dev
+```
 
-## 运行边界
+Open the one-time link printed in the terminal. It is valid for 60 seconds and works once.
+To get a new link, run `cobot serve` again and it will print a fresh one for the running instance.
+Then:
 
-仅绑定 loopback，不建设云端业务。生产根 `~/.cobot`、开发根 `~/.cobot-dev`，互不串库；团队仍必选工作目录，全员可见，目录内 `.cobot` 保存识别与交互资源，沿用 Git 本地排除、不自动提交。页面授权为一次性启动链接（60 秒、单次）兑换 HttpOnly 会话；桌面经原生桥取得一次性秘密并使用内存 Bearer。已处理的接入前提不再重复验证；证据记录对应机器、版本与范围，产品功能随实际开发验收。许可证公开发布前由用户确定。
+1. **Settings:** sign in to Codex. CoBot uses its own private Codex environment, so you sign
+   in once inside CoBot. Then pick a default model.
+   Settings also shows whether CoBot's native safety hook is trusted. Codex requires you to
+   review it once with `/hooks`; see [CONTRIBUTING.md](CONTRIBUTING.md).
+2. **New team:** choose a working directory and the members you want.
+3. **Message the leader** with what you want built.
+
+Use `cobot serve --profile production` for everyday use (data in `~/.cobot`).
+Treat startup links like passwords.
+
+## Development
+
+```bash
+./scripts/dev.sh      # Go core + Vite with auto-authorization   (Windows: scripts/dev.ps1)
+./scripts/check.sh    # lint, contract drift, frontend + Go tests (Windows: scripts/check.ps1)
+```
+
+Stack: Go · React + TypeScript + Vite · TanStack Query · Tailwind CSS · SQLite (modernc) +
+goose · Wails v2 · HTTP JSON + SSE · MCP Go SDK. The API contract lives in `api/openapi.yaml`,
+and Go and TypeScript types are generated from it.
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md). The Chinese
+[developer guide](docs/开发指南.md) covers build, run and native hook details. The design and
+acceptance documents in [`docs/`](docs/) are currently written in Chinese.
+
+## Roadmap
+
+These are directions we intend to explore, not commitments:
+
+- Verified desktop builds for Windows and macOS
+- More agent engines beyond Codex
+- Teams for non-coding work: office tasks, learning, writing and creative projects
+
+## License
+
+Not decided yet. Until a license is published, this repository does not grant one.

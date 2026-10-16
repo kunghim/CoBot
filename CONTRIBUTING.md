@@ -26,6 +26,28 @@ Use message keys for errors and accessible names for icon buttons. Do not
 embed technical diagnostics in normal product flows unless users need
 them to make a decision.
 
+## Runtime, upgrades and the native hook
+
+The service binds to loopback. Development defaults to `~/.cobot-dev` and
+production to `~/.cobot`. Tests must use an explicit temporary `--data-root`.
+Each team selects a working directory, visible to every member; its `.cobot`
+directory holds local interaction resources. CoBot does not automatically
+commit project files or implement a Git execution engine.
+
+Before upgrading, stop the service normally and preserve its entire data
+root. Startup runs embedded forward SQL migrations and backs up an existing
+database before migrating. Restore a stopped, matching database/profile
+backup to roll back; do not run an old binary on a newer schema. Do not copy
+only the main SQLite file while WAL writers are active. See
+[upgrade notes](docs/升级说明.md) for details.
+
+The native lease hook must be reviewed through Codex's normal `/hooks`
+flow in CoBot's private environment
+(step-by-step commands: [开发指南](docs/开发指南.md#codex-原生租约-hook), in Chinese). Registration does not grant trust.
+Settings reports whether this hook is trusted or unavailable. Coverage is
+limited to native paths that actually invoke it; hooks do not revoke
+commands already running or provide complete isolation.
+
 ## Validation
 
 Run `scripts/check.ps1` or `scripts/check.sh`: contract drift, frontend
