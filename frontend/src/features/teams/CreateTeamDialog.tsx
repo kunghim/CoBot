@@ -10,6 +10,7 @@ import { useCreateTeam, useRoles } from '../../api/queries';
 import { api } from '../../api/client';
 import type { DirectoryCheckResult } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
+import { useDialogFocus } from '../../components/useDialogFocus';
 import { desktopBridge } from '../../platform/native-bridge';
 
 export default function CreateTeamDialog({
@@ -46,14 +47,7 @@ export default function CreateTeamDialog({
     setAdoptMarker(false);
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const dialogRef = useDialogFocus(open, onClose);
 
   if (!open) return null;
 
@@ -124,6 +118,8 @@ export default function CreateTeamDialog({
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
       <div
+        ref={dialogRef as React.RefObject<HTMLDivElement>}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-team-title"
@@ -143,7 +139,6 @@ export default function CreateTeamDialog({
               if (event.key === 'Enter') submit();
             }}
             placeholder={t('team.namePlaceholder')}
-            autoFocus
             className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
           />
         </label>
