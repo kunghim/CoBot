@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,44 +41,54 @@ type InstanceInfo struct {
 
 // Lock is the environment-level single-instance lock, held until Release.
 type Lock struct {
+	mu    sync.Mutex
 	paths Paths
 	file  *os.File
 }
 
-// AcquireLock takes the profile lock with create-exclusive semantics. A lock
-// file is only removed and retried after the recorded instance proves
-// unreachable, so a live core is never silently replaced and two simultaneous
-// starts cannot both win.
+// AcquireLock holds an OS file lock for the whole core lifetime. The guard
+// inode is permanent; discovery records are separate and never prove ownership.
 func AcquireLock(p Paths, probeTimeout time.Duration) (*Lock, error) {
 	if err := os.MkdirAll(filepath.Dir(p.LockFile()), 0o700); err != nil {
 		return nil, fmt.Errorf("create runtime directory: %w", err)
 	}
-	for attempt := 0; attempt < 3; attempt++ {
-		f, err := os.OpenFile(p.LockFile(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
-			if err := f.Close(); err != nil {
-				return nil, fmt.Errorf("close lock file: %w", err)
-			}
-			return &Lock{paths: p}, nil
-		}
-		if !os.IsExist(err) {
-			return nil, fmt.Errorf("create lock file: %w", err)
-		}
-		existing, ok := readLockFile(p.LockFile())
-		if ok && probeEndpoint(existing.Endpoint, probeTimeout) {
-			return nil, &ErrAlreadyRunning{Endpoint: existing.Endpoint, PID: existing.PID}
-		}
-		// Stale leftover (crash or corrupt record): only the file is removed,
-		// never another process's resources.
-		if err := os.Remove(p.LockFile()); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("remove stale lock: %w", err)
-		}
+	f, err := os.OpenFile(p.LockFile()+".guard", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open instance guard: %w", err)
 	}
-	return nil, fmt.Errorf("could not acquire instance lock after retries")
+	locked, err := tryLockFile(f)
+	if err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("lock instance guard: %w", err)
+	}
+	if !locked {
+		_ = f.Close()
+		existing, _ := readLockFile(p.LockFile())
+		return nil, &ErrAlreadyRunning{Endpoint: existing.Endpoint, PID: existing.PID}
+	}
+	// A running pre-guard version must also be stopped before upgrading.
+	// Holding the new guard makes this compatibility probe atomic among new cores.
+	if existing, ok := readLockFile(p.LockFile()); ok && probeEndpoint(existing.Endpoint, probeTimeout) {
+		_ = unlockFile(f)
+		_ = f.Close()
+		return nil, &ErrAlreadyRunning{Endpoint: existing.Endpoint, PID: existing.PID}
+	}
+	l := &Lock{paths: p, file: f}
+	// Replace stale endpoint data immediately, before migration can take time.
+	if err := l.WriteLockRecord(InstanceInfo{PID: os.Getpid(), StartedAt: time.Now().UTC()}); err != nil {
+		l.Release()
+		return nil, err
+	}
+	return l, nil
 }
 
 // WriteInstance publishes the discovery document after the listener is up.
 func (l *Lock) WriteInstance(info InstanceInfo) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file == nil {
+		return errors.New("instance lock released")
+	}
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode instance info: %w", err)
@@ -91,9 +102,17 @@ func (l *Lock) WriteInstance(info InstanceInfo) error {
 // Release removes every artifact this core owns. It never touches files of
 // another instance.
 func (l *Lock) Release() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file == nil {
+		return
+	}
 	_ = os.Remove(l.paths.InstanceFile())
 	_ = os.Remove(l.paths.AdminSecretFile())
 	_ = os.Remove(l.paths.LockFile())
+	_ = unlockFile(l.file)
+	_ = l.file.Close()
+	l.file = nil
 }
 
 // WriteAdminSecret stores the local runtime credential that lets same-user
@@ -169,6 +188,11 @@ func readLockFile(path string) (InstanceInfo, bool) {
 // WriteLockRecord stores the live endpoint inside the lock file so a second
 // start can distinguish a live core from a stale leftover.
 func (l *Lock) WriteLockRecord(info InstanceInfo) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file == nil {
+		return errors.New("instance lock released")
+	}
 	data, err := json.Marshal(info)
 	if err != nil {
 		return err

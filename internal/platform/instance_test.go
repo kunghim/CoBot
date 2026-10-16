@@ -1,11 +1,13 @@
 package platform
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -87,11 +89,8 @@ func TestAcquireLockTakesOverStaleLeftover(t *testing.T) {
 	p := testPaths(t)
 	// Simulate a crash: lock + instance record exist but nothing listens.
 	stale := InstanceInfo{Endpoint: "http://127.0.0.1:1", PID: 999999}
-	l, err := AcquireLock(p, 200*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := l.WriteLockRecord(stale); err != nil {
+	data, _ := json.Marshal(stale)
+	if err := os.WriteFile(p.LockFile(), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,6 +99,39 @@ func TestAcquireLockTakesOverStaleLeftover(t *testing.T) {
 		t.Fatalf("stale takeover must succeed, got %v", err)
 	}
 	second.Release()
+}
+
+func TestInstanceLockIsExclusiveBeforeDiscoveryAndReleaseIsOwned(t *testing.T) {
+	p := testPaths(t)
+	first, err := AcquireLock(p, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(first.Release)
+	second, err := AcquireLock(p, time.Millisecond)
+	if err == nil {
+		second.Release()
+		t.Fatal("stole lock before discovery was published")
+	}
+	var busy *ErrAlreadyRunning
+	if !errors.As(err, &busy) {
+		t.Fatal(err)
+	}
+	first.Release()
+	next, err := AcquireLock(p, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer next.Release()
+	info := InstanceInfo{PID: os.Getpid(), ServiceEpoch: "next", Endpoint: "http://127.0.0.1:1"}
+	if err := next.WriteInstance(info); err != nil {
+		t.Fatal(err)
+	}
+	first.Release()
+	got, err := ReadInstance(p)
+	if err != nil || got.ServiceEpoch != "next" {
+		t.Fatalf("previous owner removed new discovery: %+v %v", got, err)
+	}
 }
 
 func TestAdminSecretRoundTrip(t *testing.T) {
@@ -117,5 +149,38 @@ func TestAdminSecretRoundTrip(t *testing.T) {
 	}
 	if got != secret {
 		t.Fatal("round trip mismatch")
+	}
+}
+
+func TestConcurrentInstanceLockAcquisitionHasOneOwner(t *testing.T) {
+	p := testPaths(t)
+	start := make(chan struct{})
+	results := make(chan *Lock, 12)
+	var wait sync.WaitGroup
+	for range 12 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			l, err := AcquireLock(p, time.Second)
+			if err == nil {
+				results <- l
+			}
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(results)
+	var locks []*Lock
+	for l := range results {
+		locks = append(locks, l)
+	}
+	defer func() {
+		for _, l := range locks {
+			l.Release()
+		}
+	}()
+	if len(locks) != 1 {
+		t.Fatalf("concurrent owners=%d", len(locks))
 	}
 }
