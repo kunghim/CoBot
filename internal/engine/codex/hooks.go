@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
-	"strings"
 )
 
 // NativeHookStatus uses the actual native registry, including native trust.
 // It does not turn configured/untrusted hooks into a protection claim.
-func (s *Server) NativeHookStatus(ctx context.Context, cwd, sourcePath string) string {
+func (s *Server) NativeHookStatus(ctx context.Context, cwd, sourcePath, command string) string {
 	var response struct {
 		Data []struct {
 			Errors []json.RawMessage `json:"errors"`
@@ -30,7 +29,7 @@ func (s *Server) NativeHookStatus(ctx context.Context, cwd, sourcePath string) s
 			return "unavailable"
 		}
 		for _, hook := range entry.Hooks {
-			if hook.EventName != "preToolUse" || filepath.Clean(hook.SourcePath) != filepath.Clean(sourcePath) || !strings.Contains(hook.Command, " hook --native-codex --data-root ") {
+			if hook.EventName != "preToolUse" || filepath.Clean(hook.SourcePath) != filepath.Clean(sourcePath) || hook.Command != command {
 				continue
 			}
 			if !hook.Enabled {

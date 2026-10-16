@@ -2,6 +2,8 @@ package hookrun
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
+	encodingbinary "encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/kunghim/CoBot/internal/platform"
 )
@@ -103,12 +106,21 @@ const nativeDescription = "CoBot native lease guard (generated; review in Codex 
 // writes trust state. Codex skips an untrusted definition until normal /hooks
 // review. A foreign or user-modified hooks file is preserved, never merged.
 func EnsureNativeConfig(paths platform.Paths, binary string) error {
-	command, err := nativeCommand(binary, paths.Root)
+	command, err := NativeCommand(binary, paths.Root)
 	if err != nil {
 		return err
 	}
 	path := filepath.Join(paths.CodexHome(), "hooks.json")
+	ownerPath := filepath.Join(paths.CodexHome(), ".cobot-hook-definition.sha256")
 	if previous, err := os.ReadFile(path); err == nil {
+		owner, ownerErr := os.ReadFile(ownerPath)
+		previousHash := sha256.Sum256(previous)
+		if ownerErr == nil && strings.TrimSpace(string(owner)) != hex.EncodeToString(previousHash[:]) {
+			return errors.New("private Codex hooks.json was edited; preserved")
+		}
+		if ownerErr != nil && !os.IsNotExist(ownerErr) {
+			return ownerErr
+		}
 		var owned struct {
 			Description string `json:"description"`
 			Hooks       map[string][]struct {
@@ -118,8 +130,13 @@ func EnsureNativeConfig(paths platform.Paths, binary string) error {
 				} `json:"hooks"`
 			} `json:"hooks"`
 		}
-		if json.Unmarshal(previous, &owned) != nil || owned.Description != nativeDescription || len(owned.Hooks) != 1 || len(owned.Hooks["PreToolUse"]) != 1 || len(owned.Hooks["PreToolUse"][0].Hooks) != 1 || owned.Hooks["PreToolUse"][0].Hooks[0].Type != "command" || !strings.Contains(owned.Hooks["PreToolUse"][0].Hooks[0].Command, " hook --native-codex --data-root ") {
+		if json.Unmarshal(previous, &owned) != nil || owned.Description != nativeDescription || len(owned.Hooks) != 1 || len(owned.Hooks["PreToolUse"]) != 1 || len(owned.Hooks["PreToolUse"][0].Hooks) != 1 || owned.Hooks["PreToolUse"][0].Hooks[0].Type != "command" {
 			return errors.New("private Codex hooks.json contains user configuration; preserved")
+		}
+		// Upgrade only the exact pre-manifest generated command for this
+		// binary/root. Never infer ownership from an arbitrary command substring.
+		if ownerErr != nil && owned.Hooks["PreToolUse"][0].Hooks[0].Command != legacyNativeCommand(binary, paths.Root) {
+			return errors.New("native hook ownership is unknown; preserved")
 		}
 		var actual, expected any
 		_ = json.Unmarshal(previous, &actual)
@@ -136,9 +153,14 @@ func EnsureNativeConfig(paths platform.Paths, binary string) error {
 		return err
 	}
 	if previous, err := os.ReadFile(path); err == nil && string(previous) == string(data) {
-		return nil
+		hash := sha256.Sum256(data)
+		return writeAtomic(ownerPath, []byte(hex.EncodeToString(hash[:])))
 	}
-	return writeAtomic(path, data)
+	if err := writeAtomic(path, data); err != nil {
+		return err
+	}
+	hash := sha256.Sum256(data)
+	return writeAtomic(ownerPath, []byte(hex.EncodeToString(hash[:])))
 }
 
 func nativeDefinition(command string) map[string]any {
@@ -150,7 +172,7 @@ func nativeDefinition(command string) map[string]any {
 	}}
 }
 
-func nativeCommand(binary, root string) (string, error) {
+func NativeCommand(binary, root string) (string, error) {
 	if !filepath.IsAbs(binary) || !filepath.IsAbs(root) {
 		return "", errors.New("native hook paths must be absolute")
 	}
@@ -158,15 +180,22 @@ func nativeCommand(binary, root string) (string, error) {
 		if strings.ContainsAny(value, "\r\n\x00") {
 			return "", errors.New("invalid native hook path")
 		}
-		if runtime.GOOS == "windows" {
-			// Codex command hooks use the platform shell. Reject cmd expansion
-			// characters rather than interpolating a path into executable code.
-			if strings.ContainsAny(value, "\"%!^&|<>") {
-				return "", fmt.Errorf("unsupported shell character in hook path")
-			}
-			return "\"" + value + "\"", nil
-		}
 		return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'", nil
+	}
+	if runtime.GOOS == "windows" {
+		if strings.ContainsAny(binary+root, "\r\n\x00") {
+			return "", fmt.Errorf("invalid native hook path")
+		}
+		psQuote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
+		// Explicit PowerShell works when Codex launches command hooks through
+		// either cmd or PowerShell. Encoded argv avoids nested shell expansion.
+		script := "& " + psQuote(binary) + " hook --native-codex --data-root " + psQuote(root) + "; exit $LASTEXITCODE"
+		units := utf16.Encode([]rune(script))
+		raw := make([]byte, len(units)*2)
+		for i, unit := range units {
+			encodingbinary.LittleEndian.PutUint16(raw[i*2:], unit)
+		}
+		return "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand " + base64.StdEncoding.EncodeToString(raw), nil
 	}
 	bin, err := quote(binary)
 	if err != nil {
@@ -177,6 +206,13 @@ func nativeCommand(binary, root string) (string, error) {
 		return "", err
 	}
 	return bin + " hook --native-codex --data-root " + dir, nil
+}
+
+func legacyNativeCommand(binary, root string) string {
+	if runtime.GOOS == "windows" {
+		return "\"" + binary + "\" hook --native-codex --data-root \"" + root + "\""
+	}
+	return "'" + strings.ReplaceAll(binary, "'", "'\"'\"'") + "' hook --native-codex --data-root '" + strings.ReplaceAll(root, "'", "'\"'\"'") + "'"
 }
 
 func writeAtomic(path string, data []byte) error {

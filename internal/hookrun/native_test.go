@@ -86,12 +86,19 @@ func TestNativeConfigNeverTrustsOrOverwritesUserHooks(t *testing.T) {
 	if err := EnsureNativeConfig(paths, binary); err != nil {
 		t.Fatal(err)
 	}
+	upgraded := filepath.Join(paths.Root, "CoBot app", "cobot-next.exe")
+	if err := EnsureNativeConfig(paths, upgraded); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureNativeConfig(paths, binary); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(paths.CodexHome(), "hooks.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "trusted_hash") || !strings.Contains(string(data), "--native-codex") {
+	if strings.Contains(string(data), "trusted_hash") {
 		t.Fatal(string(data))
 	}
 	if err := EnsureNativeConfig(paths, binary); err != nil {

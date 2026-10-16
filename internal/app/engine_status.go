@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
+	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/roles"
 )
 
@@ -33,7 +35,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	a.engineStatusMu.Lock()
 	if cache := a.engineStatusCache; cache != nil && time.Since(cache.CheckedAt) < engineStatusTTL {
 		a.engineStatusMu.Unlock()
-		return *cache
+		return a.withHookFailures(*cache)
 	}
 	a.engineStatusMu.Unlock()
 
@@ -78,7 +80,11 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	info.Status = "ready"
 	if server, err := a.control(ctx); err == nil {
 		hookCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		info.Capabilities = append(info.Capabilities, "codexHook:"+server.NativeHookStatus(hookCtx, a.Paths.WorkspacesDir(), filepath.Join(a.Paths.CodexHome(), "hooks.json")))
+		hookState := "unavailable"
+		if command, err := hookrun.NativeCommand(a.MCPBinary, a.Paths.Root); err == nil {
+			hookState = server.NativeHookStatus(hookCtx, a.Paths.WorkspacesDir(), filepath.Join(a.Paths.CodexHome(), "hooks.json"), command)
+		}
+		info.Capabilities = append(info.Capabilities, "codexHook:"+hookState)
 		cancel()
 	}
 	info.LoggedIn = account.LoggedIn
@@ -89,7 +95,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		a.engineLoginMu.Unlock()
 	}
 	a.cacheEngineStatus(info)
-	return info
+	return a.withHookFailures(info)
 }
 
 // EngineStatusCached returns the last known projection without probing or
@@ -98,9 +104,26 @@ func (a *App) EngineStatusCached() EngineStatusInfo {
 	a.engineStatusMu.Lock()
 	defer a.engineStatusMu.Unlock()
 	if a.engineStatusCache != nil {
-		return *a.engineStatusCache
+		return a.withHookFailures(*a.engineStatusCache)
 	}
 	return EngineStatusInfo{Status: "not_configured", CheckedAt: time.Now().UTC()}
+}
+
+func (a *App) withHookFailures(info EngineStatusInfo) EngineStatusInfo {
+	failed := false
+	a.hookFailures.Range(func(_, _ any) bool { failed = true; return false })
+	if !failed {
+		return info
+	}
+	info.Capabilities = append([]string(nil), info.Capabilities...)
+	for i, value := range info.Capabilities {
+		if strings.HasPrefix(value, "codexHook:") {
+			info.Capabilities[i] = "codexHook:failed"
+			return info
+		}
+	}
+	info.Capabilities = append(info.Capabilities, "codexHook:failed")
+	return info
 }
 
 func (a *App) cacheEngineStatus(info EngineStatusInfo) {

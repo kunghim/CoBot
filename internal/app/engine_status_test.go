@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func TestObservedHookFailureOverridesTrustWithoutMutatingCache(t *testing.T) {
+	a := &App{}
+	trusted := EngineStatusInfo{Capabilities: []string{"app-server", "codexHook:trusted"}}
+	a.hookFailures.Store("team", true)
+	if got := a.withHookFailures(trusted); got.Capabilities[1] != "codexHook:failed" {
+		t.Fatal(got)
+	}
+	if trusted.Capabilities[1] != "codexHook:trusted" {
+		t.Fatal("mutated cached capabilities")
+	}
+	a.hookFailures.Delete("team")
+	if got := a.withHookFailures(trusted); got.Capabilities[1] != "codexHook:trusted" {
+		t.Fatal(got)
+	}
+}
+
 func TestOfficialAccountProjection(t *testing.T) {
 	for _, tc := range []struct {
 		raw, mode string

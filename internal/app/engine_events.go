@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -70,13 +71,21 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	case "hook/completed":
 		var result struct {
 			Run struct {
-				EventName string `json:"eventName"`
-				Status    string `json:"status"`
-				ID        string `json:"id"`
+				EventName  string `json:"eventName"`
+				Status     string `json:"status"`
+				ID         string `json:"id"`
+				SourcePath string `json:"sourcePath"`
 			} `json:"run"`
 		}
 		if json.Unmarshal(n.Raw, &result) == nil {
 			s.logger.Info("native hook completed", "teamId", teamID, "threadId", n.ThreadID, "turnId", n.TurnID, "hookId", result.Run.ID, "event", result.Run.EventName, "status", result.Run.Status)
+			if filepath.Clean(result.Run.SourcePath) == filepath.Join(s.app.Paths.CodexHome(), "hooks.json") {
+				if result.Run.Status == "failed" {
+					s.app.hookFailures.Store(teamID, true)
+				} else if result.Run.Status == "completed" || result.Run.Status == "blocked" {
+					s.app.hookFailures.Delete(teamID)
+				}
+			}
 		}
 	default:
 		// Other notifications (deltas, progress) are transient by contract.

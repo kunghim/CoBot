@@ -2,12 +2,14 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/kunghim/CoBot/internal/bootstrap"
+	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/platform"
 )
 
@@ -29,7 +31,16 @@ func TestBootstrapUsesExplicitCompanionForMCPAndNativeHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "helper-cobot.exe") || strings.Contains(string(data), "trusted_hash") {
+	expected, err := hookrun.NativeCommand(helper, core.Paths.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var definition map[string]any
+	if err := json.Unmarshal(data, &definition); err != nil {
+		t.Fatal(err)
+	}
+	command := definition["hooks"].(map[string]any)["PreToolUse"].([]any)[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"]
+	if command != expected || strings.Contains(string(data), "trusted_hash") {
 		t.Fatal(string(data))
 	}
 }

@@ -41,7 +41,7 @@ func TestNativeHookStatusUsesNativeTrustAndSource(t *testing.T) {
 				writeJSONLine(outW, map[string]any{"id": request.ID, "result": map[string]any{"data": []any{map[string]any{"errors": []any{}, "hooks": []any{map[string]any{"command": "cobot hook --native-codex --data-root /private", "sourcePath": tc.path, "eventName": "preToolUse", "enabled": tc.enabled, "trustStatus": tc.trust}}}}}})
 			}()
 			server := &Server{client: client}
-			if got := server.NativeHookStatus(context.Background(), "/workspace", "/private/hooks.json"); got != tc.want {
+			if got := server.NativeHookStatus(context.Background(), "/workspace", "/private/hooks.json", "cobot hook --native-codex --data-root /private"); got != tc.want {
 				t.Fatal(got, tc.want)
 			}
 		})

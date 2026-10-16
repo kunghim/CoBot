@@ -57,6 +57,7 @@ type App struct {
 
 	engineStatusMu    sync.Mutex
 	engineStatusCache *EngineStatusInfo
+	hookFailures      sync.Map // team ID -> observed failure of this profile's native guard
 
 	engineControlMu sync.Mutex
 	engineControl   *controlServer
