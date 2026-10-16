@@ -2,7 +2,7 @@
 .idea/
 
 # docs子目录统一英文，只放本机资料，不随仓库交付
-/docs/*/
+/docs/**
 
 # 产品构建与依赖（源码、迁移、角色、生成API类型仍应提交）
 /internal/webui/dist/
