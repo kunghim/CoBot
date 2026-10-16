@@ -45,18 +45,34 @@ case "$TARGET" in
     checksum "$DIST/cobot"
     ;;
   desktop)
+    if [ "$(uname -s)" != "Darwin" ]; then
+      echo "desktop build.sh requires macOS; use build.ps1 on Windows" >&2
+      exit 1
+    fi
     command -v wails >/dev/null 2>&1 || {
       echo "wails CLI not found; install Wails v2.15.0 to build the desktop shell" >&2
       exit 1
     }
     echo "==> wails build (desktop, production, $VERSION)"
     (cd cmd/cobot-desktop && wails build -tags desktop -nosyncgomod -skipembedcreate \
-      -o "$(cd ../../ && pwd)/$DIST/cobot-desktop" \
+      -o cobot-desktop \
       -ldflags "-X main.version=$VERSION -X main.environment=production")
-    checksum "$DIST/cobot-desktop"
+    # Wails packages into the configured build:dir, not a standalone shell.
+    APP=".tmp/wails/bin/CoBot.app"
+    test -x "$APP/Contents/MacOS/cobot-desktop"
     echo "==> go build (helper cobot, production profile default)"
     go build -ldflags "-X main.version=$VERSION" -o "$DIST/cobot" ./cmd/cobot
     checksum "$DIST/cobot"
+    # The bridge resolves its helper beside os.Executable(), inside the bundle.
+    cp "$DIST/cobot" "$APP/Contents/MacOS/cobot"
+    # Adding the helper changes the bundle after Wails' ad-hoc signature.
+    # This remains a local trial signature, not Developer ID / notarization.
+    /usr/bin/codesign --force --sign - "$APP/Contents/MacOS/cobot"
+    /usr/bin/codesign --force --deep --sign - "$APP"
+    /usr/bin/codesign --verify --deep --strict "$APP"
+    ARCHIVE="$DIST/CoBot-macos-$(go env GOARCH).zip"
+    /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
+    checksum "$ARCHIVE"
     ;;
 esac
 echo "==> artifacts in $DIST"

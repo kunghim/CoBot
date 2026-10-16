@@ -27,6 +27,8 @@ npm ci --prefix frontend
 ./scripts/build.sh --target desktop   # Wails 桌面壳 + 同版本辅助 cobot（需 wails v2.15.0 CLI）
 ```
 
+macOS 桌面脚本将同版本 helper 放入 `CoBot.app/Contents/MacOS`，重新作本机临时签名并生成 ZIP 和校验和；这不包含 Developer ID 签名或公证，仍需 macOS 实机验收。
+
 独立运行核心（不依赖脚本）：
 
 ```bash

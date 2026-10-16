@@ -51,6 +51,10 @@ checksums go to `.tmp/dist`. Users of a built artifact do not need Node.js,
 Go, or a database server. Codex remains a separately installed dependency.
 Desktop packaging additionally requires Wails v2.15.0 and platform tools;
 compiling the shell alone does not validate an installed native app.
+On macOS, `./scripts/build.sh --target desktop` embeds the matching helper
+inside `CoBot.app/Contents/MacOS`, reapplies an ad-hoc trial signature, and
+creates a ZIP/checksum. Developer ID signing, notarization, and native
+runtime acceptance remain pending.
 
 ## Runtime and upgrades
 
