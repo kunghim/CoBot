@@ -82,6 +82,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	for {
 		var err error
 		select {
+		case <-s.StreamStop:
+			return
 		case <-r.Context().Done():
 			return
 		case <-notify:

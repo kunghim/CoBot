@@ -65,12 +65,13 @@ type Core struct {
 	// serve command prints it as a fragment link. It expires in 60 seconds.
 	StartupBootstrap string
 
-	listener  net.Listener
-	server    *http.Server
-	api       *apihttp.Server
-	lock      *platform.Lock
-	closeLog  func() error
-	scheduler *app.Scheduler
+	listener    net.Listener
+	server      *http.Server
+	api         *apihttp.Server
+	lock        *platform.Lock
+	closeLog    func() error
+	scheduler   *app.Scheduler
+	stopStreams context.CancelFunc
 }
 
 // Start brings up the core: lock, storage, migrations, HTTP listener.
@@ -309,7 +310,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		return fail(err)
 	}
 
+	streamContext, stopStreams := context.WithCancel(context.Background())
+	apiServer.StreamStop = streamContext.Done()
 	core := &Core{
+		stopStreams:      stopStreams,
 		StopRequested:    stopRequested,
 		Paths:            paths,
 		Config:           cfg,
@@ -370,8 +374,14 @@ func (c *Core) Shutdown(ctx context.Context) error {
 		}
 	}
 	if c.server != nil {
+		// Event streams are intentionally long-lived. Finish them before
+		// http.Shutdown waits for handlers, while storage is still available.
+		if c.stopStreams != nil {
+			c.stopStreams()
+		}
 		if err := c.server.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("http shutdown: %w", err))
+			_ = c.server.Close()
 		}
 	}
 	if c.DB != nil {

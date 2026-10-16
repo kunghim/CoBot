@@ -41,6 +41,7 @@ type Server struct {
 	// left behind by a restarted connection can be refused.
 	EngineEpochOfTeam func(teamID string) string
 	RequestShutdown   func()
+	StreamStop        <-chan struct{} // core shutdown; nil in standalone handler tests
 }
 
 // Handler builds the full HTTP handler.
