@@ -8,11 +8,52 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 type startedWriter struct {
 	io.WriteCloser
 	started chan struct{}
+}
+
+func TestTransportFailureReapsOwnedProcessBeforeHostCallback(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=^TestShutdownDeadlineWithProcessNotReadingInput$")
+	cmd.Env = append(os.Environ(), "COBOT_BLOCKED_PIPE_HELPER=1")
+	cmd.WaitDelay = time.Second
+	in, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = in.Close(); _ = cmd.Process.Kill() })
+	host := make(chan struct{})
+	server := &Server{cmd: cmd, callbacks: engine.Callbacks{OnExit: func(error) { close(host) }}}
+	server.client = NewClient(in, out, ClientHooks{OnExit: server.transportExited})
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := server.client.Call(ctx, "large", strings.Repeat("x", 1<<20), nil); err == nil {
+		t.Fatal("blocked write succeeded")
+	}
+	select {
+	case <-host:
+	case <-time.After(3 * time.Second):
+		t.Fatal("host never observed reaped transport failure")
+	}
+	if cmd.ProcessState == nil {
+		t.Fatal("host notified before owned process was reaped")
+	}
+	stop, cancelStop := context.WithTimeout(context.Background(), time.Second)
+	defer cancelStop()
+	if err := server.Shutdown(stop); err != nil {
+		t.Fatal("repeated shutdown after transport failure", err)
+	}
 }
 
 func (w startedWriter) Write(data []byte) (int, error) {

@@ -40,6 +40,9 @@ type Server struct {
 	closed    bool
 	cwd       string
 	fileItems map[nativeItemKey][]engine.FileChange
+	waitOnce  sync.Once
+	waitDone  chan struct{}
+	waitErr   error
 }
 
 type nativeItemKey struct{ ThreadID, TurnID, ItemID string }
@@ -64,6 +67,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	}
 	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
 	cmd := exec.Command(opts.Binary, args...)
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
 	if opts.Env != nil {
 		cmd.Env = opts.Env
@@ -88,11 +92,12 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		intents:   map[string]string{},
 		cwd:       opts.Cwd,
 		fileItems: map[nativeItemKey][]engine.FileChange{},
+		callbacks: opts.Callbacks,
 	}
 	s.client = NewClient(stdin, stdout, ClientHooks{
 		OnRequest: func(req InboundRequest) { s.handleRequest(req) },
 		OnNotify:  func(method string, params json.RawMessage) { s.handleNotify(method, params) },
-		OnExit:    opts.Callbacks.OnExit,
+		OnExit:    s.transportExited,
 		Logger:    opts.Logger,
 	})
 
@@ -102,13 +107,14 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		ClientInfo: opts.Client,
 	}, nil); err != nil {
 		s.kill()
+		s.waitProcess()
 		return nil, fmt.Errorf("codex initialize: %w", err)
 	}
 	if err := s.client.Notify("initialized", nil); err != nil {
 		s.kill()
+		s.waitProcess()
 		return nil, fmt.Errorf("codex initialized notify: %w", err)
 	}
-	s.callbacks = opts.Callbacks
 	s.logger.Info("codex app-server ready", "epoch", s.epoch, "cwd", opts.Cwd)
 	return s, nil
 }
@@ -485,22 +491,44 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Unlock()
 
 	_ = s.client.Close()
-	done := make(chan error, 1)
-	go func() {
-		done <- s.cmd.Wait()
-	}()
+	done := s.waitProcess()
 	select {
 	case <-ctx.Done():
 		s.kill()
-		s.client.Wait()
 		return fmt.Errorf("codex app-server did not exit in time; terminated: %w", ctx.Err())
-	case err := <-done:
-		s.client.Wait()
+	case <-done:
+		select {
+		case <-s.client.Closed():
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		err := s.waitErr
 		if err != nil && !isExitError(err) {
 			return fmt.Errorf("codex app-server exit: %w", err)
 		}
 		return nil
 	}
+}
+
+// A failed transport is fatal even if the child ignores stdin EOF. Retain
+// process ownership here until it is killed/reaped, before the host drops
+// its runtime. This is not proof that any external work succeeded.
+func (s *Server) transportExited(err error) {
+	go func() {
+		s.kill()
+		<-s.waitProcess()
+		if s.callbacks.OnExit != nil {
+			s.callbacks.OnExit(err)
+		}
+	}()
+}
+
+func (s *Server) waitProcess() <-chan struct{} {
+	s.waitOnce.Do(func() {
+		s.waitDone = make(chan struct{})
+		go func() { s.waitErr = s.cmd.Wait(); close(s.waitDone) }()
+	})
+	return s.waitDone
 }
 
 func (s *Server) kill() {
