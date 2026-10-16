@@ -1,568 +1,121 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Bot, Cpu, Info, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
+import { useSettings } from '../../api/queries';
+import { workspacePath } from '../../app/workspacePath';
 import {
-  useAuthorizations,
-  useEngine,
-  useEngineCheck,
-  useEngineLogin,
-  useEngineLoginCancel,
-  useEngineLogout,
-  useEngineModels,
-  useRevokeAuthorization,
-  useSettings,
-  useStatus,
-  useUpdateSettings,
-} from '../../api/queries';
-import { api } from '../../api/client';
-import type { EngineModel, SettingsPatch } from '../../api/types';
-import { apiErrorMessage, errorMessage } from '../../i18n/errors';
+  AboutSection,
+  CollaborationSection,
+  EngineSection,
+  GeneralSection,
+  ModelsSection,
+  SecuritySection,
+} from './SettingsSections';
+import { useSettingSaver } from './useSettingSaver';
 
-type Feedback = 'idle' | 'saved' | 'failed';
+type SectionId = 'general' | 'engine' | 'models' | 'collaboration' | 'security' | 'about';
+
+const sections: { id: SectionId; icon: LucideIcon }[] = [
+  { id: 'general', icon: Settings2 },
+  { id: 'engine', icon: Cpu },
+  { id: 'models', icon: Bot },
+  { id: 'collaboration', icon: Users },
+  { id: 'security', icon: ShieldCheck },
+  { id: 'about', icon: Info },
+];
 
 /**
- * SettingsPage edits persisted business settings through the API. Every
- * control maps to a real stored value; the engine section reads the live
- * GET /engine projection, drives the official Codex login flow (polling
- * every 3s for up to 2 minutes) and patches the default/eval models from the
- * engine-provided model list.
+ * SettingsPage is a page of its own, outside the workspace layout: a
+ * category menu on the left and the chosen category on the right. Every
+ * control saves on change; Back (or Escape) returns to the workspace
+ * location the user came from.
  */
 export default function SettingsPage() {
-  const { t, i18n } = useTranslation();
-  const status = useStatus();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { section } = useParams();
   const settings = useSettings(true);
-  const update = useUpdateSettings();
+  const { save, states } = useSettingSaver();
 
-  const engine = useEngine();
-  const login = useEngineLogin();
-  const loginCancel = useEngineLoginCancel();
-  const logout = useEngineLogout();
-  const check = useEngineCheck();
-  const models = useEngineModels(engine.data?.status === 'ready');
-
-  const [language, setLanguage] = useState('zh-CN');
-  const [defaultModel, setDefaultModel] = useState('');
-  const [evalModel, setEvalModel] = useState('');
-  const [memberLimit, setMemberLimit] = useState(6);
-  const [chainLimit, setChainLimit] = useState(6);
-  const [budgetScope, setBudgetScope] = useState('');
-  const [budgetTokens, setBudgetTokens] = useState(0);
-  const [feedback, setFeedback] = useState<Feedback>('idle');
-  const [errorKey, setErrorKey] = useState<string>('');
-  const [modelFeedback, setModelFeedback] = useState<Feedback>('idle');
-  const [modelErrorText, setModelErrorText] = useState('');
-
-  const authorizations = useAuthorizations(true);
-  const revoke = useRevokeAuthorization();
-  const [revokeError, setRevokeError] = useState('');
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState('');
-
-  const [loginPending, setLoginPending] = useState(false);
-  const [authUrl, setAuthUrl] = useState('');
-  const [loginTimedOut, setLoginTimedOut] = useState(false);
-  const [engineActionError, setEngineActionError] = useState('');
+  const back = () => navigate(workspacePath());
 
   useEffect(() => {
-    const s = settings.data;
-    if (!s) return;
-    setLanguage(s.language);
-    setDefaultModel(s.defaultModel);
-    setEvalModel(s.evalModel);
-    setMemberLimit(s.memberLimit);
-    setChainLimit(s.chainLimit);
-    setBudgetScope(s.budgetScope);
-    setBudgetTokens(s.budgetTokens);
-  }, [settings.data]);
-
-  // Keep the latest refetch function in a ref so the polling interval does
-  // not restart on every render.
-  const refetchEngine = useRef(engine.refetch);
-  refetchEngine.current = engine.refetch;
-
-  // Poll GET /engine every 3s while a login is pending, at most 2 minutes.
-  useEffect(() => {
-    if (!loginPending) return;
-    const deadline = Date.now() + 120_000;
-    const interval = window.setInterval(() => {
-      if (Date.now() >= deadline) {
-        setLoginTimedOut(true);
-        window.clearInterval(interval);
-        return;
-      }
-      void refetchEngine.current();
-    }, 3_000);
-    return () => window.clearInterval(interval);
-  }, [loginPending]);
-
-  // The engine reports loggedIn only after the real handshake; that ends
-  // the pending state without any optimistic guessing.
-  useEffect(() => {
-    if (engine.data?.loggedIn) {
-      setLoginPending(false);
-      setAuthUrl('');
-      setLoginTimedOut(false);
-    }
-  }, [engine.data?.loggedIn]);
-
-  if (settings.isPending) {
-    return <div className="p-8 text-sm text-neutral-500">{t('status.loading')}</div>;
-  }
-  if (settings.isError) {
-    return <div className="p-8 text-sm text-red-600">{t('status.error')}</div>;
-  }
-
-  const save = () => {
-    const patch: SettingsPatch = {
-      language: language as SettingsPatch['language'],
-      memberLimit,
-      chainLimit,
-      budgetScope: budgetScope as SettingsPatch['budgetScope'],
-      budgetTokens,
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return;
+      navigate(workspacePath());
     };
-    update.mutate(
-      { patch, expectedRevision: settings.data?.revision },
-      {
-        onSuccess: () => {
-          setFeedback('saved');
-          setErrorKey('');
-        },
-        onError: (err) => {
-          setFeedback('failed');
-          setErrorKey(apiErrorMessage(t, err));
-        },
-      },
-    );
-  };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate]);
 
-  const changeModel = (field: 'defaultModel' | 'evalModel', value: string) => {
-    if (field === 'defaultModel') setDefaultModel(value);
-    else setEvalModel(value);
-    const patch: SettingsPatch = field === 'defaultModel' ? { defaultModel: value } : { evalModel: value };
-    setModelFeedback('idle');
-    setModelErrorText('');
-    update.mutate(
-      { patch, expectedRevision: settings.data?.revision },
-      {
-        onSuccess: () => setModelFeedback('saved'),
-        onError: (err) => {
-          setModelFeedback('failed');
-          setModelErrorText(apiErrorMessage(t, err));
-          // Roll the select back to the persisted value: the UI must never
-          // keep showing a model that was not saved (review C).
-          const persisted = settings.data;
-          if (persisted) {
-            if (field === 'defaultModel') setDefaultModel(persisted.defaultModel);
-            else setEvalModel(persisted.evalModel);
-          }
-        },
-      },
-    );
-  };
+  const current = sections.find((entry) => entry.id === section);
+  if (!current) return <Navigate to="/settings/general" replace />;
 
-  const startLogin = () => {
-    setEngineActionError('');
-    login.mutate(undefined, {
-      onSuccess: (result) => {
-        setLoginPending(true);
-        setAuthUrl(result.authUrl);
-        setLoginTimedOut(false);
-      },
-      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
-    });
-  };
-
-  const cancelLogin = () => {
-    setEngineActionError('');
-    loginCancel.mutate(undefined, {
-      onSuccess: () => {
-        setLoginPending(false);
-        setAuthUrl('');
-        void refetchEngine.current();
-      },
-      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
-    });
-  };
-
-  const engineLogout = () => {
-    setEngineActionError('');
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        setLoginPending(false);
-        void refetchEngine.current();
-      },
-      onError: (err) => setEngineActionError(apiErrorMessage(t, err)),
-    });
-  };
-
-  const engineInfo = engine.data;
-  const engineStatusText = !engineInfo
-    ? t('status.loading')
-    : engineInfo.status === 'ready'
-      ? t('settings.engineReady')
-      : engineInfo.status === 'error'
-        ? t('settings.engineError')
-        : engineInfo.status === 'starting'
-          ? t('settings.engineStarting')
-          : t('settings.engineNotConfigured');
-  const loggedIn = engineInfo?.loggedIn ?? false;
-  const engineTone: Tone = !engineInfo ? 'idle' : engineInfo.status === 'ready' ? 'ok' : engineInfo.status === 'starting' ? 'idle' : 'bad';
-  const hookState = engineInfo?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
-  const recheck = () => {
-    setEngineActionError('');
-    check.mutate(undefined, { onError: (err) => setEngineActionError(apiErrorMessage(t, err)) });
-  };
-
-  const modelOptions = (current: string): EngineModel[] => {
-    const list = models.data?.models ?? [];
-    const known = new Set(list.map((entry) => entry.slug ?? entry.id ?? ''));
-    if (current !== '' && !known.has(current)) return [{ slug: current, displayName: current }, ...list];
-    return list;
-  };
+  let body = null;
+  if (settings.isPending) body = <p className="text-sm text-neutral-500">{t('status.loading')}</p>;
+  else if (settings.isError || !settings.data) body = <p className="text-sm text-red-600">{t('status.error')}</p>;
+  else {
+    const props = { settings: settings.data, save, states };
+    body = {
+      general: <GeneralSection {...props} />,
+      engine: <EngineSection />,
+      models: <ModelsSection {...props} />,
+      collaboration: <CollaborationSection {...props} />,
+      security: <SecuritySection />,
+      about: <AboutSection />,
+    }[current.id];
+  }
 
   return (
-    <div className="h-full overflow-y-auto p-8">
-      <div className="mx-auto max-w-2xl space-y-8">
-        <h1 className="text-lg font-semibold">{t('settings.title')}</h1>
-
-        <section aria-labelledby="settings-profile" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 id="settings-profile" className="text-sm font-semibold">
-            {t('settings.profile')}
-          </h2>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-neutral-500">{t('settings.profile')}</dt>
-            <dd>
-              {status.data?.profile === 'production' ? t('settings.profileProduction') : t('settings.profileDevelopment')}
-            </dd>
-            <dt className="text-neutral-500">{t('settings.dataRoot')}</dt>
-            <dd className="break-all font-mono text-xs">{status.data?.dataRoot}</dd>
-          </dl>
-        </section>
-
-        <section aria-labelledby="settings-language" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 id="settings-language" className="text-sm font-semibold">
-            {t('settings.language')}
-          </h2>
-          <select
-            aria-label={t('settings.language')}
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="mt-3 rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-          >
-            <option value="zh-CN">简体中文</option>
-            <option value="en">English</option>
-          </select>
-        </section>
-
-        <section aria-labelledby="settings-engine" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 id="settings-engine" className="text-sm font-semibold">
-            {t('settings.engine')}
-          </h2>
-          <p className="mt-2 flex items-center gap-2 text-sm" role="status">
-            <StatusDot tone={engineTone} />
-            <span className="w-16 shrink-0 text-neutral-500">Codex</span>
-            <span>
-              {engineStatusText}
-              {engineInfo?.version ? ` · ${engineInfo.version}` : ''}
-              {engineInfo?.status === 'ready' ? ` · ${loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}` : ''}
-            </span>
-          </p>
-          {engineInfo?.binaryPath && (
-            <p className="mt-1 break-all pl-[5.5rem] font-mono text-xs text-neutral-400">
-              {t('settings.engineBinary')}: {engineInfo.binaryPath}
-              {engineInfo.protocol ? ` · ${t('settings.engineProtocol')}: ${engineInfo.protocol}` : ''}
-            </p>
-          )}
-          {engineInfo?.errorKey && (
-            <p className="mt-2 text-sm text-red-600" role="alert">
-              {errorMessage(t, engineInfo.errorKey)}
-            </p>
-          )}
-          {engineInfo?.status === 'ready' && (
-            <div className="mt-3">
-              <p className="flex flex-wrap items-center gap-2 text-sm" role="status">
-                <StatusDot tone={hookState === 'trusted' ? 'ok' : hookState === 'failed' ? 'bad' : 'warn'} />
-                <span className="w-16 shrink-0 text-neutral-500">{t('engine.hook')}</span>
-                <span>{t(hookState === 'trusted' ? 'engine.hookTrusted' : hookState === 'failed' ? 'engine.hookFailed' : 'engine.hookUntrusted')}</span>
-                {hookState !== 'trusted' && (
-                  <button
-                    type="button"
-                    onClick={recheck}
-                    disabled={check.isPending}
-                    className="rounded-md border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                  >
-                    {check.isPending ? t('engine.hookRetrying') : t('engine.hookRetry')}
-                  </button>
-                )}
-              </p>
-              <p className="mt-1 pl-[5.5rem] text-xs text-neutral-400">
-                {t(hookState === 'trusted' ? 'engine.hookTrustedHint' : hookState === 'failed' ? 'engine.hookFailedHint' : 'engine.hookUntrustedHint')}
-              </p>
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {!loggedIn && engineInfo?.status === 'ready' && !loginPending && (
-              <button
-                type="button"
-                onClick={startLogin}
-                disabled={login.isPending}
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+    <div className="flex h-full flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 md:flex-row">
+      <nav
+        aria-label={t('settings.title')}
+        className="shrink-0 border-b border-neutral-200 bg-white px-3 py-3 dark:border-neutral-800 dark:bg-neutral-900 md:w-56 md:border-b-0 md:border-r"
+      >
+        <button
+          type="button"
+          onClick={back}
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+        >
+          <ArrowLeft size={16} aria-hidden={true} />
+          {t('settings.back')}
+        </button>
+        <h1 className="mt-4 hidden px-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 md:block">
+          {t('settings.title')}
+        </h1>
+        <ul className="mt-2 flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+          {sections.map(({ id, icon: Icon }) => (
+            <li key={id} className="shrink-0">
+              <NavLink
+                to={`/settings/${id}`}
+                replace
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                    isActive
+                      ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+                      : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                  }`
+                }
               >
-                {t('engine.login')}
-              </button>
-            )}
-            {loginPending && (
-              <>
-                {authUrl && <a href={authUrl} target="_blank" rel="noreferrer" className="text-sm underline">{t('engine.openLogin')}</a>}
-                <span className="text-sm text-neutral-500" role="status">
-                  {t('engine.waitingLogin')}
-                </span>
-                <button
-                  type="button"
-                  onClick={cancelLogin}
-                  disabled={loginCancel.isPending}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                >
-                  {t('engine.cancelLogin')}
-                </button>
-              </>
-            )}
-            {loggedIn && (
-              <button
-                type="button"
-                onClick={engineLogout}
-                disabled={logout.isPending}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-              >
-                {t('engine.logout')}
-              </button>
-            )}
-          </div>
-          {loginTimedOut && (
-            <p className="mt-2 text-sm text-amber-600" role="alert">
-              {t('engine.loginTimeout')}
-            </p>
-          )}
-          {engineActionError && (
-            <p className="mt-2 text-sm text-red-600" role="alert">
-              {engineActionError}
-            </p>
-          )}
-
-          {models.data && (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="text-neutral-500">{t('settings.defaultModel')}</span>
-                <select
-                  value={defaultModel}
-                  onChange={(e) => changeModel('defaultModel', e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-                >
-                  <option value="">{t('settings.modelUnset')}</option>
-                  {modelOptions(defaultModel).map((model) => {
-                    const value = model.slug ?? model.id ?? '';
-                    if (value === '') return null;
-                    return (
-                      <option key={value} value={value}>
-                        {model.displayName ?? value}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="text-neutral-500">{t('settings.evalModel')}</span>
-                <select
-                  value={evalModel}
-                  onChange={(e) => changeModel('evalModel', e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-                >
-                  <option value="">{t('settings.modelUnset')}</option>
-                  {modelOptions(evalModel).map((model) => {
-                    const value = model.slug ?? model.id ?? '';
-                    if (value === '') return null;
-                    return (
-                      <option key={value} value={value}>
-                        {model.displayName ?? value}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-              {modelFeedback === 'saved' && (
-                <p className="text-sm text-green-600 sm:col-span-2" role="status">
-                  {t('settings.modelChanged')}
-                </p>
-              )}
-              {modelFeedback === 'failed' && (
-                <p className="text-sm text-red-600 sm:col-span-2" role="alert">
-                  {modelErrorText}
-                </p>
-              )}
-            </div>
-          )}
-        </section>
-
-        <section aria-labelledby="settings-limits" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 id="settings-limits" className="text-sm font-semibold">
-            {t('settings.budget')}
-          </h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-neutral-500">{t('settings.memberLimit')}</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={memberLimit}
-                onChange={(e) => setMemberLimit(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-500">{t('settings.chainLimit')}</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={chainLimit}
-                onChange={(e) => setChainLimit(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-500">{t('settings.budgetScope')}</span>
-              <select
-                value={budgetScope}
-                onChange={(e) => setBudgetScope(e.target.value)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
-              >
-                <option value="">{t('settings.budgetNone')}</option>
-                <option value="bot">{t('settings.budgetBot')}</option>
-                <option value="team">{t('settings.budgetTeam')}</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-500">{t('settings.budgetTokens')}</span>
-              <input
-                type="number"
-                min={0}
-                value={budgetTokens}
-                disabled={budgetScope === ''}
-                onChange={(e) => setBudgetTokens(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
-              />
-            </label>
-          </div>
-        </section>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={save}
-            disabled={update.isPending}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            {t('settings.save')}
-          </button>
-          {feedback === 'saved' && (
-            <span className="text-sm text-green-600" role="status">
-              {t('settings.saved')}
-            </span>
-          )}
-          {feedback === 'failed' && (
-            <span className="text-sm text-red-600" role="alert">
-              {t('settings.saveFailed')}: {errorKey}
-            </span>
-          )}
+                <Icon size={16} aria-hidden={true} />
+                {t(`settings.sections.${id}`)}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-10 md:py-8">
+        <div className="mx-auto max-w-2xl space-y-6">
+          <header>
+            <h2 className="text-lg font-semibold">{t(`settings.sections.${current.id}`)}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{t(`settings.sectionHints.${current.id}`)}</p>
+          </header>
+          {body}
         </div>
-
-        <section aria-labelledby="settings-authorizations" className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 id="settings-authorizations" className="text-sm font-semibold">
-            {t('settings.authorizations')}
-          </h2>
-          <p className="mt-1 text-xs text-neutral-500">{t('settings.authorizationsHint')}</p>
-          {authorizations.isPending && (
-            <p className="mt-3 text-sm text-neutral-500" role="status">
-              {t('status.loading')}
-            </p>
-          )}
-          {authorizations.isSuccess && (authorizations.data?.items ?? []).length === 0 && (
-            <p className="mt-3 text-sm text-neutral-500">{t('settings.authorizationsEmpty')}</p>
-          )}
-          {authorizations.isSuccess && (authorizations.data?.items ?? []).length > 0 && (
-            <ul className="mt-3 divide-y divide-neutral-100 dark:divide-neutral-800">
-              {(authorizations.data?.items ?? []).map((item) => (
-                <li key={item.botId + item.engineEpoch} className="flex items-center justify-between gap-3 py-2">
-                  <span className="min-w-0">
-                    <span className="block truncate font-mono text-xs">{item.botId.slice(0, 8)}</span>
-                    <span className="block text-[11px] text-neutral-500">
-                      {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRevokeError('');
-                      revoke.mutate(item.botId, {
-                        onError: (error) => setRevokeError(apiErrorMessage(t, error)),
-                      });
-                    }}
-                    className="shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-red-950"
-                  >
-                    {t('settings.revoke')}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {revokeError && (
-            <p className="mt-2 text-sm text-red-600" role="alert">
-              {revokeError}
-            </p>
-          )}
-        </section>
-
-        {logoutError && (
-          <p className="text-sm text-red-600" role="alert">
-            {logoutError}
-          </p>
-        )}
-
-        <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
-          <button
-            type="button"
-            onClick={() => {
-              setLogoutError('');
-              setLoggingOut(true);
-              void api
-                .logout()
-                .then(() => window.location.reload())
-                .catch((error) => {
-                  setLoggingOut(false);
-                  setLogoutError(apiErrorMessage(t, error));
-                });
-            }}
-            disabled={loggingOut}
-            className="text-sm text-neutral-500 underline-offset-2 hover:underline"
-          >
-            {t('settings.logout')}
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   );
-}
-
-type Tone = 'ok' | 'warn' | 'bad' | 'idle';
-
-const toneClass: Record<Tone, string> = {
-  ok: 'bg-green-500',
-  warn: 'bg-amber-500',
-  bad: 'bg-red-500',
-  idle: 'bg-neutral-400',
-};
-
-function StatusDot({ tone }: { tone: Tone }) {
-  return <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${toneClass[tone]}`} />;
 }

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Home, PanelLeftOpen, PanelRightOpen, Settings } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTeams } from '../api/queries';
 import WorkPanel from '../components/WorkPanel';
 import TeamList from '../features/teams/TeamList';
 import { useSelectedBot } from './SelectedBotContext';
+import { rememberWorkspacePath } from './workspacePath';
 
 function IconButton({
   label,
@@ -51,6 +52,8 @@ export default function Layout() {
   const [listOpen, setListOpen] = useState(startsOpen);
   const [panelOpen, setPanelOpen] = useState(startsOpen);
   const { botId, setBotId } = useSelectedBot();
+  const location = useLocation();
+  useEffect(() => rememberWorkspacePath(location.pathname + location.search), [location.pathname, location.search]);
   const teams = useTeams(true);
   const knownSelections = useRef(new Set<string>());
 
@@ -123,7 +126,7 @@ export default function Layout() {
         </div>
       )}
 
-      {/* Conversation area: the routed page (conversation or settings). */}
+      {/* Conversation area: the routed conversation page. */}
       <main className="relative flex min-w-0 flex-1 flex-col">
         {!panelOpen && (
           <div className="absolute right-2 top-2 z-10">
