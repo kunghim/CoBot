@@ -90,7 +90,7 @@ export default function App() {
   const invalidateAll = useCallback(() => {
     void queryClient.invalidateQueries();
   }, [queryClient]);
-  useEventStream(authState === 'authorized', invalidateAll);
+  useEventStream(authState === 'authorized' && snapshot.data !== undefined, invalidateAll, snapshot.data?.seq ?? 0);
 
   if (authState !== 'authorized') {
     if (authState === 'checking') {

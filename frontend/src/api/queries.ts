@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type {
   Approval,
   Bot,
@@ -74,16 +74,18 @@ export function useUpdateSettings() {
  * Browser sessions use EventSource (cookie auth). The desktop shell cannot
  * attach headers to EventSource, so bearer sessions use a fetch reader.
  */
-export function useEventStream(enabled: boolean, onEvent: (event: Event) => void): void {
+export function useEventStream(enabled: boolean, onEvent: (event: Event) => void, snapshotSequence = 0): void {
+  const cursor = useRef(0);
   useEffect(() => {
-    if (!enabled) return;
-    let lastSeq = 0;
+    if (!enabled) { cursor.current = 0; return; }
+    let lastSeq = Math.max(cursor.current, snapshotSequence);
     let stopped = false;
 
     const handleFrame = (payload: string) => {
       try {
         const event = JSON.parse(payload) as Event;
         lastSeq = Math.max(lastSeq, event.seq);
+        cursor.current = lastSeq;
         onEvent(event);
       } catch {
         // A malformed frame never kills the stream; snapshot re-sync covers gaps.
@@ -176,6 +178,9 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
       stopped = true;
       controller.abort();
     };
+    // A snapshot seeds a new stream. Later query refreshes must not tear it
+    // down; reconnects continue from the cursor advanced by received frames.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, onEvent]);
 }
 
