@@ -229,10 +229,11 @@ func TestReviewWakesTheLeader(t *testing.T) {
 	waitUntil(t, 5*time.Second, "member assigned", func() bool { return len(fake.Turns()) == 1 })
 	memberTurn := fake.Turns()[0]
 	as := auth.NewPrincipalBot(member.ID, team.ID)
-	task, err = h.app.UpdateTaskStatus(ctx, as, task.ID, domain.TaskDoing, "", task.Revision)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Picking the task up marks it as started; the member does not.
+	waitUntil(t, 5*time.Second, "task started", func() bool {
+		started, _ := sqlite.GetTask(ctx, h.app.DB, task.ID)
+		return started.Status == domain.TaskDoing
+	})
 	evidence, err := h.app.SubmitEvidence(ctx, as, task.ID, "接口已实现，go test 通过", nil, "", "go test ./... ok", "")
 	if err != nil {
 		t.Fatal(err)
