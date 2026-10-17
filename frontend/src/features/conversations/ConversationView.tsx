@@ -213,7 +213,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
       </div>
       </div>
 
-      <div className="space-y-2 px-4 pb-4 pt-2">
+      {/* The exchange between two members is read-only: while it is open the
+          composer and approval cards step aside (kept mounted, so nothing
+          typed or pending is lost). */}
+      <div className={`space-y-2 px-4 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
         {queuedCount > 0 && (
           <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t('conversation.queuedBanner', { count: queuedCount })}
