@@ -211,3 +211,47 @@ func TestWarmTeamStartsEngineAhead(t *testing.T) {
 		t.Fatal("a second warm-up replaced the engine")
 	}
 }
+
+// A member putting its task up for review wakes the leader with a notice,
+// whatever the member itself told the leader; the leader's own move does not.
+func TestReviewWakesTheLeader(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"backend-dev"})
+	leader, member := bots[0], bots[1]
+	fake := h.ensureFake(t, team.ID)
+
+	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: member.ID, Title: "登录接口", AcceptanceCriteria: "返回 200"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "member assigned", func() bool { return len(fake.Turns()) == 1 })
+	memberTurn := fake.Turns()[0]
+	as := auth.NewPrincipalBot(member.ID, team.ID)
+	task, err = h.app.UpdateTaskStatus(ctx, as, task.ID, domain.TaskDoing, "", task.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := h.app.SubmitEvidence(ctx, as, task.ID, "接口已实现，go test 通过", nil, "", "go test ./... ok", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err = sqlite.GetTask(ctx, h.app.DB, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.app.ReportCompletion(ctx, as, task.ID, []string{evidence.ID}, task.Revision); err != nil {
+		t.Fatal(err)
+	}
+	fake.EmitTurnCompleted(memberTurn.ThreadID, memberTurn.TurnID, "completed", "已提交验收")
+
+	waitUntil(t, 5*time.Second, "leader woken", func() bool { return len(fake.Turns()) == 2 })
+	notice := fake.Turns()[1]
+	if !strings.Contains(notice.Text, "把任务「登录接口」提交验收") || !strings.Contains(notice.Text, "confirm_task") {
+		t.Fatalf("leader input:\n%s", notice.Text)
+	}
+	var leaderMessages int
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system'`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
+		t.Fatalf("leader notices = %d (%v)", leaderMessages, err)
+	}
+}

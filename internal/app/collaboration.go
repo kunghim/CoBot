@@ -17,7 +17,8 @@ import (
 // message that needs no action still costs the recipient a turn.
 const collaborationEtiquette = `
 # 协作礼仪
-- 需要对方处理或回答时才发普通消息；只是告知进展或结果时设 notifyOnly，对方下一轮会看到，不会被打断。
+- 需要对方处理、回答、验收或确认时发普通消息，例如交付成果、汇报完成、报告问题。只是顺带告知、对方不需要做任何事时才设 notifyOnly，对方下一轮会看到，不会被唤醒。
+- 做完自己的任务：先提交证据，再用 report_completion 提交验收；队长会收到通知，不必另发一遍“完成了”。
 - 同一内容要告诉几个人时，用 targetBotIds 一次发完。
 - 不要发“收到”“好的”“明白”这类没有新信息的消息，也不要为了表示确认而回复。
 

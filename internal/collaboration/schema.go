@@ -38,7 +38,7 @@ func toolSchema(name string) json.RawMessage {
 		add("targetBotId", text("A single recipient member ID; use targetBotIds for several."), false)
 		add("text", text("Message to the recipients."), true)
 		add("taskId", text("Related task ID, when applicable."), false)
-		add("notifyOnly", map[string]any{"type": "boolean", "description": "Information only: recipients see it in their next turn and are not woken. Use for progress notes that need no action."}, false)
+		add("notifyOnly", map[string]any{"type": "boolean", "description": "Information only: recipients see it in their next turn and are not woken. Only for notes that need no action; deliveries, completion reports and anything to verify or decide must wake the recipient."}, false)
 	case "create_task", "propose_task":
 		add("title", text("Task title."), true)
 		add("description", map[string]any{"type": "string", "description": "Work to perform."}, false)

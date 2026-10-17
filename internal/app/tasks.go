@@ -489,11 +489,21 @@ func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, ta
 			return domain.Task{}, err
 		}
 	}
+	leaderToWake := ""
+	if status == domain.TaskReview && task.Status != domain.TaskReview {
+		leaderToWake, err = a.enqueueReviewNoticeLocked(ctx, tx, principal, updated)
+		if err != nil {
+			return domain.Task{}, err
+		}
+	}
 	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
 		return domain.Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Task{}, err
+	}
+	if leaderToWake != "" && a.Scheduler != nil {
+		a.Scheduler.Wake(leaderToWake)
 	}
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID, Revision: updated.Revision,
 		Payload: mustJSON(map[string]any{"change": "status", "status": updated.Status})})
@@ -770,3 +780,45 @@ func (a *App) recordTaskUpdated(ctx context.Context, task domain.Task) {
 }
 
 var _ = time.Now
+
+// enqueueReviewNoticeLocked tells the leader that a member put a task up for
+// review, as a message that wakes it: the leader is the one who confirms or
+// sends it back, and a member's own report may well have been a note that
+// wakes nobody. It reports the leader to wake, or "" when the leader itself
+// moved the task.
+func (a *App) enqueueReviewNoticeLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, task domain.Task) (string, error) {
+	if principal.Kind != auth.KindBot {
+		return "", nil
+	}
+	team, _, err := sqlite.GetTeam(ctx, tx, task.TeamID)
+	if err != nil {
+		return "", err
+	}
+	if team.LeaderID == "" || principal.BotID == team.LeaderID {
+		return "", nil
+	}
+	reporter, err := sqlite.GetBot(ctx, tx, principal.BotID)
+	if err != nil {
+		return "", err
+	}
+	text := fmt.Sprintf("%s 把任务「%s」提交验收（任务 ID：%s）。请对照完成标准查看它的证据：符合就用 confirm_task 确认完成；不符合就用 update_task 改回 doing，并告诉负责人缺什么。", reporter.Name, task.Title, task.ID)
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return "", err
+	}
+	message := domain.Message{
+		ID: domain.NewID(), TeamID: task.TeamID, BotID: team.LeaderID,
+		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: task.ID,
+	}
+	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+		return "", err
+	}
+	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+		ID: domain.NewID(), MessageID: message.ID, TeamID: task.TeamID, TargetBotID: team.LeaderID,
+		Status: domain.DeliveryQueued, ChainID: chainOfRunLocked(ctx, tx, principal.BotID), TaskID: task.ID,
+		SourceRunID: principal.RunID, Kind: "review_notice",
+	}); err != nil {
+		return "", err
+	}
+	return team.LeaderID, nil
+}
