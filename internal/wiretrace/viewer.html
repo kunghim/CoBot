@@ -45,7 +45,12 @@ code { font-family: var(--mono); font-size: 12px; }
 .filters .count { color: var(--muted); font-size: 11px; }
 .filters input[type=search], .filters select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
 .split { flex: 1; min-height: 0; display: flex; }
-#list { flex: 1 1 60%; min-width: 0; overflow: auto; position: relative; }
+.listpane { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; }
+.listhead { display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 28px; border-bottom: 1px solid var(--line); background: var(--soft); color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.listhead .t { width: 88px; flex: none; }
+.listhead .who { width: 280px; flex: none; }
+.listhead .kind { width: 230px; flex: none; }
+#list { flex: 1; min-height: 0; overflow: auto; position: relative; }
 #spacer { position: relative; }
 .row { position: absolute; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; }
 .row:hover { background: var(--soft); }
@@ -60,7 +65,25 @@ code { font-family: var(--mono); font-size: 12px; }
 .badge.bad { background: var(--bad-bg); color: var(--bad); }
 .badge.fold { background: var(--soft); color: var(--muted); }
 #detail { flex: 1 1 40%; min-width: 320px; max-width: 50%; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 14px; }
-#detail h3 { font-size: 13px; margin: 0 0 6px; }
+#detail[hidden] { display: none; }
+#detail .head { display: flex; align-items: flex-start; gap: 8px; }
+#detail h3 { font-size: 13px; margin: 0 0 6px; flex: 1; min-width: 0; }
+#detail .close { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+#detail .close:hover { color: var(--text); }
+.tree { font-family: var(--mono); font-size: 12px; background: var(--soft); padding: 8px 10px; border-radius: 6px; word-break: break-all; }
+.tree details { padding-left: 14px; }
+.tree > details { padding-left: 0; }
+.tree summary { cursor: pointer; list-style: none; margin-left: -12px; }
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before { content: '▸'; display: inline-block; width: 12px; color: var(--muted); }
+.tree details[open] > summary::before { content: '▾'; }
+.tree .leaf { padding-left: 14px; white-space: pre-wrap; }
+.tree .k { color: var(--accent); }
+.tree .s { color: #15803d; }
+.tree .n { color: #b45309; }
+.tree .z { color: var(--muted); }
+.tree .meta { color: var(--muted); }
+@media (prefers-color-scheme: dark) { .tree .s { color: #86efac; } .tree .n { color: #fbbf24; } }
 #detail .facts { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 #detail .tools { display: flex; gap: 6px; margin-bottom: 8px; }
 #detail .tools button { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
@@ -84,8 +107,11 @@ code { font-family: var(--mono); font-size: 12px; }
   <div id="timeline">
     <div class="filters" id="filters"></div>
     <div class="split">
-      <div id="list"><div id="spacer"></div></div>
-      <aside id="detail"><p class="empty">点一条记录查看原文。</p></aside>
+      <div class="listpane">
+        <div class="listhead"><span class="t">时间</span><span class="who">发送方 → 接收方</span><span class="kind">类型</span><span>内容</span></div>
+        <div id="list"><div id="spacer"></div></div>
+      </div>
+      <aside id="detail" hidden></aside>
     </div>
   </div>
 </main>
@@ -211,12 +237,35 @@ $('spacer').addEventListener('click', (e) => {
   select(Number(row.dataset.id), Number(row.dataset.folded));
 });
 
+// A JSON value as a tree of <details>: objects and arrays fold, the first
+// two levels start open.
+function tree(value, key, depth) {
+  const label = key === undefined ? '' : typeof key === 'number' ? `<span class="z">${key}</span>: ` : `<span class="k">${esc(JSON.stringify(key))}</span>: `;
+  if (value !== null && typeof value === 'object') {
+    const isArray = Array.isArray(value);
+    const entries = isArray ? value.map((v, i) => [i, v]) : Object.entries(value);
+    const [open, close] = isArray ? ['[', ']'] : ['{', '}'];
+    if (!entries.length) return `<div class="leaf">${label}${open}${close}</div>`;
+    return `<details${depth < 2 ? ' open' : ''}><summary>${label}${open}<span class="meta"> ${entries.length} 项 </span>${close}</summary>` +
+      entries.map(([k, v]) => tree(v, k, depth + 1)).join('') + `</details>`;
+  }
+  const cls = typeof value === 'string' ? 's' : typeof value === 'number' ? 'n' : 'z';
+  return `<div class="leaf">${label}<span class="${cls}">${esc(JSON.stringify(value))}</span></div>`;
+}
+
+function closeDetail() {
+  state.selected = -1;
+  $('detail').hidden = true;
+  render();
+}
+
 async function select(id, folded) {
   state.selected = id;
   render();
   const data = await api(`/api/raw?id=${id}`);
   const r = data.row;
-  let html = `<h3>#${r.id} ${esc(r.from)} → ${esc(r.to)}</h3>
+  $('detail').hidden = false;
+  let html = `<div class="head"><h3>#${r.id} ${esc(r.from)} → ${esc(r.to)}</h3><button class="close" id="close" title="关闭" aria-label="关闭">×</button></div>
     <div class="facts">${esc(r.t)} · 通道 <code>${esc(r.ch)}</code> · 方向 <code>${esc(r.dir)}</code> · ${esc(r.kind)} · ${data.bytes} 字节${r.who ? ' · 成员 ' + esc(r.who) : ''}${r.anomaly ? ' · ' + esc(r.anomaly) : ''}</div>`;
   if (folded > 1) {
     const group = await api(`/api/group?id=${id}&${query()}`);
@@ -226,19 +275,29 @@ async function select(id, folded) {
   if (data.binary) {
     html += '<p class="empty">这条记录不是文本（原文以 base64 保存在录像文件里）。</p>';
   } else {
-    html += `<div class="tools">${data.pretty ? '<button id="as-pretty">格式化</button><button id="as-raw">原文</button>' : ''}<button id="copy">复制原文</button></div><pre id="body"></pre>`;
+    const json = data.pretty ? '<button id="as-tree">树形</button><button id="as-raw">原文</button><button id="expand">全部展开</button><button id="collapse">全部收起</button>' : '';
+    html += `<div class="tools">${json}<button id="copy">复制原文</button></div><div id="body"></div>`;
   }
   $('detail').innerHTML = html;
+  $('close').onclick = closeDetail;
   $('detail').querySelectorAll('.members div').forEach(div => div.onclick = () => select(Number(div.dataset.id), 0));
   if (data.binary) return;
   const body = $('body');
-  body.textContent = data.pretty ?? data.raw;
+  const showRaw = () => { body.innerHTML = '<pre></pre>'; body.firstChild.textContent = data.raw; };
+  const showTree = () => { body.innerHTML = `<div class="tree">${tree(JSON.parse(data.raw), undefined, 0)}</div>`; };
+  const setOpen = (open) => { showTree(); body.querySelectorAll('details').forEach(d => { d.open = open; }); };
   if (data.pretty) {
-    $('as-pretty').onclick = () => { body.textContent = data.pretty; };
-    $('as-raw').onclick = () => { body.textContent = data.raw; };
+    showTree();
+    $('as-tree').onclick = showTree;
+    $('as-raw').onclick = showRaw;
+    $('expand').onclick = () => setOpen(true);
+    $('collapse').onclick = () => setOpen(false);
+  } else {
+    showRaw();
   }
   $('copy').onclick = () => navigator.clipboard.writeText(data.raw);
 }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('detail').hidden) closeDetail(); });
 
 async function jumpTo(id) {
   const data = await api(`/api/raw?id=${id}`);

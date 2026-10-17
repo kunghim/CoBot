@@ -88,6 +88,9 @@ func TestIndexNamesBothEndsAndKeepsRawBytes(t *testing.T) {
 	if r := find("↩ thread/start"); r.From != "队长(Codex)" {
 		t.Fatalf("response not paired: %+v", r)
 	}
+	if r := find("thread/start"); r.To != "队长(Codex)" || r.Who != "队长" {
+		t.Fatalf("thread/start request not named: %+v", r)
+	}
 	if r := find("↩ tools/call"); r.From != "队长的协作工具桥" || r.Who != "队长" {
 		t.Fatalf("bridge row = %+v", r)
 	}

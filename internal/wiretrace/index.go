@@ -348,6 +348,15 @@ func parseRPC(row *Row, raw []byte) {
 	}
 	_ = json.Unmarshal(msg.Params, &p)
 	row.thread = p.ThreadID
+	if row.thread == "" && msg.Method == "thread/started" {
+		var started struct {
+			Thread struct {
+				ID string `json:"id"`
+			} `json:"thread"`
+		}
+		_ = json.Unmarshal(msg.Params, &started)
+		row.thread = started.Thread.ID
+	}
 	row.itemType = p.Item.Type
 	if m := memberInText.FindStringSubmatch(p.DeveloperInstructns); m != nil {
 		row.nameHint = strings.TrimSpace(m[1])
@@ -488,6 +497,9 @@ func (idx *Index) label() {
 		if name := threadName[row.thread]; name != "" {
 			return name + "(Codex)"
 		}
+		if row.nameHint != "" { // a thread/start request, before the thread has an id
+			return row.nameHint + "(Codex)"
+		}
 		if row.thread != "" {
 			return "Codex·" + row.thread[:min(8, len(row.thread))]
 		}
@@ -496,6 +508,9 @@ func (idx *Index) label() {
 	for i := range idx.Rows {
 		row := &idx.Rows[i]
 		row.Who = threadName[row.thread]
+		if row.Who == "" && row.Channel == "codex.stdio" {
+			row.Who = row.nameHint
+		}
 		switch row.Channel {
 		case "codex.stdio":
 			if row.Dir == "cobot→codex" {
