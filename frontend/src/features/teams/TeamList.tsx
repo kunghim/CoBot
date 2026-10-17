@@ -240,8 +240,9 @@ function BotRow({
 
 // TeamActions offers what the sidebar can do with a team: archive an idle
 // active team (it then moves to Settings), retry a failed creation, or delete
-// a team whose folder is gone, the only way out for it. Deleting always asks
-// first, because it cannot be undone.
+// a team whose folder is gone, the only way out for it. Archiving asks first,
+// since the team leaves the sidebar; deleting asks because it is final. A
+// refused archive (unfinished work) shows its reason in the dialog.
 function TeamActions({ item }: { item: TeamWithBots }) {
   const { t } = useTranslation();
   const { team, bots } = item;
@@ -251,6 +252,7 @@ function TeamActions({ item }: { item: TeamWithBots }) {
   const retry = useRetryTeam();
   const [errorText, setErrorText] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
   // Leaving the sidebar drops a selection inside the team.
   const leave = () => {
@@ -288,7 +290,8 @@ function TeamActions({ item }: { item: TeamWithBots }) {
             type="button"
             onClick={() => {
               setErrorText('');
-              archive.mutate({ teamId: team.id, expectedRevision: team.revision }, { onSuccess: leave, onError: fail });
+              archive.reset();
+              setArchiving(true);
             }}
             disabled={archive.isPending}
             title={t('team.archive')}
@@ -314,6 +317,27 @@ function TeamActions({ item }: { item: TeamWithBots }) {
           </button>
         )}
       </span>
+      <ConfirmDialog
+        open={archiving}
+        title={t('team.archiveConfirmTitle', { name: team.name })}
+        body={t('team.archiveConfirmBody')}
+        confirmLabel={t('team.archive')}
+        danger={false}
+        pending={archive.isPending}
+        errorText={archive.isError ? apiErrorMessage(t, archive.error) : ''}
+        onCancel={() => setArchiving(false)}
+        onConfirm={() =>
+          archive.mutate(
+            { teamId: team.id, expectedRevision: team.revision },
+            {
+              onSuccess: () => {
+                setArchiving(false);
+                leave();
+              },
+            },
+          )
+        }
+      />
       <ConfirmDialog
         open={confirming}
         title={t('team.deleteConfirmTitle', { name: team.name })}

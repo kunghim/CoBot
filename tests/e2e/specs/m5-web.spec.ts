@@ -55,8 +55,11 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
 
   // Team lifecycle: a team with an unfinished task cannot be archived; the
   // refusal names what is left.
+  // Archiving asks first; the refusal shows inside the dialog.
   await page.getByRole('button', { name: /归档团队|Archive team/ }).first().click();
-  await expect(page.getByRole('alert').filter({ hasText: /暂不能归档|cannot be archived/ })).toBeVisible({ timeout: 15000 });
+  const confirmArchive = page.getByRole('alertdialog');
+  await confirmArchive.getByRole('button', { name: /归档团队|Archive team/ }).click();
+  await expect(confirmArchive.getByRole('alert').filter({ hasText: /暂不能归档|cannot be archived/ })).toBeVisible({ timeout: 15000 });
 });
 
 // Archiving an idle team moves it from the sidebar to Settings › Archived
@@ -78,6 +81,7 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   await expect(row).toBeVisible({ timeout: 15000 });
 
   await row.getByRole('button', { name: /归档团队|Archive team/ }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: /归档团队|Archive team/ }).click();
   await expect(sidebar.getByText(label)).toHaveCount(0, { timeout: 15000 });
 
   await page.goto('/settings/archived');

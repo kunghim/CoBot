@@ -2,9 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from './useDialogFocus';
 
 /**
- * ConfirmDialog asks before an action that cannot be undone. The confirm
- * button carries the action's own name, so the choice reads plainly; Escape
- * or the backdrop cancels, and both stay disabled while the action runs.
+ * ConfirmDialog asks before an action with consequences the user should see
+ * first. The confirm button carries the action's own name, so the choice
+ * reads plainly; it is red only for actions that cannot be undone. Escape or
+ * the backdrop cancels, and both stay disabled while the action runs.
  */
 export default function ConfirmDialog({
   open,
@@ -13,6 +14,7 @@ export default function ConfirmDialog({
   confirmLabel,
   pending = false,
   errorText = '',
+  danger = true,
   onConfirm,
   onCancel,
 }: {
@@ -22,6 +24,7 @@ export default function ConfirmDialog({
   confirmLabel: string;
   pending?: boolean;
   errorText?: string;
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -69,7 +72,11 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={pending}
-            className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            className={`rounded-md px-4 py-1.5 text-sm font-medium disabled:opacity-50 ${
+              danger
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300'
+            }`}
           >
             {pending ? t('status.loading') : confirmLabel}
           </button>

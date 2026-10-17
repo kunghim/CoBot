@@ -41,6 +41,8 @@
     "directoryDuplicate": "该目录已被团队「{{teamName}}」绑定",
     "directoryNested": "该目录与团队「{{teamName}}」的目录存在包含关系",
     "deleteConfirmTitle": "删除团队「{{name}}」？",
+    "archiveConfirmTitle": "归档团队「{{name}}」？",
+    "archiveConfirmBody": "归档后，团队会从团队列表移到“设置 › 已归档团队”，它的 Codex 进程会关闭，目录仍归它所有。会话和数据都保留，随时可以恢复。",
     "deleteMissingConfirmBody": "团队的项目目录已不在原位置。删除后，团队的成员、会话、任务、记忆和 Codex 会话都会被永久删除，未完成的工作也会一并删除，无法恢复。",
     "deleteMemberConfirmTitle": "删除成员「{{name}}」？",
     "deleteMemberConfirmBody": "该成员会从团队中移除，发给它但还没送达的消息会被取消。历史消息保留。",
