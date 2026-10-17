@@ -5,10 +5,10 @@
 Do not report exploitable vulnerabilities in public issues or pull requests.
 When private vulnerability reporting is available, use
 [Report a vulnerability](https://github.com/kunghim/CoBot/security/advisories/new).
-If that option is unavailable, open an issue asking the maintainer for a
-private contact channel, without describing the vulnerability or posting
-proof-of-concept code, credentials, private data or recordings. Wait for a
-private channel before sharing details.
+If that option is unavailable, email
+[kunghimxu@gmail.com](mailto:kunghimxu@gmail.com) with the subject
+`CoBot security report`. Do not post vulnerability details publicly or
+send credentials, private databases or raw recordings by email.
 
 Include the affected version or commit, platform, reproduction, impact and
 any suggested fix in the private report. There is no guaranteed response
@@ -37,8 +37,9 @@ commit alone does not make the credential safe.
 ## 中文说明
 
 可利用的安全漏洞不要发到公开 Issue 或 PR。私密漏洞报告启用时，请使用上面的
-“Report a vulnerability”入口；如果不可用，只提交“申请私密联系渠道”的 Issue，
-不要包含漏洞细节、复现代码、凭据或私人资料，待维护者提供私密渠道后再说明。
+“Report a vulnerability”入口；如果不可用，请邮件联系
+[kunghimxu@gmail.com](mailto:kunghimxu@gmail.com)，主题写 `CoBot security report`。
+不要公开漏洞细节，也不要通过邮件发送凭据、私人数据库或原始录制。
 
 私密报告请提供版本或 commit、平台、复现步骤、影响和建议修复方式。项目处于早期
 预览阶段，安全修复面向当前开发版本和最新预览版，不承诺固定响应时间或旧版本维护。
