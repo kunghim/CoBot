@@ -4,7 +4,7 @@ import LoadMore from '../../components/LoadMore';
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Plus, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Crown, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
@@ -224,10 +224,15 @@ function BotRow({
         className={`inline-block h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[bot.status] ?? DOT_CLASS.unknown}`}
       />
       <span className="min-w-0 flex-1 truncate">{bot.name}</span>
+      {/* The leader is marked by a badge, not a second "leader" label next
+          to a name that usually already says so. */}
       {bot.isLeader && (
-        <span className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-400" title={t('team.leader')}>
-          <Users size={11} aria-hidden="true" />
-          {t('team.leader')}
+        <span
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300"
+          title={t('team.leader')}
+        >
+          <Crown size={10} aria-hidden="true" />
+          <span className="sr-only">{t('team.leader')}</span>
         </span>
       )}
     </button>
