@@ -56,7 +56,8 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   // Team lifecycle: a team with an unfinished task cannot be archived; the
   // refusal names what is left.
   // Archiving asks first; the refusal shows inside the dialog.
-  await page.getByRole('button', { name: /归档团队|Archive team/ }).first().click();
+  await page.getByRole('button', { name: /团队操作|Actions for/ }).first().click();
+  await page.getByRole('menuitem', { name: /归档团队|Archive team/ }).click();
   const confirmArchive = page.getByRole('alertdialog');
   await confirmArchive.getByRole('button', { name: /归档团队|Archive team/ }).click();
   await expect(confirmArchive.getByRole('alert').filter({ hasText: /暂不能归档|cannot be archived/ })).toBeVisible({ timeout: 15000 });
@@ -80,7 +81,19 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   const row = sidebar.locator('li').filter({ hasText: label }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
 
-  await row.getByRole('button', { name: /归档团队|Archive team/ }).click();
+  // Members are deleted from the same menu: pick one, then confirm.
+  const expand = row.getByRole('button', { name: /展开团队|Expand team/ });
+  if ((await expand.count()) > 0) await expand.click();
+  await expect(row.getByRole('button', { name: /测试工程师|QA engineer/ })).toBeVisible({ timeout: 15000 });
+  await row.getByRole('button', { name: /团队操作|Actions for/ }).click();
+  await page.getByRole('menuitem', { name: /删除成员|Delete member/ }).click();
+  const deleteMember = page.getByRole('alertdialog');
+  await deleteMember.getByRole('radio', { name: /测试工程师|QA engineer/ }).check();
+  await deleteMember.getByRole('button', { name: /删除成员|Delete member/ }).click();
+  await expect(row.getByRole('button', { name: /测试工程师|QA engineer/ })).toHaveCount(0, { timeout: 15000 });
+
+  await row.getByRole('button', { name: /团队操作|Actions for/ }).click();
+  await page.getByRole('menuitem', { name: /归档团队|Archive team/ }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: /归档团队|Archive team/ }).click();
   await expect(sidebar.getByText(label)).toHaveCount(0, { timeout: 15000 });
 

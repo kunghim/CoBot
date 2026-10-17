@@ -44,8 +44,9 @@
     "archiveConfirmTitle": "归档团队「{{name}}」？",
     "archiveConfirmBody": "归档后，团队会从团队列表移到“设置 › 已归档团队”，它的 Codex 进程会关闭，目录仍归它所有。会话和数据都保留，随时可以恢复。",
     "deleteMissingConfirmBody": "团队的项目目录已不在原位置。删除后，团队的成员、会话、任务、记忆和 Codex 会话都会被永久删除，未完成的工作也会一并删除，无法恢复。",
-    "deleteMemberConfirmTitle": "删除成员「{{name}}」？",
     "deleteMemberConfirmBody": "该成员在本团队的会话、记忆、执行记录、它负责过的已结束任务以及 Codex 会话会被永久删除，无法恢复。它发给其他成员的消息会保留。角色本身不受影响，其他团队仍可使用。",
+    "actions": "团队操作：{{name}}",
+    "deleteMemberPick": "选择要删除的成员",
     "deletedMember": "已删除的成员",
     "directoryArchived": "该目录属于已归档的团队「{{teamName}}」。如需继续使用，请恢复该团队。",
     "goRestore": "去恢复",
@@ -86,10 +87,8 @@
       "unknown": "待核对"
     },
     "tools": {"add": "添加成员"},
-    "closeTool": "关闭团队操作",
     "roleLabel": "成员角色",
-    "chooseRole": "选择角色",
-    "memberAdded": "成员已添加"
+    "chooseRole": "选择角色"
   },
   "scenario": {
     "software": { "name": "软件开发" }

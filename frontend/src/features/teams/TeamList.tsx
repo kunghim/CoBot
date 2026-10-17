@@ -4,15 +4,13 @@ import LoadMore from '../../components/LoadMore';
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, ChevronDown, ChevronRight, Plus, RotateCw, Trash2, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRetryTeam, useTeams } from '../../api/queries';
-import ConfirmDialog from '../../components/ConfirmDialog';
+import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
-import { apiErrorMessage } from '../../i18n/errors';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import CreateTeamDialog from './CreateTeamDialog';
-import TeamTools from './TeamTools';
+import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
 
 const DOT_CLASS: Record<string, string> = {
@@ -176,7 +174,7 @@ function TeamRow({
             {t(badgeKey)}
           </span>
         )}
-        <TeamActions item={item} />
+        <TeamMenu item={item} />
       </div>
       {expanded && (
         <ul className="ml-6 mt-0.5 space-y-0.5">
@@ -185,12 +183,10 @@ function TeamRow({
               <span className="min-w-0 flex-1">
                 <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
               </span>
-              {!bot.isLeader && !missing && <DeleteMemberButton bot={bot} />}
             </li>
           ))}
         </ul>
       )}
-      {expanded && <TeamTools key={team.id} item={item} />}
     </li>
   );
 }
@@ -235,166 +231,5 @@ function BotRow({
         </span>
       )}
     </button>
-  );
-}
-
-// TeamActions offers what the sidebar can do with a team: archive an idle
-// active team (it then moves to Settings), retry a failed creation, or delete
-// a team whose folder is gone, the only way out for it. Archiving asks first,
-// since the team leaves the sidebar; deleting asks because it is final. A
-// refused archive (unfinished work) shows its reason in the dialog.
-function TeamActions({ item }: { item: TeamWithBots }) {
-  const { t } = useTranslation();
-  const { team, bots } = item;
-  const { botId, setBotId } = useSelectedBot();
-  const archive = useArchiveTeam();
-  const remove = useDeleteTeam();
-  const retry = useRetryTeam();
-  const [errorText, setErrorText] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
-  // Leaving the sidebar drops a selection inside the team.
-  const leave = () => {
-    if (botId && bots.some((bot) => bot.id === botId)) setBotId(null);
-  };
-  const iconButton =
-    'flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200';
-
-  return (
-    <>
-      {/* A refusal gets its own full-width line: inside the 240px header row
-          it would be truncated (review C re-review). */}
-      {errorText && (
-        <span role="alert" className="w-full text-[10px] leading-4 text-red-600 dark:text-red-400">
-          {errorText}
-        </span>
-      )}
-      <span className="flex shrink-0 items-center gap-0.5">
-        {team.status === 'error' && (
-          <button
-            type="button"
-            onClick={() => {
-              setErrorText('');
-              retry.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
-            }}
-            title={t('team.retry')}
-            aria-label={t('team.retry')}
-            className={iconButton}
-          >
-            <RotateCw size={12} aria-hidden="true" />
-          </button>
-        )}
-        {team.status === 'active' && (
-          <button
-            type="button"
-            onClick={() => {
-              setErrorText('');
-              archive.reset();
-              setArchiving(true);
-            }}
-            disabled={archive.isPending}
-            title={t('team.archive')}
-            aria-label={t('team.archive')}
-            className={iconButton}
-          >
-            <Archive size={12} aria-hidden="true" />
-          </button>
-        )}
-        {team.status === 'directory_missing' && (
-          <button
-            type="button"
-            onClick={() => {
-              setErrorText('');
-              remove.reset();
-              setConfirming(true);
-            }}
-            title={t('team.delete')}
-            aria-label={t('team.delete')}
-            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
-          >
-            <Trash2 size={12} aria-hidden="true" />
-          </button>
-        )}
-      </span>
-      <ConfirmDialog
-        open={archiving}
-        title={t('team.archiveConfirmTitle', { name: team.name })}
-        body={t('team.archiveConfirmBody')}
-        confirmLabel={t('team.archive')}
-        danger={false}
-        pending={archive.isPending}
-        errorText={archive.isError ? apiErrorMessage(t, archive.error) : ''}
-        onCancel={() => setArchiving(false)}
-        onConfirm={() =>
-          archive.mutate(
-            { teamId: team.id, expectedRevision: team.revision },
-            {
-              onSuccess: () => {
-                setArchiving(false);
-                leave();
-              },
-            },
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        title={t('team.deleteConfirmTitle', { name: team.name })}
-        body={t('team.deleteMissingConfirmBody')}
-        confirmLabel={t('team.delete')}
-        pending={remove.isPending}
-        errorText={remove.isError ? apiErrorMessage(t, remove.error) : ''}
-        onCancel={() => setConfirming(false)}
-        onConfirm={() =>
-          remove.mutate(
-            { teamId: team.id, expectedRevision: team.revision },
-            {
-              onSuccess: () => {
-                setConfirming(false);
-                leave();
-              },
-            },
-          )
-        }
-      />
-    </>
-  );
-}
-
-// DeleteMemberButton removes a member that carries no unfinished work (B08)
-// after asking. A server refusal (unfinished tasks, runs, approvals) shows
-// in the dialog: the most common outcome must never be a silent no-op.
-function DeleteMemberButton({ bot }: { bot: Bot }) {
-  const { t } = useTranslation();
-  const remove = useDeleteBot();
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          remove.reset();
-          setConfirming(true);
-        }}
-        disabled={remove.isPending}
-        title={t('team.deleteMember')}
-        aria-label={t('team.deleteMember')}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-300 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 dark:text-neutral-600 dark:hover:bg-red-950 dark:hover:text-red-300"
-      >
-        <Trash2 size={11} aria-hidden="true" />
-      </button>
-      <ConfirmDialog
-        open={confirming}
-        title={t('team.deleteMemberConfirmTitle', { name: bot.name })}
-        body={t('team.deleteMemberConfirmBody')}
-        confirmLabel={t('team.deleteMember')}
-        pending={remove.isPending}
-        errorText={remove.isError ? apiErrorMessage(t, remove.error) : ''}
-        onCancel={() => setConfirming(false)}
-        onConfirm={() => remove.mutate({ botId: bot.id, expectedRevision: bot.revision }, { onSuccess: () => setConfirming(false) })}
-      />
-    </>
   );
 }

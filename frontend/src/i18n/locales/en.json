@@ -44,8 +44,9 @@
     "archiveConfirmTitle": "Archive team “{{name}}”?",
     "archiveConfirmBody": "The team moves from the team list to Settings › Archived teams, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
     "deleteMissingConfirmBody": "The team's project folder is no longer where it was. Deleting permanently removes its members, conversations, tasks, memories and Codex sessions, including any unfinished work. This cannot be undone.",
-    "deleteMemberConfirmTitle": "Delete member “{{name}}”?",
     "deleteMemberConfirmBody": "Its conversation, memories, runs, the finished tasks it owned and its Codex session in this team are permanently removed. This cannot be undone. Messages it sent to other members stay. The role itself is not affected and stays available to other teams.",
+    "actions": "Actions for {{name}}",
+    "deleteMemberPick": "Choose the member to delete",
     "deletedMember": "Deleted member",
     "directoryArchived": "This folder belongs to the archived team “{{teamName}}”. Restore that team to keep using it.",
     "goRestore": "Restore it",
@@ -86,10 +87,8 @@
       "unknown": "Needs verification"
     },
     "tools": {"add": "Add member"},
-    "closeTool": "Close team action",
     "roleLabel": "Member role",
-    "chooseRole": "Select a role",
-    "memberAdded": "Member added"
+    "chooseRole": "Select a role"
   },
   "scenario": {
     "software": { "name": "Software development" }
