@@ -9,6 +9,12 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+Write-Host "==> public file policy"
+node scripts/check-public-files.mjs
+if ($LASTEXITCODE -ne 0) { throw "public file policy failed" }
+node --test scripts/repository-policy.test.mjs
+if ($LASTEXITCODE -ne 0) { throw "repository policy tests failed" }
+
 Write-Host "==> gofmt"
 $bad = gofmt -l cmd internal tests
 if ($bad) { throw "gofmt needed on:`n$bad" }
