@@ -102,6 +102,16 @@ export default async function globalSetup(): Promise<void> {
     data: { requestId: `e2e-engine-${Date.now()}`, expectedRevision: settings.revision, patch: { enginePath: exe('fake-codex') } },
   });
   if (!patch.ok()) throw new Error(`enginePath patch failed: ${patch.status()} ${await patch.text()}`);
+  // Startup may cache "not_configured" on clean machines without Codex.
+  // Configuring the test binary does not itself rerun the engine check.
+  // Refresh explicitly so the login spec starts with the fake engine ready.
+  const check = await api.post('/api/v1/engine/check', {
+    headers: { 'X-CSRF-Token': csrf },
+    data: { requestId: `e2e-engine-check-${Date.now()}` },
+  });
+  if (!check.ok()) throw new Error(`engine check failed: ${check.status()} ${await check.text()}`);
+  const engine = (await check.json()).data;
+  if (engine.status !== 'ready') throw new Error(`fake engine not ready: ${engine.status} (${engine.errorKey ?? 'unknown'})`);
   await api.dispose();
 
   // Mint a fresh secret last: the specs redeem it, and the one-time secret

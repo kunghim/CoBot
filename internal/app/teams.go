@@ -87,6 +87,13 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	if reserved, ok := platform.IsReservedDir(a.Paths.Reserved(), canon); ok {
 		return domain.Team{}, nil, domain.InvalidRequest("error.team.directory_reserved", map[string]any{"reserved": reserved})
 	}
+	// A user file named .cobot cannot hold team resources. Check before
+	// reading its marker: Linux reports ENOTDIR for .cobot/team.json here,
+	// while Windows treats that path as missing. Neither case may replace
+	// the user's file or leave a partially created team.
+	if info, err := os.Stat(filepath.Join(canon.Display, ".cobot")); err == nil && !info.IsDir() {
+		return domain.Team{}, nil, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": ".cobot is not a directory"})
+	}
 
 	// One project belongs to one team for its whole life: a folder another
 	// team still claims is refused, never taken over (B04).
