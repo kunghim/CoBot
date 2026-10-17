@@ -14,39 +14,19 @@ const (
 
 // Chain is one causal chain with its shared wake budget.
 type Chain struct {
-	ID              string    `json:"id"`
-	TeamID          string    `json:"teamId"`
-	OriginMessageID string    `json:"originMessageId"`
-	OriginBotID     string    `json:"originBotId,omitempty"`
-	Epoch           int64     `json:"epoch"`
-	Status          string    `json:"status"`
-	WakeCount       int64     `json:"wakeCount"`
-	LimitCount      int64     `json:"limitCount"`
-	RiskStart       int64     `json:"riskStart"`
-	StopReason      string    `json:"stopReason,omitempty"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
-}
-
-// RiskZoneStart computes the first wake index that needs evaluation. The
-// danger zone is the last ceil(limit*0.2) wakes: for the default 6 that is
-// wakes 5 and 6, evaluated before they start, and a 7th never starts.
-func RiskZoneStart(limit int64) int64 {
-	if limit <= 0 {
-		return 1
-	}
-	risk := (limit + 4) / 5 // ceil(limit*0.2)
-	start := limit - risk + 1
-	if start < 1 {
-		start = 1
-	}
-	return start
-}
-
-// NeedsEvaluation reports whether the next wake index falls in the risk zone
-// or beyond the hard limit. Neither can be overridden by a model.
-func (c Chain) NeedsEvaluation(nextWake int64) bool {
-	return nextWake >= c.RiskStart
+	ID              string `json:"id"`
+	TeamID          string `json:"teamId"`
+	OriginMessageID string `json:"originMessageId"`
+	OriginBotID     string `json:"originBotId,omitempty"`
+	Epoch           int64  `json:"epoch"`
+	Status          string `json:"status"`
+	WakeCount       int64  `json:"wakeCount"`
+	LimitCount      int64  `json:"limitCount"`
+	// RiskStart is kept for stored rows; model risk evaluation is gone.
+	RiskStart  int64     `json:"riskStart"`
+	StopReason string    `json:"stopReason,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 // OverLimit reports whether the next wake exceeds what the user allowed.

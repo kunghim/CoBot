@@ -151,10 +151,10 @@ func BumpChainEpoch(ctx context.Context, tx *sql.Tx, chainID string) error {
 
 // GrantChainWake lets exactly one more wake start on this chain, the effect
 // of a user-approved continue past the limit.
-func GrantChainWake(ctx context.Context, tx *sql.Tx, chainID string) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE chains SET limit_count = limit_count + 1, updated_at = ? WHERE id = ?`,
-		time.Now().UTC().Format(time.RFC3339Nano), chainID); err != nil {
-		return fmt.Errorf("grant chain wake: %w", err)
+func GrantChainBudget(ctx context.Context, tx *sql.Tx, chainID string, budget int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE chains SET limit_count = wake_count + ?, risk_start = wake_count + ? + 1, updated_at = ? WHERE id = ?`,
+		budget, budget, time.Now().UTC().Format(time.RFC3339Nano), chainID); err != nil {
+		return fmt.Errorf("grant chain budget: %w", err)
 	}
 	return nil
 }

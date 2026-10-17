@@ -17,8 +17,8 @@ import (
 
 // TestChainBudgetGatesBotWakes walks the whole G01/G02 accounting loop with a
 // chain limit of 3: bot-caused wakes count against one shared budget, the
-// risk-zone wake waits for the user, a continue grants exactly that wake, and
-// stopping cancels the chain's undelivered work.
+// wake past it waits for the user, a continue grants a fresh budget of the
+// configured size, and stopping cancels the chain's undelivered work.
 func TestChainBudgetGatesBotWakes(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
@@ -26,7 +26,6 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	captain, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
-	// A compact budget: risk zone for limit 3 is wake 3 alone.
 	settings, err := h.app.GetSettings(ctx)
 	if err != nil {
 		t.Fatalf("settings: %v", err)
@@ -42,91 +41,68 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	}
 	waitUntil(t, 5*time.Second, "captain turn 1", func() bool { return len(fake.Turns()) == 1 })
 
-	// Wake 1: the captain pings the member from inside its own run.
-	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(captain.ID, team.ID), member.ID, "第一棒", "", "req-w1"); err != nil {
-		t.Fatalf("wake 1 send: %v", err)
+	// pass hands the ball from one member's running turn to the other.
+	pass := func(from, to domain.Bot, text, key string, turns int) {
+		t.Helper()
+		if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(from.ID, team.ID), to.ID, text, "", key); err != nil {
+			t.Fatalf("%s send: %v", key, err)
+		}
+		last := fake.Turns()[len(fake.Turns())-1]
+		fake.EmitTurnCompleted(last.ThreadID, last.TurnID, "completed", "已交接")
+		if turns > 0 {
+			waitUntil(t, 5*time.Second, key+" turn", func() bool { return len(fake.Turns()) == turns })
+		}
 	}
-	fake.EmitTurnCompleted(fake.Turns()[0].ThreadID, fake.Turns()[0].TurnID, "completed", "已交接")
-	waitUntil(t, 5*time.Second, "member turn (wake 1)", func() bool { return len(fake.Turns()) == 2 })
+	// Wakes 1-3 are inside the budget: no model judges them, no card asks.
+	pass(captain, member, "第一棒", "req-w1", 2)
+	pass(member, captain, "第二棒", "req-w2", 3)
+	pass(captain, member, "第三棒", "req-w3", 4)
 
-	// Wake 2: the member passes it back.
-	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(member.ID, team.ID), captain.ID, "第二棒", "", "req-w2"); err != nil {
-		t.Fatalf("wake 2 send: %v", err)
-	}
-	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "已交接")
-	waitUntil(t, 5*time.Second, "captain turn (wake 2)", func() bool { return len(fake.Turns()) == 3 })
-
-	// Wake 3 lands in the risk zone: the model judges it in its own session
-	// (G03); only its escalation produces a user card.
-	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(captain.ID, team.ID), member.ID, "第三棒", "", "req-w3"); err != nil {
-		t.Fatalf("wake 3 send: %v", err)
-	}
-	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "completed", "等待评估")
-	waitUntil(t, 5*time.Second, "risk eval turn", func() bool { return len(fake.Turns()) == 4 })
-	// The captain's own turn ends while the evaluation judges.
-	captainTurn := fake.Turns()[2]
-	fake.EmitTurnCompleted(captainTurn.ThreadID, captainTurn.TurnID, "completed", "已交接")
-	// The model escalates instead of continuing.
-	evalTurn := fake.Turns()[3]
-	fake.EmitTurnCompleted(evalTurn.ThreadID, evalTurn.TurnID, "completed", "建议用户确认方向")
-
+	// Wake 4 is past the limit: the chain waits on one card.
+	pass(member, captain, "第四棒", "req-w4", 0)
+	waitUntil(t, 5*time.Second, "over-limit card", func() bool {
+		pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
+	})
 	chains, err := sqlite.ListChains(ctx, h.app.DB, team.ID, "", 10)
 	if err != nil || len(chains) != 1 {
 		t.Fatalf("chains = %+v (err %v), want exactly the user-opened chain", chains, err)
 	}
 	chain := chains[0]
-	if chain.WakeCount != 2 || chain.Status != domain.ChainAwaitingApproval {
-		var deliveryStates string
-		rows, qerr := h.app.DB.Query(`SELECT substr(target_bot_id,1,4), status, substr(chain_id,1,4) FROM deliveries ORDER BY created_at`)
-		if qerr == nil {
-			for rows.Next() {
-				var tgt, st, ch string
-				_ = rows.Scan(&tgt, &st, &ch)
-				deliveryStates += fmt.Sprintf("[%s %s %s] ", tgt, st, ch)
-			}
-			rows.Close()
-		}
-		t.Fatalf("chain before decision = wakes %d status %s limit %d riskStart %d | captain=%s member=%s | deliveries %s",
-			chain.WakeCount, chain.Status, chain.LimitCount, chain.RiskStart, captain.ID[:4], member.ID[:4], deliveryStates)
+	if chain.WakeCount != 3 || chain.Status != domain.ChainAwaitingApproval {
+		t.Fatalf("chain before decision = wakes %d status %s limit %d", chain.WakeCount, chain.Status, chain.LimitCount)
 	}
-
-	pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
-	if err != nil || len(pending) != 1 {
-		t.Fatalf("pending approvals = %+v (err %v), want the one chain card", pending, err)
-	}
+	pending, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 	card := pending[0]
-	if card.Type != domain.ApprovalChain || card.Reason != "risk_zone" {
-		t.Fatalf("card = type %s reason %s, want chain/risk_zone", card.Type, card.Reason)
-	}
 
-	// Continue: exactly the bound wake is counted, the chain returns to
-	// active with a new authorization epoch, and the member runs.
+	// Continue: the bound wake runs and the chain gets a fresh budget of 3.
 	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision); err != nil {
 		t.Fatalf("continue: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "member turn (wake 3)", func() bool { return len(fake.Turns()) == 5 })
+	waitUntil(t, 5*time.Second, "captain turn (wake 4)", func() bool { return len(fake.Turns()) == 5 })
 	chain, err = sqlite.GetChain(ctx, h.app.DB, chain.ID)
 	if err != nil {
 		t.Fatalf("chain after continue: %v", err)
 	}
-	if chain.WakeCount != 3 || chain.Status != domain.ChainActive || chain.Epoch != 2 {
-		t.Fatalf("chain after continue = wakes %d status %s epoch %d, want 3/active/2", chain.WakeCount, chain.Status, chain.Epoch)
+	if chain.WakeCount != 4 || chain.Status != domain.ChainActive || chain.Epoch != 2 || chain.LimitCount != 6 {
+		t.Fatalf("chain after continue = wakes %d status %s epoch %d limit %d, want 4/active/2/6", chain.WakeCount, chain.Status, chain.Epoch, chain.LimitCount)
 	}
 
-	// Wake 4 exceeds the limit: another card, marked with the true trigger.
-	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(member.ID, team.ID), captain.ID, "第四棒", "", "req-w4"); err != nil {
-		t.Fatalf("wake 4 send: %v", err)
+	// Wakes 5 and 6 use the new budget without asking; 7 asks again.
+	pass(captain, member, "第五棒", "req-w5", 6)
+	pass(member, captain, "第六棒", "req-w6", 7)
+	if pending, _ := h.app.PendingApprovals(ctx, h.user, team.ID, ""); len(pending) != 0 {
+		t.Fatalf("a wake inside the granted budget asked again: %+v", pending)
 	}
-	fake.EmitTurnCompleted(fake.Turns()[4].ThreadID, fake.Turns()[4].TurnID, "completed", "等待确认")
-	waitUntil(t, 5*time.Second, "over-limit card", func() bool {
+	pass(captain, member, "第七棒", "req-w7", 0)
+	waitUntil(t, 5*time.Second, "second over-limit card", func() bool {
 		pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
 	})
 	pending, _ = h.app.PendingApprovals(ctx, h.user, team.ID, "")
 	overCard := pending[0]
 
-	// Stopping cancels the chain's undelivered work and interrupts what is
-	// still running for this chain.
+	// Stopping cancels the chain's undelivered work.
 	if _, err := h.app.DecideApproval(ctx, h.user, overCard.ID, domain.ChainOptionStop, "", overCard.Revision); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
@@ -144,7 +120,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 		t.Fatalf("count cancelled: %v", err)
 	}
 	if cancelled == 0 {
-		t.Fatal("stop must cancel the chain's undelivered fourth wake")
+		t.Fatal("stop must cancel the chain's undelivered seventh wake")
 	}
 }
 

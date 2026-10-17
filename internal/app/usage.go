@@ -43,13 +43,6 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 	}
 	botID, _ := a.botByThread(ctx, epoch, p.ThreadID)
 	purpose := domain.UsagePurposeRun
-	if botID == "" && a.Scheduler != nil {
-		// A risk evaluation is not a member: its spend counts to the team
-		// only, never to a bot's budget (G06).
-		if _, ok := a.Scheduler.EvalThreadTeam(p.ThreadID); ok {
-			purpose = domain.UsagePurposeRiskEval
-		}
-	}
 	entry := domain.UsageEntry{
 		ID: domain.NewID(), TeamID: teamID, BotID: botID, Purpose: purpose,
 		EngineEpoch: epoch, ThreadID: p.ThreadID, TurnID: p.TurnID,

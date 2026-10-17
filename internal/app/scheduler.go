@@ -68,11 +68,6 @@ type Scheduler struct {
 	pending   map[string]bool
 	teamLocks sync.Map // team id -> *sync.Mutex; serializes runtime start/stop
 
-	// Risk evaluations in flight, keyed by their engine thread (G03). They
-	// are not members, never enter provider_sessions, and their usage is
-	// booked to the team as risk_eval.
-	evalMu sync.Mutex
-	evals  map[string]*riskEval
 	// leaseDone is closed when the lease loop exits, so Stop joins it.
 	leaseDone chan struct{}
 }
@@ -86,7 +81,6 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 		factory:   factory,
 		logger:    a.Logger,
 		teams:     map[string]*teamRuntime{},
-		evals:     map[string]*riskEval{},
 		leaseDone: make(chan struct{}),
 		wake:      make(chan string, 256),
 		stop:      make(chan struct{}),
@@ -466,14 +460,6 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 				return cerr
 			}
 			chainEvents = append(chainEvents, evs...)
-		}
-		if action == ChainActionRunRiskEval {
-			// The eval runs on the engine outside any transaction; its
-			// completion (or timeout) resolves the chain later.
-			unlock()
-			s.StartRiskEval(ctx, delivery)
-			s.wakeAfterSkippedDelivery(ctx, botID, record.ID)
-			return nil
 		}
 		for _, ev := range chainEvents {
 			s.app.recordEvent(ctx, ev)

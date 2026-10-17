@@ -346,9 +346,7 @@ export function ModelsSection({ settings, save, states }: SectionProps) {
   const engine = useEngine();
   const models = useEngineModels(engine.data?.status === 'ready');
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
-  const [evalModel, setEvalModel] = useState(settings.evalModel);
   useEffect(() => setDefaultModel(settings.defaultModel), [settings.defaultModel]);
-  useEffect(() => setEvalModel(settings.evalModel), [settings.evalModel]);
 
   if (engine.data && engine.data.status !== 'ready') {
     return (
@@ -364,7 +362,7 @@ export function ModelsSection({ settings, save, states }: SectionProps) {
     if (current !== '' && !known.has(current)) return [{ slug: current, displayName: current }, ...list];
     return list;
   };
-  const modelSelect = (field: 'defaultModel' | 'evalModel', value: string, set: (v: string) => void) => (
+  const modelSelect = (field: 'defaultModel', value: string, set: (v: string) => void) => (
     <div>
       <Field label={t(`settings.${field}`)} state={states[field]}>
         <select
@@ -372,8 +370,8 @@ export function ModelsSection({ settings, save, states }: SectionProps) {
           onChange={(e) => {
             const next = e.target.value;
             set(next);
-            const patch: SettingsPatch = field === 'defaultModel' ? { defaultModel: next } : { evalModel: next };
-            save(field, patch, (persisted) => set(field === 'defaultModel' ? persisted.defaultModel : persisted.evalModel));
+            const patch: SettingsPatch = { defaultModel: next };
+            save(field, patch, (persisted) => set(persisted.defaultModel));
           }}
           className={inputClass}
         >
@@ -397,7 +395,6 @@ export function ModelsSection({ settings, save, states }: SectionProps) {
     <Card>
       <div className="grid gap-6 sm:grid-cols-2">
         {modelSelect('defaultModel', defaultModel, setDefaultModel)}
-        {modelSelect('evalModel', evalModel, setEvalModel)}
       </div>
     </Card>
   );

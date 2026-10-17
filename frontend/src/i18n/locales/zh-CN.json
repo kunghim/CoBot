@@ -283,7 +283,7 @@
   "approval": {
     "card": {
       "chain_risk": "下一步将继续推进当前任务，请确认是否按当前方向继续",
-      "chain_over_limit": "协作链的唤醒次数已用尽，确认后最多再继续一次",
+      "chain_over_limit": "成员之间已经互相唤醒了很多次。继续的话，会再给他们一轮同样多的次数",
       "recovery": "上次执行在进程退出后状态未知，请选择处理方式",
       "merge": "请求合并候选版本；确认前请核对候选与证据，CoBot 不执行 Git 合并"
     },
@@ -491,7 +491,6 @@
     "modelsNeedEngine": "Codex 可用后才能选择模型，请先查看「Codex 引擎」。",
     "limitsTitle": "协作上限",
     "defaultModelHint": "成员执行任务时使用的模型。",
-    "evalModelHint": "协作链接近上限时，判断是否需要你确认；建议选更快、更省的小模型。",
     "sections": {
       "general": "通用",
       "engine": "Codex 引擎",
@@ -521,7 +520,6 @@
     "engineBinary": "可执行文件",
     "engineProtocol": "协议",
     "defaultModel": "默认模型",
-    "evalModel": "评估模型",
     "modelUnset": "未设置（跟随引擎默认）",
     "memberLimit": "成员上限（含队长）",
     "chainLimit": "协作链唤醒上限",

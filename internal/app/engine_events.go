@@ -21,12 +21,6 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Threads of in-flight risk evaluations are not bound to any member;
-	// their events belong to the eval, not to a run (G03).
-	if s.riskEvalFor(n.ThreadID) != nil {
-		s.onRiskEvalNotification(source.server.Epoch(), n)
-		return
-	}
 	if s.onProgress(ctx, teamID, source, n) {
 		return
 	}

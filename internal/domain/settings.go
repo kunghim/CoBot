@@ -37,7 +37,7 @@ func DefaultSettings() Settings {
 		Revision:    1,
 		Language:    "zh-CN",
 		MemberLimit: 6,
-		ChainLimit:  6,
+		ChainLimit:  10,
 		BudgetScope: BudgetScopeNone,
 	}
 }

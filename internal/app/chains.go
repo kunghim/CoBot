@@ -10,11 +10,11 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Chains implement G01/G02/G03's accounting half: every bot-caused wake
-// (a bot-to-bot message or a hand-over) spends from one shared budget per
-// causal chain. A user message opens a new chain and never clears a running
-// one. The hard limit and the risk zone cannot be overridden by a model; past
-// them, exactly one more wake starts only after the user approves it.
+// Chains implement G01/G02's accounting half: every bot-caused wake (a
+// bot-to-bot message or a hand-over) spends from one shared budget per causal
+// chain. A user message opens a new chain and never clears a running one. A
+// model can never extend the budget; past the limit the chain waits for the
+// user, whose "continue" grants a fresh budget of the configured size.
 
 // chainApprovalBinding stores which delivery asked for a decision inside the
 // approval's engine request id slot (the same trick recruitment uses for a
@@ -38,7 +38,7 @@ func (a *App) openChainLocked(ctx context.Context, tx *sql.Tx, teamID, originMes
 	limit := int64(settings.ChainLimit)
 	chain := domain.Chain{
 		ID: domain.NewID(), TeamID: teamID, OriginMessageID: originMessageID, OriginBotID: originBotID,
-		Epoch: 1, Status: domain.ChainActive, LimitCount: limit, RiskStart: domain.RiskZoneStart(limit),
+		Epoch: 1, Status: domain.ChainActive, LimitCount: limit, RiskStart: limit + 1,
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := sqlite.InsertChain(ctx, tx, chain); err != nil {
@@ -76,9 +76,6 @@ const (
 	ChainActionRaiseCard
 	// ChainActionSweepStopped: cancel the stopped chain's undelivered work.
 	ChainActionSweepStopped
-	// ChainActionRunRiskEval: judge the wake in a separate read-only
-	// session; nothing is persisted by the gate itself (G03).
-	ChainActionRunRiskEval
 )
 
 // EvaluateChainGate applies the chain budget inside the caller's claim
@@ -105,7 +102,11 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 	case domain.ChainAwaitingApproval:
 		return ChainGateSkip, ChainActionNone, nil, nil // the pending card decides
 	case domain.ChainEvaluating:
-		return ChainGateSkip, ChainActionNone, nil, nil // a risk eval is in flight (G03)
+		// Model risk evaluation is gone; a chain an older build left
+		// evaluating simply continues under its budget.
+		if err := sqlite.SetChainStatus(ctx, tx, chain.ID, domain.ChainActive, ""); err != nil {
+			return ChainGateSkip, ChainActionNone, nil, err
+		}
 	}
 	if delivery.MessageID == chain.OriginMessageID {
 		// The chain's root is user-caused input; only bot-caused wakes spend
@@ -128,9 +129,9 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 	}
 	next := chain.WakeCount + 1
 	if chain.OverLimit(next) {
-		// The hard limit is never shown to a model (G03): past it only the
-		// user can grant one more wake. The card is written by the caller
-		// after the claim rolls back, so the ask survives.
+		// The limit is never shown to a model: past it only the user can
+		// grant more. The card is written by the caller after the claim
+		// rolls back, so the ask survives.
 		exists, err := pendingChainDecisionExists(ctx, tx, chain.TeamID, chain.ID)
 		if err != nil {
 			return ChainGateSkip, ChainActionNone, nil, err
@@ -139,11 +140,6 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 			return ChainGateSkip, ChainActionNone, nil, nil
 		}
 		return ChainGateSkip, ChainActionRaiseCard, nil, nil
-	}
-	if chain.NeedsEvaluation(next) {
-		// Inside the risk zone the model judges in its read-only session;
-		// ask/unknown/failure falls back to the same user card (G03).
-		return ChainGateSkip, ChainActionRunRiskEval, nil, nil
 	}
 	if _, err := sqlite.CountChainWake(ctx, tx, chain.ID, key, delivery.ID, delivery.TargetBotID); err != nil {
 		return ChainGateSkip, ChainActionNone, nil, err
@@ -286,9 +282,14 @@ func (a *App) applyChainDecisionLocked(ctx context.Context, tx *sql.Tx, approval
 			return effect, err
 		}
 		if binding.OverLimit {
-			// The user granted exactly one more wake; the model never
-			// extends its own budget.
-			if err := sqlite.GrantChainWake(ctx, tx, binding.ChainID); err != nil {
+			// The user's continue is a fresh budget of the configured size
+			// from here, not a single wake: asking again after every message
+			// only trains the user to click through.
+			settings, err := sqlite.GetSettings(ctx, tx)
+			if err != nil {
+				return effect, err
+			}
+			if err := sqlite.GrantChainBudget(ctx, tx, binding.ChainID, int64(settings.ChainLimit)); err != nil {
 				return effect, err
 			}
 		}
