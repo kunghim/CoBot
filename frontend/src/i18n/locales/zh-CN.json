@@ -159,6 +159,7 @@
     },
     "process": {
       "done": "已处理 {{duration}} · {{count}} 个步骤",
+      "doneNoSteps": "已处理 {{duration}}",
       "failedAfter": "执行失败 · {{duration}}",
       "interruptedAfter": "已停止 · {{duration}}",
       "failed": "执行失败",

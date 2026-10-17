@@ -62,7 +62,7 @@ export default function RunProcess({
   const duration = say(durationPhrase(seconds));
   const header = active
     ? `${say(runPhase(run, steps, live, seconds))} · ${duration}`
-    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: shown.length });
+    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : shown.length === 0 ? 'conversation.process.doneNoSteps' : 'conversation.process.done', { duration, count: shown.length });
 
   return (
     <div className="max-w-[85%] space-y-1.5" data-testid="run-process">

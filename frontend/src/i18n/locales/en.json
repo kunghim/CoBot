@@ -159,6 +159,7 @@
     },
     "process": {
       "done": "Worked for {{duration}} · {{count}} steps",
+      "doneNoSteps": "Worked for {{duration}}",
       "failedAfter": "Failed · {{duration}}",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",

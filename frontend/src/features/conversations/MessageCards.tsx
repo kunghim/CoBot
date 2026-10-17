@@ -78,7 +78,7 @@ export function ExchangeLine({
 }) {
   const { t } = useTranslation();
   const label = t(direction === 'to' ? 'conversation.exchange.to' : 'conversation.exchange.from');
-  const lineClass = 'flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
+  const lineClass = 'flex min-w-0 max-w-[80%] items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
   const content = (badges: ReactNode) => (
     <>
       <span className="shrink-0">{label}</span>

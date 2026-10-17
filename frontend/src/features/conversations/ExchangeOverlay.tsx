@@ -80,7 +80,7 @@ export default function ExchangeOverlay({
     <section
       role="dialog"
       aria-label={t('conversation.exchange.title', { a: nameOf(botId), b: nameOf(peerId) })}
-      className="absolute inset-0 z-20 flex flex-col bg-white/95 backdrop-blur-sm dark:bg-neutral-950/95"
+      className="absolute inset-0 z-20 flex flex-col bg-white dark:bg-neutral-950"
       data-testid="exchange-overlay"
     >
       <header className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
