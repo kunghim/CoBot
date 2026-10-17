@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// TestBotDeleteRefusesOpenWorkAndKeepsHistory walks B08: the captain and any
-// member with unfinished work are refused by name, a member that finished and
-// handed over its work deletes cleanly, and deletion tombstones the row
-// without erasing history.
-func TestBotDeleteRefusesOpenWorkAndKeepsHistory(t *testing.T) {
+// TestBotDeleteRefusesOpenWorkAndPurges walks B08: the captain and any
+// member with unfinished work are refused by name; a member that finished and
+// handed over its work is removed completely — its conversation, runs and
+// engine session — while the task it handed over stays with its new owner
+// and its role stays available to every team.
+func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
@@ -72,17 +74,52 @@ func TestBotDeleteRefusesOpenWorkAndKeepsHistory(t *testing.T) {
 		t.Fatalf("deleted = %s, want %s", deleted.ID, owner.ID)
 	}
 
-	// The projection drops the member; the history rows remain.
+	// The member and what was its own are gone.
 	members, err := sqlite.ListBots(ctx, h.app.DB, team.ID)
 	if err != nil || len(members) != 2 {
 		t.Fatalf("members after delete = %d (err %v), want leader + target", len(members), err)
 	}
-	var history int
-	if err := h.app.DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE bot_id = ?`, owner.ID).Scan(&history); err != nil {
-		t.Fatalf("history count: %v", err)
+	for _, query := range []string{
+		`SELECT COUNT(*) FROM bots WHERE id = ?`,
+		`SELECT COUNT(*) FROM messages WHERE bot_id = ?`,
+		`SELECT COUNT(*) FROM runs WHERE bot_id = ?`,
+		`SELECT COUNT(*) FROM provider_sessions WHERE bot_id = ?`,
+		`SELECT COUNT(*) FROM transfers WHERE from_bot_id = ? OR to_bot_id = ?`,
+	} {
+		args := []any{owner.ID}
+		if strings.Count(query, "?") == 2 {
+			args = append(args, owner.ID)
+		}
+		var n int
+		if err := h.app.DB.QueryRow(query, args...).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Fatalf("%s left %d rows of the deleted member", query, n)
+		}
 	}
-	if history == 0 {
-		t.Fatal("deleting a member must keep its message history")
+	// The handed-over task stays with its new owner.
+	if id := taskIDOf(t, h, target.ID); id == "" {
+		t.Fatal("the handed-over task must stay")
+	}
+	// The role is a shared definition, not member data: it stays in the
+	// library and can staff this team again.
+	again, err := h.app.AddBot(ctx, h.user, team.ID, owner.RoleID)
+	if err != nil || again.RoleID != owner.RoleID {
+		t.Fatalf("re-adding the deleted member's role = %+v, %v", again, err)
+	}
+	library, err := h.app.RoleLibrary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, role := range library {
+		if role["id"] == owner.RoleID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("deleting a member must never remove its role from the library")
 	}
 
 	// A live (unknown) execution also blocks deletion: it is unfinished work

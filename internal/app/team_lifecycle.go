@@ -15,8 +15,8 @@ import (
 
 // Team and member lifecycle (B08/B09): only an idle team can be archived,
 // restore brings it back, and deleting an archived team (or one whose folder
-// is gone) removes it completely. A member with unfinished work cannot be
-// deleted.
+// is gone) removes it completely. An idle member is deleted completely; a
+// member with unfinished work is refused.
 
 // openWorkError renders the honest refusal: every blocking count is named,
 // so the user knows exactly what to finish or transfer first.
@@ -290,12 +290,14 @@ func (a *App) removeTeamFolderData(dir, teamID string) {
 	}
 }
 
-// DeleteBot removes a member only when it carries no unfinished work: no
-// owned open tasks (so nothing is left ownerless), no offered hand-overs, no
-// pending approvals it raised, no live runs and no open questions. Messages
-// still queued for it are cancelled rather than blocking the delete. The row
-// is tombstoned for audit, its bridge credentials are revoked, and history
-// stays (B08).
+// DeleteBot removes a member completely, under the same rule as archiving
+// a team: it must be idle — no live run, no message waiting for it, no
+// pending approval or open question it raised, no hand-over it is part of
+// and no unfinished task it owns — or the delete is refused with every
+// blocker named. What is its own in this team goes with it (see
+// sqlite.PurgeBotTx) together with its engine thread; messages it sent to
+// other members stay as their history. Its role definition is untouched and
+// stays available to every team. The leader cannot be deleted (B08).
 func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID string, expectedRevision int64) (domain.Bot, error) {
 	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
 	defer unlock()
@@ -316,30 +318,27 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 	if bot.IsLeader {
 		return domain.Bot{}, domain.Conflict("error.bot.leader_delete", nil)
 	}
-	work, err := sqlite.BotOpenWork(ctx, a.DB, botID)
+	if expectedRevision > 0 && bot.Revision != expectedRevision {
+		return domain.Bot{}, domain.RevisionConflict("error.bot.revision_conflict", map[string]any{"expected": expectedRevision, "actual": bot.Revision})
+	}
+	threads, err := sqlite.BotThreadIDs(ctx, a.DB, botID)
 	if err != nil {
 		return domain.Bot{}, err
-	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
-		return domain.Bot{}, openWorkError("bot", work)
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Bot{}, err
 	}
 	defer tx.Rollback()
-	work, err = sqlite.BotOpenWork(ctx, tx, botID)
+	work, err := sqlite.BotOpenWork(ctx, tx, botID)
 	if err != nil {
 		return domain.Bot{}, err
 	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
+	if archiveBlockers(work) {
 		return domain.Bot{}, openWorkError("bot", work)
 	}
-	if _, err := sqlite.CancelQueuedDeliveriesByTeam(ctx, tx, bot.TeamID, botID); err != nil {
+	if err := sqlite.PurgeBotTx(ctx, tx, botID); err != nil {
 		return domain.Bot{}, err
-	}
-	if err := sqlite.SoftDeleteBot(ctx, tx, botID, expectedRevision); err != nil {
-		return domain.Bot{}, sqlite.NormalizeError(err)
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, bot); err != nil {
 		return domain.Bot{}, err
@@ -350,13 +349,28 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 	if a.CollaborationTokens != nil {
 		a.CollaborationTokens.RevokeOfBot(botID)
 	}
-	// The run a deleted member may still be executing is left alone: nothing
-	// here interrupts an engine; its events resolve to a missing bot and are
-	// reported as such (the census already refused live runs above).
-	_ = bot
-	a.recordEvent(ctx, domain.Event{Type: domain.EventBotDeleted, TeamID: bot.TeamID, BotID: botID, ResourceID: botID})
+	a.deleteMemberThreads(ctx, bot.TeamID, threads)
+	// The event names the removal for live views, not the member's data.
+	a.recordEvent(ctx, domain.Event{Type: domain.EventBotDeleted, TeamID: bot.TeamID, ResourceID: botID})
 	a.Hub.Publish()
 	return bot, nil
+}
+
+// deleteMemberThreads deletes a removed member's engine threads through
+// the team's running engine when there is one, else the control engine.
+func (a *App) deleteMemberThreads(ctx context.Context, teamID string, threads []string) {
+	if len(threads) == 0 {
+		return
+	}
+	if a.Scheduler != nil {
+		if handled, err := a.Scheduler.DeleteThreads(ctx, teamID, threads); handled {
+			if err != nil && a.Logger != nil {
+				a.Logger.Warn("delete engine thread of deleted member", "teamId", teamID, "error", err)
+			}
+			return
+		}
+	}
+	a.deleteEngineThreads(ctx, teamID, threads)
 }
 
 // readTeamMarker loads an on-disk identification marker, reporting presence

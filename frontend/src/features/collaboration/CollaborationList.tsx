@@ -24,7 +24,8 @@ export default function CollaborationList({ botId, bots }: { botId: string; bots
     return <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('collab.empty')}</p>;
   }
 
-  const nameOf = (botID: string) => bots.find((bot) => bot.id === botID)?.name ?? botID.slice(0, 8);
+  // A member that was deleted keeps its messages in others' history.
+  const nameOf = (botID: string) => bots.find((bot) => bot.id === botID)?.name ?? t('team.deletedMember');
 
   return (
     <div>

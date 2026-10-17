@@ -737,6 +737,34 @@ func (a *App) EngineEpochOfTeam(teamID string) string {
 	return rt.server.Epoch()
 }
 
+// threadDeleter is the engine capability to delete a stored thread.
+type threadDeleter interface {
+	DeleteThread(ctx context.Context, threadID string) error
+}
+
+// DeleteThreads removes threads through the team's running engine, which
+// holds them while it runs. It reports false when the team has no running
+// engine (or it cannot delete), so the caller uses the control engine.
+func (s *Scheduler) DeleteThreads(ctx context.Context, teamID string, threads []string) (bool, error) {
+	rt := s.runtime(teamID)
+	if rt == nil {
+		return false, nil
+	}
+	deleter, ok := rt.server.(threadDeleter)
+	if !ok {
+		return false, nil
+	}
+	var errs []error
+	for _, thread := range threads {
+		callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		if err := deleter.DeleteThread(callCtx, thread); err != nil {
+			errs = append(errs, err)
+		}
+		cancel()
+	}
+	return true, errors.Join(errs...)
+}
+
 func (s *Scheduler) runtime(teamID string) *teamRuntime {
 	s.mu.Lock()
 	defer s.mu.Unlock()

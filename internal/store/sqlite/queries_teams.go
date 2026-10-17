@@ -617,3 +617,61 @@ func PurgeTeamTx(ctx context.Context, tx *sql.Tx, teamID string) error {
 	}
 	return nil
 }
+
+// BotThreadIDs lists one member's engine threads.
+func BotThreadIDs(ctx context.Context, q Queryer, botID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT provider_thread_id FROM provider_sessions WHERE bot_id = ? AND provider_thread_id != ''`, botID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// PurgeBotTx removes one member and what is its own in its team: its
+// conversation and deliveries, runs, memories, the approvals and questions
+// it raised, the finished tasks it owned with their hand-overs, its events
+// and its engine session. Messages it sent into other members'
+// conversations stay as their history, and the usage ledger stays because
+// team budgets are counted from it. Role definitions are never touched.
+// Children go before parents because foreign keys are enforced.
+func PurgeBotTx(ctx context.Context, tx *sql.Tx, botID string) error {
+	const ownTasks = `SELECT id FROM tasks WHERE owner_id = ?`
+	const ownApprovals = `SELECT id FROM approvals WHERE requester_bot_id = ?`
+	const ownMessages = `SELECT id FROM messages WHERE bot_id = ?`
+	statements := []string{
+		`DELETE FROM approval_decisions WHERE approval_id IN (` + ownApprovals + `)`,
+		`DELETE FROM approval_responses WHERE approval_id IN (` + ownApprovals + `)`,
+		`DELETE FROM approvals WHERE requester_bot_id = ?`,
+		`DELETE FROM deliveries WHERE target_bot_id = ? OR message_id IN (` + ownMessages + `)`,
+		`DELETE FROM transfers WHERE from_bot_id = ? OR to_bot_id = ? OR task_id IN (` + ownTasks + `)`,
+		`DELETE FROM task_dependencies WHERE task_id IN (` + ownTasks + `) OR depends_on_task_id IN (` + ownTasks + `)`,
+		`DELETE FROM task_evidence WHERE task_id IN (` + ownTasks + `)`,
+		`DELETE FROM questions WHERE requester_bot_id = ? OR task_id IN (` + ownTasks + `)`,
+		`DELETE FROM tasks WHERE owner_id = ?`,
+		`DELETE FROM memories WHERE bot_id = ?`,
+		`DELETE FROM messages WHERE bot_id = ?`,
+		`DELETE FROM runs WHERE bot_id = ?`,
+		`DELETE FROM events WHERE bot_id = ?`,
+		`DELETE FROM provider_sessions WHERE bot_id = ?`,
+		`DELETE FROM bots WHERE id = ?`,
+	}
+	for _, statement := range statements {
+		args := make([]any, strings.Count(statement, "?"))
+		for i := range args {
+			args[i] = botID
+		}
+		if _, err := tx.ExecContext(ctx, statement, args...); err != nil {
+			return fmt.Errorf("purge member: %w", err)
+		}
+	}
+	return nil
+}
