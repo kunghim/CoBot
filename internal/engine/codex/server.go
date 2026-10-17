@@ -68,6 +68,40 @@ type pendingApproval struct {
 	turnID   string
 }
 
+// recordingLogFilter is the engine's log level (RUST_LOG) while a recording
+// is on. Everything logs at info, so each turn's steps, JSON-RPC handling,
+// tool and MCP calls, sandboxed commands and every warning or error stay.
+// Network setup logs at debug, to see reconnects, retries and timeouts.
+//
+// Left out (kept at warn, so their warnings and errors still show) are the
+// modules that repeat one line per small event and told nothing in past
+// recordings; together they were about 80% of the engine's log. To look into
+// one of them, change its entry to "=debug" or delete it.
+var recordingLogFilter = []string{
+	"info",
+	// Network: new connections (through a proxy too), request status codes.
+	"reqwest=debug",
+	"hyper_util::client::legacy::connect=debug",
+	"codex_http_client=debug",
+	// Telemetry, one line per streamed piece of every model reply; the
+	// protocol traffic already holds the same content.
+	"codex_otel.log_only=warn",
+	// One line per file read or metadata lookup.
+	"codex_exec_server::local_file_system=warn",
+	// HTTP connection pool reuse; new connections are logged above.
+	"hyper_util::client::legacy::pool=warn",
+	// Cookies set by every response.
+	"cookie_store=warn",
+	// "Using system root certificates", repeated on every connection.
+	"codex_http_client::custom_ca=warn",
+	// Skill selection experiments and skill state, repeated per turn.
+	"codex_skills_extension=warn",
+	// Model list and its cache, re-read again and again.
+	"codex_models_manager=warn",
+	// Plugin loading, repeated per thread.
+	"codex_core_plugins=warn",
+}
+
 // Start spawns the app-server, performs the handshake and returns a ready
 // server. The process cwd is the team directory by design: workspace-write
 // covers the startup cwd, so the boundary is set here, not per request.
@@ -88,15 +122,15 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	if opts.Env != nil {
 		cmd.Env = opts.Env
 	}
-	// While a recording is on, the engine also logs its own debug detail
-	// (connections, retries) to stderr, which the recording keeps.
+	// While a recording is on, the engine also logs its own detail to stderr,
+	// which the recording keeps; see recordingLogFilter for what is left out.
 	tracing := opts.Trace.Active()
 	if tracing {
 		env := cmd.Env
 		if env == nil {
 			env = os.Environ()
 		}
-		cmd.Env = append(env, "RUST_LOG=debug")
+		cmd.Env = append(env, "RUST_LOG="+strings.Join(recordingLogFilter, ","))
 	}
 	stderrLines := wiretrace.NewLines(opts.Trace, "codex.stderr", "codex→cobot", "")
 	cmd.Stderr = wiretrace.TeeWriter(&stderrLog{logger: opts.Logger}, stderrLines) // protocol is stdout-only
