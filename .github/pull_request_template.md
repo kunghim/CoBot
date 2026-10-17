@@ -21,5 +21,5 @@
 - [ ] No credentials, private AI instructions, runtime data or raw traces are included. / 未包含凭据、私人 AI 指令、运行数据或原始 trace。
 - [ ] I have the right to submit this material under Apache-2.0 and preserved third-party attribution. / 有权按 Apache-2.0 提交并保留第三方声明。
 
-<!-- Target dev once available; otherwise main. Maintainers handle dev -> main release PRs. -->
-<!-- dev 建立后向 dev 提交，否则向 main 提交；dev -> main 由维护者负责。 -->
+<!-- Target dev. Only maintainers' dev -> main promotion PRs target main. -->
+<!-- 普通 PR 向 dev 提交；main 只接受维护者从本仓库 dev 发起的晋级 PR。 -->

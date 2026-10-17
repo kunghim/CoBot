@@ -11,12 +11,21 @@ Issues and pull requests in English or Chinese are welcome. Search existing
 issues first. Discuss substantial features or architecture changes before
 implementing them; small bug fixes can go straight to a pull request.
 
-Contributors normally work in a fork on a short-lived topic branch. Target
-`dev` once that integration branch is available; until then, target `main`.
-The intended flow is `topic branch -> dev -> main -> release`. Maintainers
+Contributors normally work in a fork on a short-lived topic branch based
+on the upstream `dev` branch. Target `dev`, including dependency updates.
+The flow is `topic branch -> dev -> main -> release`. Maintainers
 integrate contributions into `dev`, promote tested changes to `main`, and
 publish releases manually. A merged PR is not a promise of an immediate
 release. Repository write access is not required to propose a change.
+
+Keep `main` as the default stable branch. Only this repository's `dev`
+branch may open a promotion PR into `main`. Squash topic PRs into `dev`;
+use a merge commit for `dev -> main` so repeated promotions retain shared
+ancestry. Retain both long-lived branches and delete only finished topic
+branches. After promotion, bring `main` back into `dev` before the next
+promotion. Do not require a second approving account while there is only
+one maintainer; maintainer review and passing CI remain the working policy.
+Server-enforced protections depend on repository visibility and GitHub plan.
 
 Keep each PR focused. Explain the problem, resulting behavior, validation
 and limitations. Include screenshots for visible UI changes, sanitized logs
@@ -33,8 +42,8 @@ By intentionally submitting a contribution for inclusion in CoBot, you offer
 it under the project's Apache-2.0 license. Preserve third-party attribution
 and only contribute material you have the right to submit.
 
-中文说明：欢迎中文和英文 Issue/PR。一般先 fork，在短期功能分支开发；`dev` 建立后
-向它提交 PR，目前尚未建立时向 `main` 提交。维护者负责审查、集成，再将验证后的
+中文说明：欢迎中文和英文 Issue/PR。一般先 fork，从上游 `dev` 建立短期功能分支，
+向 `dev` 提交 PR；依赖更新也进入 `dev`。维护者负责审查、集成，再将验证后的
 `dev` 合并到 `main`，手动发布。较大的需求先讨论，小修复可直接提 PR。使用 AI 不
 免除贡献者对代码、来源和测试的责任。贡献默认按 Apache-2.0 提交。
 
@@ -166,11 +175,23 @@ regressions; avoid tests that merely restate implementation details.
 
 Never commit credentials, bootstrap links, runtime databases, engine
 transcripts, raw acceptance logs, or build output. Keep raw evidence under
-the ignored `.tmp/` area. The `docs/` directory holds maintainers' local
-design and acceptance material and must not be included in contributions.
-Keep personal `AGENTS.md`, `AGENT.md`, `CLAUDE.md` and assistant settings local.
+the ignored `.tmp/` area. Documents and AI instructions are private by default.
+Selected public docs and official `AGENTS.md` / `CLAUDE.md` can be published
+after adding their exact paths to `publicFiles` in
+`scripts/public-files-policy.json`. Root hidden entries are governed by
+`rootDotEntries` in that same policy. Run
+`node scripts/check-public-files.mjs --write-ignore` to update the final
+managed `.gitignore` block, then explicitly stage the intended public files.
+Personal instructions and assistant settings stay local. Keep personal
+additions separate from any official instruction file at the same path.
 Ignore rules do not remove already tracked files or historical versions;
 maintainers handle the existing historical material separately.
+
+中文说明：`docs/` 与 AI 指令默认仅本地保存。整理好的公开文档和官方指令，先将具体
+文件路径加入 `scripts/public-files-policy.json` 的 `publicFiles`，再运行上述命令同步
+忽略例外。名单只放行指定文件，不放行相邻私人资料。提交前运行
+`node scripts/check-public-files.mjs`；CI 会再次检查。检查不会清除旧历史，也不能撤回
+已经推送到公开 PR 的内容。
 
 Raw `cobot trace` recordings are deliberately unredacted developer data and
 can include HTTP credentials, prompts, file contents and tool results. Do
