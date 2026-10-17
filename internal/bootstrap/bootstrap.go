@@ -294,7 +294,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	application.MCPBinary = helper
 	application.MCPEndpoint = endpoint
 	issuer := auth.NewBootstrapIssuer(auth.DefaultBootstrapTTL)
-	sessions := auth.NewSessionStore(auth.DefaultSessionTTL)
+	sessions := auth.NewPersistentSessionStore(auth.DefaultSessionTTL, paths.SessionsFile())
 	bearer := auth.NewBearerStore(auth.DefaultBearerTTL)
 
 	allowed := apihttp.AllowedOriginsFor(paths.Environment, endpoint, opts.DevServerOrigin, opts.ExtraOrigins...)

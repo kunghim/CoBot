@@ -1,6 +1,7 @@
 // Package auth issues and verifies page sessions, desktop bearer tokens and
-// one-time bootstrap secrets. All tokens live in memory only: a restarted
-// core invalidates every previous authorization by design.
+// one-time bootstrap secrets. Bootstrap secrets and bearer tokens live in
+// memory only; page sessions are also kept in a file under the profile's
+// credentials directory, so a browser stays signed in across core restarts.
 package auth
 
 import (
@@ -8,7 +9,10 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -17,9 +21,9 @@ import (
 // is valid for 60 seconds and can be redeemed exactly once.
 const DefaultBootstrapTTL = 60 * time.Second
 
-// DefaultSessionTTL is the page session lifetime; the browser re-authorizes
-// through a fresh startup link after restart or expiry.
-const DefaultSessionTTL = 12 * time.Hour
+// DefaultSessionTTL is the page session lifetime. Use renews it, so only a
+// browser left unused this long has to re-authorize through a startup link.
+const DefaultSessionTTL = 30 * 24 * time.Hour
 
 // DefaultBearerTTL is the desktop bearer lifetime (30 minutes, renewable).
 const DefaultBearerTTL = 30 * time.Minute
@@ -103,27 +107,52 @@ func (i *BootstrapIssuer) sweepLocked() {
 
 // Session is one authorized browser page session.
 type Session struct {
-	ID        string
-	CSRF      string
-	UserID    string
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	ID        string    `json:"-"` // the raw cookie value; only its hash is kept
+	CSRF      string    `json:"csrf"`
+	UserID    string    `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// SessionStore keeps page sessions in memory.
+// SessionStore keeps page sessions keyed by the hash of their ID, so the
+// saved file never holds a usable session cookie.
 type SessionStore struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	ttl      time.Duration
 	now      func() time.Time
+	file     string // empty: memory only
 }
 
-// NewSessionStore creates an empty store.
+// NewSessionStore creates an empty in-memory store.
 func NewSessionStore(ttl time.Duration) *SessionStore {
 	if ttl <= 0 {
 		ttl = DefaultSessionTTL
 	}
 	return &SessionStore{sessions: map[string]*Session{}, ttl: ttl, now: time.Now}
+}
+
+// NewPersistentSessionStore creates a store backed by file: sessions saved
+// by an earlier core are loaded, and every change is written back. A missing
+// or unreadable file only costs the old sessions, never the start.
+func NewPersistentSessionStore(ttl time.Duration, file string) *SessionStore {
+	s := NewSessionStore(ttl)
+	s.file = file
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return s
+	}
+	var saved map[string]*Session
+	if json.Unmarshal(data, &saved) != nil {
+		return s
+	}
+	now := s.now()
+	for key, sess := range saved {
+		if sess != nil && now.Before(sess.ExpiresAt) {
+			s.sessions[key] = sess
+		}
+	}
+	return s
 }
 
 // Create registers a new session and returns its tokens.
@@ -137,43 +166,102 @@ func (s *SessionStore) Create(userID string) (*Session, error) {
 		return nil, err
 	}
 	now := s.now()
-	sess := &Session{ID: id, CSRF: csrf, UserID: userID, CreatedAt: now, ExpiresAt: now.Add(s.ttl)}
+	sess := &Session{CSRF: csrf, UserID: userID, CreatedAt: now, ExpiresAt: now.Add(s.ttl)}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked()
-	s.sessions[id] = sess
-	return sess, nil
+	s.sessions[hashToken(id)] = sess
+	s.saveLocked()
+	out := *sess
+	out.ID = id
+	return &out, nil
 }
 
 // Get returns a live session.
 func (s *SessionStore) Get(id string) (*Session, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sess, ok := s.sessions[id]
+	return s.getLocked(id)
+}
+
+// Refresh returns a live session and, once less than half of its lifetime
+// is left, extends it; renewed tells the caller to reissue the cookies.
+func (s *SessionStore) Refresh(id string) (sess *Session, renewed bool, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok = s.getLocked(id)
+	if !ok {
+		return nil, false, false
+	}
+	now := s.now()
+	if sess.ExpiresAt.Sub(now) >= s.ttl/2 {
+		return sess, false, true
+	}
+	stored := s.sessions[hashToken(id)]
+	stored.ExpiresAt = now.Add(s.ttl)
+	s.saveLocked()
+	sess.ExpiresAt = stored.ExpiresAt
+	return sess, true, true
+}
+
+func (s *SessionStore) getLocked(id string) (*Session, bool) {
+	key := hashToken(id)
+	sess, ok := s.sessions[key]
 	if !ok {
 		return nil, false
 	}
 	if s.now().After(sess.ExpiresAt) {
-		delete(s.sessions, id)
+		delete(s.sessions, key)
+		s.saveLocked()
 		return nil, false
 	}
-	return sess, true
+	out := *sess
+	out.ID = id
+	return &out, true
 }
 
 // Delete removes a session (logout).
 func (s *SessionStore) Delete(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.sessions, id)
+	delete(s.sessions, hashToken(id))
+	s.saveLocked()
 }
 
 func (s *SessionStore) sweepLocked() {
 	now := s.now()
-	for id, sess := range s.sessions {
+	for key, sess := range s.sessions {
 		if now.After(sess.ExpiresAt) {
-			delete(s.sessions, id)
+			delete(s.sessions, key)
 		}
 	}
+}
+
+// saveLocked writes the sessions through a temporary file and a rename. A
+// failed save keeps the sessions working in memory until the next restart.
+func (s *SessionStore) saveLocked() {
+	if s.file == "" {
+		return
+	}
+	data, err := json.Marshal(s.sessions)
+	if err != nil {
+		return
+	}
+	dir := filepath.Dir(s.file)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, ".sessions-*")
+	if err != nil {
+		return
+	}
+	defer os.Remove(tmp.Name())
+	_, writeErr := tmp.Write(data)
+	if closeErr := tmp.Close(); writeErr != nil || closeErr != nil {
+		return
+	}
+	_ = os.Chmod(tmp.Name(), 0o600)
+	_ = os.Rename(tmp.Name(), s.file)
 }
 
 // ---- desktop bearer tokens ----

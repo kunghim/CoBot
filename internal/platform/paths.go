@@ -88,6 +88,12 @@ func (p Paths) RuntimeDir() string     { return p.join("runtime") }
 func (p Paths) LockFile() string       { return p.join("runtime", "instance.lock") }
 func (p Paths) InstanceFile() string   { return p.join("runtime", "instance.json") }
 func (p Paths) CredentialsDir() string { return p.join("runtime", "credentials") }
+
+// SessionsFile keeps signed-in browser sessions across core restarts.
+func (p Paths) SessionsFile() string {
+	return p.join("runtime", "credentials", "page-sessions.json")
+}
+
 func (p Paths) AdminSecretFile() string {
 	return p.join("runtime", "credentials", "instance-admin.secret")
 }

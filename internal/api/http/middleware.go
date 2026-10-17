@@ -107,6 +107,13 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 			writeError(w, r, err)
 			return
 		}
+		if principal.SessionID != "" {
+			// A session in use stays signed in: past half its lifetime it is
+			// extended and the browser gets cookies with the new expiry.
+			if sess, renewed, ok := s.Sessions.Refresh(principal.SessionID); ok && renewed {
+				s.setSessionCookies(w, sess, false)
+			}
+		}
 		if principal.Kind != "" {
 			ctx = context.WithValue(ctx, ctxPrincipal, principal)
 			r = r.WithContext(ctx)

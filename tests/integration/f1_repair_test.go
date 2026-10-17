@@ -82,23 +82,38 @@ func TestProfilesUseIndependentCookies(t *testing.T) {
 	}
 }
 
-func TestBrowserReauthorizesAfterNormalCoreRestart(t *testing.T) {
+// A browser stays signed in across a normal core restart; signing out still
+// ends the session for good, restart or not.
+func TestBrowserStaysSignedInAcrossCoreRestart(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "profile")
 	core := startCore(t, platform.EnvDevelopment, root)
 	c := newClient(t, core.Endpoint)
 	authorize(t, core, c)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := core.Shutdown(ctx); err != nil {
-		t.Fatal(err)
+	restart := func() {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := core.Shutdown(ctx); err != nil {
+			t.Fatal(err)
+		}
+		core = startCore(t, platform.EnvDevelopment, root)
+		c.base = core.Endpoint
 	}
-	restarted := startCore(t, platform.EnvDevelopment, root)
-	c.base = restarted.Endpoint
+	restart()
 	resp, _ := c.do("GET", "/api/v1/settings", nil, nil)
-	if resp.StatusCode != 401 {
-		t.Fatal("old session survived restart")
+	if resp.StatusCode != 200 {
+		t.Fatalf("session lost on restart: %d", resp.StatusCode)
 	}
-	resp, body := c.do("POST", "/api/v1/session/bootstrap", map[string]any{"requestId": "restart-bootstrap", "secret": restarted.StartupBootstrap}, nil)
+	resp, body := c.do("POST", "/api/v1/session/logout", map[string]any{"requestId": "restart-logout"}, map[string]string{"X-CSRF-Token": c.csrf})
+	if resp.StatusCode != 200 {
+		t.Fatalf("logout: %d %v", resp.StatusCode, body)
+	}
+	restart()
+	resp, _ = c.do("GET", "/api/v1/settings", nil, nil)
+	if resp.StatusCode != 401 {
+		t.Fatal("signed-out session came back after restart")
+	}
+	resp, body = c.do("POST", "/api/v1/session/bootstrap", map[string]any{"requestId": "restart-bootstrap", "secret": core.StartupBootstrap}, nil)
 	if resp.StatusCode != 200 {
 		t.Fatalf("could not reauthorize after restart: %d %v", resp.StatusCode, body)
 	}
