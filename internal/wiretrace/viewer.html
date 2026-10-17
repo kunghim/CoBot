@@ -108,7 +108,7 @@ code { font-family: var(--mono); font-size: 12px; }
     <div class="filters" id="filters"></div>
     <div class="split">
       <div class="listpane">
-        <div class="listhead"><span class="t">时间</span><span class="who">发送方 → 接收方</span><span class="kind">类型</span><span>内容</span></div>
+        <div class="listhead"><span class="t">时间</span><span class="who">发送方 → 接收方</span><span class="kind">类型</span><span>内容</span><span id="total" style="margin-left:auto"></span></div>
         <div id="list"><div id="spacer"></div></div>
       </div>
       <aside id="detail" hidden></aside>
@@ -117,9 +117,15 @@ code { font-family: var(--mono); font-size: 12px; }
 </main>
 <script>
 const ROW = 26, PAGE = 200;
+// [key, label, shown by default, hover text]
 const GROUPS = [
-  ['codex', 'CoBot ⇄ Codex', true], ['mcp', '协作工具', true], ['hook', '安全检查', true], ['process', '进程与说明', true],
-  ['log', 'Codex 调试日志', false], ['http', 'HTTP', false], ['rollout', 'Codex 本地记录', false],
+  ['codex', 'CoBot ⇄ Codex', true, 'CoBot 和 Codex 之间的消息：建会话、开始一轮、Codex 回报做了什么、报错重连、审批'],
+  ['mcp', '协作工具', true, '成员调用 CoBot 协作工具（发消息、建任务、提交证据等）和 CoBot 的返回'],
+  ['hook', '安全检查', true, 'Codex 每次执行命令前问 CoBot 能不能执行，以及得到的答复'],
+  ['process', '进程与说明', true, 'Codex 进程的启动和退出，以及录像补充的“哪个会话属于哪个成员”'],
+  ['log', 'Codex 调试日志', false, 'Codex 自己打印的详细日志：连网、走代理、重试。条数很多，查网络问题时再打开'],
+  ['http', 'HTTP', false, '所有发给 CoBot 的网页请求和响应，以及页面实时推送。查页面问题时再打开'],
+  ['rollout', 'Codex 本地记录', false, 'Codex 自己存下的会话文件，能看到它实际发给模型的内容'],
 ];
 const state = { groups: new Set(GROUPS.filter(g => g[2]).map(g => g[0])), who: '', q: '', fold: true, anomaly: false, total: 0, pages: new Map(), selected: -1, version: 0 };
 const $ = (id) => document.getElementById(id);
@@ -174,13 +180,12 @@ document.addEventListener('click', (e) => {
 
 function renderFilters() {
   const members = summary.members.map(m => `<option ${state.who === m ? 'selected' : ''}>${esc(m)}</option>`).join('');
-  $('filters').innerHTML = GROUPS.map(([key, name]) =>
-    `<label><input type="checkbox" data-group="${key}" ${state.groups.has(key) ? 'checked' : ''}>${name}<span class="count">${groupCounts[key] ?? 0}</span></label>`).join('') +
-    `<select id="who"><option value="">全部成员</option>${members}</select>
-     <input type="search" id="q" placeholder="搜索类型或内容" value="${esc(state.q)}">
-     <label><input type="checkbox" id="anomaly" ${state.anomaly ? 'checked' : ''}>只看异常</label>
-     <label><input type="checkbox" id="fold" ${state.fold ? 'checked' : ''}>折叠逐字增量</label>
-     <span class="count" id="total"></span>`;
+  $('filters').innerHTML = GROUPS.map(([key, name, , hint]) =>
+    `<label title="${esc(hint)}（共 ${groupCounts[key] ?? 0} 条）"><input type="checkbox" data-group="${key}" ${state.groups.has(key) ? 'checked' : ''}>${name}<span class="count">${groupCounts[key] ?? 0}</span></label>`).join('') +
+    `<select id="who" title="只看和这个成员有关的记录"><option value="">全部成员</option>${members}</select>
+     <input type="search" id="q" placeholder="搜索类型或内容" title="按类型、内容或收发方搜索，例如 turn/start、Reconnecting、send_message" value="${esc(state.q)}">
+     <label title="只显示报错、警告、重连、请求失败、安全检查拒绝"><input type="checkbox" id="anomaly" ${state.anomaly ? 'checked' : ''}>只看异常</label>
+     <label title="Codex 的回复是一个字一个字推送的；勾上后同一段回复合成一行，显示条数和整句话"><input type="checkbox" id="fold" ${state.fold ? 'checked' : ''}>折叠逐字增量</label>`;
   $('filters').querySelectorAll('[data-group]').forEach(box => box.onchange = () => { box.checked ? state.groups.add(box.dataset.group) : state.groups.delete(box.dataset.group); reset(); });
   $('who').onchange = (e) => { state.who = e.target.value; reset(); };
   let timer;
@@ -195,7 +200,7 @@ async function reset(keepScroll) {
   const first = await api(`/api/rows?offset=0&limit=${PAGE}&${query()}`);
   state.total = first.total;
   state.pages.set(0, first.rows);
-  $('total').textContent = `${state.total} 条`;
+  $('total').textContent = `共 ${state.total} 条`;
   $('spacer').style.height = `${state.total * ROW}px`;
   if (!keepScroll) $('list').scrollTop = 0;
   render();
