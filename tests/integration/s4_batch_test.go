@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -72,5 +73,73 @@ func TestQueuedMemberMessagesMergeIntoOneTurn(t *testing.T) {
 		if chain.OriginBotID == captain.ID && chain.WakeCount != 1 {
 			t.Fatalf("the merged turn counted %d wakes, want 1", chain.WakeCount)
 		}
+	}
+}
+
+// A user message to a member that is working joins its running turn; no
+// new turn starts for it.
+func TestUserMessageSteersRunningTurn(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "写一个登录页"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn running", func() bool {
+		run, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID)
+		return err == nil && run.Status == domain.RunRunning
+	})
+	turn := fake.Turns()[0]
+
+	result, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "顺便加上记住我"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DeliveryStatus != domain.DeliveryAccepted {
+		t.Fatalf("steered message status = %s", result.DeliveryStatus)
+	}
+	steers := fake.Steers()
+	if len(steers) != 1 || steers[0].TurnID != turn.TurnID || steers[0].Text != "顺便加上记住我" {
+		t.Fatalf("steers = %+v", steers)
+	}
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "都做好了")
+	time.Sleep(300 * time.Millisecond)
+	if n := len(fake.Turns()); n != 1 {
+		t.Fatalf("turns = %d: the steered message started its own turn", n)
+	}
+}
+
+// When the engine refuses (the turn just ended), user messages queue and the
+// ones that waited run together in the next turn.
+func TestRefusedSteerQueuesAndUserMessagesMerge(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	fake.SteerErr = errors.New("no active turn")
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "第一件事"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn running", func() bool {
+		run, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID)
+		return err == nil && run.Status == domain.RunRunning
+	})
+	for _, text := range []string{"第二件事", "第三件事"} {
+		result, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: text})
+		if err != nil || result.DeliveryStatus != domain.DeliveryQueued {
+			t.Fatalf("refused steer: %+v %v", result, err)
+		}
+	}
+	turn := fake.Turns()[0]
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "第一件做完")
+	waitUntil(t, 5*time.Second, "next turn", func() bool { return len(fake.Turns()) == 2 })
+	next := fake.Turns()[1].Text
+	if !strings.Contains(next, "收到了 2 条消息") || !strings.Contains(next, "第二件事") || !strings.Contains(next, "第三件事") || !strings.Contains(next, "【来自 用户】") {
+		t.Fatalf("queued user messages were not merged:\n%s", next)
 	}
 }

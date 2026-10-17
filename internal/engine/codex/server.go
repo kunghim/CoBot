@@ -453,6 +453,21 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 	return res.Turn.ID, nil
 }
 
+// SteerTurn adds the user's input to the running turn (turn/steer). The
+// expected turn id makes the engine refuse when that turn already ended.
+func (s *Server) SteerTurn(ctx context.Context, threadID, turnID, text string) error {
+	if threadID == "" || turnID == "" {
+		return errors.New("steer requires thread and turn identity")
+	}
+	if err := s.client.Call(ctx, "turn/steer", map[string]any{
+		"threadId": threadID, "expectedTurnId": turnID,
+		"input": []UserInput{{Type: "text", Text: text}},
+	}, nil); err != nil {
+		return fmt.Errorf("turn/steer: %w", err)
+	}
+	return nil
+}
+
 // InterruptTurn asks the engine to stop the thread's current turn.
 func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) error {
 	if threadID == "" || turnID == "" {

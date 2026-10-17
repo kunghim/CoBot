@@ -26,6 +26,7 @@ type Server struct {
 	// Scripted behavior.
 	BeforeStartTurn   func() error
 	StartTurnErr      error
+	SteerErr          error
 	ReplyErr          error
 	BeforeReplyReturn func()
 	ResumeErr         error
@@ -33,6 +34,7 @@ type Server struct {
 	threads           map[string]bool
 	startedTurns      []StartedTurn
 	interrupted       []string
+	steers            []Steer
 	replied           []Reply
 	ShutdownCalls     int
 }
@@ -114,6 +116,30 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 	turnID := fmt.Sprintf("turn-%d", s.turnSeq)
 	s.startedTurns = append(s.startedTurns, StartedTurn{ThreadID: threadID, TurnID: turnID, Text: text, Model: opts.Model, Permission: opts.Permission})
 	return turnID, nil
+}
+
+// Steer is one input added to a running turn.
+type Steer struct {
+	ThreadID, TurnID, Text string
+}
+
+// SteerTurn records the input; SteerErr makes the engine refuse, as Codex
+// does once the expected turn has ended.
+func (s *Server) SteerTurn(ctx context.Context, threadID, turnID, text string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.SteerErr != nil {
+		return s.SteerErr
+	}
+	s.steers = append(s.steers, Steer{ThreadID: threadID, TurnID: turnID, Text: text})
+	return nil
+}
+
+// Steers returns the inputs added to running turns so far.
+func (s *Server) Steers() []Steer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Steer(nil), s.steers...)
 }
 
 func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) error {

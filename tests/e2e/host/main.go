@@ -217,6 +217,9 @@ func handleRequest(req message) {
 		}
 		reply(req.ID, map[string]any{"turn": map[string]any{"id": turnID, "status": "inProgress", "items": []any{}}})
 		go runTurn(params.ThreadID, turnID, text)
+	case "turn/steer":
+		// The scripted turns finish on their own; extra input is accepted.
+		reply(req.ID, map[string]any{})
 	case "turn/interrupt":
 		var p struct {
 			ThreadID string `json:"threadId"`

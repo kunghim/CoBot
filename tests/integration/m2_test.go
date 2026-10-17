@@ -558,6 +558,9 @@ func TestQueuedFIFOAndCancel(t *testing.T) {
 	}
 	fake := h.fakeFor(t, team.ID)
 	waitUntil(t, 5*time.Second, "first turn", func() bool { return len(fake.Turns()) == 1 })
+	// A busy member normally takes user messages into its running turn; when
+	// the engine refuses that, they queue in order and can be retracted.
+	fake.SteerErr = errors.New("no active turn")
 
 	// Bot is busy; further messages queue without starting turns.
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "第二条"}); err != nil {

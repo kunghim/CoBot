@@ -48,6 +48,9 @@ type Server interface {
 	// completion arrives as notifications, not as this call's result.
 	StartTurn(ctx context.Context, threadID, text string, opts TurnOptions) (turnID string, err error)
 	InterruptTurn(ctx context.Context, threadID, turnID string) error
+	// SteerTurn adds input to the thread's running turn, which must still be
+	// turnID; it fails once that turn has ended.
+	SteerTurn(ctx context.Context, threadID, turnID, text string) error
 	// ReplyApproval answers a pending native approval request with the exact
 	// response shape the engine expects (decision / permissions).
 	ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error

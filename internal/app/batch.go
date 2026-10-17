@@ -16,8 +16,8 @@ const maxBatch = 10
 // claimBatchLocked takes the messages that queued up behind the head while
 // the member was busy into the same turn, so a member answers five pings
 // once instead of starting five turns. Only plain messages of the same kind
-// and the same causal chain join: user messages with user messages, member
-// messages of one chain with each other. Task assignments and approval
+// join: user messages with user messages, member messages of one causal chain
+// with each other. Task assignments and approval
 // results keep their own turns, their gates are per item. A merged turn is
 // one wake: companions are recorded on the chain without spending more.
 func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID string, head sqlite.DeliveryRecord, headMessage domain.Message, runID string) ([]domain.Message, error) {
@@ -33,7 +33,9 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 		if len(batch) >= maxBatch-1 {
 			break
 		}
-		if record.ID == head.ID || record.Kind != "message" || record.ChainID != head.ChainID {
+		// Every user message opens its own chain and spends nothing, so user
+		// messages merge across chains; member messages only within one.
+		if record.ID == head.ID || record.Kind != "message" || (headMessage.Kind == domain.MessageKindCollaboration && record.ChainID != head.ChainID) {
 			continue
 		}
 		message, err := sqlite.GetMessage(ctx, tx, record.MessageID)
@@ -49,7 +51,7 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 				continue // its own dispatch will settle it
 			}
 		}
-		if record.ChainID != "" {
+		if message.Kind == domain.MessageKindCollaboration && record.ChainID != "" {
 			key := record.DispatchKey
 			if key == "" {
 				key = record.ID

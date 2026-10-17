@@ -145,7 +145,14 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 	}
 	a.Hub.Publish()
 	if a.Scheduler != nil {
-		a.Scheduler.Wake(bot.ID)
+		// A busy member takes the user's message into the turn it is working
+		// on; otherwise the message waits for the next turn.
+		if a.Scheduler.trySteer(ctx, bot.ID, deliveryID, message) {
+			result.DeliveryStatus = domain.DeliveryAccepted
+			result.QueuedAhead = 0
+		} else {
+			a.Scheduler.Wake(bot.ID)
+		}
 	}
 	return result, nil
 }
