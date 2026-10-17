@@ -61,3 +61,32 @@ func TestStepOutputIsClippedOnRuneBoundaries(t *testing.T) {
 		t.Fatalf("head clip = %q", head)
 	}
 }
+
+// What the model says while working is a step with its own stream; only the
+// final answer streams as the reply.
+func TestCommentaryIsAStepAndOnlyTheAnswerIsTheReply(t *testing.T) {
+	var got []engine.Notification
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnNotification: func(n engine.Notification) { got = append(got, n) }}}
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"c1","text":"","phase":"commentary"}}`))
+	server.handleNotify("item/agentMessage/delta", json.RawMessage(`{"threadId":"th","turnId":"tu","itemId":"c1","delta":"我先看看"}`))
+	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"c1","text":"我先看看目录","phase":"commentary"}}`))
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"a1","text":"","phase":"final_answer"}}`))
+	server.handleNotify("item/agentMessage/delta", json.RawMessage(`{"threadId":"th","turnId":"tu","itemId":"a1","delta":"做好了"}`))
+	server.handleNotify("item/agentMessage/delta", json.RawMessage(`{"threadId":"th","turnId":"tu","itemId":"x9","delta":"旧引擎"}`))
+
+	if s := got[0].Step; s == nil || s.Kind != engine.StepMessage || s.Status != engine.StepInProgress {
+		t.Fatalf("commentary start = %+v", got[0])
+	}
+	if got[1].DeltaKind != "commentary" || got[1].ItemID != "c1" {
+		t.Fatalf("commentary delta = %+v", got[1])
+	}
+	if s := got[2].Step; s == nil || s.Kind != engine.StepMessage || s.Status != engine.StepCompleted || !strings.Contains(string(s.Detail), "我先看看目录") || got[2].Phase != "commentary" {
+		t.Fatalf("commentary done = %+v", got[2])
+	}
+	if got[3].Step != nil || got[3].Phase != "final_answer" {
+		t.Fatalf("answer start must not be a step: %+v", got[3])
+	}
+	if got[4].DeltaKind != "message" || got[5].DeltaKind != "message" {
+		t.Fatalf("answer and unknown-phase deltas = %+v / %+v", got[4], got[5])
+	}
+}

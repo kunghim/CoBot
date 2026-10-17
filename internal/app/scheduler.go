@@ -45,6 +45,9 @@ type teamRuntime struct {
 type runBuffer struct {
 	texts []string
 	items map[string]bool
+	// commentary is the last thing the model said while working; it stands
+	// in as the reply only when a turn ends without an answer.
+	commentary string
 }
 
 // Scheduler wakes per bot, claims queued deliveries serially and drives the

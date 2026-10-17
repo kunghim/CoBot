@@ -8,10 +8,11 @@ import type { LiveSignal, RunStep } from './types';
 
 export interface LiveRun {
   steps: Record<string, RunStep>;
-  /** The reply streamed so far (all reply items of the turn, in order). */
+  /** The answer streamed so far (the turn's final-answer items, in order). */
   reply: string;
-  /** Streamed thinking / command output per step id. */
+  /** Streamed thinking / command output / working remarks per step id. */
   reasoning: Record<string, string>;
+  commentary: Record<string, string>;
   output: Record<string, string>;
 }
 
@@ -29,7 +30,7 @@ function clip(text: string): string {
 
 export function applyLiveSignal(signal: LiveSignal): void {
   if (!signal.runId) return;
-  const current = runs[signal.runId] ?? { steps: {}, reply: '', reasoning: {}, output: {} };
+  const current = runs[signal.runId] ?? { steps: {}, reply: '', reasoning: {}, output: {}, commentary: {} };
   let next: LiveRun = current;
   if (signal.type === 'step' && signal.step) {
     next = { ...current, steps: { ...current.steps, [signal.step.id]: signal.step } };
@@ -37,6 +38,7 @@ export function applyLiveSignal(signal: LiveSignal): void {
     const id = signal.itemId ?? '';
     if (signal.kind === 'message') next = { ...current, reply: clip(current.reply + signal.text) };
     else if (signal.kind === 'reasoning') next = { ...current, reasoning: { ...current.reasoning, [id]: clip((current.reasoning[id] ?? '') + signal.text) } };
+    else if (signal.kind === 'commentary') next = { ...current, commentary: { ...current.commentary, [id]: clip((current.commentary[id] ?? '') + signal.text) } };
     else if (signal.kind === 'output') next = { ...current, output: { ...current.output, [id]: clip((current.output[id] ?? '') + signal.text) } };
   }
   if (next === current) return;

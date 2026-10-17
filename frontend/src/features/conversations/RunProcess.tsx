@@ -118,6 +118,16 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
       ? d.level === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-red-600 dark:text-red-400'
       : 'text-neutral-600 dark:text-neutral-300';
 
+  // What the model says while it works reads as plain text in its place.
+  if (step.kind === 'message') {
+    const said = (typeof d.text === 'string' && d.text) || live?.commentary[step.id] || '';
+    return (
+      <div className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="run-commentary">
+        <Markdown text={said} teamId={teamId} />
+      </div>
+    );
+  }
+
   if (step.kind === 'reasoning') {
     const thought = (typeof d.text === 'string' && d.text) || live?.reasoning[step.id] || '';
     return (

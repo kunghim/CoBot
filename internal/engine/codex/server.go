@@ -50,7 +50,8 @@ type Server struct {
 	waitDone  chan struct{}
 	waitErr   error
 
-	loaded map[string]bool // threads this app-server has loaded
+	loaded map[string]bool   // threads this app-server has loaded
+	phases map[string]string // agent message item -> phase, while it streams
 
 	trace       *wiretrace.Recorder
 	tracePeer   string
@@ -325,6 +326,12 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 				n.ItemID = item.ID
 				n.ItemType = item.Type
 				n.Text = item.Text
+				n.Phase = item.Phase
+				if item.Type == "agentMessage" {
+					// Deltas name only the item, so its phase is kept until
+					// the item completes.
+					s.setItemPhase(item.ID, item.Phase, method == "item/completed")
+				}
 				if step := normalizeStep(p.Item); step != nil {
 					if step.Status == "" {
 						step.Status = engine.StepInProgress
@@ -353,13 +360,18 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		var p struct {
 			ThreadID string `json:"threadId"`
 			TurnID   string `json:"turnId"`
+			ItemID   string `json:"itemId"`
 			Delta    string `json:"delta"`
 		}
 		if err := json.Unmarshal(params, &p); err == nil {
 			n.ThreadID = p.ThreadID
 			n.TurnID = p.TurnID
+			n.ItemID = p.ItemID
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
+			if s.itemPhase(p.ItemID) == "commentary" {
+				n.DeltaKind, n.Phase = "commentary", "commentary"
+			}
 		}
 	case "item/reasoning/summaryTextDelta", "item/commandExecution/outputDelta":
 		var p struct {
@@ -467,6 +479,25 @@ func (s *Server) ThreadLoaded(threadID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.loaded[threadID]
+}
+
+func (s *Server) setItemPhase(itemID, phase string, done bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if done || phase == "" {
+		delete(s.phases, itemID)
+		return
+	}
+	if s.phases == nil {
+		s.phases = map[string]string{}
+	}
+	s.phases[itemID] = phase
+}
+
+func (s *Server) itemPhase(itemID string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.phases[itemID]
 }
 
 func (s *Server) setLoaded(threadID string, loaded bool) {

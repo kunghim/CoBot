@@ -29,6 +29,19 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 	step := &engine.Step{ID: head.ID, Status: stepStatus(head.Status)}
 	var detail any
 	switch head.Type {
+	case "agentMessage":
+		// Only what the model says while it works is a step; the answer is
+		// the turn's reply.
+		var item struct {
+			Text  string `json:"text"`
+			Phase string `json:"phase"`
+		}
+		_ = json.Unmarshal(raw, &item)
+		if item.Phase != "commentary" {
+			return nil
+		}
+		step.Kind = engine.StepMessage
+		detail = map[string]any{"text": item.Text}
 	case "reasoning":
 		var item struct {
 			Summary []string `json:"summary"`

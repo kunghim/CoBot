@@ -63,7 +63,7 @@ describe('runPhase', () => {
     expect(runPhase({ status: 'starting' }, [], undefined).key).toBe('conversation.phase.starting');
     expect(runPhase(run, [step({ kind: 'retry', status: 'in_progress', detail: { attempt: 2 } })], undefined)).toEqual({ key: 'conversation.phase.reconnecting', params: { attempt: 2 } });
     expect(runPhase(run, [step({ status: 'in_progress' })], undefined).key).toBe('conversation.phase.command');
-    expect(runPhase(run, [step({})], { steps: {}, reply: '写', reasoning: {}, output: {} }).key).toBe('conversation.phase.replying');
+    expect(runPhase(run, [step({})], { steps: {}, reply: '写', reasoning: {}, output: {}, commentary: {} }).key).toBe('conversation.phase.replying');
     expect(runPhase({ status: 'waiting_approval' }, [step({ status: 'in_progress' })], undefined).key).toBe('conversation.phase.waitingApproval');
     expect(runPhase(run, [], undefined).key).toBe('conversation.phase.thinking');
     expect(runPhase(run, [], undefined, 20).key).toBe('conversation.phase.slow');
@@ -82,7 +82,7 @@ describe('runPhase', () => {
     expect(visibleSteps([step({ kind: 'retry', status: 'completed' })], undefined)).toHaveLength(1);
     const steps = [step({ id: 'a', kind: 'reasoning', detail: { text: '' } }), step({ id: 'b', kind: 'reasoning', detail: { text: '先看代码' } })];
     expect(visibleSteps(steps, undefined).map((s) => s.id)).toEqual(['b']);
-    expect(visibleSteps(steps, { steps: {}, reply: '', reasoning: { a: '正在想' }, output: {} }).map((s) => s.id)).toEqual(['a', 'b']);
+    expect(visibleSteps(steps, { steps: {}, reply: '', reasoning: { a: '正在想' }, output: {}, commentary: {} }).map((s) => s.id)).toEqual(['a', 'b']);
   });
   it('formats durations', () => {
     expect(durationPhrase(8)).toEqual({ key: 'conversation.duration.seconds', params: { s: 8 } });
@@ -92,6 +92,16 @@ describe('runPhase', () => {
 
 describe('live store', () => {
   beforeEach(() => resetLiveStore());
+  it('streams working remarks into their step, never into the reply', () => {
+    applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', itemId: 'm1', kind: 'commentary', text: '我先看' });
+    applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', itemId: 'm1', kind: 'commentary', text: '看目录' });
+    const live = liveRunsSnapshot().r1;
+    expect(live.reply).toBe('');
+    expect(live.commentary.m1).toBe('我先看看目录');
+    const remark = step({ id: 'm1', kind: 'message', detail: {} });
+    expect(visibleSteps([remark], live).map((s) => s.id)).toEqual(['m1']);
+    expect(visibleSteps([remark], undefined)).toEqual([]);
+  });
   it('accumulates deltas and keeps the newer form of a step', () => {
     applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', kind: 'message', text: '你' });
     applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', kind: 'message', text: '好' });
@@ -105,9 +115,9 @@ describe('live store', () => {
     forgetLiveRuns((runId) => runId !== 'r1');
     expect(liveRunsSnapshot().r1).toBeUndefined();
     const stored = [step({ id: 'c', status: 'in_progress', updatedAt: '2026-10-17T10:00:02Z' }), step({ id: 'd', seq: 2 })];
-    const merged = mergeSteps(stored, { steps: { c: newer }, reply: '', reasoning: {}, output: {} });
+    const merged = mergeSteps(stored, { steps: { c: newer }, reply: '', reasoning: {}, output: {}, commentary: {} });
     expect(merged.map((s) => [s.id, s.status])).toEqual([['c', 'completed'], ['d', 'completed']]);
-    const stale = mergeSteps([step({ id: 'c', status: 'completed', updatedAt: '2026-10-17T10:00:09Z' })], { steps: { c: step({ id: 'c', status: 'in_progress' }) }, reply: '', reasoning: {}, output: {} });
+    const stale = mergeSteps([step({ id: 'c', status: 'completed', updatedAt: '2026-10-17T10:00:09Z' })], { steps: { c: step({ id: 'c', status: 'in_progress' }) }, reply: '', reasoning: {}, output: {}, commentary: {} });
     expect(stale[0].status).toBe('completed');
   });
 });

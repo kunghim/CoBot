@@ -101,6 +101,8 @@ type ThreadItem struct {
 	Type string `json:"type"` // agentMessage | userMessage | commandExecution | fileChange | reasoning | webSearch | todoList | planUpdate | ...
 	ID   string `json:"id"`
 	Text string `json:"text,omitempty"`
+	// Phase of an agentMessage: commentary | final_answer (null on older engines).
+	Phase string `json:"phase,omitempty"`
 }
 
 // AgentMessageParams decodes an item whose type is agentMessage.

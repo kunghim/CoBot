@@ -46,6 +46,8 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
   switch (step.kind) {
     case 'reasoning':
       return { key: 'conversation.step.reasoning' };
+    case 'message':
+      return { key: 'conversation.step.message' };
     case 'command':
       return { key: step.status === 'in_progress' ? 'conversation.step.commandRunning' : 'conversation.step.command' };
     case 'file_change': {
@@ -102,6 +104,7 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
 export function visibleSteps(steps: RunStep[], live: LiveRun | undefined): RunStep[] {
   return steps.filter((step) => {
     if (step.kind === 'reasoning') return text(step.detail?.text).trim() !== '' || (live?.reasoning[step.id] ?? '') !== '';
+    if (step.kind === 'message') return text(step.detail?.text).trim() !== '' || (live?.commentary[step.id] ?? '') !== '';
     if (step.kind === 'retry') return step.status !== 'in_progress';
     return true;
   });
@@ -146,6 +149,8 @@ export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveR
       return { key: 'conversation.phase.tool' };
     case 'web_search':
       return { key: 'conversation.phase.searching' };
+    case 'message':
+      return { key: 'conversation.phase.replying' };
   }
   if ((live?.reply ?? '') !== '') return { key: 'conversation.phase.replying' };
   if (run.status === 'starting' && steps.length === 0) return { key: 'conversation.phase.starting' };

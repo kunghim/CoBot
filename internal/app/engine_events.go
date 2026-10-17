@@ -21,6 +21,11 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	// Every agent message counts toward the reply bookkeeping, also the
+	// working remarks that onProgress takes as steps.
+	if n.Method == "item/completed" && n.ItemType == "agentMessage" {
+		s.bufferReply(ctx, source, n)
+	}
 	if s.onProgress(ctx, teamID, source, n) {
 		return
 	}
@@ -39,24 +44,7 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 			}
 		}
 	case "item/completed":
-		if n.ItemType == "agentMessage" && n.TurnID != "" {
-			epoch := source.server.Epoch()
-			if runID := s.findRunByTurn(ctx, epoch, n.ThreadID, n.TurnID); runID != "" {
-				if rt := source; rt != nil {
-					rt.mu.Lock()
-					buf := rt.buffer[runID]
-					if buf == nil {
-						buf = &runBuffer{items: map[string]bool{}}
-						rt.buffer[runID] = buf
-					}
-					if n.ItemID == "" || !buf.items[n.ItemID] {
-						buf.texts = append(buf.texts, n.Text)
-						buf.items[n.ItemID] = true
-					}
-					rt.mu.Unlock()
-				}
-			}
-		}
+		// An agent message's text was taken by bufferReply above.
 	case "thread/tokenUsage/updated":
 		if uerr := s.app.ingestTokenUsage(ctx, teamID, source.server.Epoch(), n.TokenUsage); uerr != nil {
 			s.logger.Warn("record usage snapshot", "teamId", teamID, "error", uerr)
@@ -192,6 +180,9 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 		rt.mu.Lock()
 		if buf := rt.buffer[run.ID]; buf != nil {
 			text = joinTexts(buf.texts)
+			if text == "" {
+				text = buf.commentary
+			}
 			delete(rt.buffer, run.ID)
 		}
 		rt.mu.Unlock()
@@ -553,4 +544,33 @@ func (a *App) invalidateEngineStatus() {
 	a.engineStatusMu.Lock()
 	a.engineStatusCache = nil
 	a.engineStatusMu.Unlock()
+}
+
+// bufferReply keeps a turn's answer as it arrives: final-answer text becomes
+// the reply; a working remark is only remembered as the last thing said, the
+// reply of a turn that ends without an answer.
+func (s *Scheduler) bufferReply(ctx context.Context, source *teamRuntime, n engine.Notification) {
+	if n.TurnID == "" || source == nil {
+		return
+	}
+	runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
+	if runID == "" {
+		return
+	}
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	buf := source.buffer[runID]
+	if buf == nil {
+		buf = &runBuffer{items: map[string]bool{}}
+		source.buffer[runID] = buf
+	}
+	if n.ItemID != "" && buf.items[n.ItemID] {
+		return
+	}
+	if n.Phase == "commentary" {
+		buf.commentary = n.Text
+	} else {
+		buf.texts = append(buf.texts, n.Text)
+	}
+	buf.items[n.ItemID] = true
 }

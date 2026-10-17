@@ -119,9 +119,14 @@ type Notification struct {
 	// user should see (thinking, a command, a file change, a tool call...).
 	// Nil for steps that are not shown or are the reply itself.
 	Step *Step
-	// DeltaKind/Delta carry streamed text: message | reasoning | output.
+	// DeltaKind/Delta carry streamed text: message (the turn's answer) |
+	// commentary (what the model says while it works) | reasoning | output.
 	DeltaKind string
 	Delta     string
+	// Phase of an agent message: "commentary" for what the model says while
+	// it works, "final_answer" for the turn's answer; empty when the engine
+	// does not say, which counts as the answer.
+	Phase string
 	// Problem is a turn-scoped error or warning reported by the engine.
 	Problem *Problem
 }
@@ -134,6 +139,9 @@ const (
 	StepTool       = "tool"
 	StepWebSearch  = "web_search"
 	StepPlan       = "plan"
+	// StepMessage is what the model says while it works (Codex commentary);
+	// it sits among the steps, not in the reply.
+	StepMessage = "message"
 )
 
 // Step statuses.

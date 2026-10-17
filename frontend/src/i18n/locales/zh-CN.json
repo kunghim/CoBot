@@ -164,6 +164,7 @@
     },
     "step": {
       "reasoning": "思考",
+      "message": "说明",
       "command": "运行了命令",
       "commandRunning": "正在运行命令",
       "fileChange": "修改了 {{count}} 个文件",

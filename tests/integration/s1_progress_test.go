@@ -10,6 +10,8 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
+	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
 
 // A running turn's steps, streamed text and reconnects reach the live
@@ -165,4 +167,57 @@ func TestPermissionModeAppliesFromTheNextTurn(t *testing.T) {
 	if got := fake.Turns()[1].Permission; got != domain.PermissionFull {
 		t.Fatalf("second turn permission = %q", got)
 	}
+}
+
+// What the model says while working stays in the process; the reply is the
+// final answer alone. A turn that ends without an answer keeps its last
+// remark as the reply, so it never ends silent.
+func TestCommentaryStaysInTheProcess(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	remark := func(turn fakeengine.StartedTurn, id, text string) {
+		fake.Emit(engine.Notification{Method: "item/completed", ThreadID: turn.ThreadID, TurnID: turn.TurnID, ItemID: id, ItemType: "agentMessage", Phase: "commentary", Text: text,
+			Step: &engine.Step{ID: id, Kind: engine.StepMessage, Status: engine.StepCompleted, Detail: json.RawMessage(`{"text":"` + text + `"}`)}})
+	}
+	reply := func() string {
+		page, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "messages", BotID: bot.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		last := ""
+		for _, item := range page["messages"].([]any) {
+			if m := item.(domain.Message); m.Kind == domain.MessageKindAssistant {
+				last = m.RenderText()
+			}
+		}
+		return last
+	}
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "做个页面"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	first := fake.Turns()[0]
+	remark(first, "c1", "我先看看目录")
+	fake.EmitTurnCompleted(first.ThreadID, first.TurnID, "completed", "页面做好了")
+	waitUntil(t, 5*time.Second, "reply stored", func() bool { return reply() != "" })
+	if got := reply(); got != "页面做好了" {
+		t.Fatalf("reply = %q, want only the final answer", got)
+	}
+	step, err := sqlite.GetRunStep(ctx, h.app.DB, h.runStatusID(t, bot.ID), "c1")
+	if err != nil || step.Kind != engine.StepMessage {
+		t.Fatalf("remark step = %+v %v", step, err)
+	}
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "再看看"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "second turn", func() bool { return len(fake.Turns()) == 2 })
+	second := fake.Turns()[1]
+	remark(second, "c2", "正在检查，先停在这")
+	fake.EmitTurnCompleted(second.ThreadID, second.TurnID, "interrupted", "")
+	waitUntil(t, 5*time.Second, "fallback reply", func() bool { return reply() == "正在检查，先停在这" })
 }

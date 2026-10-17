@@ -164,6 +164,7 @@
     },
     "step": {
       "reasoning": "Thinking",
+      "message": "Note",
       "command": "Ran a command",
       "commandRunning": "Running a command",
       "fileChange": "Changed {{count}} files",
