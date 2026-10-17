@@ -244,7 +244,13 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 		status = domain.DeliveryWaitingDependency
 	}
 	text := fmt.Sprintf("你被指派了任务：%s\n任务 ID：%s\n详细要求：%s\n完成标准：%s", task.Title, task.ID, task.Description, task.AcceptanceCriteria)
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	// The task block is for the conversation's task card; the engine reads
+	// only the text block.
+	card, err := json.Marshal(map[string]any{"taskId": task.ID, "title": task.Title, "description": task.Description, "acceptanceCriteria": task.AcceptanceCriteria, "ownerId": task.OwnerID})
+	if err != nil {
+		return err
+	}
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}, {Type: domain.BlockTypeTask, Text: string(card)}})
 	if err != nil {
 		return err
 	}
@@ -359,7 +365,8 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	if err := tx.Commit(); err != nil {
 		return domain.Task{}, err
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: task.Revision})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID, Revision: task.Revision,
+		Payload: mustJSON(map[string]any{"change": "assigned", "ownerId": newOwnerID})})
 	a.Hub.Publish()
 	if ready && a.Scheduler != nil {
 		a.Scheduler.Wake(newOwnerID)
@@ -488,7 +495,8 @@ func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, ta
 	if err := tx.Commit(); err != nil {
 		return domain.Task{}, err
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: updated.Revision})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID, Revision: updated.Revision,
+		Payload: mustJSON(map[string]any{"change": "status", "status": updated.Status})})
 	a.Hub.Publish()
 	if a.Scheduler != nil {
 		a.Scheduler.Wake(task.OwnerID)
@@ -605,7 +613,8 @@ func (a *App) SubmitEvidence(ctx context.Context, principal auth.Principal, task
 	if err := tx.Commit(); err != nil {
 		return domain.Evidence{}, err
 	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID,
+		Payload: mustJSON(map[string]any{"change": "evidence"})})
 	a.Hub.Publish()
 	return evidence, nil
 }
@@ -755,7 +764,8 @@ func (a *App) GetTaskDetail(ctx context.Context, principal auth.Principal, taskI
 
 // recordTaskUpdated is a small helper for event publication.
 func (a *App) recordTaskUpdated(ctx context.Context, task domain.Task) {
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: task.Revision})
+	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, ResourceID: task.ID, Revision: task.Revision,
+		Payload: mustJSON(map[string]any{"change": "status", "status": task.Status})})
 	a.Hub.Publish()
 }
 

@@ -49,6 +49,10 @@ type TextBlock struct {
 	Text string `json:"text"`
 }
 
+// BlockTypeTask is a display-only block: the task a system message assigns,
+// as JSON for the conversation's task card. It never reaches the engine.
+const BlockTypeTask = "task"
+
 // RenderText joins blocks for engine input (user content passed verbatim).
 func (m Message) RenderText() string {
 	var blocks []TextBlock
@@ -56,11 +60,16 @@ func (m Message) RenderText() string {
 		return ""
 	}
 	out := ""
-	for i, b := range blocks {
-		if i > 0 {
+	first := true
+	for _, b := range blocks {
+		if b.Type == BlockTypeTask {
+			continue
+		}
+		if !first {
 			out += "\n"
 		}
 		out += b.Text
+		first = false
 	}
 	return out
 }

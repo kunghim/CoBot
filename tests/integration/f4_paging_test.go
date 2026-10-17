@@ -84,7 +84,7 @@ func TestScopedPagesKeepAllTiedRecordsAndDecidedHistory(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if _, err := sqlite.InsertEvent(ctx, tx, "test", domain.Event{ID: id, Type: "test.event", TeamID: team.ID, BotID: owner.ID, CreatedAt: stamp}); err != nil {
+		if _, err := sqlite.InsertEvent(ctx, tx, "test", domain.Event{ID: id, Type: domain.EventBudgetPaused, TeamID: team.ID, BotID: owner.ID, CreatedAt: stamp}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -151,8 +151,8 @@ func TestScopedPagesKeepAllTiedRecordsAndDecidedHistory(t *testing.T) {
 							id = value.ID
 						case domain.Memory:
 							id = value.ID
-						case domain.Event:
-							if value.Type != "test.event" {
+						case app.ActivityItem:
+							if value.Type != domain.EventBudgetPaused {
 								continue
 							}
 							id = value.ID

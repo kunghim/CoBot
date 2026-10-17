@@ -107,8 +107,10 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 			args = append(args, member)
 		}
 	case "messages":
-		from = "FROM messages WHERE bot_id = ? AND kind != ?"
-		args = []any{in.BotID, domain.MessageKindCollaboration}
+		// A member's conversation includes what other members sent it and
+		// what it sent them, alongside its own exchange with the user.
+		from = "FROM messages WHERE (bot_id = ? OR (kind = ? AND source_bot_id = ?))"
+		args = []any{in.BotID, domain.MessageKindCollaboration, in.BotID}
 	case "collaboration":
 		from = "FROM messages WHERE kind = ? AND (source_bot_id = ? OR bot_id = ?)"
 		args = []any{domain.MessageKindCollaboration, in.BotID, in.BotID}
@@ -127,9 +129,12 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		from = "FROM events e WHERE e.team_id = ?"
 		idCol, sortCol = "e.id", "e.seq"
 		args = []any{in.TeamID}
+		filter, filterArgs := activityFilter()
+		from += filter
+		args = append(args, filterArgs...)
 		if member != "" {
-			from += " AND (e.bot_id = ? OR e.resource_id = ? OR e.resource_id IN (SELECT id FROM tasks WHERE team_id = ? AND owner_id = ?))"
-			args = append(args, member, member, in.TeamID, member)
+			from += " AND (e.bot_id = ? OR e.resource_id = ? OR e.resource_id IN (SELECT id FROM tasks WHERE team_id = ? AND owner_id = ?) OR e.resource_id IN (SELECT id FROM messages WHERE source_bot_id = ?))"
+			args = append(args, member, member, in.TeamID, member, member)
 		}
 	default:
 		return nil, domain.InvalidRequest("error.invalid_request", nil)
@@ -184,7 +189,9 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 			err = q.QueryRowContext(ctx, `SELECT seq,id,instance_id,type,team_id,bot_id,resource_id,revision,payload,created_at FROM events WHERE id=?`, id).Scan(&event.Seq, &event.ID, &event.InstanceID, &event.Type, &event.TeamID, &event.BotID, &event.ResourceID, &event.Revision, &payload, &created)
 			event.Payload = json.RawMessage(payload)
 			event.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-			value = event
+			if err == nil {
+				value = ActivityItem{Event: event, Detail: a.describeActivity(ctx, q, event)}
+			}
 		}
 		if err != nil {
 			return nil, err

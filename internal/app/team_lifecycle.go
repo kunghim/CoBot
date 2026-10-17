@@ -391,7 +391,7 @@ func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID str
 	}
 	a.deleteMemberThreads(ctx, bot.TeamID, threads)
 	// The event names the removal for live views, not the member's data.
-	a.recordEvent(ctx, domain.Event{Type: domain.EventBotDeleted, TeamID: bot.TeamID, ResourceID: botID})
+	a.recordEvent(ctx, domain.Event{Type: domain.EventBotDeleted, TeamID: bot.TeamID, ResourceID: botID, Payload: mustJSON(map[string]any{"name": bot.Name})})
 	a.Hub.Publish()
 	return bot, nil
 }
