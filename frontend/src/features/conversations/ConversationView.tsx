@@ -1,16 +1,20 @@
 // ConversationView is the center column: one user↔bot session. It shows the
-// real message history, the honest queue/delivery state, pending approval
-// cards above the composer, and the interrupt control while a run is active.
-// Message text is rendered as escaped plain text only — no markdown library,
-// no raw HTML.
-import { useEffect, useRef, useState } from 'react';
+// real message history interleaved with what the member did in each turn
+// (RunProcess), the honest queue/delivery state, pending approval cards
+// above the composer, and the interrupt control while a run is active.
+// User text is shown verbatim; member replies render as Markdown without
+// raw HTML.
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Square, X } from 'lucide-react';
+import { Loader2, Send, Square, X } from 'lucide-react';
 import { useCancelMessage, useConversation, useInterruptRun, useSendMessage } from '../../api/queries';
-import type { Bot, Message, TeamWithBots } from '../../api/types';
+import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
+import { forgetLiveRuns, useLiveRuns } from '../../api/live';
 import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
-import { deliveryLabelKey, messageText, runStatusLabelKey } from './delivery';
+import { deliveryLabelKey, messageText } from './delivery';
+import Markdown from './Markdown';
+import RunProcess from './RunProcess';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
@@ -47,16 +51,37 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const activeRun = conv.data?.activeRun ?? null;
   const queuedCount = conv.data?.queuedCount ?? 0;
 
+  const liveRuns = useLiveRuns();
+  const runs = conv.data?.runs ?? [];
+  const timeline = buildTimeline(messages, runs, activeRun);
+  const activeLive = activeRun ? liveRuns[activeRun.id] : undefined;
+
   // "Stopping" is only honest while the run still exists.
   useEffect(() => {
     if (!activeRun) setStopping(false);
   }, [activeRun]);
 
-  // Keep the newest message visible on load and on new messages.
+  // Live progress of this member's finished runs is superseded by the
+  // stored steps the reload brought.
+  const finishedKey = runs.filter((run) => run.id !== activeRun?.id).map((run) => run.id).join(',');
   useEffect(() => {
+    const finished = new Set(finishedKey.split(','));
+    forgetLiveRuns((runId) => !finished.has(runId));
+  }, [finishedKey]);
+
+  // Follow the conversation while the user is at the bottom: on load, new
+  // messages, new steps and streamed text. Scrolling up to read stops it.
+  const stickToBottom = useRef(true);
+  const progressKey = `${messages.length}:${runs.length}:${activeRun?.status ?? ''}:${Object.keys(activeLive?.steps ?? {}).length}:${activeLive?.reply.length ?? 0}`;
+  useLayoutEffect(() => {
     const element = scrollRef.current;
-    if (element && !loadingOlder.current) element.scrollTop = element.scrollHeight;
-  }, [messages.length, bot.id]);
+    if (element && !loadingOlder.current && stickToBottom.current) element.scrollTop = element.scrollHeight;
+  }, [progressKey]);
+  useEffect(() => {
+    stickToBottom.current = true;
+    const element = scrollRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [bot.id]);
 
   const blockReasonKey = sendBlockReasonKey(team.status);
   // While the team's folder is gone the conversation is read-only: history
@@ -67,6 +92,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     [...messages].reverse().find((message) => message.kind === 'user' && message.deliveryStatus === 'queued') ?? null;
 
   const botNameById = new Map(item.bots.map((entry) => [entry.id, entry.name]));
+  const nameOf = (botId: string) => botNameById.get(botId) ?? botId;
+  // Between sending and the member's turn starting (engine start, thread
+  // creation) the flow still says something is happening.
+  const preparing = !activeRun && queuedCount > 0 && (lastUserMessage?.deliveryStatus === 'queued' || lastUserMessage?.deliveryStatus === 'dispatching');
 
   const sendNow = () => {
     const text = draft.trim();
@@ -92,17 +121,16 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             {headerSubtitle}
           </p>
         </div>
-        {activeRun && (
-          <p
-            role="status"
-            className="ml-auto shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-          >
-            {t('conversation.activeRun', { status: t(runStatusLabelKey(activeRun.status)) })}
-          </p>
-        )}
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+        }}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
           <p className="text-center text-sm text-red-600" role="alert">
@@ -111,22 +139,37 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         )}
         <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
         <ul className="space-y-2">
-          {messages.map((message) => (
-            <li key={message.id}>
-              <MessageRow
-                message={message}
-                isLastUser={lastUserMessage?.id === message.id}
-                showCancel={lastQueuedMessage?.id === message.id}
-                cancelPending={cancel.isPending}
-                onCancelQueued={() => {
-                  setActionError('');
-                  cancel.mutate(message.id, {
-                    onError: (error) => setActionError(apiErrorMessage(t, error)),
-                  });
-                }}
-              />
+          {timeline.map((entry) =>
+            entry.kind === 'run' ? (
+              <li key={`run-${entry.run.id}`}>
+                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} />
+              </li>
+            ) : (
+              <li key={entry.message.id}>
+                <MessageRow
+                  message={entry.message}
+                  teamId={team.id}
+                  isLastUser={lastUserMessage?.id === entry.message.id}
+                  showCancel={lastQueuedMessage?.id === entry.message.id}
+                  cancelPending={cancel.isPending}
+                  onCancelQueued={() => {
+                    setActionError('');
+                    cancel.mutate(entry.message.id, {
+                      onError: (error) => setActionError(apiErrorMessage(t, error)),
+                    });
+                  }}
+                />
+              </li>
+            ),
+          )}
+          {preparing && (
+            <li>
+              <p role="status" className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                {t('conversation.phase.preparing')}
+              </p>
             </li>
-          ))}
+          )}
         </ul>
         </fieldset>
       </div>
@@ -211,14 +254,36 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   );
 }
 
+type TimelineEntry = { kind: 'message'; message: Message; at: number } | { kind: 'run'; run: RunWithSteps; at: number };
+
+/** Messages and turns in time order: a turn sits where it started, so its
+ * process comes after the message that woke it and before its reply. */
+export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeRun: Run | null): TimelineEntry[] {
+  const seen = new Set<string>();
+  const entries: TimelineEntry[] = messages.map((message) => ({ kind: 'message', message, at: Date.parse(message.createdAt) }));
+  for (const run of runs) {
+    if (seen.has(run.id)) continue;
+    seen.add(run.id);
+    // The active run's status is the freshest read of it.
+    const current = run.id === activeRun?.id ? { ...run, status: activeRun.status } : run;
+    entries.push({ kind: 'run', run: current, at: Date.parse(run.startedAt) });
+  }
+  if (activeRun?.id && !seen.has(activeRun.id)) {
+    entries.push({ kind: 'run', run: { ...activeRun, steps: [] }, at: Date.parse(activeRun.startedAt) });
+  }
+  return entries.sort((a, b) => a.at - b.at || (a.kind === b.kind ? 0 : a.kind === 'message' ? -1 : 1));
+}
+
 function MessageRow({
   message,
+  teamId,
   isLastUser,
   showCancel,
   cancelPending,
   onCancelQueued,
 }: {
   message: Message;
+  teamId: string;
   isLastUser: boolean;
   showCancel: boolean;
   cancelPending: boolean;
@@ -252,13 +317,13 @@ function MessageRow({
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className="max-w-[85%] space-y-0.5">
         <div
-          className={`whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-sm ${
+          className={`break-words rounded-xl px-3 py-2 text-sm ${
             isUser
-              ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+              ? 'whitespace-pre-wrap bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
               : 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
           }`}
         >
-          {text}
+          {isUser ? text : <Markdown text={text} teamId={teamId} />}
         </div>
         <div className={`flex items-center gap-2 text-[11px] text-neutral-400 ${isUser ? 'justify-end' : 'justify-start'}`}>
           {isLastUser && message.deliveryStatus && (

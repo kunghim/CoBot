@@ -1,0 +1,102 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { applyLiveSignal, forgetLiveRuns, liveRunsSnapshot, mergeSteps, resetLiveStore } from '../../api/live';
+import type { Message, Run, RunStep, RunWithSteps } from '../../api/types';
+import { buildTimeline } from './ConversationView';
+import { linkTarget } from './links';
+import { describeStep, durationPhrase, runPhase, visibleSteps } from './steps';
+
+const step = (overrides: Partial<RunStep>): RunStep => ({
+  id: 's', runId: 'r1', teamId: 't', botId: 'b', seq: 1, kind: 'command', status: 'completed',
+  detail: {}, startedAt: '2026-10-17T10:00:00Z', updatedAt: '2026-10-17T10:00:01Z', ...overrides,
+});
+
+describe('linkTarget', () => {
+  it('sends paths to the core and web links to the browser', () => {
+    expect(linkTarget('https://example.com')).toEqual({ kind: 'web' });
+    expect(linkTarget('/E:/cobot-trial-ws/index.html')).toEqual({ kind: 'local', path: '/E:/cobot-trial-ws/index.html' });
+    expect(linkTarget('E:\\ws\\a.txt')).toEqual({ kind: 'local', path: 'E:\\ws\\a.txt' });
+    expect(linkTarget('src/app.ts:12')).toEqual({ kind: 'local', path: 'src/app.ts:12' });
+    expect(linkTarget('file:///E:/ws/a.txt').kind).toBe('local');
+  });
+  it('blocks every other scheme', () => {
+    for (const href of ['javascript:alert(1)', 'data:text/html,x', 'vbscript:x', '//evil.example/x', '#top', '']) {
+      expect(linkTarget(href)).toEqual({ kind: 'blocked' });
+    }
+  });
+});
+
+describe('describeStep', () => {
+  const nameOf = (id: string) => ({ qa: '测试工程师' })[id] ?? id;
+  it('describes collaboration tools in plain words', () => {
+    const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotId: 'qa', text: 'hi' } } }), nameOf);
+    expect(phrase).toEqual(expect.objectContaining({ key: 'conversation.step.cobot.send_message', params: expect.objectContaining({ name: '测试工程师' }) }));
+    const fromString = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'create_task', arguments: '{"title":"做页面","ownerId":"qa"}' } }), nameOf);
+    expect(fromString.params).toEqual(expect.objectContaining({ title: '做页面', name: '测试工程师' }));
+  });
+  it('describes other tools, retries and changes', () => {
+    expect(describeStep(step({ kind: 'tool', detail: { server: 'fs', tool: 'read' } }), nameOf)).toEqual({ key: 'conversation.step.tool', params: { tool: 'fs.read' } });
+    expect(describeStep(step({ kind: 'retry', status: 'in_progress', detail: { attempt: 3 } }), nameOf)).toEqual({ key: 'conversation.step.retrying', params: { attempt: 3 } });
+    expect(describeStep(step({ kind: 'file_change', detail: { changes: [{}, {}] } }), nameOf).params).toEqual({ count: 2 });
+  });
+});
+
+describe('runPhase', () => {
+  it('reports what the turn is doing now', () => {
+    const run: Pick<Run, 'status'> = { status: 'running' };
+    expect(runPhase({ status: 'starting' }, [], undefined).key).toBe('conversation.phase.starting');
+    expect(runPhase(run, [step({ kind: 'retry', status: 'in_progress', detail: { attempt: 2 } })], undefined)).toEqual({ key: 'conversation.phase.reconnecting', params: { attempt: 2 } });
+    expect(runPhase(run, [step({ status: 'in_progress' })], undefined).key).toBe('conversation.phase.command');
+    expect(runPhase(run, [step({})], { steps: {}, reply: '写', reasoning: {}, output: {} }).key).toBe('conversation.phase.replying');
+    expect(runPhase({ status: 'waiting_approval' }, [step({ status: 'in_progress' })], undefined).key).toBe('conversation.phase.waitingApproval');
+    expect(runPhase(run, [], undefined).key).toBe('conversation.phase.thinking');
+  });
+  it('hides empty thoughts', () => {
+    const steps = [step({ id: 'a', kind: 'reasoning', detail: { text: '' } }), step({ id: 'b', kind: 'reasoning', detail: { text: '先看代码' } })];
+    expect(visibleSteps(steps, undefined).map((s) => s.id)).toEqual(['b']);
+    expect(visibleSteps(steps, { steps: {}, reply: '', reasoning: { a: '正在想' }, output: {} }).map((s) => s.id)).toEqual(['a', 'b']);
+  });
+  it('formats durations', () => {
+    expect(durationPhrase(8)).toEqual({ key: 'conversation.duration.seconds', params: { s: 8 } });
+    expect(durationPhrase(83)).toEqual({ key: 'conversation.duration.minutes', params: { m: 1, s: 23 } });
+  });
+});
+
+describe('live store', () => {
+  beforeEach(() => resetLiveStore());
+  it('accumulates deltas and keeps the newer form of a step', () => {
+    applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', kind: 'message', text: '你' });
+    applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', kind: 'message', text: '好' });
+    applyLiveSignal({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', itemId: 'c', kind: 'output', text: 'ok' });
+    const newer = step({ id: 'c', status: 'completed', updatedAt: '2026-10-17T10:00:05Z' });
+    applyLiveSignal({ type: 'step', teamId: 't', botId: 'b', runId: 'r1', step: newer });
+    const live = liveRunsSnapshot().r1;
+    expect(live.reply).toBe('你好');
+    expect(live.output.c).toBe('ok');
+    expect(live.steps.c.status).toBe('completed');
+    forgetLiveRuns((runId) => runId !== 'r1');
+    expect(liveRunsSnapshot().r1).toBeUndefined();
+    const stored = [step({ id: 'c', status: 'in_progress', updatedAt: '2026-10-17T10:00:02Z' }), step({ id: 'd', seq: 2 })];
+    const merged = mergeSteps(stored, { steps: { c: newer }, reply: '', reasoning: {}, output: {} });
+    expect(merged.map((s) => [s.id, s.status])).toEqual([['c', 'completed'], ['d', 'completed']]);
+    const stale = mergeSteps([step({ id: 'c', status: 'completed', updatedAt: '2026-10-17T10:00:09Z' })], { steps: { c: step({ id: 'c', status: 'in_progress' }) }, reply: '', reasoning: {}, output: {} });
+    expect(stale[0].status).toBe('completed');
+  });
+});
+
+describe('buildTimeline', () => {
+  const message = (id: string, at: string, kind: Message['kind'] = 'user'): Message => ({ id, kind, createdAt: at, blocks: [] } as unknown as Message);
+  const run = (id: string, at: string): RunWithSteps => ({ id, teamId: 't', botId: 'b', status: 'completed', startedAt: at, steps: [] } as unknown as RunWithSteps);
+  it('places a turn after the message that woke it and before its reply', () => {
+    const timeline = buildTimeline(
+      [message('u1', '2026-10-17T10:00:00Z'), message('a1', '2026-10-17T10:00:30Z', 'assistant')],
+      [run('r1', '2026-10-17T10:00:01Z')],
+      null,
+    );
+    expect(timeline.map((entry) => (entry.kind === 'run' ? entry.run.id : entry.message.id))).toEqual(['u1', 'r1', 'a1']);
+  });
+  it('shows the active run even before the stored page has it', () => {
+    const active = { id: 'r2', teamId: 't', botId: 'b', status: 'running', startedAt: '2026-10-17T10:01:00Z' } as unknown as Run;
+    const timeline = buildTimeline([message('u1', '2026-10-17T10:00:59Z')], [], active);
+    expect(timeline.at(-1)).toEqual(expect.objectContaining({ kind: 'run', run: expect.objectContaining({ id: 'r2', steps: [] }) }));
+  });
+});

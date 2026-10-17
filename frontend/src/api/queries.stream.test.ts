@@ -1,6 +1,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetLiveStore, useLiveRuns } from './live';
 import { useEventStream } from './queries';
 import type { Event } from './types';
 
@@ -62,6 +63,19 @@ describe('snapshot and SSE cursor', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1501); });
     expect(Stream.opened).toHaveLength(2);
     expect(Stream.opened[1].url).toBe('/api/v1/events?after=125');
+  });
+
+  it('feeds live frames to the live store without moving the cursor', async () => {
+    resetLiveStore();
+    let seen: ReturnType<typeof useLiveRuns> = {};
+    function Watcher() { seen = useLiveRuns(); return null; }
+    await act(async () => { root.render(createElement('div', null, createElement(Observer, { enabled: true, sequence: 7 }), createElement(Watcher))); });
+    act(() => Stream.opened[0].listeners.get('cobot.live')?.({ data: JSON.stringify({ type: 'delta', teamId: 't', botId: 'b', runId: 'r1', kind: 'message', text: '你好' }) } as MessageEvent));
+    expect(seen.r1?.reply).toBe('你好');
+    expect(onEvent).not.toHaveBeenCalled();
+    await act(async () => { Stream.opened[0].onerror?.(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1501); });
+    expect(Stream.opened[1].url).toBe('/api/v1/events?after=7');
   });
 
   it('resets an old session cursor when the stream is disabled', async () => {

@@ -109,13 +109,47 @@ export type RunStatus = 'starting' | 'running' | 'waiting_approval' | 'waiting_i
 
 export type Run = components['schemas']['Run'];
 
+/** One visible step of a run (thinking, a command, a file change, a tool
+ * call, a reconnect, an engine notice). `detail` is kind-specific. */
+export type RunStepKind = 'reasoning' | 'command' | 'file_change' | 'tool' | 'web_search' | 'plan' | 'retry' | 'notice';
+export type RunStepStatus = 'in_progress' | 'completed' | 'failed' | 'declined' | 'interrupted';
+export interface RunStep {
+  id: string;
+  runId: string;
+  teamId: string;
+  botId: string;
+  seq: number;
+  kind: RunStepKind | string;
+  status: RunStepStatus | string;
+  detail: Record<string, unknown>;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export type RunWithSteps = Run & { steps: RunStep[] };
+
 /** GET /bots/{id}/messages */
 export interface ConversationResult {
   messages: Message[];
   queuedCount: number;
   bot: Bot;
   activeRun: Run | null;
+  /** Runs started between this page's messages, with their steps. */
+  runs?: RunWithSteps[];
   nextCursor: string;
+}
+
+/** A transient `cobot.live` stream frame: a step that changed or streamed
+ * text of a running turn. */
+export interface LiveSignal {
+  type: 'step' | 'delta';
+  teamId: string;
+  botId: string;
+  runId: string;
+  step?: RunStep;
+  itemId?: string;
+  kind?: 'message' | 'reasoning' | 'output';
+  text?: string;
 }
 
 /** POST /bots/{id}/messages (202: queued, not delivered). */

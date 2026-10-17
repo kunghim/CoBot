@@ -264,6 +264,10 @@ func runTurn(threadID, turnID, userText string) {
 	if mode == "approve" || mode == "deny" {
 		decision = requestApproval(threadID, turnID)
 	}
+	if mode == "process" {
+		runProcess(threadID, turnID, userText)
+		return
+	}
 	status := "completed"
 	text := "收到：" + userText
 	switch {
@@ -321,4 +325,48 @@ func requestApproval(threadID, turnID string) string {
 	case <-time.After(2 * time.Minute):
 		return "timeout"
 	}
+}
+
+// runProcess scripts a turn the way a real one looks from the outside: the
+// model connection drops and is retried, the member thinks, runs a command
+// whose output streams, edits a file and streams a Markdown reply that links
+// the file it wrote. Pauses keep each phase visible to the browser.
+func runProcess(threadID, turnID, userText string) {
+	pause := func() { time.Sleep(700 * time.Millisecond) }
+	ids := map[string]any{"threadId": threadID, "turnId": turnID}
+	with := func(extra map[string]any) map[string]any {
+		out := map[string]any{}
+		for k, v := range ids {
+			out[k] = v
+		}
+		for k, v := range extra {
+			out[k] = v
+		}
+		return out
+	}
+	notify("error", with(map[string]any{"willRetry": true, "error": map[string]any{"message": "Reconnecting... 1/5", "codexErrorInfo": "other"}}))
+	pause()
+	notify("item/started", with(map[string]any{"item": map[string]any{"type": "reasoning", "id": "r1", "summary": []any{}, "content": []any{}}}))
+	notify("item/reasoning/summaryTextDelta", with(map[string]any{"itemId": "r1", "delta": "先看看目录结构", "summaryIndex": 0}))
+	pause()
+	notify("item/completed", with(map[string]any{"item": map[string]any{"type": "reasoning", "id": "r1", "summary": []any{"先看看目录结构"}, "content": []any{}}}))
+	command := map[string]any{"type": "commandExecution", "id": "c1", "command": "go test ./...", "cwd": cwd(), "status": "inProgress", "commandActions": []any{}}
+	notify("item/started", with(map[string]any{"item": command}))
+	notify("item/commandExecution/outputDelta", with(map[string]any{"itemId": "c1", "delta": "ok  \texample/pkg\t0.01s\n"}))
+	pause()
+	command["status"], command["exitCode"], command["durationMs"], command["aggregatedOutput"] = "completed", 0, 640, "ok  \texample/pkg\t0.01s\n"
+	notify("item/completed", with(map[string]any{"item": command}))
+	notify("item/completed", with(map[string]any{"item": map[string]any{
+		"type": "fileChange", "id": "f1", "status": "completed",
+		"changes": []any{map[string]any{"path": "notes.md", "kind": map[string]any{"type": "add"}, "diff": "+# 笔记\n+完成"}},
+	}}))
+	reply := "## 已完成\n\n- 测试全部通过\n- 写了 [notes.md](notes.md)\n\n收到：" + userText
+	_ = os.WriteFile(filepath.Join(cwd(), "notes.md"), []byte("# 笔记\n完成\n"), 0o644)
+	split := strings.Index(reply, "\n\n")
+	for _, part := range []string{reply[:split], reply[split:]} {
+		notify("item/agentMessage/delta", with(map[string]any{"itemId": "m1", "delta": part}))
+		pause()
+	}
+	notify("item/completed", with(map[string]any{"completedAtMs": 1, "item": map[string]any{"type": "agentMessage", "id": "m1", "text": reply}}))
+	notify("turn/completed", map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "status": "completed", "items": []any{}}})
 }

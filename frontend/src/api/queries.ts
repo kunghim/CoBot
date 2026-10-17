@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { applyLiveSignal } from './live';
 import type {
   Approval,
   Bot,
@@ -9,6 +10,7 @@ import type {
   EngineStatus,
   Event,
   Evidence,
+  LiveSignal,
   ModelListResult,
   Question,
   QuestionListResult,
@@ -91,6 +93,14 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
         // A malformed frame never kills the stream; snapshot re-sync covers gaps.
       }
     };
+    // Live frames carry no cursor; a lost one is covered by the stored steps.
+    const handleLive = (payload: string) => {
+      try {
+        applyLiveSignal(JSON.parse(payload) as LiveSignal);
+      } catch {
+        // ignore malformed progress
+      }
+    };
 
     if (!bearerToken()) {
       let source: EventSource | null = null;
@@ -101,6 +111,7 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
         // the cursor instead of replaying from zero (review C).
         source = new EventSource(apiUrl(`/api/v1/events?after=${lastSeq}`));
         source.addEventListener('cobot.event', (message) => handleFrame((message as MessageEvent).data));
+        source.addEventListener('cobot.live', (message) => handleLive((message as MessageEvent).data));
         source.onerror = () => {
           if (stopped) return;
           source?.close();
@@ -161,8 +172,10 @@ export function useEventStream(enabled: boolean, onEvent: (event: Event) => void
             while (idx >= 0) {
               const frame = buffer.slice(0, idx);
               buffer = buffer.slice(idx + 2);
-              const dataLine = frame.split('\n').find((line) => line.startsWith('data: '));
-              if (dataLine) handleFrame(dataLine.slice(6));
+              const lines = frame.split('\n');
+              const dataLine = lines.find((line) => line.startsWith('data: '));
+              const live = lines.some((line) => line === 'event: cobot.live');
+              if (dataLine) (live ? handleLive : handleFrame)(dataLine.slice(6));
               idx = buffer.indexOf('\n\n');
             }
           }
@@ -221,7 +234,7 @@ export function useRoles(enabled = true) {
 export function useConversation(botId: string | null) {
   const query = useInfiniteQuery({ queryKey: queryKeys.messages(botId ?? ''), queryFn: ({ pageParam }) => api.listMessages(botId as string, { before: pageParam || undefined }), initialPageParam: '', getNextPageParam: (page) => page.nextCursor || undefined, enabled: botId !== null });
   const pages = query.data?.pages;
-  return { ...query, data: pages?.[0] ? { ...pages[0], messages: [...pages].reverse().flatMap((page) => page.messages) } : undefined };
+  return { ...query, data: pages?.[0] ? { ...pages[0], messages: [...pages].reverse().flatMap((page) => page.messages), runs: [...pages].reverse().flatMap((page) => page.runs ?? []) } : undefined };
 }
 
 export function useSendMessage(botId: string) {

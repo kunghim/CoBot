@@ -37,7 +37,7 @@ export async function authorize(context: BrowserContext): Promise<void> {
 // The file is keyed by the team's working directory, matching the engine: each
 // team runs its own app-server against one shared core, so a single file would
 // leak one team's mode into another team's turn.
-export function setEngineMode(mode: 'reply' | 'approve' | 'deny' | 'fail', teamDir: string): void {
+export function setEngineMode(mode: 'reply' | 'approve' | 'deny' | 'fail' | 'process', teamDir: string): void {
   const base = process.env.COBOT_E2E_FAKE_CONTROL;
   if (!base) throw new Error('COBOT_E2E_FAKE_CONTROL is not set');
   mkdirSync(base, { recursive: true });
