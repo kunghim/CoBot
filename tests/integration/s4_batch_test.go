@@ -11,6 +11,7 @@ import (
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
 
 // Messages that queue up while a member works are taken into its next turn
@@ -275,5 +276,40 @@ func TestReviewWakesTheLeader(t *testing.T) {
 	}
 	if items := record["items"].([]any); len(items) != 1 || items[0].(domain.Message).Kind != domain.MessageKindSystem {
 		t.Fatalf("exchange record = %+v", items)
+	}
+}
+
+// A member's later turns go straight to its loaded thread; only a thread the
+// engine no longer has is resumed first.
+func TestLoadedThreadIsNotResumedBeforeEachTurn(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+
+	turn := func(text string, want int) fakeengine.StartedTurn {
+		t.Helper()
+		if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: text}); err != nil {
+			t.Fatal(err)
+		}
+		waitUntil(t, 5*time.Second, "turn started", func() bool { return len(fake.Turns()) == want })
+		started := fake.Turns()[want-1]
+		fake.EmitTurnCompleted(started.ThreadID, started.TurnID, "completed", "好")
+		waitUntil(t, 5*time.Second, "turn finished", func() bool {
+			_, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID)
+			return errors.Is(err, sqlite.ErrNotFound)
+		})
+		return started
+	}
+	first := turn("第一件事", 1)
+	second := turn("第二件事", 2)
+	if second.ThreadID != first.ThreadID || fake.Resumes() != 0 {
+		t.Fatalf("second turn: thread %s→%s, resumes %d", first.ThreadID, second.ThreadID, fake.Resumes())
+	}
+	fake.Unload(first.ThreadID)
+	third := turn("第三件事", 3)
+	if third.ThreadID != first.ThreadID || fake.Resumes() != 1 {
+		t.Fatalf("after unload: thread %s, resumes %d", third.ThreadID, fake.Resumes())
 	}
 }

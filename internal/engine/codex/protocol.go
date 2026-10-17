@@ -35,6 +35,9 @@ type ThreadResumeParams struct {
 	ApprovalPolicy        string         `json:"approvalPolicy,omitempty"`
 	ApprovalsReviewer     string         `json:"approvalsReviewer,omitempty"`
 	Config                map[string]any `json:"config,omitempty"`
+	// ExcludeTurns leaves the thread's history out of the reply: CoBot keeps
+	// its own record, and full-history replies are deprecated.
+	ExcludeTurns bool `json:"excludeTurns,omitempty"`
 }
 
 // ThreadRef is the provider thread identity.

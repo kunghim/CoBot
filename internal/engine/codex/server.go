@@ -50,6 +50,8 @@ type Server struct {
 	waitDone  chan struct{}
 	waitErr   error
 
+	loaded map[string]bool // threads this app-server has loaded
+
 	trace       *wiretrace.Recorder
 	tracePeer   string
 	traceStderr *wiretrace.Lines
@@ -281,6 +283,17 @@ func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemI
 func (s *Server) handleNotify(method string, params json.RawMessage) {
 	n := engine.Notification{Method: method, Raw: params}
 	switch method {
+	case "thread/closed", "thread/status/changed":
+		// A thread Codex closed or unloaded needs a resume before its next turn.
+		var p struct {
+			ThreadID string `json:"threadId"`
+			Status   struct {
+				Type string `json:"type"`
+			} `json:"status"`
+		}
+		if json.Unmarshal(params, &p) == nil && p.ThreadID != "" && (method == "thread/closed" || p.Status.Type == "notLoaded") {
+			s.setLoaded(p.ThreadID, false)
+		}
 	case "turn/started", "turn/completed":
 		var p TurnCompletedParams
 		if err := json.Unmarshal(params, &p); err == nil {
@@ -428,6 +441,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	if res.Thread.ID == "" {
 		return engine.ThreadInfo{}, errors.New("thread/start returned no thread id")
 	}
+	s.setLoaded(res.Thread.ID, true)
 	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider}, nil
 }
 
@@ -438,10 +452,34 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
 		Model: spec.Model, DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+		ExcludeTurns: true,
 	}, nil); err != nil {
 		return fmt.Errorf("thread/resume: %w", err)
 	}
+	s.setLoaded(threadID, true)
 	return nil
+}
+
+// ThreadLoaded reports whether this app-server has the thread loaded: it
+// was started or resumed here and Codex has not closed or unloaded it since.
+// A loaded thread takes a new turn directly, with no resume first.
+func (s *Server) ThreadLoaded(threadID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.loaded[threadID]
+}
+
+func (s *Server) setLoaded(threadID string, loaded bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.loaded == nil {
+		s.loaded = map[string]bool{}
+	}
+	if loaded {
+		s.loaded[threadID] = true
+	} else {
+		delete(s.loaded, threadID)
+	}
 }
 
 // StartTurn dispatches one user turn; completion arrives via notifications.

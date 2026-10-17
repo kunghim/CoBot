@@ -760,6 +760,12 @@ func (s *Scheduler) runtime(teamID string) *teamRuntime {
 	return s.teams[teamID]
 }
 
+// threadLoadedChecker is implemented by engines that know which threads they
+// have loaded; others are resumed before every turn.
+type threadLoadedChecker interface {
+	ThreadLoaded(threadID string) bool
+}
+
 func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server, runID string) (string, error) {
 	role, err := roles.Default(bot.RoleID)
 	if err != nil {
@@ -793,6 +799,12 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Config:                config,
 	}
 	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
+		// Resuming is for a thread this app-server does not have, after an
+		// engine restart or once Codex unloaded it. A thread that is still
+		// loaded here takes the turn directly.
+		if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
+			return session.ProviderThreadID, nil
+		}
 		if err := server.ResumeThread(ctx, session.ProviderThreadID, spec); err == nil {
 			// The thread now belongs to this connection, so rebind it: thread
 			// ids are only unique inside one engine, and every later lookup

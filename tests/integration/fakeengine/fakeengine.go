@@ -32,6 +32,8 @@ type Server struct {
 	ResumeErr         error
 	TurnFacts         map[string]string // exact thread/turn -> scripted native fact
 	threads           map[string]bool
+	loaded            map[string]bool
+	resumes           int
 	startedTurns      []StartedTurn
 	interrupted       []string
 	steers            []Steer
@@ -75,7 +77,29 @@ type Reply struct {
 
 // New creates a fake server with the given callbacks.
 func New(callbacks engine.Callbacks, epoch string) *Server {
-	return &Server{epoch: epoch, callbacks: callbacks, threads: map[string]bool{}}
+	return &Server{epoch: epoch, callbacks: callbacks, threads: map[string]bool{}, loaded: map[string]bool{}}
+}
+
+// ThreadLoaded mirrors the Codex adapter: a thread started or resumed here
+// stays loaded until Unload.
+func (s *Server) ThreadLoaded(threadID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.loaded[threadID]
+}
+
+// Unload plays Codex closing an idle thread.
+func (s *Server) Unload(threadID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.loaded, threadID)
+}
+
+// Resumes counts thread/resume calls.
+func (s *Server) Resumes() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.resumes
 }
 
 func (s *Server) Epoch() string { return s.epoch }
@@ -86,18 +110,21 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.threadSeq++
 	id := fmt.Sprintf("thread-%d", s.threadSeq)
 	s.threads[id] = true
+	s.loaded[id] = true
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: "fake"}, nil
 }
 
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.resumes++
 	if s.ResumeErr != nil {
 		return s.ResumeErr
 	}
 	if !s.threads[threadID] {
 		return fmt.Errorf("unknown thread %s", threadID)
 	}
+	s.loaded[threadID] = true
 	return nil
 }
 

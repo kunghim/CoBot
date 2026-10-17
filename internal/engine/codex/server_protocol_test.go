@@ -145,8 +145,25 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	if err = s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", DeveloperInstructions: "current-role", Sandbox: "workspace-write", Config: map[string]any{"mcp_servers.cobot.enabled": true}}); err != nil {
 		t.Fatal(err)
 	}
-	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["developerInstructions"] != "current-role" || p["config"] == nil {
+	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["developerInstructions"] != "current-role" || p["config"] == nil || p["excludeTurns"] != true {
 		t.Fatal("resume lost activation config", p)
+	}
+	// A resumed thread is loaded until Codex closes or unloads it.
+	if !s.ThreadLoaded("th-1") {
+		t.Fatal("resumed thread not loaded")
+	}
+	s.handleNotify("thread/status/changed", json.RawMessage(`{"threadId":"th-1","status":{"type":"idle"}}`))
+	if !s.ThreadLoaded("th-1") {
+		t.Fatal("an idle thread is still loaded")
+	}
+	s.handleNotify("thread/status/changed", json.RawMessage(`{"threadId":"th-1","status":{"type":"notLoaded"}}`))
+	if s.ThreadLoaded("th-1") {
+		t.Fatal("an unloaded thread must be resumed again")
+	}
+	s.setLoaded("th-1", true)
+	s.handleNotify("thread/closed", json.RawMessage(`{"threadId":"th-1"}`))
+	if s.ThreadLoaded("th-1") {
+		t.Fatal("a closed thread must be resumed again")
 	}
 	if status, err := s.InspectTurn(ctx, "th-1", "turn-9"); err != nil || status != "interrupted" {
 		t.Fatalf("terminal fact = %q / %v", status, err)
