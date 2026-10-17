@@ -73,7 +73,7 @@ func runServe(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	profile := fs.String("profile", string(platform.EnvDevelopment), "data profile: development or production")
 	dataRoot := fs.String("data-root", "", "override the profile data root (tests use explicit temp roots)")
-	listen := fs.String("listen", "", "loopback listen address, default 127.0.0.1:0 (ephemeral)")
+	listen := fs.String("listen", "", "loopback listen address; default is a stable port per data root")
 	logLevel := fs.String("log-level", "info", "log level: debug, info, warn or error")
 	devOrigin := fs.String("dev-origin", "", "extra allowed browser origin (development Vite server)")
 	noOpen := fs.Bool("no-open", false, "print the startup link without opening a browser")

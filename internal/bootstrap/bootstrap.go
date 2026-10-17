@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -107,8 +108,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	if listen == "" {
 		listen = cfg.Listen
 	}
-	if listen == "" {
-		listen = "127.0.0.1:0"
+	stablePort := listen == ""
+	if stablePort {
+		// Without an explicit address the profile keeps one port across
+		// restarts, so a bookmarked page and its session keep working.
+		listen = net.JoinHostPort("127.0.0.1", strconv.Itoa(preferredPort(paths)))
 	}
 
 	lock, err := platform.AcquireLock(paths, 2*time.Second)
@@ -152,6 +156,13 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	}
 
 	listener, err := net.Listen("tcp", listen)
+	if err != nil && stablePort {
+		// The usual port is taken: use any free one and keep it from now on.
+		listener, err = net.Listen("tcp", "127.0.0.1:0")
+	}
+	if err == nil && stablePort {
+		rememberPort(paths, listener.Addr())
+	}
 	if err != nil {
 		closeLog()
 		db.Close()

@@ -31,22 +31,29 @@ test('permission mode switches like Codex and is kept', async ({ page }) => {
   mkdirSync(teamDir, { recursive: true });
   await openNewTeam(page, '权限团队', teamDir);
 
-  const select = page.getByLabel('权限模式');
-  await expect(select).toHaveValue('default', { timeout: 15000 });
-  await expect(page.getByText('可在团队目录内自由读写和执行，超出范围时会问你')).toBeVisible();
+  const pill = page.getByRole('button', { name: /^权限模式：/ });
+  await expect(pill).toHaveAccessibleName('权限模式：默认权限', { timeout: 15000 });
+  // The explanation lives in the menu, not next to the pill.
+  await expect(page.getByText('可在团队目录内自由读写和执行，超出范围时会问你')).toBeHidden();
 
-  await select.selectOption('read_only');
-  await expect(select).toHaveValue('read_only');
+  const choose = async (mode: string) => {
+    await pill.click();
+    const menu = page.getByRole('menu', { name: '权限模式' });
+    await expect(menu.getByText('可在团队目录内自由读写和执行，超出范围时会问你')).toBeVisible();
+    await menu.getByRole('menuitemradio', { name: new RegExp(`^${mode}`) }).click();
+  };
+  await choose('只读');
+  await expect(pill).toHaveAccessibleName('权限模式：只读');
 
-  await select.selectOption('full');
+  await choose('完全访问');
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('切换到完全访问？');
   await confirm.getByRole('button', { name: '切换到完全访问' }).click();
-  await expect(select).toHaveValue('full');
+  await expect(pill).toHaveAccessibleName('权限模式：完全访问');
 
   await page.reload();
   await openLeader(page, '权限团队');
-  await expect(page.getByLabel('权限模式')).toHaveValue('full', { timeout: 15000 });
+  await expect(page.getByRole('button', { name: /^权限模式：/ })).toHaveAccessibleName('权限模式：完全访问', { timeout: 15000 });
 });
 
 // A command approval reads as the command itself and offers what Codex

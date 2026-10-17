@@ -6,7 +6,7 @@
 // raw HTML.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Send, Square, X } from 'lucide-react';
+import { ArrowUp, Loader2, Square, X } from 'lucide-react';
 import { useCancelMessage, useConversation, useInterruptRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
 import { forgetLiveRuns, useLiveRuns } from '../../api/live';
@@ -36,6 +36,14 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const [actionError, setActionError] = useState('');
   const [stopping, setStopping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The composer grows with its text up to its max height, like Codex's.
+  useLayoutEffect(() => {
+    const element = composerRef.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  }, [draft, bot.id]);
   const loadingOlder = useRef(false);
   const loadEarlier = async () => {
     const element = scrollRef.current;
@@ -175,72 +183,74 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         </fieldset>
       </div>
 
-      <div className="space-y-2 border-t border-neutral-200 p-3 dark:border-neutral-800">
+      <div className="space-y-2 px-4 pb-4 pt-2">
         {queuedCount > 0 && (
-          <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">
+          <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t('conversation.queuedBanner', { count: queuedCount })}
           </p>
         )}
 
-        <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0 space-y-2">
-        <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
+        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
+          <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
 
-        <div className="flex items-end gap-2">
-          <textarea
-            aria-label={t('conversation.placeholder', { name: headerTitle })}
-            placeholder={t('conversation.placeholder', { name: headerTitle })}
-            value={draft}
-            disabled={blockReasonKey !== null}
-            rows={2}
-            onChange={(event) => setDraft(bot.id, event.target.value)}
-            onKeyDown={(event) => {
-              // Enter sends, Shift+Enter inserts a newline; IME composition
-              // must never submit mid-composition.
-              if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              sendNow();
-            }}
-            className="min-h-0 flex-1 resize-y rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-700"
-          />
-          {activeRun && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!activeRun.id) return;
-                setStopping(true);
-                interrupt.mutate(activeRun.id, {
-                  onSuccess: (result) => {
-                    if (result.responseState === 'unknown') { setStopping(false); setActionError(t('errors.error.engine.interrupt_unconfirmed')); }
-                  },
-                  onError: (error) => {
-                    setStopping(false);
-                    setActionError(apiErrorMessage(t, error));
-                  },
-                });
+          <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:focus-within:border-neutral-500">
+            <textarea
+              ref={composerRef}
+              aria-label={t('conversation.placeholder', { name: headerTitle })}
+              placeholder={t('conversation.placeholder', { name: headerTitle })}
+              value={draft}
+              disabled={blockReasonKey !== null}
+              rows={1}
+              onChange={(event) => setDraft(bot.id, event.target.value)}
+              onKeyDown={(event) => {
+                // Enter sends, Shift+Enter inserts a newline; IME composition
+                // must never submit mid-composition.
+                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+                event.preventDefault();
+                sendNow();
               }}
-              disabled={stopping || interrupt.isPending}
-              title={t('conversation.interrupt')}
-              aria-label={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-              className="flex h-10 items-center gap-1.5 rounded-md border border-neutral-300 px-3 text-sm text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            >
-              <Square size={12} aria-hidden="true" />
-              {stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={sendNow}
-            disabled={blockReasonKey !== null || draft.trim() === '' || send.isPending}
-            title={t('conversation.send')}
-            aria-label={t('conversation.send')}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-white transition-colors hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            <Send size={16} aria-hidden="true" />
-          </button>
-        </div>
+              className="block max-h-60 min-h-[44px] w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm leading-6 placeholder:text-neutral-400 focus:outline-none disabled:opacity-60"
+            />
+            <div className="flex items-center justify-between gap-2 px-2 pb-2">
+              <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+              {activeRun && draft.trim() === '' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!activeRun.id) return;
+                    setStopping(true);
+                    interrupt.mutate(activeRun.id, {
+                      onSuccess: (result) => {
+                        if (result.responseState === 'unknown') { setStopping(false); setActionError(t('errors.error.engine.interrupt_unconfirmed')); }
+                      },
+                      onError: (error) => {
+                        setStopping(false);
+                        setActionError(apiErrorMessage(t, error));
+                      },
+                    });
+                  }}
+                  disabled={stopping || interrupt.isPending}
+                  title={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
+                  aria-label={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                >
+                  {stopping ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Square size={11} fill="currentColor" aria-hidden="true" />}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={sendNow}
+                  disabled={blockReasonKey !== null || draft.trim() === '' || send.isPending}
+                  title={t('conversation.send')}
+                  aria-label={t('conversation.send')}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-200 disabled:text-neutral-400 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-500"
+                >
+                  <ArrowUp size={16} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
         </fieldset>
-
-        <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
 
         {blockReasonKey && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">
