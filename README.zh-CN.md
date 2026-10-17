@@ -136,6 +136,19 @@ Wails v2 · HTTP JSON + SSE · MCP Go SDK。接口契约在 `api/openapi.yaml`�
 请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎使用中文或英文提交 Issue 和 PR；
 安全问题请参阅 [SECURITY.md](SECURITY.md)。
 
+## 社区参与
+
+欢迎使用中文或英文，一份反馈即可，无需重复提交翻译，也无需加入额外聊天群。
+
+- [报告 Bug 或提出功能建议](https://github.com/kunghim/CoBot/issues/new/choose)。
+- [安装和使用提问](https://github.com/kunghim/CoBot/discussions/categories/q-a)。
+- [展示你用 CoBot 完成的成果](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)。
+- [查看维护者公告](https://github.com/kunghim/CoBot/discussions/categories/announcements)。
+- [参与贡献](CONTRIBUTING.md)：从 `dev` 开始，向 `dev` 提交 PR。
+
+安全漏洞请按 [安全政策](SECURITY.md) 私密报告。参与时请遵守
+[社区行为准则](CODE_OF_CONDUCT.md)，分享示例前先移除私人资料。
+
 ## 路线图
 
 以下是打算探索的方向，不是承诺：

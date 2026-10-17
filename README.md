@@ -142,6 +142,10 @@ startup link (valid 60 seconds, also printed in the terminal; `--no-open` only p
 Running `cobot serve` again opens a fresh link to the running instance.
 Then:
 
+The interface initially opens in Chinese. To switch to English, open
+**设置 (Settings) → 通用 (General) → 语言 (Language)** and select **English**.
+This preference is saved for subsequent visits; agent replies are not translated.
+
 1. **Settings:** sign in to Codex. CoBot uses its own private Codex environment, so you sign
    in once inside CoBot; the login is kept across restarts. Then pick a default model.
    CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
@@ -169,6 +173,20 @@ and Go and TypeScript types are generated from it.
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests in
 English or Chinese are welcome. For security reports, see [SECURITY.md](SECURITY.md).
+
+## Community
+
+English and Chinese are welcome. One thread is enough; you do not need to
+translate your report or join a separate chat group to participate.
+
+- [Report a bug or request a feature](https://github.com/kunghim/CoBot/issues/new/choose).
+- [Ask a setup or usage question](https://github.com/kunghim/CoBot/discussions/categories/q-a).
+- [Share something you built](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell).
+- [Read maintainer announcements](https://github.com/kunghim/CoBot/discussions/categories/announcements).
+- [Contribute](CONTRIBUTING.md): start from `dev` and open your PR against `dev`.
+
+For vulnerabilities, use [SECURITY.md](SECURITY.md). Please follow the
+[Code of conduct](CODE_OF_CONDUCT.md) and remove private data from shared examples.
 
 ## Roadmap
 

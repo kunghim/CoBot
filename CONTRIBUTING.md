@@ -11,6 +11,33 @@ Issues and pull requests in English or Chinese are welcome. Search existing
 issues first. Discuss substantial features or architecture changes before
 implementing them; small bug fixes can go straight to a pull request.
 
+English is the primary language for public documentation, commit messages
+and shared technical summaries. You may report issues, discuss ideas and
+submit pull requests in English or Chinese; do not open duplicate threads
+just to provide a translation. Maintainers aim to add an English summary
+when a Chinese discussion leads to a decision affecting other contributors.
+There is no requirement to join a chat group or use a separate community
+account to participate.
+
+Use [Issues](https://github.com/kunghim/CoBot/issues) for reproducible bugs
+and feature requests, [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
+for setup and usage questions, and
+[Show and tell](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)
+to share projects and workflows. Maintainer announcements appear in
+[Announcements](https://github.com/kunghim/CoBot/discussions/categories/announcements).
+If you are unsure where a report belongs, use the closest entry; maintainers
+can help route it. Replies are best effort across time zones, with no fixed
+response deadline.
+
+For a first contribution, look for `good first issue` (a bounded task with
+starting points and acceptance criteria) or `help wanted` (work ready for
+contributions). Comment before starting a substantial task to avoid duplicate
+work. Maintainers use `status: needs-triage` for new reports,
+`status: needs-info` when a report needs clarification, and `status: accepted`
+for work agreed in scope. These states are updated manually; an accepted
+request is not a release-date commitment. Dependency PRs follow their existing
+bot labels. Do not label a task newcomer-friendly until it has enough guidance.
+
 Contributors normally work in a fork on a short-lived topic branch based
 on the upstream `dev` branch. Target `dev`, including dependency updates.
 The flow is `topic branch -> dev -> main -> release`. Maintainers
@@ -46,6 +73,13 @@ and only contribute material you have the right to submit.
 向 `dev` 提交 PR；依赖更新也进入 `dev`。维护者负责审查、集成，再将验证后的
 `dev` 合并到 `main`，手动发布。较大的需求先讨论，小修复可直接提 PR。使用 AI 不
 免除贡献者对代码、来源和测试的责任。贡献默认按 Apache-2.0 提交。
+
+英文是公开文档、提交信息和公共技术摘要的主要语言，但中文反馈、讨论和 PR 同样欢迎，
+无需另发英文副本。影响其他贡献者的重要中文讨论，由维护者尽量补充英文决策摘要。
+Bug 与功能建议进入 Issues，安装和使用问题进入 Discussions 的 Q&A，成果进入
+Show and tell；无需加入聊天群。维护者跨时区尽力回复，不承诺固定响应时限。
+首次贡献可找 `good first issue` 或 `help wanted`，较大任务开始前先留言协调。
+状态标签由维护者手动调整：待分诊、待补充信息、已接受；已接受不代表承诺发布日期。
 
 ## Working locally
 
