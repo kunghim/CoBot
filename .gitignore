@@ -4,6 +4,9 @@
 # docs 整体只放本机资料，不随仓库交付；需要公开的文件由维护者决定后单独放出
 /docs/**
 
+# Historical protocol experiments are maintained locally.
+/experiments/**
+
 # Private AI coding instructions and local assistant settings.
 # Ignore rules do not untrack existing files or remove Git history.
 **/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
@@ -17,6 +20,9 @@
 **/.codex/
 **/.agents/
 **/.cursor/
+**/.zcode/
+**/.deepseek/
+**/.kimi/
 **/.github/copilot-instructions.md
 **/.github/instructions/
 **/.cursorrules
@@ -67,3 +73,9 @@ test-results/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Root dotfiles and dot-directories are private unless explicitly allowed.
+# Keep this last so earlier exceptions cannot expose root-local settings.
+/.*
+!/.github/
+!/.gitignore
