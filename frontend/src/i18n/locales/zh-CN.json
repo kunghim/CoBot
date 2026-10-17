@@ -118,6 +118,7 @@
   },
   "conversation": {
     "sentTo": "已发给 {{name}}",
+    "notifiedTo": "已通知 {{name}}（无需回复）",
     "taskCard": { "assigned": "任务指派 · 负责人 {{name}}", "acceptance": "完成标准", "open": "在任务面板查看" },
     "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
     "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
@@ -160,6 +161,7 @@
       "noOutput": "没有输出",
       "cobot": {
         "send_message": "给 {{name}} 发送了消息",
+        "notify": "通知了 {{name}}",
         "create_task": "创建任务「{{title}}」，负责人 {{name}}",
         "propose_task": "提出任务「{{title}}」",
         "assign_task": "把任务转派给 {{name}}",

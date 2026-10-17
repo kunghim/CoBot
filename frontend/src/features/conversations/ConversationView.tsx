@@ -328,7 +328,7 @@ function MessageRow({
     // In the sender's conversation it is what the member sent; in the
     // recipient's, what it received.
     return message.sourceBotId === botId && message.botId !== botId
-      ? <OutgoingMessage to={nameOf(message.botId)} text={text} teamId={teamId} />
+      ? <OutgoingMessage to={nameOf(message.botId)} text={text} teamId={teamId} notified={!message.deliveryStatus} />
       : <IncomingMessage from={nameOf(message.sourceBotId ?? '')} text={text} teamId={teamId} />;
   }
 

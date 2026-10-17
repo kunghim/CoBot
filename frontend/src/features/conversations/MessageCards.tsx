@@ -21,7 +21,8 @@ export function IncomingMessage({ from, text, teamId }: { from: string; text: st
   );
 }
 
-export function OutgoingMessage({ to, text, teamId }: { to: string; text: string; teamId: string }) {
+/** notified: an information-only note, left for the recipient's next turn. */
+export function OutgoingMessage({ to, text, teamId, notified = false }: { to: string; text: string; teamId: string; notified?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
@@ -29,7 +30,7 @@ export function OutgoingMessage({ to, text, teamId }: { to: string; text: string
       <div className="max-w-[85%] rounded-xl border border-dashed border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700" data-testid="outgoing-message">
         <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
           <CornerUpRight size={13} aria-hidden="true" />
-          {t('conversation.sentTo', { name: to })}
+          {t(notified ? 'conversation.notifiedTo' : 'conversation.sentTo', { name: to })}
         </p>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-1 block w-full text-left text-neutral-700 dark:text-neutral-300">
           <div className={open ? '' : 'line-clamp-3'}>

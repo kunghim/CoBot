@@ -60,11 +60,14 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       const tool = text(d.tool);
       if (text(d.server) === 'cobot' || collaborationTools.has(tool)) {
         const args = toolArguments(d);
+        const recipients = Array.isArray(args.targetBotIds) ? args.targetBotIds.filter((id): id is string => typeof id === 'string') : [];
         const target = text(args.targetBotId) || text(args.ownerId) || text(args.toBotId);
+        const names = (recipients.length ? recipients : target ? [target] : []).map(nameOf).join('、');
+        const key = tool === 'send_message' && args.notifyOnly === true ? 'conversation.step.cobot.notify' : `conversation.step.cobot.${tool}`;
         return {
-          key: collaborationTools.has(tool) ? `conversation.step.cobot.${tool}` : 'conversation.step.tool',
+          key: collaborationTools.has(tool) ? key : 'conversation.step.tool',
           params: {
-            name: target ? nameOf(target) : '',
+            name: names,
             title: text(args.title),
             status: text(args.status),
             question: text(args.question),

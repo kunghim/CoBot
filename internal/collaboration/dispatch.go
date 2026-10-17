@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
@@ -18,6 +19,7 @@ import (
 type App interface {
 	ValidateToolRun(ctx context.Context, principal auth.Principal) error
 	SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
+	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in app.CreateTaskInput) (domain.Task, error)
 	ListTasks(ctx context.Context, principal auth.Principal, teamID, ownerID string, limit int) ([]domain.Task, error)
 	GetTaskDetail(ctx context.Context, principal auth.Principal, taskID string) (map[string]any, error)
@@ -236,10 +238,12 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 
 	case "send_message":
 		var args struct {
-			TargetBotID string `json:"targetBotId"`
-			Text        string `json:"text"`
-			TaskID      string `json:"taskId"`
-			RequestID   string `json:"idempotencyKey"`
+			TargetBotID  string   `json:"targetBotId"`
+			TargetBotIDs []string `json:"targetBotIds"`
+			Text         string   `json:"text"`
+			TaskID       string   `json:"taskId"`
+			NotifyOnly   bool     `json:"notifyOnly"`
+			RequestID    string   `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
 			return rejected("invalid_request", "error.invalid_json", nil)
@@ -247,11 +251,33 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
-		result, err := d.app.SendMessageFromBot(ctx, principal, args.TargetBotID, args.Text, args.TaskID, args.RequestID)
-		if err != nil {
-			return errorResult(err)
+		targets := uniqueTargets(args.TargetBotID, args.TargetBotIDs)
+		if len(targets) == 0 {
+			return rejected("invalid_request", "error.message.target_required", nil)
 		}
-		return ToolResult{Status: StatusAccepted, Data: result}
+		send := d.app.SendMessageFromBot
+		if args.NotifyOnly {
+			send = d.app.NotifyFromBot
+		}
+		if len(targets) == 1 {
+			result, err := send(ctx, principal, targets[0], args.Text, args.TaskID, args.RequestID)
+			if err != nil {
+				return errorResult(err)
+			}
+			return ToolResult{Status: StatusAccepted, Data: result}
+		}
+		// One message per recipient, each its own idempotent write so a
+		// retried broadcast neither duplicates nor drops a recipient.
+		results := make([]map[string]any, 0, len(targets))
+		for _, target := range targets {
+			result, err := send(ctx, perRecipient(principal, target), target, args.Text, args.TaskID, recipientKey(args.RequestID, target))
+			if err != nil {
+				return errorResult(err)
+			}
+			result["targetBotId"] = target
+			results = append(results, result)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"status": "accepted", "recipients": results}}
 
 	case "create_task":
 		var args struct {
@@ -582,4 +608,43 @@ func (d *Dispatcher) requireBot(ctx context.Context, principal auth.Principal) (
 
 func (d *Dispatcher) captainOf(ctx context.Context, teamID string) (string, error) {
 	return d.app.CaptainOf(ctx, teamID)
+}
+
+// uniqueTargets is the send_message recipient list: targetBotIds, or the
+// single legacy targetBotId, without repeats.
+func uniqueTargets(single string, many []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, id := range append([]string{single}, many...) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+// recipientKey derives one recipient's idempotency key from the broadcast's.
+func recipientKey(key, target string) string {
+	if len(key) > 100 {
+		key = key[:100]
+	}
+	suffix := target
+	if len(suffix) > 12 {
+		suffix = suffix[:12]
+	}
+	return key + "/" + suffix
+}
+
+// perRecipient gives each recipient's write its own idempotency identity.
+func perRecipient(p auth.Principal, target string) auth.Principal {
+	if p.Write == nil {
+		return p
+	}
+	write := *p.Write
+	write.Key = recipientKey(write.Key, target)
+	p.Write = &write
+	return p
 }

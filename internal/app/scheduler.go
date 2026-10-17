@@ -898,5 +898,6 @@ func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string
 	fmt.Fprintf(&b, "团队工作目录：%s\n", team.Directory)
 	fmt.Fprintf(&b, "你的名字：%s（角色：%s）\n", bot.Name, role.Name)
 	b.WriteString("与同团队成员的结构化协作由宿主工具提供；没有工具时直接用文字回复。用用户的语言交流。\n")
+	b.WriteString(collaborationEtiquette)
 	return b.String()
 }

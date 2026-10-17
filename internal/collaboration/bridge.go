@@ -79,7 +79,7 @@ func (b *Bridge) register(server *mcp.Server) {
 		{"list_tasks", "列出本团队任务（可按状态过滤）"},
 		{"get_task", "读取一个任务及其证据与转交记录"},
 		{"list_roles", "列出内置角色库（仅队长可见完整库）"},
-		{"send_message", "向同团队另一个 Bot 发送结构化消息（accepted 仅表示已持久化）"},
+		{"send_message", "给同团队成员发消息；同一内容发给多人用 targetBotIds 一次发完；只告知进展、不需要对方处理时设 notifyOnly=true，对方下一轮会看到但不会被唤醒（accepted 仅表示已持久化）"},
 		{"create_task", "创建任务并指派唯一负责人（仅队长）"},
 		{"propose_task", "以成员身份向队长提交任务提议（不直接建任务）"},
 		{"assign_task", "更换任务负责人（仅队长，按安全换人规则）"},

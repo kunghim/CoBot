@@ -143,3 +143,44 @@ func TestRefusedSteerQueuesAndUserMessagesMerge(t *testing.T) {
 		t.Fatalf("queued user messages were not merged:\n%s", next)
 	}
 }
+
+// One send_message reaches several members; a notify-only message is left
+// for the recipient's next turn and wakes nobody.
+func TestBroadcastAndNotifyOnly(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	captain, backend, qa := bots[0], bots[1], bots[2]
+	token := h.botToken(t, captain)
+	fake := h.ensureFake(t, team.ID)
+
+	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID}, "text": "接口文档已更新", "notifyOnly": true, "idempotencyKey": "s4-note"}); status != 200 {
+		t.Fatalf("notify = %d %v", status, body)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if n := len(fake.Turns()); n != 0 {
+		t.Fatalf("a notify-only message woke %d turns", n)
+	}
+	var deliveries int
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM deliveries d JOIN messages m ON m.id = d.message_id WHERE m.source_bot_id = ?`, captain.ID).Scan(&deliveries); err != nil || deliveries != 0 {
+		t.Fatalf("notify-only created %d deliveries (%v)", deliveries, err)
+	}
+
+	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID, backend.ID}, "text": "开始联调", "idempotencyKey": "s4-all"}); status != 200 {
+		t.Fatalf("broadcast = %d %v", status, body)
+	}
+	waitUntil(t, 5*time.Second, "both woken", func() bool { return len(fake.Turns()) == 2 })
+	for _, turn := range fake.Turns() {
+		// The note left earlier reaches each recipient with its next turn.
+		if !strings.Contains(turn.Text, "开始联调") || !strings.Contains(turn.Text, "接口文档已更新") {
+			t.Fatalf("turn input lacks the message or the earlier note:\n%s", turn.Text)
+		}
+	}
+	// A retried broadcast is idempotent per recipient.
+	if status, _ := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID}, "text": "开始联调", "idempotencyKey": "s4-all"}); status != 200 {
+		t.Fatalf("retry status %d", status)
+	}
+	var messages int
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE source_bot_id = ? AND blocks LIKE '%开始联调%'`, captain.ID).Scan(&messages); err != nil || messages != 2 {
+		t.Fatalf("broadcast messages = %d (%v), want one per recipient", messages, err)
+	}
+}

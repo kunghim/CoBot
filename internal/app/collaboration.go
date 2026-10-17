@@ -13,10 +13,30 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
+// collaborationEtiquette keeps member traffic to what moves the work: every
+// message that needs no action still costs the recipient a turn.
+const collaborationEtiquette = `
+# 协作礼仪
+- 需要对方处理或回答时才发普通消息；只是告知进展或结果时设 notifyOnly，对方下一轮会看到，不会被打断。
+- 同一内容要告诉几个人时，用 targetBotIds 一次发完。
+- 不要发“收到”“好的”“明白”这类没有新信息的消息，也不要为了表示确认而回复。
+`
+
 // SendMessageFromBot delivers a bot-to-bot message. It is stored first, then
 // queued: accepted only ever means the fact is persisted, never that the
 // target ran. The target's busy queue is respected — nothing interrupts.
 func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error) {
+	return a.sendFromBot(ctx, principal, targetBotID, text, taskID, requestID, false)
+}
+
+// NotifyFromBot leaves a member a message it reads with its next turn's
+// context, without waking it or spending the chain: progress notes and
+// "for your information" need no reply.
+func (a *App) NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error) {
+	return a.sendFromBot(ctx, principal, targetBotID, text, taskID, requestID, true)
+}
+
+func (a *App) sendFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string, notify bool) (map[string]any, error) {
 	cached, unlock, writeErr := beginWrite[map[string]any](ctx, a, principal)
 	defer unlock()
 	if writeErr != nil {
@@ -80,11 +100,15 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 		}
 	}
 
+	status := domain.DeliveryQueued
+	if notify {
+		status = "" // stored for the recipient's context, never dispatched
+	}
 	message := domain.Message{
 		ID: domain.NewID(), TeamID: source.TeamID, BotID: target.ID,
 		Kind: domain.MessageKindCollaboration, Blocks: blocks,
 		SourceBotID: source.ID, RequestID: requestID,
-		DeliveryStatus: domain.DeliveryQueued, RunID: taskID,
+		DeliveryStatus: status, RunID: taskID,
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -96,6 +120,18 @@ func (a *App) SendMessageFromBot(ctx context.Context, principal auth.Principal, 
 			return nil, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": requestID})
 		}
 		return nil, err
+	}
+	if notify {
+		result := map[string]any{"status": "notified", "messageId": message.ID}
+		if err := a.saveWriteResult(ctx, tx, principal, result); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		_ = a.recordEvent(ctx, domain.Event{Type: domain.EventMessageCreated, TeamID: source.TeamID, BotID: target.ID, ResourceID: message.ID})
+		a.Hub.Publish()
+		return result, nil
 	}
 	// The wake this causes belongs to the causal chain the sender is working
 	// in. The lookup runs on the caller's transaction: the pool is a single
@@ -333,5 +369,6 @@ func (a *App) BuildContext(ctx context.Context, bot domain.Bot, taskID string) s
 	if role, err := roles.Default(bot.RoleID); err == nil {
 		fmt.Fprintf(&b, "\n# 你的角色\n%s\n", role.Instructions)
 	}
+	b.WriteString(collaborationEtiquette)
 	return b.String()
 }

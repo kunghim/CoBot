@@ -118,6 +118,7 @@
   },
   "conversation": {
     "sentTo": "Sent to {{name}}",
+    "notifiedTo": "Noted for {{name}} (no reply needed)",
     "taskCard": { "assigned": "Task assigned · owner {{name}}", "acceptance": "Done when", "open": "Open in the task board" },
     "file": { "open": "Open file", "reveal": "Show in folder" },
     "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
@@ -160,6 +161,7 @@
       "noOutput": "No output",
       "cobot": {
         "send_message": "Sent a message to {{name}}",
+        "notify": "Left a note for {{name}}",
         "create_task": "Created task “{{title}}” for {{name}}",
         "propose_task": "Proposed task “{{title}}”",
         "assign_task": "Reassigned a task to {{name}}",
