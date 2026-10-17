@@ -552,42 +552,6 @@ paths:
                       data: { $ref: "#/components/schemas/Team" }
         "404":
           $ref: "#/components/responses/Error"
-  /api/v1/teams/{id}/retry:
-    post:
-      operationId: retryTeam
-      security:
-        - SessionCookie: []
-      summary: Retry a team whose staged creation failed
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, expectedRevision]
-              properties:
-                requestId: { type: string, format: uuid }
-                expectedRevision: { type: integer, format: int64, minimum: 1 }
-      responses:
-        "200":
-          description: Retried team
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/Team" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/archive:
     post:
       operationId: archiveTeam
@@ -2051,7 +2015,7 @@ components:
         directory: { type: string }
         status:
           type: string
-          enum: [creating, active, archived, deleted, directory_missing, error]
+          enum: [active, archived, deleted, directory_missing]
         statusDetail: { type: string }
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }

@@ -2,16 +2,16 @@ package domain
 
 import "time"
 
-// Team lifecycle states. Archived pauses dispatch; directory_missing keeps
-// the team read-only while its lifelong folder is gone and clears itself when
-// the folder is back; error keeps a retryable creation failure.
+// Team lifecycle states. Creation is one transaction, so a team is active
+// from its first moment. Archived sets an idle team aside; directory_missing
+// keeps the team read-only while its lifelong folder is gone and clears
+// itself when the folder is back. Deleted is only ever a response value:
+// deleting removes the team.
 const (
-	TeamStatusCreating         = "creating"
 	TeamStatusActive           = "active"
 	TeamStatusArchived         = "archived"
 	TeamStatusDeleted          = "deleted"
 	TeamStatusDirectoryMissing = "directory_missing"
-	TeamStatusError            = "error"
 )
 
 // Team is one collaboration unit bound to exactly one working directory.

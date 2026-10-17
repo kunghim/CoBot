@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MoreHorizontal } from 'lucide-react';
 import { api } from '../../api/client';
-import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRetryTeam, useRoles } from '../../api/queries';
+import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRoles } from '../../api/queries';
 import type { TeamWithBots } from '../../api/types';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useDialogFocus } from '../../components/useDialogFocus';
@@ -19,9 +19,9 @@ const itemClass =
  * TeamMenu keeps the team list clean: every team action sits behind one
  * "more" button. What it offers follows the team's state — an active team
  * can add or delete members and be archived (only when idle; it then moves
- * to Settings), a team whose folder is gone can only be deleted, and a
- * failed creation can be retried. Each action that changes the team asks
- * first and shows a refusal inside its dialog.
+ * to Settings), and a team whose folder is gone can only be deleted. Each
+ * action that changes the team asks first and shows a refusal inside its
+ * dialog.
  */
 export default function TeamMenu({ item }: { item: TeamWithBots }) {
   const { t } = useTranslation();
@@ -29,7 +29,6 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
   const { botId, setBotId } = useSelectedBot();
   const archive = useArchiveTeam();
   const removeTeam = useDeleteTeam();
-  const retry = useRetryTeam();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [errorText, setErrorText] = useState('');
@@ -74,20 +73,6 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
   }
   if (team.status === 'directory_missing') {
     entries.push({ key: 'delete', label: t('team.delete'), danger: true, run: () => choose('deleteTeam') });
-  }
-  if (team.status === 'error') {
-    entries.push({
-      key: 'retry',
-      label: t('team.retry'),
-      run: () => {
-        setOpen(false);
-        setErrorText('');
-        retry.mutate(
-          { teamId: team.id, expectedRevision: team.revision },
-          { onError: (error) => setErrorText(apiErrorMessage(t, error)) },
-        );
-      },
-    });
   }
   if (entries.length === 0) return null;
 

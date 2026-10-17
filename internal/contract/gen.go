@@ -185,12 +185,10 @@ const (
 
 // Defines values for TeamStatus.
 const (
-	TeamStatusActive           TeamStatus = "active"
-	TeamStatusArchived         TeamStatus = "archived"
-	TeamStatusCreating         TeamStatus = "creating"
-	TeamStatusDeleted          TeamStatus = "deleted"
-	TeamStatusDirectoryMissing TeamStatus = "directory_missing"
-	TeamStatusError            TeamStatus = "error"
+	Active           TeamStatus = "active"
+	Archived         TeamStatus = "archived"
+	Deleted          TeamStatus = "deleted"
+	DirectoryMissing TeamStatus = "directory_missing"
 )
 
 // Defines values for ToolResultStatus.
@@ -870,12 +868,6 @@ type RestoreTeamJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
-// RetryTeamJSONBody defines parameters for RetryTeam.
-type RetryTeamJSONBody struct {
-	ExpectedRevision int64              `json:"expectedRevision"`
-	RequestId        openapi_types.UUID `json:"requestId"`
-}
-
 // ListTasksParams defines parameters for ListTasks.
 type ListTasksParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -973,9 +965,6 @@ type AddBotJSONRequestBody AddBotJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody
-
-// RetryTeamJSONRequestBody defines body for RetryTeam for application/json ContentType.
-type RetryTeamJSONRequestBody RetryTeamJSONBody
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest

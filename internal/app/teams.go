@@ -37,9 +37,9 @@ type TeamMarker struct {
 	Directory     string `json:"directory"`
 }
 
-// CreateTeam reserves the binding and members atomically, then prepares the
-// directory marker; a preparation failure flips the team to error (retryable)
-// and never deletes the user's directory contents.
+// CreateTeam creates the team, its members, its folder binding and the
+// folder's .cobot data in one transaction: it either succeeds completely or
+// leaves nothing behind. The user's own files are never touched.
 func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in CreateTeamInput) (domain.Team, []domain.Bot, error) {
 	if principal.Write == nil && in.RequestID != "" {
 		var err error
@@ -162,46 +162,48 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 
 	team := domain.Team{
 		ID: domain.NewID(), Name: name, ProfileInstance: a.InstanceID,
-		LeaderID: leaderBot.ID, Status: domain.TeamStatusCreating,
+		LeaderID: leaderBot.ID, Status: domain.TeamStatusActive,
 	}
 	for i := range bots {
 		bots[i].TeamID = team.ID
 	}
-	if err := sqlite.InsertTeamStaged(ctx, tx, team, canon.Display, canon.Key, bots); err != nil {
+	if err := sqlite.InsertTeam(ctx, tx, team, canon.Display, canon.Key, bots); err != nil {
 		if isUniqueViolation(err) {
 			return domain.Team{}, nil, domain.Conflict("error.team.directory_bound_race", nil)
 		}
 		return domain.Team{}, nil, err
 	}
-	reserved, _, err := sqlite.GetTeam(ctx, tx, team.ID)
+	// Creation is one transaction: the project folder is prepared while it
+	// is still open, and any failure rolls the rows back and removes the
+	// .cobot folder this attempt created. A team exists completely or not
+	// at all; there is no half-created state to retry.
+	cobotDir := filepath.Join(canon.Display, ".cobot")
+	_, statErr := os.Stat(cobotDir)
+	createdCobot := os.IsNotExist(statErr)
+	undo := func() {
+		if createdCobot {
+			_ = os.RemoveAll(cobotDir)
+		}
+	}
+	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
+		undo()
+		return domain.Team{}, nil, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
+	}
+	created, _, err := sqlite.GetTeam(ctx, tx, team.ID)
 	if err != nil {
+		undo()
 		return domain.Team{}, nil, err
 	}
-	if err := a.saveWriteResult(ctx, tx, principal, TeamWithBots{Team: reserved, Bots: bots}); err != nil {
+	if err := a.saveWriteResult(ctx, tx, principal, TeamWithBots{Team: created, Bots: bots}); err != nil {
+		undo()
 		return domain.Team{}, nil, err
 	}
 	if err := tx.Commit(); err != nil {
+		undo()
 		return domain.Team{}, nil, err
 	}
+	team = created
 
-	// Resource preparation happens after the reservation committed. Failure
-	// keeps a retryable error state; the user's files are never removed.
-	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
-		if _, serr := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusError, err.Error(), 0); serr != nil {
-			a.Logger.Error("mark team error failed", "teamId", team.ID, "error", serr)
-		}
-		a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID})
-		a.Hub.Publish()
-		return domain.Team{}, nil, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
-	}
-	if _, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusActive, "", 0); err != nil {
-		return domain.Team{}, nil, err
-	}
-
-	team, _, err = sqlite.GetTeam(ctx, a.DB, team.ID)
-	if err != nil {
-		return domain.Team{}, nil, err
-	}
 	botsOut, err := sqlite.ListBots(ctx, a.DB, team.ID)
 	if err != nil {
 		return domain.Team{}, nil, err
@@ -278,66 +280,6 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 	}
 	_ = ctx
 	return nil
-}
-
-// RetryTeamCreation re-runs resource preparation for a team stuck in the
-// error state (B06): no half-created bots are duplicated and the reservation
-// is reused.
-func (a *App) RetryTeamCreation(ctx context.Context, principal auth.Principal, teamID string) (domain.Team, error) {
-	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
-	defer unlock()
-	if writeErr != nil {
-		return domain.Team{}, writeErr
-	}
-	if cached != nil {
-		team, _, err := sqlite.GetTeam(ctx, a.DB, cached.ID)
-		return team, err
-	}
-
-	if principal.Kind != auth.KindUser {
-		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
-	}
-	team, directory, err := sqlite.GetTeam(ctx, a.DB, teamID)
-	if err != nil {
-		return domain.Team{}, sqlite.NormalizeError(err)
-	}
-	if team.Status != domain.TeamStatusError {
-		return domain.Team{}, domain.Conflict("error.team.not_retryable", map[string]any{"status": team.Status})
-	}
-	canon, err := platform.CanonicalDirFrom(directory)
-	if err != nil {
-		return domain.Team{}, domain.InvalidRequest("error.team.directory_invalid", nil)
-	}
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	defer tx.Rollback()
-	expected := team.Revision
-	if principal.Write != nil && principal.Write.ExpectedRevision > 0 {
-		expected = principal.Write.ExpectedRevision
-	}
-	reserved, err := sqlite.SetTeamStatusTx(ctx, tx, team.ID, domain.TeamStatusCreating, "", expected)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	if err := a.saveWriteResult(ctx, tx, principal, reserved); err != nil {
-		return domain.Team{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return domain.Team{}, err
-	}
-	if err := a.prepareTeamResources(ctx, team, canon); err != nil {
-		_, _ = sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusError, "resource_preparation_failed", 0)
-		return domain.Team{}, domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
-	}
-	activated, err := sqlite.SetTeamStatus(ctx, a.DB, teamID, domain.TeamStatusActive, "", 0)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID})
-	a.Hub.Publish()
-	return activated, nil
 }
 
 // AddBot appends one member of an existing role to an active team; the user

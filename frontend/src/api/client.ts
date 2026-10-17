@@ -288,8 +288,6 @@ export const api = {
     request<import('./types').Team>('DELETE', `/api/v1/teams/${teamId}`, { expectedRevision }),
   deleteBot: (botId: string, expectedRevision?: number) =>
     request<import('./types').Bot>('DELETE', `/api/v1/bots/${botId}`, { expectedRevision }),
-  retryTeam: (teamId: string, expectedRevision: number) =>
-    request<import('./types').Team>('POST', `/api/v1/teams/${teamId}/retry`, { expectedRevision }),
 
   // Activity, memories, directories, authorizations (M5).
   listActivity: (teamId: string, viewBotId?: string, cursor?: string) => request<{ items: import('./types').ActivityItem[]; nextCursor: string }>('GET', `/api/v1/teams/${teamId}/activity` + pageQuery({ viewBotId, cursor })),

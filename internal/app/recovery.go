@@ -67,11 +67,6 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
-	// A staged filesystem preparation that lost its owner is retryable;
-	// replaying the original request returns the same reserved team.
-	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = 'resource_preparation_interrupted', revision = revision + 1 WHERE status = ?`, domain.TeamStatusError, domain.TeamStatusCreating); err != nil {
-		return err
-	}
 	for _, run := range runs {
 		// Keep the dead connection's turn id and epoch: they document which
 		// engine the run belonged to, which is exactly what "unknown after

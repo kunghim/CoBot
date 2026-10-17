@@ -32,7 +32,6 @@
     "deleteBody": "团队的成员、会话、任务、记忆，以及 Codex 会话和项目里的 .cobot 文件夹都会被永久删除，无法恢复。项目里的其他文件不受影响。"
   },
   "team": {
-    "retry": "重试创建",
     "archive": "归档团队",
     "restore": "恢复团队",
     "delete": "删除团队",
@@ -72,9 +71,7 @@
     "loading": "加载团队中…",
     "loadFailed": "团队列表加载失败",
     "badge": {
-      "creating": "创建中",
       "archived": "已归档",
-      "error": "创建失败",
       "directory_missing": "目录不在"
     },
     "status": {
@@ -454,7 +451,7 @@
     "error.team.unknown_role": "未知角色：{{roleId}}",
     "error.team.archived": "团队已归档，无法发送消息",
     "error.team.not_active": "团队当前状态为 {{status}}，无法操作",
-    "error.team.prepare_failed": "团队资源准备失败：{{detail}}",
+    "error.team.prepare_failed": "无法在该目录写入 CoBot 数据，团队没有创建：{{detail}}",
     "error.team.revision_conflict": "团队已被其他入口修改，请刷新后重试",
     "error.message.text_required": "消息不能为空",
     "error.message.request_reused": "请求 ID 已被使用",

@@ -263,23 +263,6 @@ export interface paths {
         patch: operations["patchTeam"];
         trace?: never;
     };
-    "/api/v1/teams/{id}/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retry a team whose staged creation failed */
-        post: operations["retryTeam"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/teams/{id}/archive": {
         parameters: {
             query?: never;
@@ -1064,7 +1047,7 @@ export interface components {
             leaderId: string;
             directory: string;
             /** @enum {string} */
-            status: "creating" | "active" | "archived" | "deleted" | "directory_missing" | "error";
+            status: "active" | "archived" | "deleted" | "directory_missing";
             statusDetail?: string;
             /** Format: int64 */
             revision: number;
@@ -1726,41 +1709,6 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             404: components["responses"]["Error"];
-        };
-    };
-    retryTeam: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Retried team */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Team"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            409: components["responses"]["Error"];
         };
     };
     archiveTeam: {

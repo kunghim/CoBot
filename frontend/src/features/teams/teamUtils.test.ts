@@ -58,15 +58,12 @@ describe('sendability by team status', () => {
   it('gives an honest reason for every other state', () => {
     expect(sendBlockReasonKey('archived')).toBe('conversation.blocked.archived');
     expect(sendBlockReasonKey('directory_missing')).toBe('conversation.blocked.directory_missing');
-    expect(sendBlockReasonKey('creating')).toBe('conversation.blocked.notActive');
-    expect(sendBlockReasonKey('error')).toBe('conversation.blocked.notActive');
+    expect(sendBlockReasonKey('deleted')).toBe('conversation.blocked.notActive');
   });
 
   it('shows a badge for every non-active listed team state', () => {
     expect(teamBadgeKey('active')).toBeNull();
-    expect(teamBadgeKey('creating')).toBe('team.badge.creating');
     expect(teamBadgeKey('archived')).toBe('team.badge.archived');
-    expect(teamBadgeKey('error')).toBe('team.badge.error');
     expect(teamBadgeKey('directory_missing')).toBe('team.badge.directory_missing');
   });
 });

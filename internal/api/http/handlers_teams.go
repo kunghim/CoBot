@@ -72,27 +72,6 @@ func (s *Server) handleAddBot(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, http.StatusCreated, bot)
 }
 
-func (s *Server) handleRetryTeam(w http.ResponseWriter, r *http.Request) {
-	principal, ok := requireUser(w, r)
-	if !ok {
-		return
-	}
-	var req struct {
-		RequestID        string `json:"requestId"`
-		ExpectedRevision int64  `json:"expectedRevision"`
-	}
-	if err := decodeBody(w, r, &req); err != nil {
-		writeError(w, r, err)
-		return
-	}
-	team, err := s.App.RetryTeamCreation(r.Context(), principal, r.PathValue("id"))
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	writeData(w, r, http.StatusOK, team)
-}
-
 func (s *Server) handleListRoles(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireUser(w, r); !ok {
 		return

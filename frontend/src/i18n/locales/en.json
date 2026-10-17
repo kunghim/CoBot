@@ -32,7 +32,6 @@
     "deleteBody": "Their members, conversations, tasks, memories, Codex sessions and the .cobot folder in the project are permanently removed. This cannot be undone. Other project files are not touched."
   },
   "team": {
-    "retry": "Retry creation",
     "archive": "Archive team",
     "restore": "Restore team",
     "delete": "Delete team",
@@ -72,9 +71,7 @@
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {
-      "creating": "Creating",
       "archived": "Archived",
-      "error": "Failed",
       "directory_missing": "Folder missing"
     },
     "status": {
@@ -458,7 +455,7 @@
     "error.team.unknown_role": "Unknown role: {{roleId}}",
     "error.team.archived": "Team is archived; messages cannot be sent",
     "error.team.not_active": "Team is currently {{status}}; not available",
-    "error.team.prepare_failed": "Failed to prepare team resources: {{detail}}",
+    "error.team.prepare_failed": "CoBot could not write its data into this folder, so no team was created: {{detail}}",
     "error.team.revision_conflict": "Team changed elsewhere; refresh and retry",
     "error.message.text_required": "Message cannot be empty",
     "error.message.request_reused": "Request ID already used",

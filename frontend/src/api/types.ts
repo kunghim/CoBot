@@ -40,7 +40,7 @@ export interface ModelListResult {
 // Teams and members
 // ---------------------------------------------------------------------------
 
-export type TeamStatus = 'creating' | 'active' | 'archived' | 'deleted' | 'directory_missing' | 'error';
+export type TeamStatus = 'active' | 'archived' | 'deleted' | 'directory_missing';
 
 export type Team = components['schemas']['Team'];
 

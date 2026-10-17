@@ -413,3 +413,49 @@ func TestTeamFollowsItsFolder(t *testing.T) {
 		t.Fatalf("lost marker must be rewritten: %s (%v)", data, err)
 	}
 }
+
+// TestCreateTeamIsAtomic: creating a team is one transaction. When the
+// folder cannot be prepared nothing is left — no team, member or binding
+// row, and the user's own file is untouched — and the same request can be
+// sent again once the folder is fixed.
+func TestCreateTeamIsAtomic(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	dir := filepath.Join(filepath.Dir(h.teamDir), "blocked-folder")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	blocker := filepath.Join(dir, ".cobot")
+	if err := os.WriteFile(blocker, []byte("a user file, not a folder"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	input := app.CreateTeamInput{Name: "原子创建", Directory: dir, InitialRoleIDs: []string{"backend-dev"}, RequestID: "atomic-create"}
+	_, _, err := h.app.CreateTeam(ctx, h.user, input)
+	var de *domain.Error
+	if !errors.As(err, &de) || de.MessageKey != "error.team.prepare_failed" {
+		t.Fatalf("create in an unpreparable folder = %v, want prepare_failed", err)
+	}
+	for _, table := range []string{"teams", "bots", "directory_bindings"} {
+		var n int
+		if err := h.app.DB.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Fatalf("%s keeps %d rows after a failed create", table, n)
+		}
+	}
+	if data, err := os.ReadFile(blocker); err != nil || string(data) != "a user file, not a folder" {
+		t.Fatalf("the user's file must stay: %q (%v)", data, err)
+	}
+
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	team, _, err := h.app.CreateTeam(ctx, h.user, input)
+	if err != nil || team.Status != domain.TeamStatusActive {
+		t.Fatalf("the same request after fixing the folder = %+v, %v", team, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".cobot", "team.json")); err != nil {
+		t.Fatalf("marker after create: %v", err)
+	}
+}

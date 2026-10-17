@@ -96,20 +96,13 @@ func FindActiveTeamByDirectoryKey(ctx context.Context, q Queryer, key string) (d
 	return t, nil
 }
 
-// FindTeamByMarker returns any team bound to a directory key regardless of
-// status (used for takeover/conflict decisions), excluding deleted.
-func FindTeamByMarker(ctx context.Context, q Queryer, key string) (domain.Team, error) {
-	return FindActiveTeamByDirectoryKey(ctx, q, key)
-}
-
-// InsertTeamStaged creates the team row, its binding and its bots inside one
-// transaction: the reservation is atomic; resource preparation happens after
-// commit and a failure only flips status to error (retryable).
-func InsertTeamStaged(ctx context.Context, tx *sql.Tx, team domain.Team, bindingDirectory, bindingKey string, bots []domain.Bot) error {
+// InsertTeam creates the team row, its binding and its bots inside the
+// caller's transaction, with the team's status as given.
+func InsertTeam(ctx context.Context, tx *sql.Tx, team domain.Team, bindingDirectory, bindingKey string, bots []domain.Bot) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if _, err := tx.ExecContext(ctx, `INSERT INTO teams (id, name, profile_instance, leader_id, status, status_detail, revision, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, '', 1, ?, ?)`,
-		team.ID, team.Name, team.ProfileInstance, team.LeaderID, domain.TeamStatusCreating, now, now); err != nil {
+		team.ID, team.Name, team.ProfileInstance, team.LeaderID, team.Status, now, now); err != nil {
 		return fmt.Errorf("insert team: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO directory_bindings (team_id, directory_key, directory, created_at) VALUES (?, ?, ?, ?)`,

@@ -48,9 +48,9 @@ func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	team := domain.Team{ID: "team", Name: "kept team", LeaderID: "bot", ProfileInstance: "instance"}
+	team := domain.Team{ID: "team", Name: "kept team", LeaderID: "bot", ProfileInstance: "instance", Status: domain.TeamStatusActive}
 	bot := domain.Bot{ID: "bot", TeamID: team.ID, Name: "kept bot", RoleID: "leader", Status: domain.BotStatusIdle, IsLeader: true}
-	if err := InsertTeamStaged(ctx, tx, team, dir, dir, []domain.Bot{bot}); err != nil {
+	if err := InsertTeam(ctx, tx, team, dir, dir, []domain.Bot{bot}); err != nil {
 		t.Fatal(err)
 	}
 	task := domain.Task{ID: "task", TeamID: team.ID, OwnerID: bot.ID, Title: "kept task", Status: domain.TaskTodo, Revision: 1}
@@ -329,8 +329,9 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 	}
 }
 
-// TestUpgradePurgesSoftDeletedTeams: migration 11 removes teams that earlier
-// builds soft-deleted, with every row of theirs, and keeps live teams intact.
+// TestUpgradePurgesSoftDeletedTeams: migrations 11 and 12 remove teams that
+// earlier builds soft-deleted or left half created, with every row of
+// theirs, and keep live teams intact.
 func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -367,11 +368,11 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	for _, id := range []string{"gone", "kept"} {
-		team := domain.Team{ID: id, Name: id, LeaderID: id + "-bot", ProfileInstance: "instance"}
+	for _, id := range []string{"gone", "half", "kept"} {
+		team := domain.Team{ID: id, Name: id, LeaderID: id + "-bot", ProfileInstance: "instance", Status: domain.TeamStatusActive}
 		bot := domain.Bot{ID: id + "-bot", TeamID: id, Name: id, RoleID: "leader", Status: domain.BotStatusIdle, IsLeader: true}
 		folder := filepath.Join(dir, id)
-		if err := InsertTeamStaged(ctx, tx, team, folder, folder, []domain.Bot{bot}); err != nil {
+		if err := InsertTeam(ctx, tx, team, folder, folder, []domain.Bot{bot}); err != nil {
 			t.Fatal(err)
 		}
 		task := domain.Task{ID: id + "-task", TeamID: id, OwnerID: bot.ID, Title: id, Status: domain.TaskTodo, Revision: 1}
@@ -388,6 +389,9 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = 'deleted' WHERE id = 'gone'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = 'error' WHERE id = 'half'`); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -417,8 +421,10 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		`SELECT COUNT(*) FROM deliveries WHERE team_id = ?`,
 		`SELECT COUNT(*) FROM directory_bindings WHERE team_id = ?`,
 	} {
-		if n := count(query, "gone"); n != 0 {
-			t.Fatalf("%s left %d rows of the soft-deleted team", query, n)
+		for _, id := range []string{"gone", "half"} {
+			if n := count(query, id); n != 0 {
+				t.Fatalf("%s left %d rows of team %s", query, n, id)
+			}
 		}
 		if n := count(query, "kept"); n != 1 {
 			t.Fatalf("%s kept %d rows of the live team, want 1", query, n)

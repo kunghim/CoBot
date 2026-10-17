@@ -518,14 +518,6 @@ export function useDeleteBot() {
   });
 }
 
-export function useRetryTeam() {
-  const invalidate = useInvalidateTeamScope();
-  return useMutation({
-    mutationFn: ({ teamId, expectedRevision }: { teamId: string; expectedRevision: number }) => api.retryTeam(teamId, expectedRevision),
-    onSuccess: invalidate,
-  });
-}
-
 /** GET /authorizations: live bridge credentials without token values. */
 export function useAuthorizations(enabled = true) {
   return useQuery({

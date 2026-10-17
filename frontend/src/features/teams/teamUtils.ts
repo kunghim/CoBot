@@ -46,9 +46,7 @@ export function teamBadgeKey(status: TeamStatus): string | null {
     case 'active':
     case 'deleted':
       return null;
-    case 'creating':
     case 'archived':
-    case 'error':
     case 'directory_missing':
       return `team.badge.${status}`;
     default:

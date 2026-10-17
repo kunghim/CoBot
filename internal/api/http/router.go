@@ -84,7 +84,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/authorizations", s.handleListAuthorizations)
 	mux.HandleFunc("POST /api/v1/authorizations/{id}/revoke", s.handleRevokeAuthorization)
 	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)
-	mux.HandleFunc("POST /api/v1/teams/{id}/retry", s.handleRetryTeam)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
 
 	// Conversations and runs.
