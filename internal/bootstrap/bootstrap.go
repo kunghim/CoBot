@@ -30,6 +30,7 @@ import (
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/webui"
 )
@@ -369,6 +370,12 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			logger.Error("http server stopped", "error", err)
 		}
 	}()
+	// Bring the editable role library up to date at every start, not only
+	// when a team is created: unedited copies of retired defaults upgrade,
+	// user edits stay.
+	if err := roles.EnsureProfileCopy(paths.RolesDir()); err != nil {
+		logger.Warn("role library not refreshed", "error", err)
+	}
 	logger.Info("core started",
 		"profile", string(paths.Environment),
 		"endpoint", endpoint,

@@ -61,9 +61,9 @@ func toolSchema(name string) json.RawMessage {
 		task()
 		add("summary", text("What was produced and how it was verified."), true)
 		add("artifactRefs", strings("Paths or stable references to outputs."), false)
-		add("candidateRef", text("Exact candidate version, e.g. commit SHA."), false)
-		add("testResult", text("Actual test outcome for this candidate."), false)
-		add("reviewResult", text("Actual review outcome for this candidate."), false)
+		add("candidateRef", text("Only for Git work: the commit this evidence is about. Leave empty otherwise; never invent a version by hashing files."), false)
+		add("testResult", text("The tests actually run and their outcome."), false)
+		add("reviewResult", text("The actual review outcome, when this evidence is a review."), false)
 	case "report_completion", "confirm_task":
 		task()
 		add("evidenceIds", strings("Evidence IDs for this task and candidate."), true)

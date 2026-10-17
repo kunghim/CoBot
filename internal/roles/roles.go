@@ -87,7 +87,12 @@ func Digest(instructions string) string {
 // profile copy still carrying one of them was never edited by the user, so it
 // is upgraded to the current default instead of pinning the old text forever.
 var retiredDigests = map[string][]string{
-	LeaderRoleID: {"d4ff9b5d42b58330"},
+	LeaderRoleID:      {"d4ff9b5d42b58330", "47096f47252a1cbe"},
+	"backend-dev":     {"8129f84c3283bf85"},
+	"code-reviewer":   {"356c52217a6c921b"},
+	"frontend-dev":    {"9efc19173ce35554"},
+	"product-manager": {"04df35093d7484bc"},
+	"qa-engineer":     {"8d36dda792696699"},
 }
 
 // EnsureProfileCopy materializes the editable role files on first use.

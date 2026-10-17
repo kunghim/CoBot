@@ -20,6 +20,10 @@ const collaborationEtiquette = `
 - 需要对方处理或回答时才发普通消息；只是告知进展或结果时设 notifyOnly，对方下一轮会看到，不会被打断。
 - 同一内容要告诉几个人时，用 targetBotIds 一次发完。
 - 不要发“收到”“好的”“明白”这类没有新信息的消息，也不要为了表示确认而回复。
+
+# 证据
+- 证据与任务规模相称：小任务写清怎么运行或打开成果，加上实际执行的测试命令和结果即可。
+- 不要计算文件哈希、冻结“候选版本”，也不要为同一结论反复复测或重复提交证据。只有涉及 Git 合并时才需要写明 commit。
 `
 
 // SendMessageFromBot delivers a bot-to-bot message. It is stored first, then
