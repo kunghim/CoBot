@@ -37,6 +37,7 @@ export const queryKeys = {
   engine: ['engine'] as const,
   models: ['models'] as const,
   messages: (botId: string) => ['messages', botId] as const,
+  exchanges: (botId: string, peerBotId: string) => ['exchanges', botId, peerBotId] as const,
   approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
   tasks: (teamId: string) => ['tasks', teamId] as const,
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
@@ -234,6 +235,19 @@ export function useConversation(botId: string | null) {
   const query = useInfiniteQuery({ queryKey: queryKeys.messages(botId ?? ''), queryFn: ({ pageParam }) => api.listMessages(botId as string, { before: pageParam || undefined }), initialPageParam: '', getNextPageParam: (page) => page.nextCursor || undefined, enabled: botId !== null });
   const pages = query.data?.pages;
   return { ...query, data: pages?.[0] ? { ...pages[0], messages: [...pages].reverse().flatMap((page) => page.messages), runs: [...pages].reverse().flatMap((page) => page.runs ?? []) } : undefined };
+}
+
+/** Everything two members sent each other, oldest first; fetchNextPage
+ * reaches further back. */
+export function useExchanges(teamId: string, botId: string, peerBotId: string) {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.exchanges(botId, peerBotId),
+    queryFn: ({ pageParam }) => api.listExchanges({ teamId, botId, peerBotId, cursor: pageParam || undefined }),
+    initialPageParam: '',
+    getNextPageParam: (page) => page.nextCursor || undefined,
+  });
+  const messages = [...(query.data?.pages ?? [])].reverse().flatMap((page) => page.items);
+  return { ...query, messages };
 }
 
 export function useSendMessage(botId: string) {

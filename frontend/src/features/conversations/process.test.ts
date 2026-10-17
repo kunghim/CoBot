@@ -3,6 +3,7 @@ import { applyLiveSignal, forgetLiveRuns, liveRunsSnapshot, mergeSteps, resetLiv
 import type { Message, Run, RunStep, RunWithSteps } from '../../api/types';
 import { buildTimeline } from './ConversationView';
 import { linkTarget } from './links';
+import { exchangeExcerpt, isExchange } from './MessageCards';
 import { describeStep, displayCommand, durationPhrase, runPhase, visibleSteps } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({
@@ -119,5 +120,33 @@ describe('buildTimeline', () => {
     const active = { id: 'r2', teamId: 't', botId: 'b', status: 'running', startedAt: '2026-10-17T10:01:00Z' } as unknown as Run;
     const timeline = buildTimeline([message('u1', '2026-10-17T10:00:59Z')], [], active);
     expect(timeline.at(-1)).toEqual(expect.objectContaining({ kind: 'run', run: expect.objectContaining({ id: 'r2', steps: [] }) }));
+  });
+  it('folds the reply of a turn another member started into that turn', () => {
+    const reply = { ...message('a1', '2026-10-17T10:00:30Z', 'assistant'), runId: 'r1', audience: 'member', blocks: [{ type: 'text', text: '已交给测试' }] } as Message;
+    const timeline = buildTimeline([reply], [run('r1', '2026-10-17T10:00:01Z')], null, 'b');
+    expect(timeline).toHaveLength(1);
+    expect(timeline[0]).toEqual(expect.objectContaining({ kind: 'run', note: '已交给测试' }));
+  });
+  it('merges one message sent to several members into one line', () => {
+    const sent = (id: string, to: string, at: string) =>
+      ({ ...message(id, at, 'collaboration'), botId: to, sourceBotId: 'b', blocks: [{ type: 'text', text: '开工' }] }) as Message;
+    const timeline = buildTimeline([sent('m1', 'fe', '2026-10-17T10:00:00Z'), sent('m2', 'qa', '2026-10-17T10:00:01Z'), sent('m3', 'fe', '2026-10-17T10:05:00Z')], [], null, 'b');
+    expect(timeline.map((entry) => (entry.kind === 'message' ? entry.recipients : null))).toEqual([['fe', 'qa'], ['fe']]);
+  });
+});
+
+describe('exchange lines', () => {
+  const t = (key: string, params?: Record<string, unknown>) => `${key}:${String(params?.title ?? '')}`;
+  const base = { id: 'm', teamId: 't', createdAt: '2026-10-17T10:00:00Z' };
+  it('treats member messages, task assignments and review notices as exchanges', () => {
+    expect(isExchange({ ...base, botId: 'fe', kind: 'collaboration', sourceBotId: 'lead', blocks: [] } as Message)).toBe(true);
+    const assignment = { ...base, botId: 'fe', kind: 'system', blocks: [{ type: 'text', text: '你被指派了任务…' }, { type: 'task', text: JSON.stringify({ taskId: 't1', title: '做页面' }) }] } as Message;
+    expect(isExchange(assignment)).toBe(true);
+    expect(exchangeExcerpt(assignment, t)).toBe('conversation.exchange.task:做页面');
+    expect(isExchange({ ...base, botId: 'lead', kind: 'system', sourceBotId: 'fe', blocks: [{ type: 'text', text: '提交验收' }] } as Message)).toBe(true);
+    expect(isExchange({ ...base, botId: 'lead', kind: 'system', blocks: [{ type: 'text', text: '这一轮被中断' }] } as Message)).toBe(false);
+  });
+  it('shows the first non-empty line of a message', () => {
+    expect(exchangeExcerpt({ ...base, botId: 'fe', kind: 'collaboration', blocks: [{ type: 'text', text: '\n页面好了\n细节如下' }] } as Message, t)).toBe('页面好了');
   });
 });

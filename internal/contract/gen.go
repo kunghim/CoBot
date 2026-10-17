@@ -103,6 +103,11 @@ const (
 	Unauthorized        ErrorEnvelopeErrorCode = "unauthorized"
 )
 
+// Defines values for MessageAudience.
+const (
+	Member MessageAudience = "member"
+)
+
 // Defines values for MessageDeliveryStatus.
 const (
 	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
@@ -438,6 +443,8 @@ type MergeApprovalDetails struct {
 
 // Message defines model for Message.
 type Message struct {
+	// Audience Conversation pages only; member marks the reply of a turn another member started.
+	Audience       *MessageAudience       `json:"audience,omitempty"`
 	Blocks         []TextBlock            `json:"blocks"`
 	BotId          string                 `json:"botId"`
 	CreatedAt      time.Time              `json:"createdAt"`
@@ -449,6 +456,9 @@ type Message struct {
 	SourceBotId    *string                `json:"sourceBotId,omitempty"`
 	TeamId         string                 `json:"teamId"`
 }
+
+// MessageAudience Conversation pages only; member marks the reply of a turn another member started.
+type MessageAudience string
 
 // MessageDeliveryStatus defines model for Message.DeliveryStatus.
 type MessageDeliveryStatus string
@@ -717,6 +727,12 @@ type DeleteBotParams struct {
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// TeamId The team both members belong to; required with peerBotId.
+	TeamId *string `form:"teamId,omitempty" json:"teamId,omitempty"`
+
+	// PeerBotId Limit the record to messages between the member and this peer.
+	PeerBotId *string `form:"peerBotId,omitempty" json:"peerBotId,omitempty"`
 
 	// ViewBotId Selected member projection; a leader selects the whole team.
 	ViewBotId *string `form:"viewBotId,omitempty" json:"viewBotId,omitempty"`

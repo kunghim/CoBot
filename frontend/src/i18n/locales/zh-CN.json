@@ -117,7 +117,18 @@
     }
   },
   "conversation": {
-    "sentTo": "已发给 {{name}}",
+    "exchange": {
+      "to": "发给",
+      "from": "来自",
+      "you": "你",
+      "task": "任务「{{title}}」",
+      "title": "{{a}} 与 {{b}} 的往来",
+      "close": "关闭",
+      "latest": "跳到最新",
+      "older": "加载更早的消息",
+      "loading": "正在加载",
+      "empty": "还没有往来消息"
+    },
     "engineError": {
       "serverOverloaded": "模型当前满载，这一轮没能完成。请稍后重发，或在设置里换一个模型",
       "usageLimitExceeded": "账号的模型用量已达上限，这一轮没能完成。请等额度恢复后再试",
@@ -129,8 +140,6 @@
       "responseStreamDisconnected": "与模型服务的连接中断，这一轮没能完成，请重发",
       "internalServerError": "模型服务内部出错，请稍后重发"
     },
-    "notifiedTo": "已通知 {{name}}（无需回复）",
-    "taskCard": { "assigned": "任务指派 · 负责人 {{name}}", "acceptance": "完成标准", "open": "在任务面板查看" },
     "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
     "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
     "duration": { "seconds": "{{s}} 秒", "minutes": "{{m}} 分 {{s}} 秒" },

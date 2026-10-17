@@ -186,7 +186,7 @@ func (a *App) AcceptTransfer(ctx context.Context, principal auth.Principal, tran
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID); err != nil {
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID, transfer.FromBotID); err != nil {
 		return domain.Task{}, err
 	}
 	task, err = sqlite.GetTask(ctx, tx, task.ID)

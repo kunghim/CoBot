@@ -895,6 +895,11 @@ export interface components {
             deliveryStatus?: "waiting_dependency" | "queued" | "dispatching" | "accepted" | "cancelled" | "unknown";
             runId?: string;
             sourceBotId?: string;
+            /**
+             * @description Conversation pages only; member marks the reply of a turn another member started.
+             * @enum {string}
+             */
+            audience?: "member";
             /** Format: date-time */
             createdAt: string;
         };
@@ -2495,6 +2500,10 @@ export interface operations {
         parameters: {
             query?: {
                 cursor?: string;
+                /** @description The team both members belong to; required with peerBotId. */
+                teamId?: string;
+                /** @description Limit the record to messages between the member and this peer. */
+                peerBotId?: string;
                 /** @description Selected member projection; a leader selects the whole team. */
                 viewBotId?: string;
                 limit?: number;

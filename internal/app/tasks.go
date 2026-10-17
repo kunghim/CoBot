@@ -192,7 +192,7 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if principal.Kind == auth.KindBot {
 		chainID = chainOfRunLocked(ctx, tx, principal.BotID)
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID); err != nil {
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID, principal.BotID); err != nil {
 		return domain.Task{}, err
 	}
 	task, err = sqlite.GetTask(ctx, tx, task.ID)
@@ -238,7 +238,10 @@ func (a *App) dependenciesSatisfied(ctx context.Context, q sqlite.Queryer, taskI
 // dependencies allow the bot to start. chainID carries the causal chain this
 // assignment belongs to: a hand-over continues the chain that produced the
 // work, while a fresh user-directed assignment carries none.
-func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task domain.Task, ready bool, chainID string) error {
+// sourceBotID is the member who handed the task over, or "" when the user did;
+// the assignment then reads as a message from that member in both
+// conversations.
+func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task domain.Task, ready bool, chainID, sourceBotID string) error {
 	status := domain.DeliveryQueued
 	if !ready {
 		status = domain.DeliveryWaitingDependency
@@ -257,6 +260,7 @@ func (a *App) enqueueAssignmentLocked(ctx context.Context, tx *sql.Tx, task doma
 	message := domain.Message{
 		ID: domain.NewID(), TeamID: task.TeamID, BotID: task.OwnerID,
 		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: status, RunID: task.ID,
+		SourceBotID: sourceBotID,
 	}
 	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
 		return err
@@ -352,7 +356,7 @@ func (a *App) AssignTask(ctx context.Context, principal auth.Principal, taskID, 
 	if err != nil {
 		return domain.Task{}, err
 	}
-	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, ""); err != nil {
+	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, "", principal.BotID); err != nil {
 		return domain.Task{}, err
 	}
 	task, err = sqlite.GetTask(ctx, tx, task.ID)
@@ -809,6 +813,7 @@ func (a *App) enqueueReviewNoticeLocked(ctx context.Context, tx *sql.Tx, princip
 	message := domain.Message{
 		ID: domain.NewID(), TeamID: task.TeamID, BotID: team.LeaderID,
 		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: task.ID,
+		SourceBotID: principal.BotID,
 	}
 	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
 		return "", err

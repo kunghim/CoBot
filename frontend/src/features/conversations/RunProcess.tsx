@@ -30,12 +30,16 @@ export default function RunProcess({
   live,
   teamId,
   nameOf,
+  note,
 }: {
   run: RunWithSteps;
   active: boolean;
   live: LiveRun | undefined;
   teamId: string;
   nameOf: (botId: string) => string;
+  /** The reply of a turn another member started: nobody asked for it, so it
+   * closes the expanded process instead of standing as a bubble. */
+  note?: string;
 }) {
   const { t } = useTranslation();
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
@@ -46,7 +50,7 @@ export default function RunProcess({
   // A failed turn stays open so its reason is seen without a click.
   const expanded = open ?? (active || run.status === 'failed');
 
-  if (!active && shown.length === 0) {
+  if (!active && shown.length === 0 && !note) {
     if (run.status === 'failed' || run.status === 'interrupted') {
       return <p className="text-xs text-neutral-400">{t(`conversation.process.${run.status}`)}</p>;
     }
@@ -79,6 +83,11 @@ export default function RunProcess({
             </li>
           ))}
         </ol>
+      )}
+      {expanded && !active && note && (
+        <div className="ml-1.5 border-l border-neutral-200 pl-3 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300" data-testid="run-note">
+          <Markdown text={note} teamId={teamId} />
+        </div>
       )}
       {active && live?.reply && (
         <div className="rounded-xl bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100" data-testid="streaming-reply">

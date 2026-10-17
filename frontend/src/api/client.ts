@@ -207,6 +207,13 @@ export const api = {
       `/api/v1/bots/${botId}/messages${suffix ? `?${suffix}` : ''}`,
     );
   },
+  /** What passed between two members, oldest first within a page; the
+   * cursor walks back to older pages. */
+  listExchanges: (params: { teamId: string; botId: string; peerBotId: string; cursor?: string }) => {
+    const query = new URLSearchParams({ teamId: params.teamId, peerBotId: params.peerBotId });
+    if (params.cursor) query.set('cursor', params.cursor);
+    return request<{ items: import('./types').Message[]; nextCursor?: string }>('GET', `/api/v1/bots/${params.botId}/collaboration?${query.toString()}`);
+  },
   sendMessage: (botId: string, text: string) =>
     request<import('./types').SendMessageResult>('POST', `/api/v1/bots/${botId}/messages`, { text }),
   cancelMessage: (messageId: string) =>

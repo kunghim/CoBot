@@ -1362,6 +1362,14 @@ paths:
         - name: cursor
           in: query
           schema: { type: string }
+        - name: teamId
+          in: query
+          description: The team both members belong to; required with peerBotId.
+          schema: { type: string }
+        - name: peerBotId
+          in: query
+          description: Limit the record to messages between the member and this peer.
+          schema: { type: string }
         - name: viewBotId
           in: query
           description: Selected member projection; a leader selects the whole team.
@@ -1860,6 +1868,10 @@ components:
         deliveryStatus: { type: string, enum: [waiting_dependency, queued, dispatching, accepted, cancelled, unknown] }
         runId: { type: string }
         sourceBotId: { type: string }
+        audience:
+          type: string
+          enum: [member]
+          description: Conversation pages only; member marks the reply of a turn another member started.
         createdAt: { type: string, format: date-time }
     Memory:
       type: object

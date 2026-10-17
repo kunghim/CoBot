@@ -108,12 +108,15 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		}
 	case "messages":
 		// A member's conversation includes what other members sent it and
-		// what it sent them, alongside its own exchange with the user.
-		from = "FROM messages WHERE (bot_id = ? OR (kind = ? AND source_bot_id = ?))"
-		args = []any{in.BotID, domain.MessageKindCollaboration, in.BotID}
+		// what it sent them (task assignments and review notices included),
+		// alongside its own exchange with the user.
+		from = "FROM messages WHERE (bot_id = ? OR (kind IN (?, ?) AND source_bot_id = ?))"
+		args = []any{in.BotID, domain.MessageKindCollaboration, domain.MessageKindSystem, in.BotID}
 	case "collaboration":
-		from = "FROM messages WHERE kind = ? AND (source_bot_id = ? OR bot_id = ?)"
-		args = []any{domain.MessageKindCollaboration, in.BotID, in.BotID}
+		// Everything that passed between members: their messages plus the
+		// task assignments and review notices one member caused for another.
+		from = "FROM messages WHERE kind IN (?, ?) AND source_bot_id != '' AND (source_bot_id = ? OR bot_id = ?)"
+		args = []any{domain.MessageKindCollaboration, domain.MessageKindSystem, in.BotID, in.BotID}
 		if in.PeerBotID != "" {
 			peer, err := sqlite.GetBot(ctx, q, in.PeerBotID)
 			if err != nil || peer.TeamID != in.TeamID {
@@ -212,6 +215,9 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		result["total"] = total
 	}
 	if in.Kind == "messages" {
+		if err := markMemberReplies(ctx, q, items); err != nil {
+			return nil, err
+		}
 		delete(result, "items")
 		result["messages"] = items
 		bot, e := sqlite.GetBot(ctx, q, in.BotID)
@@ -252,4 +258,30 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		return nil, err
 	}
 	return result, nil
+}
+
+// markMemberReplies flags the replies of turns that another member started:
+// nobody but the member's own log reads them, so the conversation folds them
+// into the turn's process instead of showing them as answers to the user. A
+// turn the user started or joined (a steered message) stays an answer.
+func markMemberReplies(ctx context.Context, q sqlite.Queryer, items []any) error {
+	for i, item := range items {
+		message, ok := item.(domain.Message)
+		if !ok || message.Kind != domain.MessageKindAssistant || message.RunID == "" {
+			continue
+		}
+		var fromUser, fromMember int
+		err := q.QueryRowContext(ctx, `SELECT
+			EXISTS(SELECT 1 FROM deliveries d JOIN messages m ON m.id = d.message_id WHERE d.run_id = ? AND m.kind = ?),
+			EXISTS(SELECT 1 FROM deliveries d JOIN messages m ON m.id = d.message_id WHERE d.run_id = ? AND m.source_bot_id != '')`,
+			message.RunID, domain.MessageKindUser, message.RunID).Scan(&fromUser, &fromMember)
+		if err != nil {
+			return err
+		}
+		if fromUser == 0 && fromMember == 1 {
+			message.Audience = domain.AudienceMember
+			items[i] = message
+		}
+	}
+	return nil
 }

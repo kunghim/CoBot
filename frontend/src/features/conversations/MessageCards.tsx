@@ -1,44 +1,17 @@
-// How member-to-member traffic reads in a conversation: a message from
-// another member is a named bubble, a message this member sent is a compact
-// "→ sent to X" card, and a task assignment is a task card that opens the
-// task on the board.
-import { useState } from 'react';
+// How member-to-member traffic reads in a conversation: one centered line,
+// "发给 [前端开发] …" or "来自 [测试工程师] …". The member name is a badge;
+// clicking the line opens the whole exchange with that member above the
+// conversation. Task assignments and review notices are such messages too.
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ClipboardList, CornerUpRight } from 'lucide-react';
-import { showInWorkPanel } from '../../app/workPanelNav';
-import Markdown from './Markdown';
+import type { Message } from '../../api/types';
+import { messageText } from './delivery';
 
-export function IncomingMessage({ from, text, teamId }: { from: string; text: string; teamId: string }) {
+export function RoleBadge({ name }: { name: string }) {
   return (
-    <div className="flex justify-start">
-      <div className="max-w-[85%] space-y-1">
-        <p className="px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">{from}</p>
-        <div className="break-words rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
-          <Markdown text={text} teamId={teamId} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** notified: an information-only note, left for the recipient's next turn. */
-export function OutgoingMessage({ to, text, teamId, notified = false }: { to: string; text: string; teamId: string; notified?: boolean }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[85%] rounded-xl border border-dashed border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700" data-testid="outgoing-message">
-        <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-          <CornerUpRight size={13} aria-hidden="true" />
-          {t(notified ? 'conversation.notifiedTo' : 'conversation.sentTo', { name: to })}
-        </p>
-        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-1 block w-full text-left text-neutral-700 dark:text-neutral-300">
-          <div className={open ? '' : 'line-clamp-3'}>
-            <Markdown text={text} teamId={teamId} />
-          </div>
-        </button>
-      </div>
-    </div>
+    <span className="inline-flex max-w-[12rem] shrink-0 items-center truncate rounded-md bg-neutral-200/80 px-1.5 py-px text-[11px] font-medium leading-4 text-neutral-700 dark:bg-neutral-700/80 dark:text-neutral-200">
+      {name}
+    </span>
   );
 }
 
@@ -69,36 +42,77 @@ export function taskCardOf(blocks: Array<{ type: string; text: string }>): TaskC
   }
 }
 
-export function TaskCard({ card, owner, teamId }: { card: TaskCardData; owner: string; teamId: string }) {
+/** Whether a message passed between members (or from the user's own task
+ * assignment), and so reads as an exchange line rather than a bubble. */
+export function isExchange(message: Message): boolean {
+  if (message.kind === 'collaboration') return true;
+  if (message.kind !== 'system') return false;
+  if (message.sourceBotId) return message.sourceBotId !== message.botId;
+  return taskCardOf(message.blocks) !== null;
+}
+
+/** The line's short text: an assignment names its task, anything else
+ * shows its first line. */
+export function exchangeExcerpt(message: Message, t: (key: string, params?: Record<string, unknown>) => string): string {
+  const card = message.kind === 'system' ? taskCardOf(message.blocks) : null;
+  if (card) return t('conversation.exchange.task', { title: card.title });
+  return messageText(message).trim().split('\n').find((line) => line.trim() !== '')?.trim() ?? '';
+}
+
+/**
+ * One exchange line. `peers` are the other members (several when one message
+ * went to many); an empty list means the user, whose line opens nothing.
+ */
+export function ExchangeLine({
+  direction,
+  peers,
+  excerpt,
+  nameOf,
+  onOpen,
+}: {
+  direction: 'to' | 'from';
+  peers: string[];
+  excerpt: string;
+  nameOf: (botId: string) => string;
+  onOpen: (peerId: string) => void;
+}) {
   const { t } = useTranslation();
-  return (
-    <div className="flex justify-start">
-      <div className="w-full max-w-[85%] rounded-xl border border-blue-200 bg-blue-50/50 px-3 py-2.5 text-sm dark:border-blue-900 dark:bg-blue-950/30" data-testid="task-card">
-        <p className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-          <ClipboardList size={13} aria-hidden="true" />
-          {t('conversation.taskCard.assigned', { name: owner })}
-        </p>
-        <p className="mt-1 font-semibold text-neutral-900 dark:text-neutral-100">{card.title}</p>
-        {card.description && (
-          <div className="mt-1 line-clamp-3 text-neutral-700 dark:text-neutral-300">
-            <Markdown text={card.description} teamId={teamId} />
-          </div>
-        )}
-        {card.acceptanceCriteria && (
-          <div className="mt-2 text-xs">
-            <p className="font-medium text-neutral-600 dark:text-neutral-400">{t('conversation.taskCard.acceptance')}</p>
-            <div className="text-neutral-700 dark:text-neutral-300">
-              <Markdown text={card.acceptanceCriteria} teamId={teamId} />
-            </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => showInWorkPanel('tasks', card.taskId)}
-          className="mt-2 text-xs font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-300"
-        >
-          {t('conversation.taskCard.open')}
+  const label = t(direction === 'to' ? 'conversation.exchange.to' : 'conversation.exchange.from');
+  const lineClass = 'flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
+  const content = (badges: ReactNode) => (
+    <>
+      <span className="shrink-0">{label}</span>
+      {badges}
+      {excerpt && <span className="min-w-0 truncate">{excerpt}</span>}
+    </>
+  );
+  if (peers.length === 0) {
+    return (
+      <div className="flex justify-center" data-testid="exchange-line">
+        <div className={lineClass}>{content(<RoleBadge name={t('conversation.exchange.you')} />)}</div>
+      </div>
+    );
+  }
+  if (peers.length === 1) {
+    return (
+      <div className="flex justify-center" data-testid="exchange-line">
+        <button type="button" onClick={() => onOpen(peers[0])} className={`${lineClass} hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200`}>
+          {content(<RoleBadge name={nameOf(peers[0])} />)}
         </button>
+      </div>
+    );
+  }
+  // A message to several members: each name opens the exchange with that one.
+  return (
+    <div className="flex justify-center" data-testid="exchange-line">
+      <div className={lineClass}>
+        {content(
+          peers.map((peer) => (
+            <button key={peer} type="button" onClick={() => onOpen(peer)} className="shrink-0 rounded-md hover:ring-1 hover:ring-neutral-400">
+              <RoleBadge name={nameOf(peer)} />
+            </button>
+          )),
+        )}
       </div>
     </div>
   );

@@ -117,7 +117,18 @@
     }
   },
   "conversation": {
-    "sentTo": "Sent to {{name}}",
+    "exchange": {
+      "to": "To",
+      "from": "From",
+      "you": "You",
+      "task": "Task “{{title}}”",
+      "title": "Exchange between {{a}} and {{b}}",
+      "close": "Close",
+      "latest": "Jump to latest",
+      "older": "Load earlier messages",
+      "loading": "Loading",
+      "empty": "No messages between them yet"
+    },
     "engineError": {
       "serverOverloaded": "The model is at capacity, so this turn did not finish. Send again later or pick another model in Settings",
       "usageLimitExceeded": "The account reached its model usage limit, so this turn did not finish. Try again when it resets",
@@ -129,8 +140,6 @@
       "responseStreamDisconnected": "The connection to the model dropped, so this turn did not finish; send again",
       "internalServerError": "The model service had an internal error; send again later"
     },
-    "notifiedTo": "Noted for {{name}} (no reply needed)",
-    "taskCard": { "assigned": "Task assigned · owner {{name}}", "acceptance": "Done when", "open": "Open in the task board" },
     "file": { "open": "Open file", "reveal": "Show in folder" },
     "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
     "duration": { "seconds": "{{s}}s", "minutes": "{{m}}m {{s}}s" },

@@ -17,7 +17,8 @@ import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
 import RunProcess from './RunProcess';
-import { IncomingMessage, OutgoingMessage, TaskCard, taskCardOf } from './MessageCards';
+import { ExchangeLine, RoleBadge, exchangeExcerpt, isExchange } from './MessageCards';
+import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
@@ -37,6 +38,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   // look like a successful one (review C).
   const [actionError, setActionError] = useState('');
   const [stopping, setStopping] = useState(false);
+  // The exchange with another member laid over the conversation, opened at
+  // the message that was clicked.
+  const [exchange, setExchange] = useState<{ peerId: string; anchorId: string } | null>(null);
+  useEffect(() => setExchange(null), [bot.id]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   // The composer grows with its text up to its max height, like Codex's.
@@ -70,7 +75,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
 
   const liveRuns = useLiveRuns();
   const runs = conv.data?.runs ?? [];
-  const timeline = buildTimeline(messages, runs, activeRun);
+  const timeline = buildTimeline(messages, runs, activeRun, bot.id);
   const activeLive = activeRun ? liveRuns[activeRun.id] : undefined;
 
   // "Stopping" is only honest while the run still exists.
@@ -140,6 +145,18 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         </div>
       </header>
 
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      {exchange && (
+        <ExchangeOverlay
+          key={`${exchange.peerId}:${exchange.anchorId}`}
+          teamId={team.id}
+          botId={bot.id}
+          peerId={exchange.peerId}
+          anchorId={exchange.anchorId}
+          nameOf={nameOf}
+          onClose={() => setExchange(null)}
+        />
+      )}
       <div
         ref={scrollRef}
         onScroll={(event) => {
@@ -159,12 +176,14 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           {timeline.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
-                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} />
+                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} note={entry.note} />
               </li>
             ) : (
               <li key={entry.message.id}>
                 <MessageRow
                   message={entry.message}
+                  recipients={entry.recipients}
+                  onOpenExchange={(peerId) => setExchange({ peerId, anchorId: entry.message.id })}
                   botId={bot.id}
                   nameOf={nameOf}
                   teamId={team.id}
@@ -191,6 +210,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           )}
         </ul>
         </fieldset>
+      </div>
       </div>
 
       <div className="space-y-2 px-4 pb-4 pt-2">
@@ -277,19 +297,53 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   );
 }
 
-type TimelineEntry = { kind: 'message'; message: Message; at: number } | { kind: 'run'; run: RunWithSteps; at: number };
+type TimelineEntry =
+  | { kind: 'message'; message: Message; recipients?: string[]; at: number }
+  | { kind: 'run'; run: RunWithSteps; note?: string; at: number };
+
+// One message sent to several members is stored once per recipient, moments
+// apart; within this window the copies read as one line.
+const broadcastWindowMs = 5000;
 
 /** Messages and turns in time order: a turn sits where it started, so its
- * process comes after the message that woke it and before its reply. */
-export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeRun: Run | null): TimelineEntry[] {
+ * process comes after the message that woke it and before its reply.
+ *
+ * Only the user and this member talk in bubbles. The reply of a turn another
+ * member started was read by nobody, so it moves into that turn's process as
+ * its closing note; and copies of one message sent to several members merge
+ * into a single "sent to" line. */
+export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeRun: Run | null, botId = ''): TimelineEntry[] {
+  const notes = new Map<string, string>();
+  const entries: TimelineEntry[] = [];
+  let lastBroadcast: { entry: Extract<TimelineEntry, { kind: 'message' }>; text: string } | null = null;
+  for (const message of messages) {
+    if (message.kind === 'assistant' && message.audience === 'member' && message.runId) {
+      const text = messageText(message);
+      notes.set(message.runId, notes.has(message.runId) ? `${notes.get(message.runId)}\n\n${text}` : text);
+      continue;
+    }
+    const at = Date.parse(message.createdAt);
+    const outgoing = message.kind === 'collaboration' && message.sourceBotId === botId && message.botId !== botId;
+    if (outgoing) {
+      const text = messageText(message);
+      if (lastBroadcast && lastBroadcast.text === text && at - lastBroadcast.entry.at <= broadcastWindowMs && !lastBroadcast.entry.recipients?.includes(message.botId)) {
+        lastBroadcast.entry.recipients = [...(lastBroadcast.entry.recipients ?? []), message.botId];
+        continue;
+      }
+      const entry = { kind: 'message' as const, message, recipients: [message.botId], at };
+      entries.push(entry);
+      lastBroadcast = { entry, text };
+      continue;
+    }
+    entries.push({ kind: 'message', message, at });
+  }
   const seen = new Set<string>();
-  const entries: TimelineEntry[] = messages.map((message) => ({ kind: 'message', message, at: Date.parse(message.createdAt) }));
   for (const run of runs) {
     if (seen.has(run.id)) continue;
     seen.add(run.id);
     // The active run's status is the freshest read of it.
     const current = run.id === activeRun?.id ? { ...run, status: activeRun.status } : run;
-    entries.push({ kind: 'run', run: current, at: Date.parse(run.startedAt) });
+    entries.push({ kind: 'run', run: current, note: notes.get(run.id), at: Date.parse(run.startedAt) });
   }
   if (activeRun?.id && !seen.has(activeRun.id)) {
     entries.push({ kind: 'run', run: { ...activeRun, steps: [] }, at: Date.parse(activeRun.startedAt) });
@@ -299,6 +353,8 @@ export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeR
 
 function MessageRow({
   message,
+  recipients,
+  onOpenExchange,
   botId,
   nameOf,
   teamId,
@@ -308,6 +364,8 @@ function MessageRow({
   onCancelQueued,
 }: {
   message: Message;
+  recipients?: string[];
+  onOpenExchange: (peerId: string) => void;
   botId: string;
   nameOf: (botId: string) => string;
   teamId: string;
@@ -331,16 +389,21 @@ function MessageRow({
     } catch { /* A malformed record remains visible as escaped text. */ }
   }
 
-  if (message.kind === 'collaboration') {
+  if (isExchange(message)) {
     // In the sender's conversation it is what the member sent; in the
-    // recipient's, what it received.
-    return message.sourceBotId === botId && message.botId !== botId
-      ? <OutgoingMessage to={nameOf(message.botId)} text={text} teamId={teamId} notified={!message.deliveryStatus} />
-      : <IncomingMessage from={nameOf(message.sourceBotId ?? '')} text={text} teamId={teamId} />;
+    // recipient's, what it received. A task the user assigned has no member
+    // sender and reads as coming from the user.
+    const outgoing = message.sourceBotId === botId && message.botId !== botId;
+    return (
+      <ExchangeLine
+        direction={outgoing ? 'to' : 'from'}
+        peers={outgoing ? (recipients ?? [message.botId]) : message.sourceBotId ? [message.sourceBotId] : []}
+        excerpt={exchangeExcerpt(message, t)}
+        nameOf={nameOf}
+        onOpen={onOpenExchange}
+      />
+    );
   }
-
-  const card = message.kind === 'system' ? taskCardOf(message.blocks) : null;
-  if (card) return <TaskCard card={card} owner={nameOf(card.ownerId ?? message.botId)} teamId={teamId} />;
 
   if (message.kind === 'system') {
     return (
@@ -353,7 +416,8 @@ function MessageRow({
   const isUser = message.kind === 'user';
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className="max-w-[85%] space-y-0.5">
+      <div className="max-w-[85%] space-y-1">
+        {!isUser && <RoleBadge name={nameOf(message.botId)} />}
         <div
           className={`break-words rounded-xl px-3 py-2 text-sm ${
             isUser

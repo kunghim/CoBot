@@ -254,4 +254,48 @@ func TestReviewWakesTheLeader(t *testing.T) {
 	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system'`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
 		t.Fatalf("leader notices = %d (%v)", leaderMessages, err)
 	}
+	fake.EmitTurnCompleted(notice.ThreadID, notice.TurnID, "completed", "已确认完成")
+	waitUntil(t, 5*time.Second, "leader reply stored", func() bool {
+		var n int
+		_ = h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'assistant'`, leader.ID).Scan(&n)
+		return n == 1
+	})
+
+	// The leader's conversation: the notice comes from the member, and the
+	// reply of the turn the member started is marked as nobody's answer.
+	page, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "messages", BotID: leader.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawNotice, sawReply bool
+	for _, item := range page["messages"].([]any) {
+		message := item.(domain.Message)
+		switch message.Kind {
+		case domain.MessageKindSystem:
+			sawNotice = message.SourceBotID == member.ID
+		case domain.MessageKindAssistant:
+			sawReply = message.Audience == domain.AudienceMember
+		}
+	}
+	if !sawNotice || !sawReply {
+		t.Fatalf("leader page: notice from member %v, reply folded %v", sawNotice, sawReply)
+	}
+	// The member answered a task the user assigned: that reply stays an answer.
+	page, err = h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "messages", BotID: member.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range page["messages"].([]any) {
+		if message := item.(domain.Message); message.Kind == domain.MessageKindAssistant && message.Audience != "" {
+			t.Fatalf("reply to the user's task folded: %+v", message)
+		}
+	}
+	// The record between the two members carries the notice.
+	record, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "collaboration", TeamID: team.ID, BotID: member.ID, PeerBotID: leader.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items := record["items"].([]any); len(items) != 1 || items[0].(domain.Message).Kind != domain.MessageKindSystem {
+		t.Fatalf("exchange record = %+v", items)
+	}
 }
