@@ -1072,6 +1072,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description When the team was archived (RFC 3339); absent unless archived. */
+            archivedAt?: string;
         };
         Bot: {
             id: string;
@@ -2657,6 +2659,8 @@ export interface operations {
                             claimed?: boolean;
                             teamId?: string;
                             teamName?: string;
+                            /** @description The folder belongs to an archived team; restoring that team is the way to use it again. */
+                            archived?: boolean;
                         };
                     };
                 };

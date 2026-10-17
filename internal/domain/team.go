@@ -27,6 +27,8 @@ type Team struct {
 	Revision        int64     `json:"revision"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+	// ArchivedAt is when the team was archived (RFC 3339), empty otherwise.
+	ArchivedAt string `json:"archivedAt,omitempty"`
 }
 
 // Bot is one member of a team. The product status is derived from run

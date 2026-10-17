@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Bot, Cpu, Info, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { Archive, ArrowLeft, Bot, Cpu, Info, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
 import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { useSettings } from '../../api/queries';
 import { workspacePath } from '../../app/workspacePath';
@@ -12,15 +12,17 @@ import {
   ModelsSection,
   SecuritySection,
 } from './SettingsSections';
+import ArchivedTeamsSection from './ArchivedTeamsSection';
 import { useSettingSaver } from './useSettingSaver';
 
-type SectionId = 'general' | 'engine' | 'models' | 'collaboration' | 'security' | 'about';
+type SectionId = 'general' | 'engine' | 'models' | 'collaboration' | 'archived' | 'security' | 'about';
 
 const sections: { id: SectionId; icon: LucideIcon }[] = [
   { id: 'general', icon: Settings2 },
   { id: 'engine', icon: Cpu },
   { id: 'models', icon: Bot },
   { id: 'collaboration', icon: Users },
+  { id: 'archived', icon: Archive },
   { id: 'security', icon: ShieldCheck },
   { id: 'about', icon: Info },
 ];
@@ -64,6 +66,7 @@ export default function SettingsPage() {
       engine: <EngineSection />,
       models: <ModelsSection {...props} />,
       collaboration: <CollaborationSection {...props} />,
+      archived: <ArchivedTeamsSection />,
       security: <SecuritySection />,
       about: <AboutSection />,
     }[current.id];
@@ -91,7 +94,6 @@ export default function SettingsPage() {
             <li key={id} className="shrink-0">
               <NavLink
                 to={`/settings/${id}`}
-                replace
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
                     isActive

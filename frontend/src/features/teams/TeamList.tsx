@@ -4,9 +4,10 @@ import LoadMore from '../../components/LoadMore';
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, ChevronDown, ChevronRight, Plus, RotateCw, Trash2, Undo2, Users, X } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, Plus, RotateCw, Trash2, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRestoreTeam, useRetryTeam, useTeams } from '../../api/queries';
+import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRetryTeam, useTeams } from '../../api/queries';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -32,7 +33,8 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [createOpen, setCreateOpen] = useState(false);
 
-  const items = teams.data?.items ?? [];
+  // Archived teams live in Settings; the sidebar lists teams in use.
+  const items = (teams.data?.items ?? []).filter((item) => item.team.status !== 'archived');
 
   const selectedTeamId = botId ? findBotContext(items, botId)?.team.id : undefined;
   // A new selection reveals its team; later manual collapse remains respected.
@@ -174,7 +176,7 @@ function TeamRow({
             {t(badgeKey)}
           </span>
         )}
-        <TeamActions team={team} />
+        <TeamActions item={item} />
       </div>
       {expanded && (
         <ul className="ml-6 mt-0.5 space-y-0.5">
@@ -236,21 +238,30 @@ function BotRow({
   );
 }
 
-// TeamActions offers the real lifecycle verbs (B09): archive pauses dispatch
-// and keeps work; restore resumes it; delete is reachable only after
-// archiving and never touches user files.
-function TeamActions({ team }: { team: TeamWithBots['team'] }) {
+// TeamActions offers what the sidebar can do with a team: archive an idle
+// active team (it then moves to Settings), retry a failed creation, or delete
+// a team whose folder is gone, the only way out for it. Deleting always asks
+// first, because it cannot be undone.
+function TeamActions({ item }: { item: TeamWithBots }) {
   const { t } = useTranslation();
+  const { team, bots } = item;
+  const { botId, setBotId } = useSelectedBot();
   const archive = useArchiveTeam();
-  const restore = useRestoreTeam();
   const remove = useDeleteTeam();
   const retry = useRetryTeam();
   const [errorText, setErrorText] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const fail = (error: unknown) => setErrorText(apiErrorMessage(t, error));
+  // Leaving the sidebar drops a selection inside the team.
+  const leave = () => {
+    if (botId && bots.some((bot) => bot.id === botId)) setBotId(null);
+  };
+  const iconButton =
+    'flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200';
 
   return (
     <>
-      {/* A refusal gets its own full-width line: inside the240px header row
+      {/* A refusal gets its own full-width line: inside the 240px header row
           it would be truncated (review C re-review). */}
       {errorText && (
         <span role="alert" className="w-full text-[10px] leading-4 text-red-600 dark:text-red-400">
@@ -258,53 +269,42 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
         </span>
       )}
       <span className="flex shrink-0 items-center gap-0.5">
-      {team.status === 'error' && (
-        <button
-          type="button"
-          onClick={() => {
-            setErrorText('');
-            retry.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
-          }}
-          title={t('team.retry')}
-          aria-label={t('team.retry')}
-          className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <RotateCw size={12} aria-hidden="true" />
-        </button>
-      )}
-      {team.status === 'active' && (
-        <button
-          type="button"
-          onClick={() => {
-            setErrorText('');
-            archive.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
-          }}
-          title={t('team.archive')}
-          aria-label={t('team.archive')}
-          className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <Archive size={12} aria-hidden="true" />
-        </button>
-      )}
-      {team.status === 'archived' && (
-        <>
+        {team.status === 'error' && (
           <button
             type="button"
             onClick={() => {
               setErrorText('');
-              restore.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
+              retry.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
             }}
-            title={t('team.restore')}
-            aria-label={t('team.restore')}
-            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            title={t('team.retry')}
+            aria-label={t('team.retry')}
+            className={iconButton}
           >
-            <Undo2 size={12} aria-hidden="true" />
+            <RotateCw size={12} aria-hidden="true" />
           </button>
+        )}
+        {team.status === 'active' && (
           <button
             type="button"
             onClick={() => {
               setErrorText('');
-              remove.mutate({ teamId: team.id, expectedRevision: team.revision }, { onError: fail });
+              archive.mutate({ teamId: team.id, expectedRevision: team.revision }, { onSuccess: leave, onError: fail });
+            }}
+            disabled={archive.isPending}
+            title={t('team.archive')}
+            aria-label={t('team.archive')}
+            className={iconButton}
+          >
+            <Archive size={12} aria-hidden="true" />
+          </button>
+        )}
+        {team.status === 'directory_missing' && (
+          <button
+            type="button"
+            onClick={() => {
+              setErrorText('');
+              remove.reset();
+              setConfirming(true);
             }}
             title={t('team.delete')}
             aria-label={t('team.delete')}
@@ -312,28 +312,47 @@ function TeamActions({ team }: { team: TeamWithBots['team'] }) {
           >
             <Trash2 size={12} aria-hidden="true" />
           </button>
-        </>
-      )}
+        )}
       </span>
+      <ConfirmDialog
+        open={confirming}
+        title={t('team.deleteConfirmTitle', { name: team.name })}
+        body={t('team.deleteMissingConfirmBody')}
+        confirmLabel={t('team.delete')}
+        pending={remove.isPending}
+        errorText={remove.isError ? apiErrorMessage(t, remove.error) : ''}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() =>
+          remove.mutate(
+            { teamId: team.id, expectedRevision: team.revision },
+            {
+              onSuccess: () => {
+                setConfirming(false);
+                leave();
+              },
+            },
+          )
+        }
+      />
     </>
   );
 }
 
-// DeleteMemberButton removes a member that carries no unfinished work (B08).
-// A server refusal (unfinished tasks, runs, approvals) is shown inline: the
-// most common outcome must never be a silent no-op (review C).
+// DeleteMemberButton removes a member that carries no unfinished work (B08)
+// after asking. A server refusal (unfinished tasks, runs, approvals) shows
+// in the dialog: the most common outcome must never be a silent no-op.
 function DeleteMemberButton({ bot }: { bot: Bot }) {
   const { t } = useTranslation();
   const remove = useDeleteBot();
-  const [errorText, setErrorText] = useState('');
+  const [confirming, setConfirming] = useState(false);
   return (
     <>
       <button
         type="button"
         onClick={(event) => {
           event.stopPropagation();
-          setErrorText('');
-          remove.mutate({ botId: bot.id, expectedRevision: bot.revision }, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
+          remove.reset();
+          setConfirming(true);
         }}
         disabled={remove.isPending}
         title={t('team.deleteMember')}
@@ -342,11 +361,16 @@ function DeleteMemberButton({ bot }: { bot: Bot }) {
       >
         <Trash2 size={11} aria-hidden="true" />
       </button>
-      {errorText && (
-        <span role="alert" className="w-full text-[10px] leading-4 text-red-600 dark:text-red-400">
-          {errorText}
-        </span>
-      )}
+      <ConfirmDialog
+        open={confirming}
+        title={t('team.deleteMemberConfirmTitle', { name: bot.name })}
+        body={t('team.deleteMemberConfirmBody')}
+        confirmLabel={t('team.deleteMember')}
+        pending={remove.isPending}
+        errorText={remove.isError ? apiErrorMessage(t, remove.error) : ''}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => remove.mutate({ botId: bot.id, expectedRevision: bot.revision }, { onSuccess: () => setConfirming(false) })}
+      />
     </>
   );
 }

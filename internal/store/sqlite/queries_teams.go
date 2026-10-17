@@ -5,17 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
-const teamColumns = `id, name, profile_instance, leader_id, status, status_detail, revision, created_at, updated_at`
+const teamColumns = `id, name, profile_instance, leader_id, status, status_detail, revision, created_at, updated_at, archived_at`
 
 func scanTeam(row *sql.Row) (domain.Team, error) {
 	var t domain.Team
 	var created, updated string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -33,7 +34,7 @@ func GetTeam(ctx context.Context, q Queryer, id string) (domain.Team, string, er
 		FROM teams t LEFT JOIN directory_bindings b ON b.team_id = t.id WHERE t.id = ?`, id)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, "", ErrNotFound
 	}
@@ -59,7 +60,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 	for rows.Next() {
 		var t domain.Team
 		var created, updated, directory string
-		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &directory); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &directory); err != nil {
 			return nil, fmt.Errorf("scan team row: %w", err)
 		}
 		t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
@@ -72,7 +73,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 
 func prefixedTeamColumns(prefix string) string {
 	return prefix + `.id, ` + prefix + `.name, ` + prefix + `.profile_instance, ` + prefix + `.leader_id, ` +
-		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at`
+		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at, ` + prefix + `.archived_at`
 }
 
 // FindActiveTeamByDirectoryKey returns the binding for a canonical directory.
@@ -82,7 +83,7 @@ func FindActiveTeamByDirectoryKey(ctx context.Context, q Queryer, key string) (d
 		WHERE b.directory_key = ? AND t.status != ?`, key, domain.TeamStatusDeleted)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -153,8 +154,9 @@ func SetTeamStatus(ctx context.Context, db *sql.DB, teamID, status, detail strin
 	if expectedRevision > 0 && revision != expectedRevision {
 		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
-		status, detail, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = ?, revision = revision + 1, updated_at = ?,
+		archived_at = CASE WHEN ? = 'archived' THEN ? ELSE '' END WHERE id = ?`,
+		status, detail, time.Now().UTC().Format(time.RFC3339Nano), status, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
 		return domain.Team{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -319,8 +321,9 @@ func SetTeamStatusTx(ctx context.Context, tx *sql.Tx, teamID, status, detail str
 	if expectedRevision > 0 && revision != expectedRevision {
 		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
-		status, detail, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = ?, status_detail = ?, revision = revision + 1, updated_at = ?,
+		archived_at = CASE WHEN ? = 'archived' THEN ? ELSE '' END WHERE id = ?`,
+		status, detail, time.Now().UTC().Format(time.RFC3339Nano), status, time.Now().UTC().Format(time.RFC3339Nano), teamID); err != nil {
 		return domain.Team{}, err
 	}
 	team, _, err := GetTeam(ctx, tx, teamID)
@@ -455,7 +458,7 @@ func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error)
 	var t domain.Team
 	var created, updated string
 	err := q.QueryRowContext(ctx, `SELECT `+prefixedTeamColumns("t")+` FROM teams t WHERE t.id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated)
+		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -543,4 +546,74 @@ func ListLeaseBots(ctx context.Context, q Queryer) ([]LeaseBot, error) {
 		out = append(out, b)
 	}
 	return out, rows.Err()
+}
+
+// TeamThreadIDs lists the engine threads of a team's members, so deleting
+// the team can delete them from the engine too.
+func TeamThreadIDs(ctx context.Context, q Queryer, teamID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT p.provider_thread_id FROM provider_sessions p
+		JOIN bots b ON b.id = p.bot_id WHERE b.team_id = ? AND p.provider_thread_id != ''`, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// TeamExists reports whether a team row is still present.
+func TeamExists(ctx context.Context, q Queryer, teamID string) (bool, error) {
+	var n int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM teams WHERE id = ?`, teamID).Scan(&n); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// PurgeTeamTx removes every row of a team: members, conversations, runs,
+// tasks, approvals, memories, usage, events and its directory binding.
+// Children go before parents because foreign keys are enforced.
+func PurgeTeamTx(ctx context.Context, tx *sql.Tx, teamID string) error {
+	const teamBots = `SELECT id FROM bots WHERE team_id = ?`
+	const teamTasks = `SELECT id FROM tasks WHERE team_id = ?`
+	const teamApprovals = `SELECT id FROM approvals WHERE team_id = ?`
+	statements := []string{
+		`DELETE FROM approval_decisions WHERE approval_id IN (` + teamApprovals + `)`,
+		`DELETE FROM approval_responses WHERE approval_id IN (` + teamApprovals + `)`,
+		`DELETE FROM approvals WHERE team_id = ?`,
+		`DELETE FROM chain_wakes WHERE chain_id IN (SELECT id FROM chains WHERE team_id = ?)`,
+		`DELETE FROM chains WHERE team_id = ?`,
+		`DELETE FROM deliveries WHERE team_id = ?`,
+		`DELETE FROM task_dependencies WHERE task_id IN (` + teamTasks + `) OR depends_on_task_id IN (` + teamTasks + `)`,
+		`DELETE FROM task_evidence WHERE task_id IN (` + teamTasks + `)`,
+		`DELETE FROM transfers WHERE task_id IN (` + teamTasks + `)`,
+		`DELETE FROM tasks WHERE team_id = ?`,
+		`DELETE FROM questions WHERE team_id = ?`,
+		`DELETE FROM memories WHERE team_id = ?`,
+		`DELETE FROM messages WHERE team_id = ?`,
+		`DELETE FROM runs WHERE team_id = ?`,
+		`DELETE FROM usage_ledger WHERE team_id = ?`,
+		`DELETE FROM events WHERE team_id = ?`,
+		`DELETE FROM provider_sessions WHERE bot_id IN (` + teamBots + `)`,
+		`DELETE FROM directory_bindings WHERE team_id = ?`,
+		`DELETE FROM bots WHERE team_id = ?`,
+		`DELETE FROM teams WHERE id = ?`,
+	}
+	for _, statement := range statements {
+		args := make([]any, strings.Count(statement, "?"))
+		for i := range args {
+			args[i] = teamID
+		}
+		if _, err := tx.ExecContext(ctx, statement, args...); err != nil {
+			return fmt.Errorf("purge team: %w", err)
+		}
+	}
+	return nil
 }

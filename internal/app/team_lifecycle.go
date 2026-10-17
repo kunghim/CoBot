@@ -6,16 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Team and member lifecycle (B08/B09): archive pauses dispatch and keeps
-// work, restore resumes it, delete is a soft removal that unbinds the
-// directory but never touches user files, and a member with any unfinished
-// work cannot be deleted.
+// Team and member lifecycle (B08/B09): only an idle team can be archived,
+// restore brings it back, and deleting an archived team (or one whose folder
+// is gone) removes it completely. A member with unfinished work cannot be
+// deleted.
 
 // openWorkError renders the honest refusal: every blocking count is named,
 // so the user knows exactly what to finish or transfer first.
@@ -68,11 +69,19 @@ func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamI
 	return team, nil
 }
 
-// ArchiveTeam pauses a team. While archived no delivery dispatches (the
-// scheduler checks team status), tasks and history are preserved, and a
-// restore brings the same work back. The precondition census refuses a team
-// with running executions, pending approvals or in-flight hand-overs, so an
-// archive never freezes a decision someone is waiting on.
+// archiveBlockers is the one census for archiving. A team may be archived
+// only when it is completely idle: no running member, no queued message, no
+// pending approval, no open question, no offered hand-over and no unfinished
+// task. Passing it is what makes an archived team safe to delete outright.
+func archiveBlockers(c sqlite.OpenWorkCounts) bool {
+	return c.ActiveRuns > 0 || c.QueuedDeliveries > 0 || c.PendingApprovals > 0 ||
+		c.OpenQuestions > 0 || c.OfferedTransfers > 0 || c.OpenTasks > 0
+}
+
+// ArchiveTeam sets an idle team aside. It leaves the sidebar for the
+// archived list in Settings, keeps its folder (no other team may take it),
+// and its engine is shut down. Anything unfinished refuses the archive with
+// every blocking count named.
 func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
 	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
 	defer unlock()
@@ -90,29 +99,19 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
-	if team.Status == domain.TeamStatusDeleted {
-		return domain.Team{}, domain.NotFound("error.not_found", nil)
-	}
-	if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusArchived {
+	if team.Status != domain.TeamStatusActive {
 		return domain.Team{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
-	}
-	work, err := sqlite.TeamOpenWork(ctx, a.DB, teamID)
-	if err != nil {
-		return domain.Team{}, err
-	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 {
-		return domain.Team{}, openWorkError("team", work)
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Team{}, err
 	}
 	defer tx.Rollback()
-	work, err = sqlite.TeamOpenWork(ctx, tx, teamID)
+	work, err := sqlite.TeamOpenWork(ctx, tx, teamID)
 	if err != nil {
 		return domain.Team{}, err
 	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 {
+	if archiveBlockers(work) {
 		return domain.Team{}, openWorkError("team", work)
 	}
 	archived, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusArchived, "", expectedRevision)
@@ -125,13 +124,15 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
+	a.releaseTeamRuntime(ctx, teamID)
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamArchived, TeamID: teamID, ResourceID: teamID, Revision: archived.Revision})
 	a.Hub.Publish()
 	return archived, nil
 }
 
-// RestoreTeam re-activates an archived team and re-wakes the queued work the
-// archive held back.
+// RestoreTeam brings an archived team back to the sidebar. Archiving
+// required it to be idle, so there is no held-back work to resume; if its
+// folder is gone meanwhile it comes back as directory_missing.
 func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
 	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
 	defer unlock()
@@ -149,8 +150,8 @@ func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
-	if team.Status != domain.TeamStatusArchived && team.Status != domain.TeamStatusActive {
-		return domain.Team{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
+	if team.Status != domain.TeamStatusArchived {
+		return domain.Team{}, domain.Conflict("error.team.not_archived", map[string]any{"status": team.Status})
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -167,17 +168,18 @@ func (a *App) RestoreTeam(ctx context.Context, principal auth.Principal, teamID 
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
+	restored = a.checkTeamDirectory(ctx, restored)
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamRestored, TeamID: teamID, ResourceID: teamID, Revision: restored.Revision})
 	a.Hub.Publish()
-	a.ResumeBudgetPausedBots(ctx) // re-wake whatever the archive held
 	return restored, nil
 }
 
-// DeleteTeam soft-deletes an archived team that has no unfinished work: the
-// application rows stay for audit, the directory binding is removed together
-// with this team's own marker, so the folder is free for a new team. The
-// user's files are never deleted. Queued deliveries
-// are cancelled because their team is going away; their rows stay too.
+// DeleteTeam removes an archived team, or one whose folder is gone,
+// completely and for good: every row of the team, its members' engine
+// threads and the .cobot folder CoBot keeps in the project. Archiving
+// already proved the team idle, so nothing is checked again here; a team
+// whose folder is gone cannot finish its work and loses it with the team.
+// Project files outside .cobot are never touched.
 func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID string, expectedRevision int64) (domain.Team, error) {
 	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
 	defer unlock()
@@ -195,72 +197,105 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}
-	if team.Status == domain.TeamStatusDeleted {
-		return domain.Team{}, domain.NotFound("error.not_found", nil)
-	}
-	// Deleting is deliberately a two-step: archive first, so a live team can
-	// never disappear in one click (B09).
-	if team.Status != domain.TeamStatusArchived {
+	if team.Status != domain.TeamStatusArchived && team.Status != domain.TeamStatusDirectoryMissing {
 		return domain.Team{}, domain.Conflict("error.team.not_archived", map[string]any{"status": team.Status})
 	}
-	work, err := sqlite.TeamOpenWork(ctx, a.DB, teamID)
+	if expectedRevision > 0 && team.Revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": team.Revision})
+	}
+	a.releaseTeamRuntime(ctx, teamID)
+	threads, err := sqlite.TeamThreadIDs(ctx, a.DB, teamID)
 	if err != nil {
 		return domain.Team{}, err
 	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
-		return domain.Team{}, openWorkError("team", work)
-	}
+	bots := mustListBots(ctx, a, teamID)
+
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Team{}, err
 	}
 	defer tx.Rollback()
-	// Everything the delete changes — including the lifecycle state with its
-	// revision check and a fresh open-work census — happens in this one
-	// transaction: a stale expectedRevision must roll the whole delete back
-	// instead of leaving a half-removed team (review B7/B11).
-	work, err = sqlite.TeamOpenWork(ctx, tx, teamID)
-	if err != nil {
+	if err := sqlite.PurgeTeamTx(ctx, tx, teamID); err != nil {
 		return domain.Team{}, err
 	}
-	if work.OpenQuestions > 0 || work.ActiveRuns > 0 || work.PendingApprovals > 0 || work.OfferedTransfers > 0 || work.OpenTasks > 0 {
-		return domain.Team{}, openWorkError("team", work)
-	}
-	if _, err := sqlite.CancelQueuedDeliveriesByTeam(ctx, tx, teamID, ""); err != nil {
-		return domain.Team{}, err
-	}
-	if err := sqlite.SoftDeleteBotsOfTeam(ctx, tx, teamID); err != nil {
-		return domain.Team{}, err
-	}
-	if err := sqlite.UnbindTeamDirectory(ctx, tx, teamID); err != nil {
-		return domain.Team{}, err
-	}
-	deleted, err := sqlite.SetTeamStatusTx(ctx, tx, teamID, domain.TeamStatusDeleted, "", expectedRevision)
-	if err != nil {
-		return domain.Team{}, sqlite.NormalizeError(err)
-	}
-	if err := a.saveWriteResult(ctx, tx, principal, deleted); err != nil {
+	team.Status = domain.TeamStatusDeleted
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
 		return domain.Team{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
+
 	if a.CollaborationTokens != nil {
-		for _, bot := range mustListBots(ctx, a, teamID) {
+		for _, bot := range bots {
 			a.CollaborationTokens.RevokeOfBot(bot.ID)
 		}
 	}
-	a.removeOwnMarker(directory, teamID)
-	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamDeleted, TeamID: teamID, ResourceID: teamID, Revision: deleted.Revision})
+	a.deleteEngineThreads(ctx, teamID, threads)
+	a.removeTeamFolderData(directory, teamID)
 	a.Hub.Publish()
-	return deleted, nil
+	return team, nil
+}
+
+// releaseTeamRuntime shuts the team's engine down and revokes nothing else;
+// archive and delete both leave no idle process behind.
+func (a *App) releaseTeamRuntime(ctx context.Context, teamID string) {
+	if a.Scheduler == nil {
+		return
+	}
+	if err := a.Scheduler.StopTeam(ctx, teamID); err != nil && a.Logger != nil {
+		a.Logger.Warn("stop team engine", "teamId", teamID, "error", err)
+	}
+}
+
+// deleteEngineThreads removes a deleted team's threads from the private
+// engine environment. It is best effort: a thread the engine cannot delete
+// now is logged, never a reason to keep the team.
+func (a *App) deleteEngineThreads(ctx context.Context, teamID string, threads []string) {
+	if len(threads) == 0 {
+		return
+	}
+	server, err := a.control(ctx)
+	if err != nil {
+		if a.Logger != nil {
+			a.Logger.Warn("engine threads of deleted team kept: engine unavailable", "teamId", teamID, "threads", len(threads), "error", err)
+		}
+		return
+	}
+	for _, thread := range threads {
+		callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		if err := server.DeleteThread(callCtx, thread); err != nil && a.Logger != nil {
+			a.Logger.Warn("delete engine thread of deleted team", "teamId", teamID, "threadId", thread, "error", err)
+		}
+		cancel()
+	}
+}
+
+// removeTeamFolderData deletes the .cobot folder CoBot keeps in a deleted
+// team's project, unless its marker names another team. Nothing else in the
+// project is touched; a folder that is gone is simply skipped.
+func (a *App) removeTeamFolderData(dir, teamID string) {
+	if dir == "" {
+		return
+	}
+	marker, present, err := readTeamMarker(dir)
+	if err != nil {
+		return
+	}
+	if present && (marker.InstanceID != a.InstanceID || marker.TeamID != teamID) {
+		return
+	}
+	if err := os.RemoveAll(filepath.Join(dir, ".cobot")); err != nil && a.Logger != nil {
+		a.Logger.Warn("remove .cobot of deleted team", "teamId", teamID, "error", err)
+	}
 }
 
 // DeleteBot removes a member only when it carries no unfinished work: no
 // owned open tasks (so nothing is left ownerless), no offered hand-overs, no
-// pending approvals it raised, no live runs, no queued deliveries. The row is
-// tombstoned for audit, its bridge credentials are revoked, and undelivered
-// messages to it are cancelled; history stays (B08).
+// pending approvals it raised, no live runs and no open questions. Messages
+// still queued for it are cancelled rather than blocking the delete. The row
+// is tombstoned for audit, its bridge credentials are revoked, and history
+// stays (B08).
 func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID string, expectedRevision int64) (domain.Bot, error) {
 	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
 	defer unlock()

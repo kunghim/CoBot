@@ -435,6 +435,17 @@ func (s *Server) AccountLoginStart(ctx context.Context) (engine.LoginInfo, error
 	return out, nil
 }
 
+// DeleteThread removes a stored thread from this private environment.
+func (s *Server) DeleteThread(ctx context.Context, threadID string) error {
+	if threadID == "" {
+		return errors.New("threadId is required")
+	}
+	if err := s.client.Call(ctx, "thread/delete", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/delete: %w", err)
+	}
+	return nil
+}
+
 // AccountLoginCancel aborts a pending login.
 func (s *Server) AccountLoginCancel(ctx context.Context, loginID string) error {
 	if loginID == "" {

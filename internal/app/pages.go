@@ -24,6 +24,12 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 	if p.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// Loading the team list re-checks every team folder first (outside the
+	// read transaction: the pool is one connection), so the list is honest
+	// about moved or returned projects without a background timer.
+	if in.Kind == "teams" && in.Cursor == "" {
+		a.CheckTeamDirectories(ctx)
+	}
 	tx, err := a.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err

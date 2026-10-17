@@ -96,7 +96,7 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 	}
 	result := map[string]any{
 		"canonical": canon.Display, "key": canon.Key, "ok": true,
-		"duplicate": false, "nested": false, "claimed": false,
+		"duplicate": false, "nested": false, "claimed": false, "archived": false,
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -108,6 +108,7 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 		result["ok"] = false
 		result["teamId"] = existing.ID
 		result["teamName"] = existing.Name
+		result["archived"] = existing.Status == domain.TeamStatusArchived
 	} else if !errors.Is(err, sqlite.ErrNotFound) {
 		return nil, err
 	}

@@ -106,6 +106,11 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	}
 
 	if existing, err := sqlite.FindActiveTeamByDirectoryKey(ctx, tx, canon.Key); err == nil {
+		if existing.Status == domain.TeamStatusArchived {
+			return domain.Team{}, nil, domain.Conflict("error.team.directory_archived", map[string]any{
+				"teamId": existing.ID, "teamName": existing.Name, "directory": existing.Directory,
+			})
+		}
 		return domain.Team{}, nil, domain.Conflict("error.team.directory_bound", map[string]any{
 			"teamId": existing.ID, "teamName": existing.Name, "directory": existing.Directory,
 		})
@@ -492,7 +497,7 @@ func (a *App) markerClaim(ctx context.Context, dir string) (map[string]any, erro
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"teamId": team.ID, "teamName": team.Name, "external": false}, nil
+		return map[string]any{"teamId": team.ID, "teamName": team.Name, "external": false, "archived": team.Status == domain.TeamStatusArchived}, nil
 	}
 	return map[string]any{"teamId": marker.TeamID, "teamName": marker.TeamName, "external": true}, nil
 }
@@ -511,71 +516,70 @@ func (a *App) refuseClaimedDirectory(ctx context.Context, dir string) error {
 		}
 		return domain.Conflict(key, map[string]any{"teamName": claim["teamName"], "directory": dir})
 	}
-	return domain.Conflict("error.team.directory_bound", map[string]any{"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir})
+	key := "error.team.directory_bound"
+	if claim["archived"] == true {
+		key = "error.team.directory_archived"
+	}
+	return domain.Conflict(key, map[string]any{"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir})
 }
 
-// removeOwnMarker deletes the team marker when it still names this team of
-// this instance, so the folder is free for a new team. The rest of .cobot
-// and every project file stay.
-func (a *App) removeOwnMarker(dir, teamID string) {
-	if dir == "" {
-		return
-	}
-	marker, present, err := readTeamMarker(dir)
-	if err != nil || !present || marker.InstanceID != a.InstanceID || marker.TeamID != teamID {
-		return
-	}
-	_ = os.Remove(filepath.Join(dir, ".cobot", "team.json"))
-}
-
-// CheckTeamDirectories keeps each team's state honest about its folder. A
-// team bound for life to a folder that is gone becomes directory_missing:
-// it stays visible read-only and receives no work. When the folder is back
-// at the same path the team becomes active again on its own. A lost marker in
-// a folder the team still owns is rewritten; a marker naming another team is
-// never overwritten.
+// CheckTeamDirectories checks every live team's folder. It runs at startup
+// and whenever the team list is loaded, so the list a user looks at is
+// always honest; dispatch checks its own team before every turn.
 func (a *App) CheckTeamDirectories(ctx context.Context) {
 	teams, err := sqlite.ListTeams(ctx, a.DB)
 	if err != nil {
 		return
 	}
-	changed := false
 	for _, team := range teams {
-		if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusDirectoryMissing {
-			continue
-		}
-		info, statErr := os.Stat(team.Directory)
-		present := team.Directory != "" && statErr == nil && info.IsDir()
-		if present {
-			if marker, has, err := readTeamMarker(team.Directory); err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID)) {
-				if canon, err := platform.CanonicalDirFrom(team.Directory); err == nil && (!has || marker.TeamName != team.Name) {
-					if err := a.prepareTeamResources(ctx, team, canon); err != nil && a.Logger != nil {
-						a.Logger.Warn("rewrite team marker", "teamId", team.ID, "error", err)
-					}
-				}
-			} else if has && a.Logger != nil {
-				a.Logger.Warn("team folder carries another team's marker; left untouched", "teamId", team.ID, "directory", team.Directory)
-			}
-		}
-		switch {
-		case !present && team.Status == domain.TeamStatusActive:
-			if updated, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusDirectoryMissing, team.Directory, 0); err == nil {
-				a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID, Revision: updated.Revision})
-				changed = true
-			}
-		case present && team.Status == domain.TeamStatusDirectoryMissing:
-			if updated, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, domain.TeamStatusActive, "", 0); err == nil {
-				a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID, Revision: updated.Revision})
-				changed = true
-				if a.Scheduler != nil {
-					for _, bot := range mustListBots(ctx, a, team.ID) {
-						a.Scheduler.Wake(bot.ID)
-					}
+		a.checkTeamDirectory(ctx, team)
+	}
+}
+
+// checkTeamDirectory keeps one team's state honest about its lifelong
+// folder and returns the team as it is afterwards. A folder that is gone
+// makes an active team directory_missing: it stays visible read-only and
+// receives no work. Once the folder is back at the same path the team is
+// active again by itself. A lost marker in a folder the team owns is
+// rewritten; a marker naming another team is never overwritten.
+func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.Team {
+	if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusDirectoryMissing {
+		return team
+	}
+	info, statErr := os.Stat(team.Directory)
+	present := team.Directory != "" && statErr == nil && info.IsDir()
+	if present {
+		marker, has, err := readTeamMarker(team.Directory)
+		ours := err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID))
+		if ours && (!has || marker.TeamName != team.Name) {
+			if canon, err := platform.CanonicalDirFrom(team.Directory); err == nil {
+				if err := a.prepareTeamResources(ctx, team, canon); err != nil && a.Logger != nil {
+					a.Logger.Warn("rewrite team marker", "teamId", team.ID, "error", err)
 				}
 			}
+		} else if !ours && a.Logger != nil {
+			a.Logger.Warn("team folder carries another team's marker; left untouched", "teamId", team.ID, "directory", team.Directory)
 		}
 	}
-	if changed {
-		a.Hub.Publish()
+	next := ""
+	switch {
+	case !present && team.Status == domain.TeamStatusActive:
+		next, team.StatusDetail = domain.TeamStatusDirectoryMissing, team.Directory
+	case present && team.Status == domain.TeamStatusDirectoryMissing:
+		next, team.StatusDetail = domain.TeamStatusActive, ""
+	default:
+		return team
 	}
+	updated, err := sqlite.SetTeamStatus(ctx, a.DB, team.ID, next, team.StatusDetail, 0)
+	if err != nil {
+		return team
+	}
+	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: team.ID, ResourceID: team.ID, Revision: updated.Revision})
+	if next == domain.TeamStatusActive && a.Scheduler != nil {
+		for _, bot := range mustListBots(ctx, a, team.ID) {
+			a.Scheduler.Wake(bot.ID)
+		}
+	}
+	a.Hub.Publish()
+	return updated
 }

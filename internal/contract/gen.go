@@ -585,6 +585,8 @@ type TaskStatus string
 
 // Team defines model for Team.
 type Team struct {
+	// ArchivedAt When the team was archived (RFC 3339); absent unless archived.
+	ArchivedAt        *string    `json:"archivedAt,omitempty"`
 	CreatedAt         time.Time  `json:"createdAt"`
 	Directory         string     `json:"directory"`
 	Id                string     `json:"id"`

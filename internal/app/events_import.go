@@ -37,6 +37,13 @@ func (a *App) ImportEventFiles(ctx context.Context) (int, error) {
 			continue
 		}
 		for _, ev := range events {
+			// A deleted team is gone for good: its events still in the
+			// ledger are not brought back.
+			if ev.TeamID != "" {
+				if exists, err := sqlite.TeamExists(ctx, a.DB, ev.TeamID); err == nil && !exists {
+					continue
+				}
+			}
 			inserted, ierr := sqlite.ImportEventRow(ctx, a.DB, ev)
 			if ierr != nil {
 				return imported, ierr

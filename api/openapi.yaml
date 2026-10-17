@@ -1591,6 +1591,9 @@ paths:
                             description: Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it.
                           teamId: { type: string }
                           teamName: { type: string }
+                          archived:
+                            type: boolean
+                            description: The folder belongs to an archived team; restoring that team is the way to use it again.
         "400":
           $ref: "#/components/responses/Error"
   /api/v1/authorizations:
@@ -2053,6 +2056,9 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        archivedAt:
+          type: string
+          description: When the team was archived (RFC 3339); absent unless archived.
     Bot:
       type: object
       required: [id, teamId, name, roleId, isLeader, status, revision, createdAt]

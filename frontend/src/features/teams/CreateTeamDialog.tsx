@@ -8,6 +8,7 @@
 // with params.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Check, FolderOpen, Lock } from 'lucide-react';
 import { useCreateTeam, useRoles } from '../../api/queries';
 import { api } from '../../api/client';
@@ -32,6 +33,7 @@ export default function CreateTeamDialog({
   onCreated: (leaderBotId: string, teamId: string) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const roles = useRoles(open);
   const create = useCreateTeam();
 
@@ -109,6 +111,16 @@ export default function CreateTeamDialog({
       })
       .catch((error) => setErrorText(apiErrorMessage(t, error)))
       .finally(() => setPicking(false));
+  };
+
+  const verdictText = (result: DirectoryCheckResult): string => {
+    const teamName = result.teamName ?? '';
+    if (result.ok) return t('team.directoryOk', { path: result.canonical });
+    if (result.duplicate && result.archived) return t('team.directoryArchived', { teamName });
+    if (result.duplicate) return t('team.directoryDuplicate', { teamName });
+    if (result.nested) return t('team.directoryNested', { teamName });
+    if (result.claimed) return teamName ? t('team.directoryClaimed', { teamName }) : t('team.directoryClaimedUnknown');
+    return t('status.error');
   };
 
   const toggleRole = (roleId: string) => {
@@ -226,17 +238,19 @@ export default function CreateTeamDialog({
               role="status"
               className={`mt-1.5 text-xs ${verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}
             >
-              {verdict.ok
-                ? t('team.directoryOk', { path: verdict.canonical })
-                : verdict.duplicate
-                  ? t('team.directoryDuplicate', { teamName: verdict.teamName ?? '' })
-                  : verdict.nested
-                    ? t('team.directoryNested', { teamName: verdict.teamName ?? '' })
-                    : verdict.claimed
-                      ? verdict.teamName
-                        ? t('team.directoryClaimed', { teamName: verdict.teamName })
-                        : t('team.directoryClaimedUnknown')
-                      : t('status.error')}
+              {verdictText(verdict)}
+              {verdict.duplicate && verdict.archived && verdict.teamId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    navigate(`/settings/archived?team=${encodeURIComponent(verdict.teamId ?? '')}`);
+                  }}
+                  className="ml-2 font-medium underline underline-offset-2"
+                >
+                  {t('team.goRestore')}
+                </button>
+              )}
             </p>
           )}
         </div>

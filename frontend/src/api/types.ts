@@ -186,6 +186,8 @@ export interface DirectoryCheckResult {
   nested: boolean;
   /** Another team, possibly in another CoBot instance, claims the folder. */
   claimed: boolean;
+  /** The folder belongs to an archived team; restore it to use the folder. */
+  archived?: boolean;
   teamId?: string;
   teamName?: string;
 }

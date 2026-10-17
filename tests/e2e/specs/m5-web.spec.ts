@@ -53,12 +53,42 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await panel.getByRole('tab', { name: /协作/ }).click();
   await expect(panel.getByText(/暂无协作记录|No collaboration records/)).toBeVisible();
 
-  // Team lifecycle: archive pauses dispatch (messaging is refused with an
-  // honest reason) and restore brings the team back.
+  // Team lifecycle: a team with an unfinished task cannot be archived; the
+  // refusal names what is left.
   await page.getByRole('button', { name: /归档团队|Archive team/ }).first().click();
-  await expect(page.getByText(/已归档|Archived/).first()).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: /恢复团队|Restore team/ }).first().click();
-  await expect(page.getByText(/已归档|Archived/).first()).toBeHidden({ timeout: 15000 });
+  await expect(page.getByRole('alert').filter({ hasText: /暂不能归档|cannot be archived/ })).toBeVisible({ timeout: 15000 });
+});
+
+// Archiving an idle team moves it from the sidebar to Settings › Archived
+// teams, where it can be found and restored back to the sidebar.
+test('an idle team archives to settings and restores', async ({ page }) => {
+  const label = '归档测试' + Date.now();
+  const teamDir = join(process.env.COBOT_E2E_ROOT!, 'm5-archive-' + Date.now());
+  mkdirSync(teamDir, { recursive: true });
+  setEngineMode('reply', teamDir);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /新建团队|create team/i }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/团队名称|team name/i).fill(label);
+  await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
+  await dialog.getByRole('button', { name: /创建|create/i }).click();
+  const sidebar = page.getByRole('complementary', { name: /团队列表|team list/i });
+  const row = sidebar.locator('li').filter({ hasText: label }).first();
+  await expect(row).toBeVisible({ timeout: 15000 });
+
+  await row.getByRole('button', { name: /归档团队|Archive team/ }).click();
+  await expect(sidebar.getByText(label)).toHaveCount(0, { timeout: 15000 });
+
+  await page.goto('/settings/archived');
+  await page.getByRole('searchbox').fill(label);
+  const archivedRow = page.locator('li').filter({ hasText: label });
+  await expect(archivedRow).toBeVisible();
+  await archivedRow.getByRole('button', { name: /恢复团队|Restore team/ }).click();
+  await expect(page.getByText(/已恢复|is restored/)).toBeVisible({ timeout: 15000 });
+
+  await page.goto('/');
+  await expect(page.getByRole('complementary', { name: /团队列表|team list/i }).getByText(label)).toBeVisible({ timeout: 15000 });
 });
 
 // I05: on a 320px screen the team list and work panel overlay the

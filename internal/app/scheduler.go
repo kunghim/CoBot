@@ -95,10 +95,6 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 // Leases tick on their own goroutine (review B9): a slow engine call inside
 // dispatch must never starve the 2-second refresh, or every member's bridge
 // would start refusing side effects while the core is healthy (H06).
-// directoryCheckInterval bounds how long a team keeps receiving work after
-// its folder disappeared, and how soon it resumes once the folder is back.
-const directoryCheckInterval = 10 * time.Second
-
 func (s *Scheduler) Start() {
 	go func() {
 		defer close(s.done)
@@ -115,10 +111,6 @@ func (s *Scheduler) Start() {
 		defer close(s.leaseDone)
 		leaseTicker := time.NewTicker(platform.LeaseInterval)
 		defer leaseTicker.Stop()
-		// Team folders are re-checked on a short interval, so a moved or
-		// unplugged project pauses its team and a returned one resumes it.
-		directoryTicker := time.NewTicker(directoryCheckInterval)
-		defer directoryTicker.Stop()
 		s.app.CheckTeamDirectories(s.ctx)
 		for {
 			select {
@@ -126,8 +118,6 @@ func (s *Scheduler) Start() {
 				return
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(s.ctx)
-			case <-directoryTicker.C:
-				s.app.CheckTeamDirectories(s.ctx)
 			}
 		}
 	}()
@@ -192,6 +182,23 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 		s.mu.Unlock()
 	}
 	return errors.Join(errs...)
+}
+
+// StopTeam shuts down one team's engine when the team is archived or
+// deleted, so an idle team holds no process. The team has no live run by
+// then; a later dispatch (after a restore) starts a fresh engine.
+func (s *Scheduler) StopTeam(ctx context.Context, teamID string) error {
+	lock := s.teamLock(teamID)
+	lock.Lock()
+	defer lock.Unlock()
+	s.mu.Lock()
+	rt := s.teams[teamID]
+	delete(s.teams, teamID)
+	s.mu.Unlock()
+	if rt == nil {
+		return nil
+	}
+	return rt.server.Shutdown(ctx)
 }
 
 // Wake schedules a dispatch attempt for one bot without blocking writers.
@@ -271,6 +278,9 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
+	// The folder is checked before every turn: a team whose folder is gone
+	// becomes directory_missing here instead of failing inside the engine.
+	team = s.app.checkTeamDirectory(ctx, team)
 	if team.Status != domain.TeamStatusActive {
 		return nil // archived/missing/error teams pause dispatch
 	}
