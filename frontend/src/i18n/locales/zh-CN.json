@@ -121,7 +121,6 @@
       "to": "发给",
       "from": "来自",
       "you": "你",
-      "task": "任务「{{title}}」",
       "title": "{{a}} 与 {{b}} 的往来",
       "close": "关闭",
       "latest": "跳到最新",
@@ -158,9 +157,7 @@
       "waitingInput": "等待你回复"
     },
     "process": {
-      "done": "已处理 {{duration}} · {{count}} 个步骤",
-      "doneNoSteps": "已处理 {{duration}}",
-      "failedAfter": "执行失败 · {{duration}}",
+      "done": "已处理 {{duration}} · {{count}} 个步骤",      "failedAfter": "执行失败 · {{duration}}",
       "interruptedAfter": "已停止 · {{duration}}",
       "failed": "执行失败",
       "interrupted": "已停止"

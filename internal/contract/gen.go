@@ -103,11 +103,6 @@ const (
 	Unauthorized        ErrorEnvelopeErrorCode = "unauthorized"
 )
 
-// Defines values for MessageAudience.
-const (
-	Member MessageAudience = "member"
-)
-
 // Defines values for MessageDeliveryStatus.
 const (
 	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
@@ -443,8 +438,6 @@ type MergeApprovalDetails struct {
 
 // Message defines model for Message.
 type Message struct {
-	// Audience Conversation pages only; member marks the reply of a turn another member started.
-	Audience       *MessageAudience       `json:"audience,omitempty"`
 	Blocks         []TextBlock            `json:"blocks"`
 	BotId          string                 `json:"botId"`
 	CreatedAt      time.Time              `json:"createdAt"`
@@ -456,9 +449,6 @@ type Message struct {
 	SourceBotId    *string                `json:"sourceBotId,omitempty"`
 	TeamId         string                 `json:"teamId"`
 }
-
-// MessageAudience Conversation pages only; member marks the reply of a turn another member started.
-type MessageAudience string
 
 // MessageDeliveryStatus defines model for Message.DeliveryStatus.
 type MessageDeliveryStatus string

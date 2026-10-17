@@ -17,7 +17,7 @@ import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
 import RunProcess from './RunProcess';
-import { ExchangeLine, RoleBadge, exchangeExcerpt, isExchange } from './MessageCards';
+import { ExchangeLine, RoleBadge, isExchange } from './MessageCards';
 import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -176,7 +176,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           {timeline.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
-                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} note={entry.note} />
+                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} />
               </li>
             ) : (
               <li key={entry.message.id}>
@@ -299,29 +299,19 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
 
 type TimelineEntry =
   | { kind: 'message'; message: Message; recipients?: string[]; at: number }
-  | { kind: 'run'; run: RunWithSteps; note?: string; at: number };
+  | { kind: 'run'; run: RunWithSteps; at: number };
 
 // One message sent to several members is stored once per recipient, moments
 // apart; within this window the copies read as one line.
 const broadcastWindowMs = 5000;
 
 /** Messages and turns in time order: a turn sits where it started, so its
- * process comes after the message that woke it and before its reply.
- *
- * Only the user and this member talk in bubbles. The reply of a turn another
- * member started was read by nobody, so it moves into that turn's process as
- * its closing note; and copies of one message sent to several members merge
- * into a single "sent to" line. */
+ * process comes after the message that woke it and before its reply. Copies
+ * of one message sent to several members merge into a single "sent to" line. */
 export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeRun: Run | null, botId = ''): TimelineEntry[] {
-  const notes = new Map<string, string>();
   const entries: TimelineEntry[] = [];
   let lastBroadcast: { entry: Extract<TimelineEntry, { kind: 'message' }>; text: string } | null = null;
   for (const message of messages) {
-    if (message.kind === 'assistant' && message.audience === 'member' && message.runId) {
-      const text = messageText(message);
-      notes.set(message.runId, notes.has(message.runId) ? `${notes.get(message.runId)}\n\n${text}` : text);
-      continue;
-    }
     const at = Date.parse(message.createdAt);
     const outgoing = message.kind === 'collaboration' && message.sourceBotId === botId && message.botId !== botId;
     if (outgoing) {
@@ -343,7 +333,7 @@ export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeR
     seen.add(run.id);
     // The active run's status is the freshest read of it.
     const current = run.id === activeRun?.id ? { ...run, status: activeRun.status } : run;
-    entries.push({ kind: 'run', run: current, note: notes.get(run.id), at: Date.parse(run.startedAt) });
+    entries.push({ kind: 'run', run: current, at: Date.parse(run.startedAt) });
   }
   if (activeRun?.id && !seen.has(activeRun.id)) {
     entries.push({ kind: 'run', run: { ...activeRun, steps: [] }, at: Date.parse(activeRun.startedAt) });
@@ -398,7 +388,6 @@ function MessageRow({
       <ExchangeLine
         direction={outgoing ? 'to' : 'from'}
         peers={outgoing ? (recipients ?? [message.botId]) : message.sourceBotId ? [message.sourceBotId] : []}
-        excerpt={exchangeExcerpt(message, t)}
         nameOf={nameOf}
         onOpen={onOpenExchange}
       />

@@ -1868,10 +1868,6 @@ components:
         deliveryStatus: { type: string, enum: [waiting_dependency, queued, dispatching, accepted, cancelled, unknown] }
         runId: { type: string }
         sourceBotId: { type: string }
-        audience:
-          type: string
-          enum: [member]
-          description: Conversation pages only; member marks the reply of a turn another member started.
         createdAt: { type: string, format: date-time }
     Memory:
       type: object

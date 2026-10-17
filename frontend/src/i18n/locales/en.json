@@ -121,7 +121,6 @@
       "to": "To",
       "from": "From",
       "you": "You",
-      "task": "Task “{{title}}”",
       "title": "Exchange between {{a}} and {{b}}",
       "close": "Close",
       "latest": "Jump to latest",
@@ -158,9 +157,7 @@
       "waitingInput": "Waiting for your reply"
     },
     "process": {
-      "done": "Worked for {{duration}} · {{count}} steps",
-      "doneNoSteps": "Worked for {{duration}}",
-      "failedAfter": "Failed · {{duration}}",
+      "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",
       "interrupted": "Stopped"

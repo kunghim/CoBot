@@ -895,11 +895,6 @@ export interface components {
             deliveryStatus?: "waiting_dependency" | "queued" | "dispatching" | "accepted" | "cancelled" | "unknown";
             runId?: string;
             sourceBotId?: string;
-            /**
-             * @description Conversation pages only; member marks the reply of a turn another member started.
-             * @enum {string}
-             */
-            audience?: "member";
             /** Format: date-time */
             createdAt: string;
         };

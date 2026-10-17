@@ -35,14 +35,8 @@ type Message struct {
 	DeliveryStatus string          `json:"deliveryStatus,omitempty"`
 	RunID          string          `json:"runId,omitempty"`
 	SourceBotID    string          `json:"sourceBotId,omitempty"`
-	// Audience is set on conversation pages only: AudienceMember marks the
-	// reply of a turn another member started, which the user never asked for.
-	Audience  string    `json:"audience,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt      time.Time       `json:"createdAt"`
 }
-
-// AudienceMember: the reply closed a turn another member started.
-const AudienceMember = "member"
 
 // TextBlocks is the helper shape for the first version's text-only blocks.
 type TextBlocks struct {

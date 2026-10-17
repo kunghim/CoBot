@@ -1,11 +1,10 @@
 // How member-to-member traffic reads in a conversation: one centered line,
-// "发给 [前端开发] …" or "来自 [测试工程师] …". The member name is a badge;
+// "发给 [前端开发]" or "来自 [测试工程师]". The member name is a badge;
 // clicking the line opens the whole exchange with that member above the
 // conversation. Task assignments and review notices are such messages too.
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Message } from '../../api/types';
-import { messageText } from './delivery';
 
 export function RoleBadge({ name }: { name: string }) {
   return (
@@ -51,39 +50,30 @@ export function isExchange(message: Message): boolean {
   return taskCardOf(message.blocks) !== null;
 }
 
-/** The line's short text: an assignment names its task, anything else
- * shows its first line. */
-export function exchangeExcerpt(message: Message, t: (key: string, params?: Record<string, unknown>) => string): string {
-  const card = message.kind === 'system' ? taskCardOf(message.blocks) : null;
-  if (card) return t('conversation.exchange.task', { title: card.title });
-  return messageText(message).trim().split('\n').find((line) => line.trim() !== '')?.trim() ?? '';
-}
-
 /**
- * One exchange line. `peers` are the other members (several when one message
- * went to many); an empty list means the user, whose line opens nothing.
+ * One exchange line: only who it went to or came from, the message itself is
+ * in the record the line opens. `peers` are the other members (several when
+ * one message went to many); an empty list means the user, whose line opens
+ * nothing.
  */
 export function ExchangeLine({
   direction,
   peers,
-  excerpt,
   nameOf,
   onOpen,
 }: {
   direction: 'to' | 'from';
   peers: string[];
-  excerpt: string;
   nameOf: (botId: string) => string;
   onOpen: (peerId: string) => void;
 }) {
   const { t } = useTranslation();
   const label = t(direction === 'to' ? 'conversation.exchange.to' : 'conversation.exchange.from');
-  const lineClass = 'flex min-w-0 max-w-[80%] items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
+  const lineClass = 'flex flex-wrap items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
   const content = (badges: ReactNode) => (
     <>
-      <span className="shrink-0">{label}</span>
+      <span>{label}</span>
       {badges}
-      {excerpt && <span className="min-w-0 truncate">{excerpt}</span>}
     </>
   );
   if (peers.length === 0) {
