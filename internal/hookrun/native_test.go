@@ -2,6 +2,8 @@ package hookrun
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -193,5 +195,38 @@ func TestPlainWindowsPathsSkipPowerShell(t *testing.T) {
 		if err != nil || !strings.HasPrefix(quoted, "powershell.exe ") {
 			t.Fatalf("spaced path command = %q %v", quoted, err)
 		}
+	}
+}
+
+// A guard an earlier build generated for every tool is CoBot's own and is
+// upgraded to check only commands and file patches; the result is the
+// current guard, verified and ready for trust.
+func TestUnmatchedGuardIsUpgradedToCommandsAndPatches(t *testing.T) {
+	paths := platform.Paths{Root: t.TempDir()}
+	binary := filepath.Join(paths.Root, "CoBot app", "cobot.exe")
+	command, err := NativeCommand(binary, paths.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, _ := json.MarshalIndent(unmatchedDefinition(command), "", "  ")
+	if err := os.MkdirAll(paths.CodexHome(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.CodexHome(), "hooks.json"), old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(old)
+	if err := os.WriteFile(filepath.Join(paths.CodexHome(), ".cobot-hook-definition.sha256"), []byte(hex.EncodeToString(sum[:])), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureNativeConfig(paths, binary); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(paths.CodexHome(), "hooks.json"))
+	if !strings.Contains(string(data), `"matcher": "Bash|apply_patch"`) {
+		t.Fatalf("guard not upgraded:\n%s", data)
+	}
+	if err := VerifyNativeConfig(paths, binary); err != nil {
+		t.Fatal(err)
 	}
 }

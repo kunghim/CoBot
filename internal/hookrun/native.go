@@ -139,11 +139,17 @@ func EnsureNativeConfig(paths platform.Paths, binary string) error {
 		if ownerErr != nil && owned.Hooks["PreToolUse"][0].Hooks[0].Command != legacyNativeCommand(binary, paths.Root) {
 			return errors.New("native hook ownership is unknown; preserved")
 		}
-		var actual, expected any
+		var actual any
 		_ = json.Unmarshal(previous, &actual)
-		baseline, _ := json.Marshal(nativeDefinition(owned.Hooks["PreToolUse"][0].Hooks[0].Command))
-		_ = json.Unmarshal(baseline, &expected)
-		if !reflect.DeepEqual(actual, expected) {
+		previousCommand := owned.Hooks["PreToolUse"][0].Hooks[0].Command
+		generated := false
+		for _, definition := range []map[string]any{nativeDefinition(previousCommand), unmatchedDefinition(previousCommand)} {
+			var expected any
+			baseline, _ := json.Marshal(definition)
+			_ = json.Unmarshal(baseline, &expected)
+			generated = generated || reflect.DeepEqual(actual, expected)
+		}
+		if !generated {
 			return errors.New("private Codex hooks.json was edited; preserved")
 		}
 	} else if !os.IsNotExist(err) {
@@ -195,13 +201,28 @@ func VerifyNativeConfig(paths platform.Paths, binary string) error {
 	return nil
 }
 
+// nativeMatcher limits the guard to the tools that act on the machine:
+// shell commands and file patches. CoBot's own collaboration tools are
+// already checked by the core, and waiting or reading needs no lease, so
+// spawning a guard process for them only cost time.
+const nativeMatcher = "Bash|apply_patch"
+
 func nativeDefinition(command string) map[string]any {
 	return map[string]any{"description": nativeDescription, "hooks": map[string]any{
-		"PreToolUse": []any{map[string]any{"hooks": []any{map[string]any{
+		"PreToolUse": []any{map[string]any{"matcher": nativeMatcher, "hooks": []any{map[string]any{
 			"type": "command", "command": command, "timeout": 5,
 			"statusMessage": "CoBot lease guard",
 		}}}},
 	}}
+}
+
+// unmatchedDefinition is the guard as earlier builds generated it, checking
+// every tool; such a file is CoBot's own and is upgraded in place.
+func unmatchedDefinition(command string) map[string]any {
+	definition := nativeDefinition(command)
+	group := definition["hooks"].(map[string]any)["PreToolUse"].([]any)[0].(map[string]any)
+	delete(group, "matcher")
+	return definition
 }
 
 func NativeCommand(binary, root string) (string, error) {
