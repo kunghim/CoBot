@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -169,5 +170,28 @@ func TestVerifyNativeConfigAcceptsOnlyCoBotsGuard(t *testing.T) {
 	}
 	if err := VerifyNativeConfig(paths, binary); err == nil {
 		t.Fatal("verified an edited hooks file")
+	}
+}
+
+func TestPlainWindowsPathsSkipPowerShell(t *testing.T) {
+	for _, path := range []string{`E:\Project\GitHub\CoBot\.tmp\bin\cobot.exe`, `C:\Users\kungh\.cobot-trial`, `D:/a_b-c/x.exe`} {
+		if !plainWindowsPath(path) {
+			t.Errorf("%s should run unquoted", path)
+		}
+	}
+	for _, path := range []string{`C:\Program Files\CoBot\cobot.exe`, `C:\a&b`, `C:\it's`, `C:\%TEMP%`, `C:\a;b`, `C:\测试`, ""} {
+		if plainWindowsPath(path) {
+			t.Errorf("%q must keep the encoded PowerShell form", path)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		command, err := NativeCommand(`E:\bin\cobot.exe`, `C:\Users\u\.cobot`)
+		if err != nil || command != `E:\bin\cobot.exe hook --native-codex --data-root C:\Users\u\.cobot` {
+			t.Fatalf("plain command = %q %v", command, err)
+		}
+		quoted, err := NativeCommand(`C:\Program Files\cobot.exe`, `C:\Users\u\.cobot`)
+		if err != nil || !strings.HasPrefix(quoted, "powershell.exe ") {
+			t.Fatalf("spaced path command = %q %v", quoted, err)
+		}
 	}
 }

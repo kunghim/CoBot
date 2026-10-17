@@ -87,10 +87,11 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 				Status     string `json:"status"`
 				ID         string `json:"id"`
 				SourcePath string `json:"sourcePath"`
+				DurationMs int64  `json:"durationMs"`
 			} `json:"run"`
 		}
 		if json.Unmarshal(n.Raw, &result) == nil {
-			s.logger.Info("native hook completed", "teamId", teamID, "threadId", n.ThreadID, "turnId", n.TurnID, "hookId", result.Run.ID, "event", result.Run.EventName, "status", result.Run.Status)
+			s.logger.Info("native hook completed", "teamId", teamID, "threadId", n.ThreadID, "turnId", n.TurnID, "hookId", result.Run.ID, "event", result.Run.EventName, "status", result.Run.Status, "durationMs", result.Run.DurationMs)
 			if filepath.Clean(result.Run.SourcePath) == filepath.Join(s.app.Paths.CodexHome(), "hooks.json") {
 				if result.Run.Status == "failed" {
 					s.app.hookFailures.Store(teamID, true)

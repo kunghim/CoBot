@@ -218,6 +218,12 @@ func NativeCommand(binary, root string) (string, error) {
 		if strings.ContainsAny(binary+root, "\r\n\x00") {
 			return "", fmt.Errorf("invalid native hook path")
 		}
+		// A plain path needs no quoting in cmd or PowerShell, so the hook
+		// runs cobot directly instead of first starting powershell.exe
+		// (about a quarter second on every tool call).
+		if plainWindowsPath(binary) && plainWindowsPath(root) {
+			return binary + " hook --native-codex --data-root " + root, nil
+		}
 		psQuote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
 		// Explicit PowerShell works when Codex launches command hooks through
 		// either cmd or PowerShell. Encoded argv avoids nested shell expansion.
@@ -238,6 +244,24 @@ func NativeCommand(binary, root string) (string, error) {
 		return "", err
 	}
 	return bin + " hook --native-codex --data-root " + dir, nil
+}
+
+// plainWindowsPath reports whether a path reads the same to cmd and to
+// PowerShell without quotes: drive, separators, letters, digits, dot, dash
+// and underscore only.
+func plainWindowsPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	for _, r := range path {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == ':' || r == '\\' || r == '/' || r == '.' || r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func legacyNativeCommand(binary, root string) string {
