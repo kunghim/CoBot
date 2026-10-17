@@ -65,6 +65,8 @@ Usage:
   cobot version
   cobot mcp                      # MCP stdio bridge for one bot (spawned by the engine)
   cobot hook                     # run one configured hook from stdin JSON (H07)
+  cobot trace on|off|status|view|protocol [--data-root <path>]
+                                 # developer recording of raw exchanges (never commit it)
 
 The core binds loopback only. `+"`serve`"+` opens the default browser with a
 one-time startup link (also printed; --no-open only prints it); a second serve

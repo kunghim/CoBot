@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
@@ -341,5 +340,3 @@ func requireUser(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) 
 	}
 	return p, true
 }
-
-func nowUTC() time.Time { return time.Now().UTC() }

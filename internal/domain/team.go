@@ -58,7 +58,6 @@ const (
 	BotStatusWorking         = "working"
 	BotStatusWaitingApproval = "waiting_approval"
 	BotStatusWaitingInput    = "waiting_input"
-	BotStatusInterrupted     = "interrupted"
 	BotStatusUnknown         = "unknown"
 )
 
@@ -92,7 +91,6 @@ const (
 	EventTeamUpdated     = "team.updated"
 	EventTeamArchived    = "team.archived"
 	EventTeamRestored    = "team.restored"
-	EventTeamDeleted     = "team.deleted"
 	EventBotDeleted      = "bot.deleted"
 	EventBotAdded        = "bot.added"
 	EventMessageCreated  = "message.created"

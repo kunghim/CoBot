@@ -97,13 +97,7 @@ func (p Paths) SessionsFile() string {
 func (p Paths) AdminSecretFile() string {
 	return p.join("runtime", "credentials", "instance-admin.secret")
 }
-func (p Paths) EventsDir() string { return p.join("events") }
-func (p Paths) EventsPendingDir(botID string) string {
-	if botID == "" {
-		return p.join("events", "pending")
-	}
-	return p.join("events", "pending", botID)
-}
+func (p Paths) EventsDir() string           { return p.join("events") }
 func (p Paths) EventsImportedDir() string   { return p.join("events", "imported") }
 func (p Paths) EventsQuarantineDir() string { return p.join("events", "quarantine") }
 func (p Paths) LogsDir() string             { return p.join("logs") }

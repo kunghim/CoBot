@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -407,13 +406,6 @@ func nativeToolOptions(method string) []domain.ApprovalOption {
 	}
 }
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "…"
-}
-
 // onServerExitRuntime marks the team degraded when THIS runtime dies: pending
 // approvals of its epoch are invalidated, active runs become unknown (not
 // assumed stopped), and no automatic restart happens. The runtime identity
@@ -506,16 +498,6 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 		}
 	}
 	s.app.Hub.Publish()
-}
-
-// ReplyApproval delivers the engine response for a decided approval and
-// tracks queued/sent/unknown truthfully.
-func (s *Scheduler) replyApproval(ctx context.Context, teamID string, req engine.ApprovalRequest, response map[string]any) error {
-	rt := s.runtime(teamID)
-	if rt == nil {
-		return errors.New("team server is not running")
-	}
-	return rt.server.ReplyApproval(ctx, req.RequestID, response)
 }
 
 // InterruptRun requests an engine-side stop for one run. Only that bot's

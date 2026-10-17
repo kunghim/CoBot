@@ -158,9 +158,3 @@ type TokenUsageParams struct {
 type AccountUpdatedParams struct {
 	Account json.RawMessage `json:"account,omitempty"`
 }
-
-// Approval decision constants used by command/file approvals.
-const (
-	DecisionAccept  = "accept"
-	DecisionDecline = "decline"
-)

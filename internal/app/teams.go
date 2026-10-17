@@ -411,16 +411,6 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-// TouchTeamActivity records a directory existence check for the UI.
-func (a *App) VerifyTeamDirectory(teamID string) bool {
-	_, directory, err := sqlite.GetTeam(context.Background(), a.DB, teamID)
-	if err != nil || directory == "" {
-		return false
-	}
-	info, err := os.Stat(directory)
-	return err == nil && info.IsDir()
-}
-
 // markerClaim reports which team still claims a folder through its marker,
 // or nil when nobody does. A marker written by this instance for a team that
 // was deleted is stale and claims nothing. Any other marker — another CoBot

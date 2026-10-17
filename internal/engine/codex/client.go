@@ -26,12 +26,6 @@ func (e *RPCError) Error() string {
 	return fmt.Sprintf("codex rpc %d: %s", e.Code, e.Message)
 }
 
-type rpcResponse struct {
-	ID     json.RawMessage `json:"id"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  *RPCError       `json:"error,omitempty"`
-}
-
 type rpcMessage struct {
 	ID     json.RawMessage `json:"id,omitempty"`
 	Method string          `json:"method,omitempty"`

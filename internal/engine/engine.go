@@ -172,6 +172,9 @@ const (
 //	tool:        {server, tool, arguments, result?, error?, durationMs?}
 //	web_search:  {query}
 //	plan:        {text}
+//	message:     {text}  (what the model says while working)
+//	agent:       {tool, agents, prompt?} | {activity, agent}  (Codex sub-agents)
+//	diff:        {diff, files}  (the turn's changes so far)
 type Step struct {
 	ID     string
 	Kind   string

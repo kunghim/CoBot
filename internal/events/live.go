@@ -12,7 +12,8 @@ type Live struct {
 	RunID  string `json:"runId"`
 	// Step is the stored step for Type "step".
 	Step any `json:"step,omitempty"`
-	// ItemID/Kind/Text describe a "delta": Kind is message | reasoning | output.
+	// ItemID/Kind/Text describe a "delta": Kind is message | commentary |
+	// reasoning | output.
 	ItemID string `json:"itemId,omitempty"`
 	Kind   string `json:"kind,omitempty"`
 	Text   string `json:"text,omitempty"`

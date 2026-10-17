@@ -11,23 +11,6 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
-const teamColumns = `id, name, profile_instance, leader_id, status, status_detail, revision, created_at, updated_at, archived_at, permission_mode, reasoning_effort`
-
-func scanTeam(row *sql.Row) (domain.Team, error) {
-	var t domain.Team
-	var created, updated string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Team{}, ErrNotFound
-	}
-	if err != nil {
-		return domain.Team{}, fmt.Errorf("scan team: %w", err)
-	}
-	t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-	t.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
-	return t, nil
-}
-
 // GetTeam reads one team and joins its binding directory.
 func GetTeam(ctx context.Context, q Queryer, id string) (domain.Team, string, error) {
 	row := q.QueryRowContext(ctx, `SELECT `+prefixedTeamColumns("t")+`, COALESCE(b.directory, '')

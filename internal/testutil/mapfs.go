@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -163,11 +162,3 @@ func (i mapFileInfo) Mode() fs.FileMode {
 func (i mapFileInfo) ModTime() time.Time { return time.Time{} }
 func (i mapFileInfo) IsDir() bool        { return i.dir }
 func (i mapFileInfo) Sys() any           { return nil }
-
-// Basename is a tiny helper for path-free comparisons in tests.
-func Basename(path string) string {
-	if idx := strings.LastIndexAny(path, `/\`); idx >= 0 {
-		return path[idx+1:]
-	}
-	return path
-}

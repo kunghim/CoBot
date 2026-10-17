@@ -87,8 +87,8 @@ const (
 )
 
 // Run step kinds CoBot adds to the engine's own (reasoning, command,
-// file_change, tool, web_search, plan): engine errors/warnings and the
-// reconnect attempts of one run.
+// file_change, tool, web_search, plan, message, agent, diff): engine
+// errors/warnings and the reconnect attempts of one run.
 const (
 	StepKindNotice = "notice"
 	StepKindRetry  = "retry"

@@ -223,8 +223,9 @@ func (a *App) requestChainDecision(ctx context.Context, tx *sql.Tx, chain domain
 }
 
 // ApplyChainDecision executes the user's continue/stop choice for a chain
-// card. Continue grants exactly one more wake when the chain was over limit,
-// counts the bound delivery's wake and returns the chain to active; stop
+// card. Continue grants a fresh budget of the configured limit when the chain
+// was over it, counts the bound delivery's wake and returns the chain to
+// active; stop
 // cancels the chain's undelivered work and interrupts its executions.
 func (a *App) ApplyChainDecision(ctx context.Context, approval domain.Approval, optionID string) error {
 	tx, err := a.DB.BeginTx(ctx, nil)
