@@ -4,7 +4,7 @@
 
 这是协议实验程序，不是 CoBot 产品、开发框架选型或完整多 bot 调度器。使用 Node 内置模块，无第三方包，无安装步骤。
 
-目标是验证四件事：基本接入、多 bot 独立运行、MCP 结构化调用、原生审批。首轮结果见 [接入基线与历史范围](../../docs/接入基线.md)，当前通过范围见 [接入基线与历史范围](../../docs/接入基线.md)。
+目标是验证四件事：基本接入、多 bot 独立运行、MCP 结构化调用、原生审批。首轮结果与当前通过范围见 [接入基线与历史范围](../../docs/接入基线.md)。
 
 ## 执行
 
@@ -90,4 +90,4 @@ node experiments/app-server/inspect.mjs .tmp/app-server-spike/<本次approval目
 - 默认用户配置中的 `node_repl`、`rea` MCP 在测试 thread 局部禁用；其他环境可能有额外配置，需要在实际运行前检查。继承的 hook 不在本实验中修改。
 - 对话并发/cwd 返回值正确，只证明线程路由与配置，不能代替文件边界或恶意越权测试。
 - 正常 resume 不证明崩溃恢复；文件审批不代表网络授权或“总是允许这个 bot”已经验证。
-- 原始报告与schema留在 `.tmp/` 或docs/validation，均不提交；需要交付的脱敏结论保存为docs根Markdown，不提交凭据或本机路径快照。
+- 原始报告与schema留在 `.tmp/` 或docs/archive/validation，均不提交；需要交付的脱敏结论保存为docs根Markdown，不提交凭据或本机路径快照。
