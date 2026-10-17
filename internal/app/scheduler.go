@@ -379,7 +379,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 			tx.Rollback()
 			return err
 		}
-		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || (task.Status == domain.TaskDone && delivery.Kind != "approval_result") || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
+		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				tx.Rollback()
 				return err

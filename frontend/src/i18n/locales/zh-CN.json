@@ -234,23 +234,7 @@
         "view_tasks": "查看任务",
         "notify": "通知了 {{name}}",
         "create_task": "创建任务「{{title}}」，负责人 {{name}}",
-        "propose_task": "提出任务「{{title}}」",
-        "assign_task": "把任务转派给 {{name}}",
-        "update_task": "更新了任务状态",
-        "submit_evidence": "提交了完成证据",
-        "report_completion": "报告任务已完成",
-        "confirm_task": "确认任务完成",
-        "offer_transfer": "提议把任务交给 {{name}}",
-        "accept_transfer": "接受了任务交接",
-        "ask_user": "向你提问：{{question}}",
-        "request_member": "申请增加成员",
-        "request_merge": "申请合并代码",
-        "remember": "记下了一条工作方法",
-        "search_memory": "查找记忆",
-        "get_context": "查看团队情况",
-        "list_tasks": "查看任务列表",
-        "get_task": "查看任务详情",
-        "list_roles": "查看角色列表"
+        "ask_user": "向你提问：{{question}}"
       }
     },
     "placeholder": "给 {{name}} 发消息……",
@@ -287,10 +271,7 @@
     "title": "安全审批",
     "type": {
       "native_tool": "安全审批",
-      "collaboration": "协作确认",
-      "recruitment": "招募确认",
       "recovery": "中断恢复",
-      "merge": "合并确认",
       "chain": "协作链确认"
     },
     "requester": "发起者：{{name}}",
@@ -310,13 +291,6 @@
     },
     "loadFailed": "审批请求加载失败",
     "optionUnavailable": "当前无法核实该选项的执行条件。",
-    "candidate": "候选版本",
-    "target": "目标版本",
-    "executionDirectory": "执行目录",
-    "boundTask": "任务与版本",
-    "reportedEvidence": "以下是 Agent 为该候选版本提交的测试与审查报告。",
-    "testReport": "测试报告",
-    "reviewReport": "审查报告",
     "comment": "意见",
     "laterInvalidatedShort": "之后已失效",
     "you": "你",
@@ -326,16 +300,13 @@
       "risk_zone": "协作进入需要你确认的阶段",
       "unresolved_run": "上次执行在进程退出后状态未知"
     },
-    "openConversation": "查看申请者会话",
-    "feedback": "{{type}}结果：{{decision}}",
-    "feedbackDecision": {"approve": "已批准", "reject": "已拒绝"}
+    "openConversation": "查看申请者会话"
   },
   "approval": {
     "card": {
       "chain_risk": "下一步将继续推进当前任务，请确认是否按当前方向继续",
       "chain_over_limit": "成员之间已经互相唤醒了很多次。继续的话，会再给他们一轮同样多的次数",
-      "recovery": "上次执行在进程退出后状态未知，请选择处理方式",
-      "merge": "请求合并候选版本；确认前请核对候选与证据，CoBot 不执行 Git 合并"
+      "recovery": "上次执行在进程退出后状态未知，请选择处理方式"
     },
     "option": {
       "allow_once": "允许",
@@ -714,11 +685,6 @@
     "error.idempotency.required": "写操作需要幂等键 idempotencyKey",
     "error.idempotency.reused_key": "幂等键已用于不同内容",
     "error.invalid_request": "请求无效",
-    "error.merge.candidate_required": "合并请求需要候选版本引用",
-    "error.merge.needs_evidence": "合并请求需要先提交证据",
-    "error.merge.requester_only": "只有发起者可以提交合并请求",
-    "error.merge.target_required": "合并请求需要目标引用",
-    "error.task.id_required": "缺少任务 ID",
     "error.team.not_retryable": "该团队状态不能重试创建",
     "error.tool.unknown": "未知工具：{{tool}}",
     "error.unauthorized.bad_token": "桥凭据无效",
@@ -733,13 +699,6 @@
     "error.idempotency.header_conflict": "请求 ID 与 Idempotency-Key 不一致。",
     "error.cursor.invalid": "分页游标不适用于当前视图，请重新加载。",
     "error.scope.other_team": "该成员不属于当前团队。",
-    "error.merge.directory_invalid": "执行目录必须存在且位于团队目录内。",
-    "error.merge.directory_changed": "团队目录已变化，请重新提交合并申请。",
-    "error.merge.candidate_changed": "任务、候选版本或目录已变化，请重新提交合并申请。",
-    "error.merge.evidence_changed": "申请后证据已变化，请重新提交申请。",
-    "error.merge.binding_unverified": "这条旧申请缺少可核实的候选绑定，请拒绝后重新提交。",
-    "error.merge.evidence_candidate_mismatch": "证据对应的候选版本不一致。",
-    "error.merge.needs_test_review": "该候选版本需要测试报告和审查报告。",
     "error.chain.decision_stale": "该决定对应旧的链路授权，当前不能再使用。",
     "error.engine.interrupt_unconfirmed": "停止请求已保存，尚未确认送达。",
     "error.recovery.end_unverified": "尚未核实上次具体执行已经结束，成员仍保持锁定。"

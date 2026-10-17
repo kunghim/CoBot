@@ -9,7 +9,6 @@ import type { Approval, Bot } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
 import { displayCommand } from '../conversations/steps';
-import MergeDetails from './MergeDetails';
 import NativeApprovalBody from './NativeApprovalBody';
 import { parseNativeRequest } from './nativeRequest';
 import { approvalSummaryText, optionFallbackText, optionLabelKeys } from './pager';
@@ -55,7 +54,7 @@ function HistoryRow({ approval, bots }: { approval: Approval; bots: Bot[] }) {
   const declined = /decline|deny|reject|cancel|stop|abandon/i.test(decision.optionId);
   const actor = decision.actor === 'user-local' || decision.actor === 'user' ? t('approvals.you') : bots.find((bot) => bot.id === decision.actor)?.name ?? decision.actor;
   const time = new Date(decision.decidedAt).toLocaleString(i18n.language, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const reason = approval.type === 'merge' ? '' : approval.reason ? t(`approvals.reasonCode.${approval.reason}`, { defaultValue: approval.reason }) : '';
+  const reason = approval.reason ? t(`approvals.reasonCode.${approval.reason}`, { defaultValue: approval.reason }) : '';
 
   return (
     <li className="py-2 text-xs">
@@ -88,7 +87,6 @@ function HistoryRow({ approval, bots }: { approval: Approval; bots: Bot[] }) {
             <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{approvalSummaryText(t, approval.summary)}</p>
           )}
           {reason && <p className="text-neutral-600 dark:text-neutral-400">{t('approvals.reason')}：{reason}</p>}
-          <MergeDetails approval={approval} />
           {decision.comment && <p className="whitespace-pre-wrap">{t('approvals.comment')}：{decision.comment}</p>}
           {requester && (
             <button type="button" className="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400" onClick={() => setBotId(requester.id)}>

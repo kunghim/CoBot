@@ -2252,34 +2252,18 @@ components:
         teamId: { type: string }
         requesterBotId: { type: string }
         runId: { type: string }
-        type: { type: string, enum: [native_tool, collaboration, recruitment, recovery, merge, chain] }
+        type: { type: string, enum: [native_tool, recovery, chain] }
         method: { type: string }
         summary: { type: string }
         reason: { type: string }
         options:
           type: array
           items: { $ref: "#/components/schemas/ApprovalOption" }
-        details: { $ref: "#/components/schemas/MergeApprovalDetails" }
         requestState: { type: string, enum: [pending, decided, invalidated] }
         decision: { $ref: "#/components/schemas/ApprovalDecision" }
-        responseState: { type: string, enum: [queued, sent, confirmed, unknown, expired] }
+        responseState: { type: string, enum: [queued, sent, unknown, expired] }
         createdAt: { type: string, format: date-time }
         revision: { type: integer, format: int64 }
-    MergeApprovalDetails:
-      type: object
-      required: [taskId, taskRevision, candidateRef, targetRef, executionDirectory, evidenceIds, evidence]
-      properties:
-        taskId: { type: string }
-        taskRevision: { type: integer, format: int64 }
-        candidateRef: { type: string }
-        targetRef: { type: string }
-        executionDirectory: { type: string }
-        evidenceIds:
-          type: array
-          items: { type: string }
-        evidence:
-          type: array
-          items: { $ref: "#/components/schemas/Evidence" }
     Event:
       type: object
       required: [seq, id, instanceId, type, teamId, botId, resourceId, revision, payload, createdAt]

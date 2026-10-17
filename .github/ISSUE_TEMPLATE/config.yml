@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting / 安全问题报告
+    url: https://github.com/kunghim/CoBot/blob/main/SECURITY.md
+    about: Read the private reporting instructions; do not post vulnerability details in a public issue. / 请先阅读私密报告说明，不要公开漏洞细节。

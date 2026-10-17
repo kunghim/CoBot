@@ -55,7 +55,7 @@ func TestScopedPagesKeepAllTiedRecordsAndDecidedHistory(t *testing.T) {
 		if err := sqlite.InsertMemory(ctx, tx, domain.Memory{ID: id, TeamID: team.ID, BotID: bots[1].ID, Body: id, NormKey: id, CreatedAt: stamp}); err != nil {
 			t.Fatal(err)
 		}
-		card := domain.Approval{ID: id, TeamID: team.ID, RequesterBotID: owner.ID, Type: domain.ApprovalRecruitment, Summary: id, Options: []domain.ApprovalOption{{ID: "reject"}}, CreatedAt: stamp}
+		card := domain.Approval{ID: id, TeamID: team.ID, RequesterBotID: owner.ID, Type: domain.ApprovalNativeTool, Summary: id, Options: []domain.ApprovalOption{{ID: "reject"}}, CreatedAt: stamp}
 		if err := sqlite.InsertApproval(ctx, tx, card); err != nil {
 			t.Fatal(err)
 		}

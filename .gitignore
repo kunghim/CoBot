@@ -4,8 +4,31 @@
 # docs 整体只放本机资料，不随仓库交付；需要公开的文件由维护者决定后单独放出
 /docs/**
 
+# Private AI coding instructions and local assistant settings.
+# Ignore rules do not untrack existing files or remove Git history.
+**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
+**/[Aa][Gg][Ee][Nn][Tt].[Mm][Dd]
+**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]
+**/[Gg][Ee][Mm][Ii][Nn][Ii].[Mm][Dd]
+**/AGENTS.override.md
+**/CLAUDE.local.md
+**/.mcp.json
+**/.claude/
+**/.codex/
+**/.agents/
+**/.cursor/
+**/.github/copilot-instructions.md
+**/.github/instructions/
+**/.cursorrules
+**/.cursorignore
+
 # 产品构建与依赖（源码、迁移、角色、生成API类型仍应提交）
 /internal/webui/dist/
+# 在仓库根目录直接 go build 产生的可执行文件
+/cobot
+/cobot.exe
+/cobot-desktop
+/cobot-desktop.exe
 node_modules/
 /frontend/wailsjs/
 /frontend/coverage/
@@ -32,6 +55,13 @@ test-results/
 *.sqlite3-wal
 *.sqlite3-shm
 *.log
+*.jsonl
+**/traces/
+**/credentials/
+*.pem
+*.key
+*.p12
+*.pfx
 
 # 操作系统缓存
 .DS_Store

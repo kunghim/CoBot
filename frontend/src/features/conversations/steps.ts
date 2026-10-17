@@ -27,14 +27,8 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
   return {};
 }
 
-// CoBot's own collaboration tools, described as what the member did. Names
-// after ask_user are no longer offered; they stay so runs stored before still
-// read in plain language.
-const collaborationTools = new Set([
-  'deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'ask_user',
-  'propose_task', 'assign_task', 'update_task', 'submit_evidence', 'report_completion', 'confirm_task', 'offer_transfer',
-  'accept_transfer', 'request_member', 'request_merge', 'remember', 'search_memory', 'get_context', 'list_tasks', 'get_task', 'list_roles',
-]);
+// CoBot's own collaboration tools, described as what the member did.
+const collaborationTools = new Set(['deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'ask_user']);
 
 // Codex sub-agent tools and activity kinds with their own wording; anything
 // newer reads as the generic sub-agent line instead of a raw key.

@@ -1222,31 +1222,20 @@ export interface components {
             requesterBotId: string;
             runId?: string;
             /** @enum {string} */
-            type: "native_tool" | "collaboration" | "recruitment" | "recovery" | "merge" | "chain";
+            type: "native_tool" | "recovery" | "chain";
             method?: string;
             summary: string;
             reason?: string;
             options: components["schemas"]["ApprovalOption"][];
-            details?: components["schemas"]["MergeApprovalDetails"];
             /** @enum {string} */
             requestState: "pending" | "decided" | "invalidated";
             decision?: components["schemas"]["ApprovalDecision"];
             /** @enum {string} */
-            responseState?: "queued" | "sent" | "confirmed" | "unknown" | "expired";
+            responseState?: "queued" | "sent" | "unknown" | "expired";
             /** Format: date-time */
             createdAt: string;
             /** Format: int64 */
             revision: number;
-        };
-        MergeApprovalDetails: {
-            taskId: string;
-            /** Format: int64 */
-            taskRevision: number;
-            candidateRef: string;
-            targetRef: string;
-            executionDirectory: string;
-            evidenceIds: string[];
-            evidence: components["schemas"]["Evidence"][];
         };
         Event: {
             /** Format: int64 */

@@ -2,11 +2,45 @@
 
 CoBot is a local multi-agent application with one Go core shared by Web
 and desktop. Keep changes small, observable, and suitable for future use
-cases beyond coding. Please read `AGENTS.md` before implementation.
+cases beyond coding. This guide is the public development entry point;
+maintainers' local design notes and AI instructions are not prerequisites.
+
+## Issues, pull requests and releases
+
+Issues and pull requests in English or Chinese are welcome. Search existing
+issues first. Discuss substantial features or architecture changes before
+implementing them; small bug fixes can go straight to a pull request.
+
+Contributors normally work in a fork on a short-lived topic branch. Target
+`dev` once that integration branch is available; until then, target `main`.
+The intended flow is `topic branch -> dev -> main -> release`. Maintainers
+integrate contributions into `dev`, promote tested changes to `main`, and
+publish releases manually. A merged PR is not a promise of an immediate
+release. Repository write access is not required to propose a change.
+
+Keep each PR focused. Explain the problem, resulting behavior, validation
+and limitations. Include screenshots for visible UI changes, sanitized logs
+only when relevant, and the issue number if one exists. CI and maintainer
+review are required before accepting a change. Do not change dependency
+locks, generated contracts or migrations without explaining why.
+
+AI-assisted contributions are welcome. You are responsible for understanding
+the change, checking its sources and running the relevant tests. Summarize
+AI assistance when it helps reviewers assess the work; never upload private
+prompts, account material or model transcripts as review evidence.
+
+By intentionally submitting a contribution for inclusion in CoBot, you offer
+it under the project's Apache-2.0 license. Preserve third-party attribution
+and only contribute material you have the right to submit.
+
+中文说明：欢迎中文和英文 Issue/PR。一般先 fork，在短期功能分支开发；`dev` 建立后
+向它提交 PR，目前尚未建立时向 `main` 提交。维护者负责审查、集成，再将验证后的
+`dev` 合并到 `main`，手动发布。较大的需求先讨论，小修复可直接提 PR。使用 AI 不
+免除贡献者对代码、来源和测试的责任。贡献默认按 Apache-2.0 提交。
 
 ## Working locally
 
-Use Go 1.25+, Node.js 24+, and npm 11+. Install frontend dependencies with
+Use Go 1.25.12+ (the `go.mod` minimum), Node.js 24+, and npm 11+. Install frontend dependencies with
 `npm ci --prefix frontend`. Run `scripts/dev.ps1` on Windows or
 `scripts/dev.sh` on macOS/Linux. Use the development profile or an explicit
 temporary data root; never test with a production database or everyday
@@ -52,8 +86,9 @@ does so only when the private `hooks.json` is byte-for-byte the guard CoBot
 generated and matches its ownership record, and only for that one entry:
 project hooks in team directories, managed hooks and edited files are never
 trusted automatically. Upgrades re-trust the new definition the same way.
-Settings shows whether the hook is authorized and offers a retry. Coverage
-is limited to native paths that actually invoke it; hooks do not revoke
+Settings shows whether the hook is authorized and offers a retry. The hook
+matches only shell commands and file patches (`Bash|apply_patch`), and
+coverage is limited to native paths that actually invoke it; hooks do not revoke
 commands already running or provide complete isolation.
 
 If automatic trust is refused (for example because the private hooks file
@@ -72,10 +107,13 @@ $previousCodexSQLiteHome = $env:CODEX_SQLITE_HOME
 try {
     $env:CODEX_HOME = Join-Path $cobotRoot 'engines/codex/home'
     $env:CODEX_SQLITE_HOME = Join-Path $cobotRoot 'engines/codex/sqlite'
-    # On Windows the hook command is base64 EncodedCommand; decode it to inspect, do not run it.
+    # On Windows the hook command calls cobot directly when the paths need no quoting,
+    # otherwise it is a base64 -EncodedCommand; decode it to inspect, do not run it.
     $hooks = Get-Content (Join-Path $env:CODEX_HOME 'hooks.json') -Raw | ConvertFrom-Json
     $command = $hooks.hooks.PreToolUse[0].hooks[0].command
-    [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($command -split ' ')[-1]))
+    if ($command -match '-EncodedCommand (\S+)$') {
+        [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
+    } else { $command }
     codex --no-daemon --no-alt-screen --cd $teamDirectory
     # Inside Codex, type /hooks, review, then exit.
 } finally {
@@ -93,12 +131,16 @@ Re-review after an upgrade changes the helper path.
 
 ## Validation
 
-Run `scripts/check.ps1` or `scripts/check.sh`: contract drift, frontend
-build/types/tests, Go vet/build, and unit/integration tests. On Windows,
+Run `scripts/check.ps1` or `scripts/check.sh`: gofmt, contract drift,
+frontend build/types/tests, Go vet/build, and unit/integration tests. On Windows,
 `scripts/check.ps1 -Desktop` also compiles the native shell. These checks
 do not prove macOS installation or native runtime behavior.
 
-Browser regression tests use the real core with a fake engine:
+Browser regression tests (10 Playwright spec files under `tests/e2e/specs`)
+use the real core with a fake engine. Global setup builds the frontend,
+`cobot` and the fake Codex host into `.tmp/bin` and starts a core on a
+throwaway data root under `.tmp/test-runs`, so frontend dependencies must
+already be installed:
 
 ```sh
 cd tests/e2e
@@ -125,9 +167,18 @@ regressions; avoid tests that merely restate implementation details.
 Never commit credentials, bootstrap links, runtime databases, engine
 transcripts, raw acceptance logs, or build output. Keep raw evidence under
 the ignored `.tmp/` area. The `docs/` directory holds maintainers' local
-design and acceptance material and is not tracked by Git.
+design and acceptance material and must not be included in contributions.
+Keep personal `AGENTS.md`, `AGENT.md`, `CLAUDE.md` and assistant settings local.
+Ignore rules do not remove already tracked files or historical versions;
+maintainers handle the existing historical material separately.
+
+Raw `cobot trace` recordings are deliberately unredacted developer data and
+can include HTTP credentials, prompts, file contents and tool results. Do
+not attach them to issues or pull requests. Share only a minimal, manually
+sanitized reproduction. Do not enable recording just to report a normal bug.
 
 Report bugs with reproduction steps, platform/tool versions, expected and
 actual behavior, and sanitized logs. Remove private paths/content when
 unnecessary, and always remove tokens. Public releases, signing, and the
-project license require a separate maintainer decision.
+release timing require a separate maintainer decision. Report security
+vulnerabilities through [SECURITY.md](SECURITY.md), rather than public issues.

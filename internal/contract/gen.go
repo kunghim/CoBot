@@ -25,21 +25,17 @@ const (
 
 // Defines values for ApprovalResponseState.
 const (
-	ApprovalResponseStateConfirmed ApprovalResponseState = "confirmed"
-	ApprovalResponseStateExpired   ApprovalResponseState = "expired"
-	ApprovalResponseStateQueued    ApprovalResponseState = "queued"
-	ApprovalResponseStateSent      ApprovalResponseState = "sent"
-	ApprovalResponseStateUnknown   ApprovalResponseState = "unknown"
+	ApprovalResponseStateExpired ApprovalResponseState = "expired"
+	ApprovalResponseStateQueued  ApprovalResponseState = "queued"
+	ApprovalResponseStateSent    ApprovalResponseState = "sent"
+	ApprovalResponseStateUnknown ApprovalResponseState = "unknown"
 )
 
 // Defines values for ApprovalType.
 const (
-	ApprovalTypeChain         ApprovalType = "chain"
-	ApprovalTypeCollaboration ApprovalType = "collaboration"
-	ApprovalTypeMerge         ApprovalType = "merge"
-	ApprovalTypeNativeTool    ApprovalType = "native_tool"
-	ApprovalTypeRecovery      ApprovalType = "recovery"
-	ApprovalTypeRecruitment   ApprovalType = "recruitment"
+	Chain      ApprovalType = "chain"
+	NativeTool ApprovalType = "native_tool"
+	Recovery   ApprovalType = "recovery"
 )
 
 // Defines values for BotStatus.
@@ -102,10 +98,10 @@ const (
 
 // Defines values for MessageKind.
 const (
-	MessageKindAssistant     MessageKind = "assistant"
-	MessageKindCollaboration MessageKind = "collaboration"
-	MessageKindSystem        MessageKind = "system"
-	MessageKindUser          MessageKind = "user"
+	Assistant     MessageKind = "assistant"
+	Collaboration MessageKind = "collaboration"
+	System        MessageKind = "system"
+	User          MessageKind = "user"
 )
 
 // Defines values for PatchTaskRequestStatus.
@@ -282,7 +278,6 @@ type AnswerQuestionRequest struct {
 type Approval struct {
 	CreatedAt      time.Time              `json:"createdAt"`
 	Decision       *ApprovalDecision      `json:"decision,omitempty"`
-	Details        *MergeApprovalDetails  `json:"details,omitempty"`
 	Id             string                 `json:"id"`
 	Method         *string                `json:"method,omitempty"`
 	Options        []ApprovalOption       `json:"options"`
@@ -475,17 +470,6 @@ type Memory struct {
 	SourceRunId  *string   `json:"sourceRunId,omitempty"`
 	SourceTaskId *string   `json:"sourceTaskId,omitempty"`
 	TeamId       string    `json:"teamId"`
-}
-
-// MergeApprovalDetails defines model for MergeApprovalDetails.
-type MergeApprovalDetails struct {
-	CandidateRef       string     `json:"candidateRef"`
-	Evidence           []Evidence `json:"evidence"`
-	EvidenceIds        []string   `json:"evidenceIds"`
-	ExecutionDirectory string     `json:"executionDirectory"`
-	TargetRef          string     `json:"targetRef"`
-	TaskId             string     `json:"taskId"`
-	TaskRevision       int64      `json:"taskRevision"`
 }
 
 // Message defines model for Message.

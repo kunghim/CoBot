@@ -50,9 +50,6 @@ type Queryer interface {
 
 // ---- settings ----
 
-// The settings table still has eval_model, the evaluation model of the
-// removed risk checks; nothing reads or writes it.
-
 const settingsColumns = `revision, language, default_model, member_limit, chain_limit, budget_scope, budget_tokens, engine_path`
 
 func scanSettings(row *sql.Row) (domain.Settings, error) {

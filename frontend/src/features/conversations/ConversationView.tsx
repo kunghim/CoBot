@@ -376,18 +376,6 @@ function MessageRow({
   const { t } = useTranslation();
   const text = messageText(message);
 
-  const feedbackBlock = message.blocks.find((block) => block.type === 'approval_result');
-  if (feedbackBlock) {
-    try {
-      const feedback = JSON.parse(feedbackBlock.text) as { approvalType: string; decision: string; comment?: string; details?: { candidateRef?: string; targetRef?: string } };
-      return <div className="space-y-1 rounded-md border border-neutral-200 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-700">
-        <p>{t('approvals.feedback', { type: t(`approvals.type.${feedback.approvalType}`), decision: t(`approvals.feedbackDecision.${feedback.decision}`, { defaultValue: feedback.decision }) })}</p>
-        {feedback.details?.candidateRef && <p className="break-all font-mono">{feedback.details.candidateRef} → {feedback.details.targetRef}</p>}
-        {feedback.comment && <p className="whitespace-pre-wrap">{feedback.comment}</p>}
-      </div>;
-    } catch { /* A malformed record remains visible as escaped text. */ }
-  }
-
   if (isExchange(message)) {
     // In the sender's conversation it is what the member sent; in the
     // recipient's, what it received. A task the user assigned has no member

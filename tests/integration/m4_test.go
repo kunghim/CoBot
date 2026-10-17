@@ -287,22 +287,6 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 		t.Fatalf("unknown count after real usage = %d, want 0", unknown)
 	}
 
-	// A system session (future risk evaluation) counts for the team only.
-	system := base
-	system.ID = domain.NewID()
-	system.BotID = ""
-	system.Purpose = domain.UsagePurposeRiskEval
-	system.TurnID = "turn-eval"
-	system.InputTokens = 7
-	system.OutputTokens = 3
-	if err := h.app.RecordUsage(ctx, system); err != nil {
-		t.Fatalf("system usage: %v", err)
-	}
-	teamTotal, _, _ := sqlite.SumUsage(ctx, h.app.DB, team.ID, "")
-	botTotal, _, _ := sqlite.SumUsage(ctx, h.app.DB, team.ID, bot.ID)
-	if teamTotal != botTotal+10 {
-		t.Fatalf("team %d vs bot %d: system session must count for the team only", teamTotal, botTotal)
-	}
 }
 
 // TestBudgetPausesNewTurnsAndResumes walks G07/G08 end to end: a budget

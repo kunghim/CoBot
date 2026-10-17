@@ -9,7 +9,6 @@ import { useApprovals, useDecideApproval } from '../../api/queries';
 import type { ApprovalOption } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
-import MergeDetails from './MergeDetails';
 import NativeApprovalBody from './NativeApprovalBody';
 
 export default function ApprovalCardStack({
@@ -94,7 +93,6 @@ export default function ApprovalCardStack({
             {approvalSummaryText(t, approval.summary)}
           </pre>
         )}
-        <MergeDetails approval={approval} />
         {approval.reason && (
           <p className="text-sm">
             <span className="text-neutral-500 dark:text-neutral-400">{t('approvals.reason')}: </span>

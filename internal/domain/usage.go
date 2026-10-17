@@ -10,13 +10,11 @@ const (
 	UsageStatusUnknown  = "unknown"
 )
 
-// Usage purpose separates business turns from system sessions. Risk
-// evaluations are gone, but ledgers written before still hold their rows.
-// Both count toward their team (G06); only business turns count toward a
-// per-bot budget.
+// Usage purpose separates business turns from system sessions; every row
+// today is a member's turn. Both count toward their team (G06); only
+// business turns count toward a per-bot budget.
 const (
-	UsagePurposeRun      = "run"
-	UsagePurposeRiskEval = "risk_eval"
+	UsagePurposeRun = "run"
 )
 
 // UsageEntry is one turn's token snapshot in the ledger.

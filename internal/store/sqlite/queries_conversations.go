@@ -428,12 +428,6 @@ func GetApproval(ctx context.Context, q Queryer, id string) (domain.Approval, er
 		return domain.Approval{}, err
 	}
 	a.EngineRequestID = []byte(engineReqID)
-	if a.Type == domain.ApprovalMerge {
-		var details domain.MergeApprovalDetails
-		if json.Unmarshal(a.EngineRequestID, &details) == nil && details.TaskID != "" && details.TaskRevision > 0 && details.Evidence != nil {
-			a.Details = &details
-		}
-	}
 	a.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	if err := jsonUnmarshal([]byte(options), &a.Options); err != nil {
 		return domain.Approval{}, err

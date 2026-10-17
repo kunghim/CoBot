@@ -234,23 +234,7 @@
         "view_tasks": "Looked at the tasks",
         "notify": "Left a note for {{name}}",
         "create_task": "Created task “{{title}}” for {{name}}",
-        "propose_task": "Proposed task “{{title}}”",
-        "assign_task": "Reassigned a task to {{name}}",
-        "update_task": "Updated a task's status",
-        "submit_evidence": "Submitted completion evidence",
-        "report_completion": "Reported a task done",
-        "confirm_task": "Confirmed a task done",
-        "offer_transfer": "Offered a task to {{name}}",
-        "accept_transfer": "Accepted a task handoff",
-        "ask_user": "Asked you: {{question}}",
-        "request_member": "Requested a new member",
-        "request_merge": "Requested a merge",
-        "remember": "Saved a working method",
-        "search_memory": "Searched memories",
-        "get_context": "Checked the team",
-        "list_tasks": "Listed tasks",
-        "get_task": "Read a task",
-        "list_roles": "Listed roles"
+        "ask_user": "Asked you: {{question}}"
       }
     },
     "placeholder": "Message {{name}}…",
@@ -289,10 +273,7 @@
     "title": "Security approval",
     "type": {
       "native_tool": "Security approval",
-      "collaboration": "Collaboration confirmation",
-      "recruitment": "Recruitment confirmation",
       "recovery": "Recovery",
-      "merge": "Merge confirmation",
       "chain": "Chain confirmation"
     },
     "requester": "Requested by: {{name}}",
@@ -312,13 +293,6 @@
     },
     "loadFailed": "Could not load approval requests",
     "optionUnavailable": "This option cannot be verified for this request.",
-    "candidate": "Candidate",
-    "target": "Target",
-    "executionDirectory": "Execution directory",
-    "boundTask": "Task and revision",
-    "reportedEvidence": "These are Agent-reported test and review results for this candidate.",
-    "testReport": "Test report",
-    "reviewReport": "Review report",
     "comment": "Comment",
     "laterInvalidatedShort": "later invalidated",
     "you": "You",
@@ -328,16 +302,13 @@
       "risk_zone": "The collaboration needs your confirmation",
       "unresolved_run": "The last run's state is unknown after the process exited"
     },
-    "openConversation": "Open requester conversation",
-    "feedback": "{{type}} result: {{decision}}",
-    "feedbackDecision": {"approve": "Approved", "reject": "Rejected"}
+    "openConversation": "Open requester conversation"
   },
   "approval": {
     "card": {
       "chain_risk": "The work will continue in this direction — please confirm",
       "chain_over_limit": "Members have woken each other many times. Continuing grants them another budget of the same size",
-      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it",
-      "merge": "Requests merging a candidate version; verify the candidate and evidence — CoBot never runs Git itself"
+      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it"
     },
     "option": {
       "allow_once": "Allow",
@@ -718,11 +689,6 @@
     "error.idempotency.required": "Write calls require an idempotencyKey",
     "error.idempotency.reused_key": "The idempotency key was already used with different content",
     "error.invalid_request": "Invalid request",
-    "error.merge.candidate_required": "A merge request needs a candidate reference",
-    "error.merge.needs_evidence": "A merge request needs evidence first",
-    "error.merge.requester_only": "Only the requester can submit a merge request",
-    "error.merge.target_required": "A merge request needs a target reference",
-    "error.task.id_required": "Missing task id",
     "error.team.not_retryable": "This team state cannot retry creation",
     "error.tool.unknown": "Unknown tool: {{tool}}",
     "error.unauthorized.bad_token": "Invalid bridge credential",
@@ -737,13 +703,6 @@
     "error.idempotency.header_conflict": "The request ID conflicts with Idempotency-Key.",
     "error.cursor.invalid": "This page cursor is invalid for the selected view.",
     "error.scope.other_team": "This member belongs to another team.",
-    "error.merge.directory_invalid": "The execution directory must exist inside the team directory.",
-    "error.merge.directory_changed": "The team directory changed. Submit a fresh merge request.",
-    "error.merge.candidate_changed": "The task, candidate or directory changed. Submit a fresh merge request.",
-    "error.merge.evidence_changed": "Evidence changed after this request was created. Submit a fresh request.",
-    "error.merge.binding_unverified": "This older request has no verifiable candidate binding. Reject it and submit a fresh request.",
-    "error.merge.evidence_candidate_mismatch": "Evidence belongs to another candidate.",
-    "error.merge.needs_test_review": "The exact candidate needs test and review reports.",
     "error.chain.decision_stale": "This decision belongs to an earlier chain authorization.",
     "error.engine.interrupt_unconfirmed": "The stop request was saved, but delivery is unconfirmed.",
     "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked."

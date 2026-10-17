@@ -1,0 +1,27 @@
+name: Feature request / 功能建议
+description: Describe a problem and proposed improvement / 描述问题和改进建议
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English and Chinese are welcome. Discuss substantial changes before opening a large PR.
+        欢迎中文和英文；较大改动请先讨论，再提交大型 PR。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case / 问题或使用场景
+      description: What are you trying to achieve, and what gets in the way? / 想完成什么，目前遇到什么阻碍？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 建议的行为
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and scope / 替代方案与范围
+      description: Optional workarounds, alternatives, and what should stay outside this change. / 可选：现有办法、替代方案和范围边界。
