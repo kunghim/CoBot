@@ -81,7 +81,11 @@ func (a *App) ownTasksText(ctx context.Context, teamID, botID string) string {
 		if line.Status == domain.TaskDone || line.Status == domain.TaskCancelled {
 			continue
 		}
-		fmt.Fprintf(&b, "- 「%s」（id=%s）%s", line.Title, line.ID, taskStatusNames[line.Status])
+		status := taskStatusNames[line.Status]
+		if line.Status == domain.TaskTodo && len(line.WaitingOn) == 0 {
+			status = "刚交给你" // it turns to doing as this turn starts
+		}
+		fmt.Fprintf(&b, "- 「%s」（id=%s）%s", line.Title, line.ID, status)
 		if len(line.WaitingOn) > 0 {
 			fmt.Fprintf(&b, "，要等「%s」完成后才会送到你手上，现在不要开工", strings.Join(line.WaitingOn, "」「"))
 		}
