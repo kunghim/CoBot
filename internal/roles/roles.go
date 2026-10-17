@@ -83,8 +83,16 @@ func Digest(instructions string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// retiredDigests lists the content versions of earlier shipped defaults. A
+// profile copy still carrying one of them was never edited by the user, so it
+// is upgraded to the current default instead of pinning the old text forever.
+var retiredDigests = map[string][]string{
+	LeaderRoleID: {"d4ff9b5d42b58330"},
+}
+
 // EnsureProfileCopy materializes the editable role files on first use.
-// Existing user files are never overwritten; new default roles are added.
+// User-edited files are never overwritten; new default roles are added and
+// unedited copies of retired defaults are upgraded.
 func EnsureProfileCopy(rolesDir string) error {
 	if err := os.MkdirAll(rolesDir, 0o700); err != nil {
 		return fmt.Errorf("create roles dir: %w", err)
@@ -95,7 +103,7 @@ func EnsureProfileCopy(rolesDir string) error {
 	}
 	for _, role := range defaults {
 		path := filepath.Join(rolesDir, fileNameFor(role.ID)+".json")
-		if _, err := os.Stat(path); err == nil {
+		if _, err := os.Stat(path); err == nil && !isRetiredCopy(path, role.ID) {
 			continue // user copy wins
 		}
 		if err := writeRoleFile(path, role); err != nil {
@@ -132,6 +140,24 @@ func LoadProfile(rolesDir string) ([]Role, error) {
 	}
 	sort.Slice(roles, func(i, j int) bool { return roles[i].ID < roles[j].ID })
 	return roles, nil
+}
+
+func isRetiredCopy(path, id string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var role Role
+	if err := json.Unmarshal(data, &role); err != nil {
+		return false
+	}
+	digest := Digest(role.Instructions)
+	for _, retired := range retiredDigests[id] {
+		if digest == retired {
+			return true
+		}
+	}
+	return false
 }
 
 func writeRoleFile(path string, role Role) error {
