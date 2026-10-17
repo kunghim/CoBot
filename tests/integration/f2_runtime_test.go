@@ -76,10 +76,10 @@ func TestIdleUnknownAndPredecessorBridgeCannotWrite(t *testing.T) {
 	ctx := context.Background()
 	team, bots := h.createTeam(t, []string{"backend-dev"})
 	readToken := h.botToken(t, bots[1])
-	args := map[string]any{"body": "unauthorized memory", "idempotencyKey": "idle-write"}
+	args := map[string]any{"targetBotId": bots[0].ID, "text": "unauthorized message", "idempotencyKey": "idle-write"}
 	assertRejected := func(token string) {
 		t.Helper()
-		status, body := h.callToolRaw(t, token, "remember", args)
+		status, body := h.callToolRaw(t, token, "send_message", args)
 		if status == 200 {
 			data, _ := body["data"].(map[string]any)
 			if data["status"] != "rejected" {
@@ -93,7 +93,7 @@ func TestIdleUnknownAndPredecessorBridgeCannotWrite(t *testing.T) {
 	binding, _ := h.tokens.Resolve(readToken)
 	bound, finish := h.scriptExecution(t, binding)
 	run, _ := sqlite.FindActiveRun(ctx, h.app.DB, bots[1].ID)
-	status, body := h.callToolRaw(t, bound, "remember", args)
+	status, body := h.callToolRaw(t, bound, "send_message", args)
 	if status != 200 || body["data"].(map[string]any)["status"] != "accepted" {
 		t.Fatalf("live write rejected: %+v", body)
 	}

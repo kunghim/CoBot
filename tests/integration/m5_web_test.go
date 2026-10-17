@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
-	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // userPost drives a user route with the bearer token, mirroring userGet.
@@ -67,12 +68,17 @@ func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 		t.Fatal("activity feed must contain the task.created event")
 	}
 
-	// Memories: the member remembers through the app; the page lists and
-	// deletes it.
-	principal := auth.NewPrincipalBot(member.ID, team.ID)
-	mem, err := h.app.RememberMemory(ctx, principal, "提交前先 gofmt", "")
+	// Memories: a kept memory of the member; the page lists and deletes it.
+	mem := domain.Memory{ID: domain.NewID(), TeamID: team.ID, BotID: member.ID, Body: "提交前先 gofmt", NormKey: domain.NormalizeMemoryBody("提交前先 gofmt")}
+	tx, err := h.app.DB.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("remember: %v", err)
+		t.Fatal(err)
+	}
+	if err := sqlite.InsertMemory(ctx, tx, mem); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 	status, payload = h.userGet(t, "/api/v1/bots/"+member.ID+"/memories")
 	if status != http.StatusOK {

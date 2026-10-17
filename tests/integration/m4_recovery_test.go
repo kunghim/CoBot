@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -251,7 +252,7 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 		return len(fake.Turns()) >= 2
 	})
 	last := fake.Turns()[len(fake.Turns())-1]
-	if !endsWithString(last.Text, "重跑的原始派发") {
+	if !strings.HasSuffix(last.Text, "重跑的原始派发") {
 		t.Fatalf("rerun turn = %q, want the original request", last.Text)
 	}
 	requeued, err := sqlite.GetDelivery(ctx, h.app.DB, delivery2)
@@ -295,12 +296,6 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
 		t.Fatalf("second recovery decision = %v, want conflict not_unknown", err)
 	}
-}
-
-// endsWithString mirrors the dispatch context prefix: the engine input ends
-// with the raw message text.
-func endsWithString(text, suffix string) bool {
-	return len(text) >= len(suffix) && text[len(text)-len(suffix):] == suffix
 }
 
 // TestStopInterruptsInFlightRuns pins H01: shutting the scheduler down

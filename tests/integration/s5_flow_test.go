@@ -68,6 +68,10 @@ func TestDeliverAndReviewMoveTheTaskForTheModel(t *testing.T) {
 		t.Fatalf("leader notice:\n%s", notice.Text)
 	}
 
+	// Only the leader reviews.
+	if _, err := h.app.ReviewTask(ctx, auth.NewPrincipalBot(qa.ID, team.ID), build.ID, true, ""); err == nil {
+		t.Fatal("a member reviewed a task")
+	}
 	asLeader := auth.NewPrincipalBot(leader.ID, team.ID)
 	if _, err := h.app.ReviewTask(ctx, asLeader, build.ID, false, ""); err == nil {
 		t.Fatal("rejected without a reason")

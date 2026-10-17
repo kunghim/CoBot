@@ -280,22 +280,6 @@ func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error
 	return nil
 }
 
-func BindApprovalDelivery(ctx context.Context, tx *sql.Tx, approvalID, deliveryID string) error {
-	_, err := tx.ExecContext(ctx, `UPDATE approval_responses SET delivery_id = ?, state = ?, detail = '', updated_at = ? WHERE approval_id = ?`, deliveryID, domain.ResponseQueued, time.Now().UTC().Format(time.RFC3339Nano), approvalID)
-	return err
-}
-
-func ApprovalOfDelivery(ctx context.Context, q Queryer, deliveryID string) (domain.Approval, error) {
-	var id string
-	if err := q.QueryRowContext(ctx, `SELECT approval_id FROM approval_responses WHERE delivery_id = ?`, deliveryID).Scan(&id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Approval{}, ErrNotFound
-		}
-		return domain.Approval{}, err
-	}
-	return GetApproval(ctx, q, id)
-}
-
 // GetDelivery reads one delivery.
 func GetDelivery(ctx context.Context, q Queryer, id string) (DeliveryRecord, error) {
 	return scanDelivery(q.QueryRowContext(ctx, `SELECT `+deliveryColumns+` FROM deliveries WHERE id = ?`, id))

@@ -174,16 +174,6 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 				if card.Type == domain.ApprovalRecovery {
 					a.projectRecoveryOptionsOn(ctx, q, &card)
 				}
-				if card.Type == domain.ApprovalMerge {
-					if _, e := a.validateMergeDecision(ctx, q, card); e != nil {
-						for i := range card.Options {
-							if card.Options[i].ID == "approve" {
-								card.Options[i].Disabled = true
-								card.Options[i].DisabledReasonKey = domain.AsError(e).MessageKey
-							}
-						}
-					}
-				}
 			}
 			value = card
 		case "activity":

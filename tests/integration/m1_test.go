@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,14 +139,6 @@ func authorize(t *testing.T, core *bootstrap.Core, c *client) {
 	if c.csrf == "" {
 		t.Fatal("csrf cookie missing after bootstrap")
 	}
-}
-
-func mustURL(t *testing.T, raw string) *url.URL {
-	u, err := url.Parse(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return u
 }
 
 // A02/A04: committed settings survive restart; a new profile starts clean.

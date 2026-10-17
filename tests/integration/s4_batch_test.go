@@ -213,7 +213,7 @@ func TestWarmTeamStartsEngineAhead(t *testing.T) {
 	}
 }
 
-// A member putting its task up for review wakes the leader with a notice,
+// A member delivering its task wakes the leader with a notice,
 // whatever the member itself told the leader; the leader's own move does not.
 func TestReviewWakesTheLeader(t *testing.T) {
 	h := newM2Harness(t)
@@ -234,15 +234,7 @@ func TestReviewWakesTheLeader(t *testing.T) {
 		started, _ := sqlite.GetTask(ctx, h.app.DB, task.ID)
 		return started.Status == domain.TaskDoing
 	})
-	evidence, err := h.app.SubmitEvidence(ctx, as, task.ID, "接口已实现，go test 通过", nil, "", "go test ./... ok", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	task, err = sqlite.GetTask(ctx, h.app.DB, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.ReportCompletion(ctx, as, task.ID, []string{evidence.ID}, task.Revision); err != nil {
+	if _, err := h.app.DeliverTask(ctx, as, task.ID, "接口已实现，go test ./... 通过", nil); err != nil {
 		t.Fatal(err)
 	}
 	fake.EmitTurnCompleted(memberTurn.ThreadID, memberTurn.TurnID, "completed", "已提交验收")
@@ -281,7 +273,7 @@ func TestReviewWakesTheLeader(t *testing.T) {
 }
 
 // A member's later turns go straight to its loaded thread; only a thread the
-// engine no longer has is resumed first.
+// engine no longer has is resumed first, and one it cannot resume is replaced.
 func TestLoadedThreadIsNotResumedBeforeEachTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
@@ -312,5 +304,14 @@ func TestLoadedThreadIsNotResumedBeforeEachTurn(t *testing.T) {
 	third := turn("第三件事", 3)
 	if third.ThreadID != first.ThreadID || fake.Resumes() != 1 {
 		t.Fatalf("after unload: thread %s, resumes %d", third.ThreadID, fake.Resumes())
+	}
+	// A thread the engine cannot resume is replaced by a new one, told the
+	// full instructions again.
+	fake.Unload(first.ThreadID)
+	fake.ResumeErr = errors.New("thread not found")
+	threads := len(fake.Instructions())
+	fourth := turn("第四件事", 4)
+	if fourth.ThreadID == first.ThreadID || len(fake.Instructions()) != threads+1 {
+		t.Fatalf("after failed resume: thread %s, threads started %d→%d", fourth.ThreadID, threads, len(fake.Instructions()))
 	}
 }

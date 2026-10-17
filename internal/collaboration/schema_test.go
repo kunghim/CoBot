@@ -7,8 +7,7 @@ import (
 )
 
 func TestEveryToolAdvertisesItsArguments(t *testing.T) {
-	all := []string{"view_tasks", "deliver_task", "review_task", "get_context", "list_tasks", "get_task", "list_roles", "send_message", "create_task", "propose_task", "assign_task", "update_task", "submit_evidence", "report_completion", "confirm_task", "offer_transfer", "accept_transfer", "ask_user", "request_member", "request_merge", "remember", "search_memory"}
-	for _, name := range all {
+	for _, name := range ToolsForRole("") {
 		var shape struct {
 			Properties           map[string]any `json:"properties"`
 			Required             []string       `json:"required"`
@@ -23,14 +22,9 @@ func TestEveryToolAdvertisesItsArguments(t *testing.T) {
 		if toolDescriptions[name] == "" {
 			t.Fatalf("%s has no description", name)
 		}
-		// Offered tools take their idempotency key from the engine's call id;
-		// legacy write tools still require one from the caller.
-		_, advertised := shape.Properties["idempotencyKey"]
-		switch {
-		case offered(name) && advertised:
+		// Writes take their idempotency key from the engine's call id.
+		if _, advertised := shape.Properties["idempotencyKey"]; advertised {
 			t.Fatalf("%s makes the model invent an idempotency key", name)
-		case !offered(name) && IsSideEffectTool(name) && (!advertised || !slices.Contains(shape.Required, "idempotencyKey")):
-			t.Fatalf("legacy %s must require its idempotency key", name)
 		}
 		if shape.Properties["from"] != nil || shape.Properties["teamId"] != nil || shape.Properties["sourceRun"] != nil {
 			t.Fatalf("%s exposes host identity", name)

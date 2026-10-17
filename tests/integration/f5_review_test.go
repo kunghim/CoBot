@@ -14,69 +14,6 @@ import (
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
 
-func TestRecruitmentFeedbackKeepsTaskChainAndQuestionGate(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, nil)
-	bot := bots[0]
-	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "root"}); err != nil {
-		t.Fatal(err)
-	}
-	fake := h.fakeFor(t, team.ID)
-	waitUntil(t, 3*time.Second, "root run", func() bool { return len(fake.Turns()) == 1 })
-	principal := auth.NewPrincipalBot(bot.ID, team.ID)
-	task, err := h.app.CreateTask(ctx, principal, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bot.ID, Title: "task requesting recruitment"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	first := fake.Turns()[0]
-	fake.EmitTurnCompleted(first.ThreadID, first.TurnID, "completed", "assigned")
-	waitUntil(t, 3*time.Second, "task run", func() bool { return len(fake.Turns()) == 2 })
-	run, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	principal.RunID = run.ID
-	chainID, err := sqlite.ChainOfRun(ctx, h.app.DB, run.ID)
-	if err != nil || chainID == "" {
-		t.Fatal("task lost root chain", err)
-	}
-	card, err := h.app.RequestMember(ctx, principal, "backend-dev", "help this task")
-	if err != nil {
-		t.Fatal(err)
-	}
-	question, err := h.app.AskUser(ctx, principal, app.AskUserInput{TaskID: task.ID, Question: "keep waiting"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, "reject", "", card.Revision); err != nil {
-		t.Fatal(err)
-	}
-	var gotTask, gotChain, source, status string
-	if err := h.app.DB.QueryRow(`SELECT task_id,chain_id,source_run_id,status FROM deliveries WHERE kind='approval_result' AND source_run_id=?`, run.ID).Scan(&gotTask, &gotChain, &source, &status); err != nil {
-		t.Fatal(err)
-	}
-	if gotTask != task.ID || gotChain != chainID || source != run.ID || status != domain.DeliveryQueued {
-		t.Fatalf("feedback escaped source: %q %q %q %q", gotTask, gotChain, source, status)
-	}
-	second := fake.Turns()[1]
-	fake.EmitTurnCompleted(second.ThreadID, second.TurnID, "completed", "waiting")
-	waitUntil(t, 3*time.Second, "question state", func() bool {
-		b, _ := sqlite.GetBot(ctx, h.app.DB, bot.ID)
-		return b.Status == domain.BotStatusWaitingInput
-	})
-	if len(fake.Turns()) != 2 {
-		t.Fatal("feedback bypassed open task question")
-	}
-	if _, err := h.app.AnswerQuestion(ctx, h.user, question.ID, "ready", question.Revision); err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, 3*time.Second, "feedback released", func() bool { return len(fake.Turns()) == 3 })
-	if !strings.Contains(fake.Turns()[2].Text, "approval_result") {
-		t.Fatal("feedback not delivered after answer")
-	}
-}
-
 func TestPausedChainDoesNotBlockNewUserChain(t *testing.T) {
 	for _, held := range []string{domain.ChainAwaitingApproval, domain.ChainEvaluating} {
 		t.Run(held, func(t *testing.T) {

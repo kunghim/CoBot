@@ -45,13 +45,5 @@ func NormalizeMemoryBody(body string) string {
 	return strings.Join(fields, " ")
 }
 
-// MemoryErrorKeys are the i18n keys the write path can return.
-const (
-	ErrorMemoryTooLong      = "error.memory.too_long"
-	ErrorMemoryLooksSecret  = "error.memory.looks_secret"
-	ErrorMemoryDuplicate    = "error.memory.duplicate"
-	ErrorMemoryBodyRequired = "error.memory.body_required"
-)
-
 // EventMemoryChanged is published when a memory is stored or tombstoned.
 const EventMemoryChanged = "memory.changed"

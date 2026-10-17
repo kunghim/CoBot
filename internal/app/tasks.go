@@ -426,10 +426,6 @@ func (a *App) UpdateTaskStatus(ctx context.Context, principal auth.Principal, ta
 	return a.updateTaskStatus(ctx, principal, taskID, status, blockedReason, expectedRevision, nil, false)
 }
 
-func (a *App) ReportCompletion(ctx context.Context, principal auth.Principal, taskID string, evidenceIDs []string, expectedRevision int64) (domain.Task, error) {
-	return a.updateTaskStatus(ctx, principal, taskID, domain.TaskReview, "", expectedRevision, evidenceIDs, true)
-}
-
 func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, taskID, status, blockedReason string, expectedRevision int64, evidenceIDs []string, requireEvidenceIDs bool) (domain.Task, error) {
 	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
 	defer unlock()
@@ -741,14 +737,6 @@ func (a *App) activateDependentDeliveriesLocked(ctx context.Context, tx *sql.Tx,
 		activated = append(activated, task)
 	}
 	return activated, nil
-}
-
-// ListTasks projects a team's tasks; the caller decides the owner scope.
-func (a *App) ListTasks(ctx context.Context, principal auth.Principal, teamID, ownerID string, limit int) ([]domain.Task, error) {
-	if principal.Kind != auth.KindUser && principal.Kind != auth.KindBot {
-		return nil, domain.Unauthorized("error.unauthorized.principal_required")
-	}
-	return sqlite.ListTasks(ctx, a.DB, teamID, ownerID, limit)
 }
 
 // GetTaskDetail returns a task with its evidence and transfer history.

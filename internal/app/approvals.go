@@ -70,8 +70,6 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 		return domain.Approval{}, sqlite.NormalizeError(err)
 	}
 	switch card.Type {
-	case domain.ApprovalMerge, domain.ApprovalRecruitment:
-		return a.decideProductApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
 	case domain.ApprovalNativeTool:
 		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
 	case domain.ApprovalChain, domain.ApprovalRecovery:

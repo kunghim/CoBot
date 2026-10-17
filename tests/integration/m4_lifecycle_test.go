@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
-	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
@@ -175,18 +174,20 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 	}
 
 	// A pending approval blocks the archive.
-	approval, err := h.app.RequestMember(ctx, auth.NewPrincipalBot(captain.ID, team.ID), "qa-engineer", "需要测试人手")
-	if err != nil {
-		t.Fatalf("request member: %v", err)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "跑一下测试"}); err != nil {
+		t.Fatalf("command msg: %v", err)
 	}
+	waitUntil(t, 5*time.Second, "captain turn", func() bool { return len(fake.Turns()) == 1 })
+	asking := fake.Turns()[0]
+	fake.EmitApproval("archive-gate", asking.ThreadID, asking.TurnID, "go test ./...")
+	waitUntil(t, 5*time.Second, "approval card", func() bool { cards, _ := h.app.PendingApprovals(ctx, h.user, team.ID, ""); return len(cards) == 1 })
+	cards, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 	refused("a pending approval")
-	if _, err := h.app.DecideApproval(ctx, h.user, approval.ID, "reject", "", approval.Revision); err != nil {
-		t.Fatalf("reject: %v", err)
+	if _, err := h.app.DecideApproval(ctx, h.user, cards[0].ID, "decline", "", cards[0].Revision); err != nil {
+		t.Fatalf("decline: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "rejection feedback", func() bool { return len(fake.Turns()) == 1 })
-	feedback := fake.Turns()[0]
-	fake.EmitTurnCompleted(feedback.ThreadID, feedback.TurnID, "completed", "feedback received")
-	waitUntil(t, 5*time.Second, "feedback run ended", func() bool {
+	fake.EmitTurnCompleted(asking.ThreadID, asking.TurnID, "completed", "declined")
+	waitUntil(t, 5*time.Second, "captain run ended", func() bool {
 		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
 		return errors.Is(err, sqlite.ErrNotFound)
 	})

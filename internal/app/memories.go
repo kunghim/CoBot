@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"regexp"
-	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -29,73 +27,6 @@ var memorySecretGuards = []*regexp.Regexp{
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`\bsk-[A-Za-z0-9]{20,}`),
 	regexp.MustCompile(`(?i)\b(?:password|passwd|api[_-]?key|secret)\s*[:=]\s*\S{6,}`),
-}
-
-func looksSecret(body string) bool {
-	for _, guard := range memorySecretGuards {
-		if guard.MatchString(body) {
-			return true
-		}
-	}
-	return false
-}
-
-// RememberMemory stores one memory for the calling member. The size cap and
-// secret guard refuse rather than silently mangle: a half-remembered method
-// or a stored credential is worse than none.
-func (a *App) RememberMemory(ctx context.Context, principal auth.Principal, body, sourceTaskID string) (domain.Memory, error) {
-	cached, unlock, writeErr := beginWrite[domain.Memory](ctx, a, principal)
-	defer unlock()
-	if writeErr != nil {
-		return domain.Memory{}, writeErr
-	}
-	if cached != nil {
-		return *cached, nil
-	}
-	if principal.Kind != auth.KindBot {
-		return domain.Memory{}, domain.Forbidden("error.forbidden.bot_only", nil)
-	}
-	text := strings.TrimSpace(body)
-	if text == "" {
-		return domain.Memory{}, domain.InvalidRequest(domain.ErrorMemoryBodyRequired, nil)
-	}
-	if utf8.RuneCountInString(text) > domain.MemoryLimitMaxBody {
-		return domain.Memory{}, domain.InvalidRequest(domain.ErrorMemoryTooLong, map[string]any{
-			"max": domain.MemoryLimitMaxBody,
-		})
-	}
-	if looksSecret(text) {
-		return domain.Memory{}, domain.InvalidRequest(domain.ErrorMemoryLooksSecret, nil)
-	}
-	bot, err := sqlite.GetBot(ctx, a.DB, principal.BotID)
-	if err != nil {
-		return domain.Memory{}, sqlite.NormalizeError(err)
-	}
-	mem := domain.Memory{
-		ID: domain.NewID(), TeamID: bot.TeamID, BotID: bot.ID, Body: text,
-		SourceTaskID: sourceTaskID, SourceRunID: principal.RunID, NormKey: domain.NormalizeMemoryBody(text),
-		CreatedAt: time.Now().UTC(),
-	}
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Memory{}, err
-	}
-	defer tx.Rollback()
-	if err := sqlite.InsertMemory(ctx, tx, mem); err != nil {
-		if isUniqueViolation(err) {
-			return domain.Memory{}, domain.Conflict(domain.ErrorMemoryDuplicate, map[string]any{"body": text})
-		}
-		return domain.Memory{}, err
-	}
-	if err := a.saveWriteResult(ctx, tx, principal, mem); err != nil {
-		return domain.Memory{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return domain.Memory{}, err
-	}
-	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventMemoryChanged, TeamID: mem.TeamID, BotID: mem.BotID, ResourceID: mem.ID})
-	a.Hub.Publish()
-	return mem, nil
 }
 
 // memorySearchResult is the bounded retrieval handed to the caller: at most
@@ -134,29 +65,6 @@ func boundMemories(items []domain.Memory) memorySearchResult {
 		out.Items = append(out.Items, m)
 	}
 	return out
-}
-
-// SearchMemories retrieves from the calling member's own memory only; the
-// ownership filter lives in the store query, so another member's facts can
-// never leak into the result (G04). The map carries the bounded item list
-// plus how many matched rows did not fit the character budget.
-func (a *App) SearchMemories(ctx context.Context, principal auth.Principal, query string, limit int) (map[string]any, error) {
-	if principal.Kind != auth.KindBot {
-		return nil, domain.Forbidden("error.forbidden.bot_only", nil)
-	}
-	bot, err := sqlite.GetBot(ctx, a.DB, principal.BotID)
-	if err != nil {
-		return nil, sqlite.NormalizeError(err)
-	}
-	if limit <= 0 || limit > domain.MemorySearchMaxItems {
-		limit = domain.MemorySearchMaxItems
-	}
-	items, err := sqlite.SearchLiveMemories(ctx, a.DB, bot.TeamID, bot.ID, strings.TrimSpace(query), limit)
-	if err != nil {
-		return nil, err
-	}
-	bounded := boundMemories(items)
-	return map[string]any{"items": bounded.Items, "dropped": bounded.Dropped}, nil
 }
 
 // ListMemories exposes one member's live memories for the UI: the user reads

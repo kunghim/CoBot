@@ -11,7 +11,6 @@ import (
 const (
 	StatusOK          = "ok"
 	StatusAccepted    = "accepted"
-	StatusDuplicate   = "duplicate"
 	StatusWaiting     = "waiting"
 	StatusRejected    = "rejected"
 	StatusUnavailable = "unavailable"
@@ -58,10 +57,7 @@ type WaitResult struct {
 // local lease is stale must not run these; read tools always pass (H06).
 func IsSideEffectTool(name string) bool {
 	switch name {
-	case "deliver_task", "review_task",
-		"send_message", "create_task", "propose_task", "assign_task", "update_task",
-		"submit_evidence", "report_completion", "confirm_task", "offer_transfer",
-		"accept_transfer", "ask_user", "request_member", "request_merge", "remember":
+	case "deliver_task", "review_task", "send_message", "create_task", "ask_user":
 		return true
 	default:
 		return false

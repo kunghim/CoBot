@@ -502,8 +502,8 @@ func TestSendMessageDispatchAndAssistantReply(t *testing.T) {
 	fake := h.fakeFor(t, team.ID)
 	waitUntil(t, 5*time.Second, "turn started", func() bool { return len(fake.Turns()) == 1 })
 	turn := fake.Turns()[0]
-	// M3 prepends a fresh context block to every turn, so the user's text is
-	// the tail of the input rather than the whole of it.
+	// A turn may carry what changed for the member before the user's text,
+	// so the text is the tail of the input rather than the whole of it.
 	if !strings.HasSuffix(turn.Text, "你好，队长") {
 		t.Fatalf("engine received %q", turn.Text)
 	}
