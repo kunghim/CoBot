@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -286,6 +287,25 @@ func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemI
 func (s *Server) handleNotify(method string, params json.RawMessage) {
 	n := engine.Notification{Method: method, Raw: params}
 	switch method {
+	case "turn/diff/updated":
+		var p struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+			Diff     string `json:"diff"`
+		}
+		if json.Unmarshal(params, &p) == nil {
+			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
+			detail, _ := json.Marshal(map[string]any{"diff": clipHead(p.Diff, maxTurnDiff), "files": strings.Count(p.Diff, "diff --git ")})
+			n.Step = &engine.Step{ID: "turn-diff", Kind: engine.StepDiff, Status: engine.StepCompleted, Detail: detail}
+		}
+	case "serverRequest/resolved":
+		var p struct {
+			ThreadID  string          `json:"threadId"`
+			RequestID json.RawMessage `json:"requestId"`
+		}
+		if json.Unmarshal(params, &p) == nil {
+			n.ThreadID, n.RequestID = p.ThreadID, p.RequestID
+		}
 	case "thread/started":
 		// A sub-agent's thread names its parent; its activity belongs to
 		// the member whose thread spawned it.

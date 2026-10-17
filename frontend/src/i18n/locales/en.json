@@ -197,6 +197,7 @@
     "step": {
       "reasoning": "Thinking",
       "message": "Note",
+      "diff": "Changes this turn: {{count}} file(s)",
       "agent": {
         "badge": "Sub-agent",
         "spawnAgent": "Spawned {{count}} sub-agent(s)",

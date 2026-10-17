@@ -11,6 +11,8 @@ import (
 // stays in the engine's own history.
 const (
 	maxStepOutput = 16 << 10
+	// maxTurnDiff bounds the turn diff kept as a step.
+	maxTurnDiff   = 256 << 10
 	maxStepDiff   = 64 << 10
 	maxStepResult = 4 << 10
 )

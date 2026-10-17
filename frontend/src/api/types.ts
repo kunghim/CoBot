@@ -128,7 +128,7 @@ export type PermissionMode = 'read_only' | 'default' | 'full';
 
 /** One visible step of a run (thinking, a command, a file change, a tool
  * call, a reconnect, an engine notice). `detail` is kind-specific. */
-export type RunStepKind = 'reasoning' | 'message' | 'agent' | 'command' | 'file_change' | 'tool' | 'web_search' | 'plan' | 'retry' | 'notice';
+export type RunStepKind = 'reasoning' | 'message' | 'agent' | 'diff' | 'command' | 'file_change' | 'tool' | 'web_search' | 'plan' | 'retry' | 'notice';
 export type RunStepStatus = 'in_progress' | 'completed' | 'failed' | 'declined' | 'interrupted';
 export interface RunStep {
   id: string;

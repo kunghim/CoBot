@@ -113,3 +113,18 @@ func TestSubAgentThreadsLeadBackToTheMember(t *testing.T) {
 		t.Fatalf("activity step = %+v", got[2].Step)
 	}
 }
+
+// The turn's diff is one step holding the newest diff; a settled server
+// request names its id.
+func TestTurnDiffAndSettledRequests(t *testing.T) {
+	var got []engine.Notification
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnNotification: func(n engine.Notification) { got = append(got, n) }}}
+	server.handleNotify("turn/diff/updated", json.RawMessage(`{"threadId":"th","turnId":"tu","diff":"diff --git a/x b/x\n+1\ndiff --git a/y b/y\n+2\n"}`))
+	server.handleNotify("serverRequest/resolved", json.RawMessage(`{"threadId":"th","requestId":7}`))
+	if s := got[0].Step; s == nil || s.ID != "turn-diff" || s.Kind != engine.StepDiff || !strings.Contains(string(s.Detail), `"files":2`) {
+		t.Fatalf("diff step = %+v", got[0].Step)
+	}
+	if string(got[1].RequestID) != "7" || got[1].ThreadID != "th" {
+		t.Fatalf("settled request = %+v", got[1])
+	}
+}

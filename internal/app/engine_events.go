@@ -74,6 +74,8 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		s.app.invalidateEngineStatus()
 	case "account/rateLimits/updated":
 		s.app.recordRateLimits(n.Raw)
+	case "serverRequest/resolved":
+		s.app.settleEngineRequest(ctx, teamID, source.server.Epoch(), n.RequestID)
 	case "hook/completed":
 		var result struct {
 			Run struct {

@@ -131,6 +131,8 @@ type Notification struct {
 	Phase string
 	// Problem is a turn-scoped error or warning reported by the engine.
 	Problem *Problem
+	// RequestID names the server request a serverRequest/resolved settled.
+	RequestID json.RawMessage
 }
 
 // Step kinds shown in the conversation's process view.
@@ -147,6 +149,9 @@ const (
 	// StepAgent is a member working with its own Codex sub-agents: spawning,
 	// instructing, waiting for or closing one, and their activity.
 	StepAgent = "agent"
+	// StepDiff is the turn's code changes so far, kept as one step that
+	// always holds the newest diff.
+	StepDiff = "diff"
 )
 
 // Step statuses.

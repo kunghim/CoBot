@@ -184,6 +184,46 @@ func TestSubAgentWorkBelongsToTheMember(t *testing.T) {
 	}
 }
 
+// A card Codex stopped waiting for leaves the screen; a decided card is left
+// as decided. The turn's diff is stored as one step.
+func TestSettledRequestsCloseCardsAndTheTurnDiffIsKept(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "改代码"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	fake.EmitApproval("req-a", turn.ThreadID, turn.TurnID, "npm install")
+	fake.EmitApproval("req-b", turn.ThreadID, turn.TurnID, "npm test")
+	stateOf := func(requestID string) string {
+		var state string
+		_ = h.app.DB.QueryRow(`SELECT request_state FROM approvals WHERE engine_request_id = ?`, `"`+requestID+`"`).Scan(&state)
+		return state
+	}
+	waitUntil(t, 5*time.Second, "cards", func() bool { return stateOf("req-a") == "pending" && stateOf("req-b") == "pending" })
+	if _, err := h.app.DB.Exec(`UPDATE approvals SET request_state = 'decided' WHERE engine_request_id = ?`, `"req-b"`); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"req-a", "req-b"} {
+		fake.Emit(engine.Notification{Method: "serverRequest/resolved", ThreadID: turn.ThreadID, RequestID: json.RawMessage(`"` + id + `"`)})
+	}
+	waitUntil(t, 5*time.Second, "unanswered card closed", func() bool { return stateOf("req-a") == domain.ApprovalStateInvalidated })
+	if got := stateOf("req-b"); got != "decided" {
+		t.Fatalf("decided card changed to %q", got)
+	}
+
+	fake.Emit(engine.Notification{Method: "turn/diff/updated", ThreadID: turn.ThreadID, TurnID: turn.TurnID,
+		Step: &engine.Step{ID: "turn-diff", Kind: engine.StepDiff, Status: engine.StepCompleted, Detail: json.RawMessage(`{"diff":"diff --git a/x b/x","files":1}`)}})
+	waitUntil(t, 5*time.Second, "diff step", func() bool {
+		step, err := sqlite.GetRunStep(ctx, h.app.DB, h.runStatusID(t, bot.ID), "turn-diff")
+		return err == nil && step.Kind == engine.StepDiff
+	})
+}
+
 // A member's statistics come from what the engine reported: turns, steps,
 // usage, the context in use and the account's limits.
 func TestSessionStatsReadWhatTheEngineReported(t *testing.T) {

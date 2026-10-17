@@ -48,6 +48,8 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: 'conversation.step.reasoning' };
     case 'message':
       return { key: 'conversation.step.message' };
+    case 'diff':
+      return { key: 'conversation.step.diff', params: { count: Number(d.files) || 0 } };
     case 'agent': {
       // A member working with its own Codex sub-agents.
       if (text(d.activity)) return { key: `conversation.step.agent.activity.${text(d.activity)}`, params: { agent: text(d.agent) } };

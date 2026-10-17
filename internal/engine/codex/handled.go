@@ -20,11 +20,13 @@ var HandledMessages = []string{
 	"item/reasoning/summaryTextDelta",
 	"item/started",
 	"mcpServer/elicitation/request",
+	"serverRequest/resolved",
 	"thread/closed",
 	"thread/started",
 	"thread/status/changed",
 	"thread/tokenUsage/updated",
 	"turn/completed",
+	"turn/diff/updated",
 	"turn/started",
 	"warning",
 }

@@ -99,6 +99,7 @@ const kindIcon: Record<string, typeof Brain> = {
   retry: RefreshCw,
   notice: TriangleAlert,
   agent: Bot,
+  diff: FileDiff,
 };
 
 function StatusMark({ status, running }: { status: string; running: boolean }) {
@@ -199,6 +200,8 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
     }
     case 'plan':
       return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={teamId} /> : null;
+    case 'diff':
+      return typeof d.diff === 'string' && d.diff ? <DiffView diff={d.diff} /> : null;
     case 'agent':
       return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={teamId} /></div> : null;
     case 'retry':

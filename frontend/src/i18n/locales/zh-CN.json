@@ -197,6 +197,7 @@
     "step": {
       "reasoning": "思考",
       "message": "说明",
+      "diff": "本轮改动 {{count}} 个文件",
       "agent": {
         "badge": "子智能体",
         "spawnAgent": "派生了 {{count}} 个子智能体",
