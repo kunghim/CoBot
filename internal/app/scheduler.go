@@ -480,6 +480,11 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		tx.Rollback()
 		return err
 	}
+	batch, err := s.claimBatchLocked(ctx, tx, botID, delivery, message, run.ID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 	if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusWorking, run.ID); err != nil {
 		tx.Rollback()
 		return err
@@ -498,7 +503,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// Engine interaction happens outside any SQL transaction.
 	server, err := s.EnsureTeamServer(ctx, team.ID, directory)
 	if err != nil {
-		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.unavailable")
+		return s.failStart(ctx, run.ID, bot.ID, "error.engine.unavailable")
 	}
 	// Publish the host execution binding before the bridge can call back,
 	// including while turn/start has not yet returned a provider turn id.
@@ -507,19 +512,23 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	threadID, err := s.ensureThread(ctx, team, bot, directory, server, run.ID)
 	if err != nil {
-		return s.failStart(ctx, run.ID, delivery.ID, message.ID, bot.ID, "error.engine.thread_failed")
+		return s.failStart(ctx, run.ID, bot.ID, "error.engine.thread_failed")
 	}
 	// The context is rebuilt on every dispatch so the bot sees the current
 	// team, member list and task instead of trusting a stale model memory.
 	// A task-assignment message carries its task id in run_id.
 	taskID := delivery.TaskID
-	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + message.RenderText()
+	text := message.RenderText()
+	if len(batch) > 0 {
+		text = s.batchInput(ctx, append([]domain.Message{message}, batch...))
+	}
+	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + text
 	s.app.TouchLease(ctx, bot.ID)
 	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team)})
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried (D04).
-		return s.unknownStart(ctx, run.ID, delivery.ID, message.ID, bot.ID)
+		return s.unknownStart(ctx, run.ID, delivery.ID, bot.ID)
 	}
 
 	tx, err = s.app.DB.BeginTx(ctx, nil)
@@ -530,10 +539,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err := sqlite.AcknowledgeRunStart(ctx, tx, run.ID, turnID, server.Epoch()); err != nil {
 		return err
 	}
-	if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryAccepted); err != nil {
-		return err
-	}
-	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryAccepted); err != nil {
+	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, run.ID, domain.DeliveryAccepted, domain.DeliveryDispatching); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -560,7 +566,7 @@ func (s *Scheduler) wakeAfterSkippedDelivery(ctx context.Context, botID, skipped
 	}
 }
 
-func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID, botID, errorKey string) error {
+func (s *Scheduler) failStart(ctx context.Context, runID, botID, errorKey string) error {
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -569,10 +575,7 @@ func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID,
 	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunFailed, "", "", errorKey, true); err != nil {
 		return err
 	}
-	if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, domain.DeliveryUnknown); err != nil {
-		return err
-	}
-	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, messageID, domain.DeliveryUnknown); err != nil {
+	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
 		return err
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusIdle, ""); err != nil {
@@ -589,7 +592,7 @@ func (s *Scheduler) failStart(ctx context.Context, runID, deliveryID, messageID,
 	return fmt.Errorf("start failed: %s", errorKey)
 }
 
-func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, messageID, botID string) error {
+func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, botID string) error {
 	// A cancelled transport does not prove the model rejected the turn. Keep
 	// the uncertainty durable even when Stop cancelled the dispatch context.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -609,10 +612,7 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, message
 	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, run.ProviderTurnID, run.EngineEpoch, "error.engine.turn_unknown", false); err != nil {
 		return err
 	}
-	if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, domain.DeliveryUnknown); err != nil {
-		return err
-	}
-	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, messageID, domain.DeliveryUnknown); err != nil {
+	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
 		return err
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusUnknown, runID); err != nil {

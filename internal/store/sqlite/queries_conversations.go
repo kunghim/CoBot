@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -729,15 +730,26 @@ func ListUnresolvedRuns(ctx context.Context, q Queryer) ([]domain.Run, error) {
 	return out, rows.Err()
 }
 
-// MarkDeliveryUnknownByRun flips a claimed delivery to unknown (its turn is
-// gone with the previous process) and mirrors the message; the delivery id is
-// returned so a recovery card can bind it.
+// MarkDeliveryUnknownByRun flips a run's claimed deliveries to unknown (its
+// turn is gone with the previous process) and mirrors the messages; the head
+// delivery's id (the first a merged turn claimed) is returned so a recovery
+// card can bind it.
 func MarkDeliveryUnknownByRun(ctx context.Context, tx *sql.Tx, runID string) (string, error) {
 	if runID == "" {
 		return "", nil
 	}
+	if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE id IN (SELECT message_id FROM deliveries WHERE run_id = ? AND status = ?)
+		AND id NOT IN (SELECT message_id FROM deliveries WHERE run_id = ? ORDER BY created_at ASC, id ASC LIMIT 1)`,
+		domain.DeliveryUnknown, runID, domain.DeliveryDispatching, runID); err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE run_id = ? AND status = ?
+		AND id NOT IN (SELECT id FROM deliveries WHERE run_id = ? ORDER BY created_at ASC, id ASC LIMIT 1)`,
+		domain.DeliveryUnknown, time.Now().UTC().Format(time.RFC3339Nano), runID, domain.DeliveryDispatching, runID); err != nil {
+		return "", err
+	}
 	var deliveryID, messageID, status string
-	err := tx.QueryRowContext(ctx, `SELECT id, message_id, status FROM deliveries WHERE run_id = ? ORDER BY created_at DESC LIMIT 1`, runID).
+	err := tx.QueryRowContext(ctx, `SELECT id, message_id, status FROM deliveries WHERE run_id = ? ORDER BY created_at ASC, id ASC LIMIT 1`, runID).
 		Scan(&deliveryID, &messageID, &status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
@@ -815,4 +827,46 @@ func HasPendingRecoveryForRun(ctx context.Context, q Queryer, runID string) (boo
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// SetRunDeliveriesStatus moves every delivery a run claimed (a merged turn
+// claims several) from one of the given states to status, mirroring each
+// message. It reports the message ids it touched.
+func SetRunDeliveriesStatus(ctx context.Context, tx *sql.Tx, runID, status string, from ...string) ([]string, error) {
+	if runID == "" || len(from) == 0 {
+		return nil, nil
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(from)), ",")
+	args := []any{runID}
+	for _, f := range from {
+		args = append(args, f)
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT id, message_id FROM deliveries WHERE run_id = ? AND status IN (`+marks+`) ORDER BY created_at ASC, id ASC`, args...)
+	if err != nil {
+		return nil, err
+	}
+	var ids, messages []string
+	for rows.Next() {
+		var id, message string
+		if err := rows.Scan(&id, &message); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids, messages = append(ids, id), append(messages, message)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for i := range ids {
+		// SetDeliveryStatus also moves an approval result's response state.
+		if err := SetDeliveryStatus(ctx, tx, ids[i], status); err != nil {
+			return nil, err
+		}
+		if err := SetMessageDeliveryStatus(ctx, tx, messages[i], status); err != nil {
+			return nil, err
+		}
+	}
+	return messages, nil
 }
