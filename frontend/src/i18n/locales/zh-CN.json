@@ -110,6 +110,7 @@
       "preparing": "正在准备…",
       "starting": "正在启动",
       "thinking": "思考中",
+      "slow": "模型响应较慢，仍在等待",
       "replying": "正在回复",
       "command": "正在执行命令",
       "editing": "正在修改文件",

@@ -80,17 +80,42 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
   }
 }
 
-/** Steps worth listing: an empty thought or a settled retry with nothing
- * to say would only add noise. */
+/** Steps worth listing: an empty thought would only add noise, and an
+ * ongoing reconnect is already the status line itself. */
 export function visibleSteps(steps: RunStep[], live: LiveRun | undefined): RunStep[] {
   return steps.filter((step) => {
     if (step.kind === 'reasoning') return text(step.detail?.text).trim() !== '' || (live?.reasoning[step.id] ?? '') !== '';
+    if (step.kind === 'retry') return step.status !== 'in_progress';
     return true;
   });
 }
 
-/** What a running turn is doing now, for the status line in the flow. */
-export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveRun | undefined): Phrase {
+/** The command a member ran, without the shell the engine wrapped it in:
+ * `"C:\\...\\pwsh.exe" -Command 'git status'` reads as `git status`. */
+export function displayCommand(command: string): string {
+  const trimmed = command.trim();
+  const wrapped =
+    /^"?[^"]*?(?:pwsh|powershell)(?:\.exe)?"?\s+(?:-NoLogo\s+|-NoProfile\s+|-NonInteractive\s+)*-Command\s+([\s\S]+)$/i.exec(trimmed) ??
+    /^"?[^"]*?\b(?:bash|zsh|sh)(?:\.exe)?"?\s+-l?c\s+([\s\S]+)$/i.exec(trimmed) ??
+    /^"?[^"]*?\bcmd(?:\.exe)?"?\s+\/[cC]\s+([\s\S]+)$/.exec(trimmed);
+  if (!wrapped) return trimmed;
+  let inner = wrapped[1].trim();
+  const quote = inner[0];
+  if (inner.length >= 2 && (quote === "'" || quote === '"') && inner.at(-1) === quote) {
+    // Inside single quotes a quote is written twice ('it''s').
+    inner = quote === "'" ? inner.slice(1, -1).replace(/''/g, "'") : inner.slice(1, -1);
+  }
+  return inner;
+}
+
+/** How long a turn may go without any sign of progress before the status
+ * line says the model is slow to answer. */
+export const slowAfterSeconds = 15;
+
+/** What a running turn is doing now, for the status line in the flow.
+ * `quietSeconds` is how long the turn has run without any sign of
+ * progress; a long silence is called out instead of a bare "thinking". */
+export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveRun | undefined, quietSeconds = 0): Phrase {
   if (run.status === 'waiting_approval') return { key: 'conversation.phase.waitingApproval' };
   if (run.status === 'waiting_input') return { key: 'conversation.phase.waitingInput' };
   const open = [...steps].reverse().find((step) => step.status === 'in_progress');
@@ -107,6 +132,7 @@ export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveR
   }
   if ((live?.reply ?? '') !== '') return { key: 'conversation.phase.replying' };
   if (run.status === 'starting' && steps.length === 0) return { key: 'conversation.phase.starting' };
+  if (steps.length === 0 && quietSeconds >= slowAfterSeconds) return { key: 'conversation.phase.slow' };
   return { key: 'conversation.phase.thinking' };
 }
 

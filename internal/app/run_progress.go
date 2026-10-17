@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strconv"
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
@@ -17,7 +19,12 @@ type liveTurnKey struct{ threadID, turnID string }
 type liveRun struct {
 	teamID, botID, runID string
 	retries              int
+	// retryOpen is true while the retry step still says "reconnecting".
+	retryOpen bool
 }
+
+// attemptPattern reads the engine's own count from "Reconnecting... 3/5".
+var attemptPattern = regexp.MustCompile(`(\d+)\s*/\s*\d+`)
 
 // retryStepID is the one step that tracks a run's reconnect attempts.
 const retryStepID = "cobot-retry"
@@ -68,51 +75,58 @@ func (rt *teamRuntime) forgetLiveRun(threadID, turnID string) {
 // streamed text and engine problems. It returns false for events that carry
 // no progress, which the caller handles as before.
 func (s *Scheduler) onProgress(ctx context.Context, teamID string, rt *teamRuntime, n engine.Notification) bool {
-	switch {
-	case n.Step != nil:
-		ref, ok := s.resolveLiveRun(ctx, teamID, rt, n.ThreadID, n.TurnID)
-		if !ok {
-			return true
-		}
-		s.saveStep(ctx, ref, domain.RunStep{ID: n.Step.ID, Kind: n.Step.Kind, Status: n.Step.Status, Detail: n.Step.Detail})
-		return true
-	case n.DeltaKind != "":
-		ref, ok := s.resolveLiveRun(ctx, teamID, rt, n.ThreadID, n.TurnID)
-		if !ok || n.Delta == "" {
-			return true
-		}
-		s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: n.ItemID, Kind: n.DeltaKind, Text: n.Delta})
-		return true
-	case n.Problem != nil:
-		ref, ok := s.resolveLiveRun(ctx, teamID, rt, n.ThreadID, n.TurnID)
-		if !ok {
-			// A warning outside any turn of ours is only logged.
+	if n.Step == nil && n.DeltaKind == "" && n.Problem == nil {
+		return false
+	}
+	ref, ok := s.resolveLiveRun(ctx, teamID, rt, n.ThreadID, n.TurnID)
+	if !ok {
+		if n.Problem != nil {
+			// A notice outside any turn of ours is only logged.
 			s.logger.Info("engine notice", "teamId", teamID, "level", n.Problem.Level, "message", n.Problem.Message)
-			return true
 		}
-		if n.Problem.WillRetry {
-			rt.mu.Lock()
-			ref.retries++
-			rt.live[liveTurnKey{n.ThreadID, n.TurnID}] = ref
-			rt.mu.Unlock()
-			detail, _ := json.Marshal(map[string]any{"attempt": ref.retries, "message": n.Problem.Message, "code": n.Problem.Code})
-			s.saveStep(ctx, ref, domain.RunStep{ID: retryStepID, Kind: domain.StepKindRetry, Status: engine.StepInProgress, Detail: detail})
-			return true
+		return true
+	}
+	switch {
+	case n.Problem != nil && n.Problem.WillRetry:
+		attempt := ref.retries + 1
+		if m := attemptPattern.FindStringSubmatch(n.Problem.Message); m != nil {
+			if reported, err := strconv.Atoi(m[1]); err == nil && reported > 0 {
+				attempt = reported
+			}
 		}
+		ref.retries, ref.retryOpen = attempt, true
+		rt.storeLiveRun(n.ThreadID, n.TurnID, ref)
+		detail, _ := json.Marshal(map[string]any{"attempt": attempt, "message": n.Problem.Message, "code": n.Problem.Code})
+		s.saveStep(ctx, ref, domain.RunStep{ID: retryStepID, Kind: domain.StepKindRetry, Status: engine.StepInProgress, Detail: detail})
+	case n.Problem != nil:
+		s.settleRetry(ctx, rt, n, &ref)
 		detail, _ := json.Marshal(map[string]any{"level": n.Problem.Level, "message": n.Problem.Message, "code": n.Problem.Code})
 		s.saveStep(ctx, ref, domain.RunStep{ID: "cobot-notice-" + domain.NewID(), Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
-		return true
+	case n.Step != nil:
+		s.settleRetry(ctx, rt, n, &ref)
+		s.saveStep(ctx, ref, domain.RunStep{ID: n.Step.ID, Kind: n.Step.Kind, Status: n.Step.Status, Detail: n.Step.Detail})
+	default:
+		if n.Delta == "" {
+			return true
+		}
+		s.settleRetry(ctx, rt, n, &ref)
+		s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: n.ItemID, Kind: n.DeltaKind, Text: n.Delta})
 	}
-	return false
+	return true
 }
 
-// saveStep stores a step and relays its stored form. Any real progress after
-// a reconnect means the connection is back, so the retry step settles.
+func (rt *teamRuntime) storeLiveRun(threadID, turnID string, ref liveRun) {
+	rt.mu.Lock()
+	if rt.live == nil {
+		rt.live = map[liveTurnKey]liveRun{}
+	}
+	rt.live[liveTurnKey{threadID, turnID}] = ref
+	rt.mu.Unlock()
+}
+
+// saveStep stores a step and relays its stored form.
 func (s *Scheduler) saveStep(ctx context.Context, ref liveRun, step domain.RunStep) {
 	step.RunID, step.TeamID, step.BotID = ref.runID, ref.teamID, ref.botID
-	if step.Kind != domain.StepKindRetry && ref.retries > 0 {
-		s.settleRetry(ctx, ref)
-	}
 	stored, err := sqlite.UpsertRunStep(ctx, s.app.DB, step)
 	if err != nil {
 		s.logger.Warn("record run step", "runId", ref.runID, "error", err)
@@ -121,13 +135,18 @@ func (s *Scheduler) saveStep(ctx context.Context, ref liveRun, step domain.RunSt
 	s.app.Live.Publish(events.Live{Type: "step", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, Step: stored})
 }
 
-func (s *Scheduler) settleRetry(ctx context.Context, ref liveRun) {
+// settleRetry closes an open "reconnecting" step: any real progress (a step,
+// streamed text, another notice) means the connection is back.
+func (s *Scheduler) settleRetry(ctx context.Context, rt *teamRuntime, n engine.Notification, ref *liveRun) {
+	if !ref.retryOpen {
+		return
+	}
+	ref.retryOpen = false
+	rt.storeLiveRun(n.ThreadID, n.TurnID, *ref)
 	current, err := sqlite.GetRunStep(ctx, s.app.DB, ref.runID, retryStepID)
 	if err != nil || current.Status != engine.StepInProgress {
 		return
 	}
 	current.Status = engine.StepCompleted
-	if stored, err := sqlite.UpsertRunStep(ctx, s.app.DB, current); err == nil {
-		s.app.Live.Publish(events.Live{Type: "step", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, Step: stored})
-	}
+	s.saveStep(ctx, *ref, current)
 }

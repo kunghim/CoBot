@@ -277,8 +277,10 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 	s.Wake(botID) // pick up the next queued delivery without model help
 }
 
+// joinTexts keeps each reply segment of a turn (a note before the work, the
+// final answer) its own paragraph.
 func joinTexts(parts []string) string {
-	return strings.Join(parts, "\n")
+	return strings.Join(parts, "\n\n")
 }
 
 // onApproval persists a native tool approval and projects it to the member

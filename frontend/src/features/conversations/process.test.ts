@@ -3,7 +3,7 @@ import { applyLiveSignal, forgetLiveRuns, liveRunsSnapshot, mergeSteps, resetLiv
 import type { Message, Run, RunStep, RunWithSteps } from '../../api/types';
 import { buildTimeline } from './ConversationView';
 import { linkTarget } from './links';
-import { describeStep, durationPhrase, runPhase, visibleSteps } from './steps';
+import { describeStep, displayCommand, durationPhrase, runPhase, visibleSteps } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({
   id: 's', runId: 'r1', teamId: 't', botId: 'b', seq: 1, kind: 'command', status: 'completed',
@@ -49,8 +49,20 @@ describe('runPhase', () => {
     expect(runPhase(run, [step({})], { steps: {}, reply: '写', reasoning: {}, output: {} }).key).toBe('conversation.phase.replying');
     expect(runPhase({ status: 'waiting_approval' }, [step({ status: 'in_progress' })], undefined).key).toBe('conversation.phase.waitingApproval');
     expect(runPhase(run, [], undefined).key).toBe('conversation.phase.thinking');
+    expect(runPhase(run, [], undefined, 20).key).toBe('conversation.phase.slow');
+    expect(runPhase(run, [step({})], undefined, 20).key).toBe('conversation.phase.thinking');
   });
-  it('hides empty thoughts', () => {
+  it('shows commands without the shell wrapper', () => {
+    expect(displayCommand(String.raw`"D:\\Developer\\PowerShell\\7\\pwsh.exe" -Command 'git status --short'`)).toBe('git status --short');
+    expect(displayCommand(String.raw`"C:\\pwsh.exe" -Command Get-ChildItem`)).toBe('Get-ChildItem');
+    expect(displayCommand(`powershell.exe -NoProfile -Command 'echo ''hi'''`)).toBe(`echo 'hi'`);
+    expect(displayCommand(`/bin/bash -lc 'ls -la'`)).toBe('ls -la');
+    expect(displayCommand('cmd.exe /c dir')).toBe('dir');
+    expect(displayCommand('npm test')).toBe('npm test');
+  });
+  it('hides empty thoughts and an ongoing reconnect', () => {
+    expect(visibleSteps([step({ kind: 'retry', status: 'in_progress' })], undefined)).toHaveLength(0);
+    expect(visibleSteps([step({ kind: 'retry', status: 'completed' })], undefined)).toHaveLength(1);
     const steps = [step({ id: 'a', kind: 'reasoning', detail: { text: '' } }), step({ id: 'b', kind: 'reasoning', detail: { text: '先看代码' } })];
     expect(visibleSteps(steps, undefined).map((s) => s.id)).toEqual(['b']);
     expect(visibleSteps(steps, { steps: {}, reply: '', reasoning: { a: '正在想' }, output: {} }).map((s) => s.id)).toEqual(['a', 'b']);

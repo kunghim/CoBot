@@ -110,6 +110,7 @@
       "preparing": "Getting ready…",
       "starting": "Starting",
       "thinking": "Thinking",
+      "slow": "The model is slow to respond; still waiting",
       "replying": "Replying",
       "command": "Running a command",
       "editing": "Editing files",

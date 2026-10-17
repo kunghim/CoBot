@@ -35,7 +35,8 @@ func TestTurnProgressIsRelayedAndStored(t *testing.T) {
 	}
 
 	emit(engine.Notification{Method: "error", Problem: &engine.Problem{Level: "error", Message: "Reconnecting... 1/5", WillRetry: true}})
-	emit(engine.Notification{Method: "error", Problem: &engine.Problem{Level: "error", Message: "Reconnecting... 2/5", WillRetry: true}})
+	// The engine's own count wins over ours: a first notice may arrive late.
+	emit(engine.Notification{Method: "error", Problem: &engine.Problem{Level: "error", Message: "Reconnecting... 4/5", WillRetry: true}})
 	emit(engine.Notification{Method: "item/started", Step: &engine.Step{ID: "cmd-1", Kind: engine.StepCommand, Status: engine.StepInProgress, Detail: json.RawMessage(`{"command":"go test ./...","cwd":"."}`)}})
 	emit(engine.Notification{Method: "item/commandExecution/outputDelta", ItemID: "cmd-1", DeltaKind: "output", Delta: "ok  pkg\n"})
 	emit(engine.Notification{Method: "item/completed", Step: &engine.Step{ID: "cmd-1", Kind: engine.StepCommand, Status: engine.StepCompleted, Detail: json.RawMessage(`{"command":"go test ./...","exitCode":0,"output":"ok  pkg\n"}`)}})
@@ -93,7 +94,7 @@ func TestTurnProgressIsRelayedAndStored(t *testing.T) {
 	var retryDetail struct {
 		Attempt int `json:"attempt"`
 	}
-	if err := json.Unmarshal(retry.Detail, &retryDetail); err != nil || retryDetail.Attempt != 2 {
+	if err := json.Unmarshal(retry.Detail, &retryDetail); err != nil || retryDetail.Attempt != 4 || retry.Status != engine.StepCompleted {
 		t.Fatalf("retry detail = %s", retry.Detail)
 	}
 	command := byID["cmd-1"]

@@ -11,7 +11,7 @@ import { mergeSteps } from '../../api/live';
 import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from './Markdown';
-import { describeStep, durationPhrase, elapsedSeconds, runPhase, toolArguments, visibleSteps, type Phrase } from './steps';
+import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, visibleSteps, type Phrase } from './steps';
 
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -55,7 +55,7 @@ export default function RunProcess({
   const seconds = elapsedSeconds(run.startedAt, active || Number.isNaN(endedAt) ? now : endedAt);
   const duration = say(durationPhrase(seconds));
   const header = active
-    ? `${say(runPhase(run, steps, live))} · ${duration}`
+    ? `${say(runPhase(run, steps, live, seconds))} · ${duration}`
     : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: shown.length });
 
   return (
@@ -137,8 +137,8 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
         className="flex w-full min-w-0 items-center gap-1.5 text-left enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100"
       >
         <Icon size={12} className="shrink-0" aria-hidden="true" />
-        <span className="min-w-0 truncate">{t(phrase.key, phrase.params)}</span>
-        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-[11px] text-neutral-500">{d.command}</code>}
+        <span className={step.kind === 'command' ? 'shrink-0' : 'min-w-0 truncate'}>{t(phrase.key, phrase.params)}</span>
+        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-[11px] text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
         {step.kind === 'command' && typeof d.exitCode === 'number' && d.exitCode !== 0 && <span className="shrink-0 text-red-500">{t('conversation.step.exitCode', { code: d.exitCode })}</span>}
         <span className="ml-auto shrink-0"><StatusMark status={step.status} running={running} /></span>
       </button>
@@ -154,7 +154,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       const output = (typeof d.output === 'string' ? d.output : '') || live?.output[step.id] || '';
       return (
         <div className="space-y-1">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-neutral-900 p-2 font-mono text-[11px] leading-4 text-neutral-100">$ {String(d.command ?? '')}</pre>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-neutral-900 p-2 font-mono text-[11px] leading-4 text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
           {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-[11px] leading-4 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-400">{t('conversation.step.noOutput')}</p>}
         </div>
       );
