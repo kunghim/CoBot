@@ -141,7 +141,7 @@ func TestDuplicatePredecessorCompletionCannotFinishStartingSuccessor(t *testing.
 
 type completionBeforeReply struct{ *fakeengine.Server }
 
-func (s *completionBeforeReply) StartTurn(ctx context.Context, thread, text, model string) (string, error) {
+func (s *completionBeforeReply) StartTurn(ctx context.Context, thread, text string, model engine.TurnOptions) (string, error) {
 	id, err := s.Server.StartTurn(ctx, thread, text, model)
 	if err == nil {
 		s.EmitTurnCompleted(thread, id, "completed", "finished before response")
@@ -151,7 +151,7 @@ func (s *completionBeforeReply) StartTurn(ctx context.Context, thread, text, mod
 
 type approvalBeforeReply struct{ *fakeengine.Server }
 
-func (s *approvalBeforeReply) StartTurn(ctx context.Context, thread, text, model string) (string, error) {
+func (s *approvalBeforeReply) StartTurn(ctx context.Context, thread, text string, model engine.TurnOptions) (string, error) {
 	id, err := s.Server.StartTurn(ctx, thread, text, model)
 	if err == nil {
 		s.EmitApproval("early-approval", thread, id, "approval before response")
@@ -233,7 +233,7 @@ type slowStartReply struct {
 	entered chan struct{}
 }
 
-func (s *slowStartReply) StartTurn(ctx context.Context, thread, text, model string) (string, error) {
+func (s *slowStartReply) StartTurn(ctx context.Context, thread, text string, model engine.TurnOptions) (string, error) {
 	if strings.HasSuffix(text, "slow") {
 		close(s.entered)
 		<-ctx.Done()

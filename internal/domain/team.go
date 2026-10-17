@@ -29,6 +29,22 @@ type Team struct {
 	UpdatedAt       time.Time `json:"updatedAt"`
 	// ArchivedAt is when the team was archived (RFC 3339), empty otherwise.
 	ArchivedAt string `json:"archivedAt,omitempty"`
+	// PermissionMode is how freely members may act (PermissionReadOnly,
+	// PermissionDefault, PermissionFull); applied from the next turn.
+	PermissionMode string `json:"permissionMode"`
+}
+
+// Team permission modes. CoBot only knows these three; each engine adapter
+// maps them onto its own approval and sandbox settings.
+const (
+	PermissionReadOnly = "read_only"
+	PermissionDefault  = "default"
+	PermissionFull     = "full"
+)
+
+// ValidPermissionMode reports whether mode is one of the three modes.
+func ValidPermissionMode(mode string) bool {
+	return mode == PermissionReadOnly || mode == PermissionDefault || mode == PermissionFull
 }
 
 // Bot is one member of a team. The product status is derived from run

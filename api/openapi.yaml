@@ -489,7 +489,7 @@ paths:
       operationId: patchTeam
       security:
         - SessionCookie: []
-      summary: Rename a team
+      summary: Rename a team or change its permission mode
       parameters:
         - name: id
           in: path
@@ -501,10 +501,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, name, expectedRevision]
+              required: [requestId, expectedRevision]
               properties:
                 requestId: { type: string, format: uuid }
                 name: { type: string }
+                permissionMode:
+                  type: string
+                  enum: [read_only, default, full]
+                  description: Applies from each member's next turn.
                 expectedRevision: { type: integer, format: int64 }
       responses:
         "200":
@@ -2053,6 +2057,10 @@ components:
         archivedAt:
           type: string
           description: When the team was archived (RFC 3339); absent unless archived.
+        permissionMode:
+          type: string
+          enum: [read_only, default, full]
+          description: How freely members may act; mapped onto the engine's approval and sandbox settings.
     Bot:
       type: object
       required: [id, teamId, name, roleId, isLeader, status, revision, createdAt]

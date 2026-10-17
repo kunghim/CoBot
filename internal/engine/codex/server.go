@@ -139,6 +139,10 @@ func (s *Server) handleRequest(req InboundRequest) {
 		Command  string `json:"command"`
 		Cwd      string `json:"cwd"`
 		Reason   string `json:"reason"`
+		// permissions requests: the access asked for
+		Permissions json.RawMessage `json:"permissions"`
+		// command requests that need the network
+		NetworkApprovalContext json.RawMessage `json:"networkApprovalContext"`
 	}
 	_ = json.Unmarshal(req.Params, &base)
 
@@ -183,6 +187,10 @@ func (s *Server) handleRequest(req InboundRequest) {
 		Changes:   fileChange.Changes,
 		RawParams: req.Params,
 	}
+	if len(base.Permissions) > 0 && string(base.Permissions) != "null" {
+		approval.Permissions = base.Permissions
+	}
+	approval.Network = len(base.NetworkApprovalContext) > 0 && string(base.NetworkApprovalContext) != "null"
 	if s.callbacks.OnApproval == nil {
 		return
 	}
@@ -368,6 +376,7 @@ func (s *Server) Epoch() string { return s.epoch }
 
 // StartThread creates a new provider thread for one bot.
 func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
+	spec = applyPermission(spec)
 	res := ThreadStartResult{}
 	err := s.client.Call(ctx, "thread/start", ThreadStartParams{
 		Cwd:                   spec.Cwd,
@@ -389,6 +398,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 
 // ResumeThread reattaches a previously created thread.
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+	spec = applyPermission(spec)
 	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
@@ -420,13 +430,17 @@ func (s *Server) InspectTurn(ctx context.Context, threadID, turnID string) (stri
 	return "", errors.New("exact provider turn not found")
 }
 
-func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (string, error) {
+func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engine.TurnOptions) (string, error) {
 	res := TurnStartResult{}
-	err := s.client.Call(ctx, "turn/start", TurnStartParams{
+	params := TurnStartParams{
 		ThreadID: threadID,
 		Input:    []UserInput{{Type: "text", Text: text}},
-		Model:    model,
-	}, &res)
+		Model:    opts.Model,
+	}
+	if policy, ok := permissionPolicies[opts.Permission]; ok {
+		params.ApprovalPolicy, params.SandboxPolicy = policy.approval, policy.sandboxPolicy()
+	}
+	err := s.client.Call(ctx, "turn/start", params, &res)
 	if err != nil {
 		return "", fmt.Errorf("turn/start: %w", err)
 	}

@@ -97,9 +97,10 @@ func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		RequestID        string `json:"requestId"`
-		Name             string `json:"name"`
-		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+		RequestID        string  `json:"requestId"`
+		Name             *string `json:"name,omitempty"`
+		PermissionMode   *string `json:"permissionMode,omitempty"`
+		ExpectedRevision *int64  `json:"expectedRevision,omitempty"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
@@ -109,7 +110,16 @@ func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
 	if req.ExpectedRevision != nil {
 		expected = *req.ExpectedRevision
 	}
-	team, err := s.App.PatchTeamName(r.Context(), principal, r.PathValue("id"), req.Name, expected)
+	var team domain.Team
+	var err error
+	switch {
+	case req.PermissionMode != nil && req.Name == nil:
+		team, err = s.App.PatchTeamPermissionMode(r.Context(), principal, r.PathValue("id"), *req.PermissionMode, expected)
+	case req.Name != nil && req.PermissionMode == nil:
+		team, err = s.App.PatchTeamName(r.Context(), principal, r.PathValue("id"), *req.Name, expected)
+	default:
+		err = domain.InvalidRequest("error.team.patch_one_field", nil)
+	}
 	if err != nil {
 		writeError(w, r, err)
 		return

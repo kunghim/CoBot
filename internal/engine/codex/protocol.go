@@ -59,9 +59,11 @@ type UserInput struct {
 
 // TurnStartParams mirrors turn/start.
 type TurnStartParams struct {
-	ThreadID string      `json:"threadId"`
-	Input    []UserInput `json:"input"`
-	Model    string      `json:"model,omitempty"`
+	ThreadID       string         `json:"threadId"`
+	Input          []UserInput    `json:"input"`
+	Model          string         `json:"model,omitempty"`
+	ApprovalPolicy string         `json:"approvalPolicy,omitempty"`
+	SandboxPolicy  map[string]any `json:"sandboxPolicy,omitempty"`
 }
 
 // TurnRef identifies a turn and its lifecycle status.

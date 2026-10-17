@@ -259,7 +259,7 @@ export interface paths {
         delete: operations["deleteTeam"];
         options?: never;
         head?: never;
-        /** Rename a team */
+        /** Rename a team or change its permission mode */
         patch: operations["patchTeam"];
         trace?: never;
     };
@@ -1074,6 +1074,11 @@ export interface components {
             updatedAt: string;
             /** @description When the team was archived (RFC 3339); absent unless archived. */
             archivedAt?: string;
+            /**
+             * @description How freely members may act; mapped onto the engine's approval and sandbox settings.
+             * @enum {string}
+             */
+            permissionMode?: "read_only" | "default" | "full";
         };
         Bot: {
             id: string;
@@ -1706,7 +1711,12 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
-                    name: string;
+                    name?: string;
+                    /**
+                     * @description Applies from each member's next turn.
+                     * @enum {string}
+                     */
+                    permissionMode?: "read_only" | "default" | "full";
                     /** Format: int64 */
                     expectedRevision: number;
                 };

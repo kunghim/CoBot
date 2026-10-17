@@ -183,6 +183,13 @@ const (
 	TaskStatusTodo      TaskStatus = "todo"
 )
 
+// Defines values for TeamPermissionMode.
+const (
+	TeamPermissionModeDefault  TeamPermissionMode = "default"
+	TeamPermissionModeFull     TeamPermissionMode = "full"
+	TeamPermissionModeReadOnly TeamPermissionMode = "read_only"
+)
+
 // Defines values for TeamStatus.
 const (
 	Active           TeamStatus = "active"
@@ -220,6 +227,13 @@ const (
 	Answered  ListQuestionsParamsStatus = "answered"
 	Cancelled ListQuestionsParamsStatus = "cancelled"
 	Open      ListQuestionsParamsStatus = "open"
+)
+
+// Defines values for PatchTeamJSONBodyPermissionMode.
+const (
+	PatchTeamJSONBodyPermissionModeDefault  PatchTeamJSONBodyPermissionMode = "default"
+	PatchTeamJSONBodyPermissionModeFull     PatchTeamJSONBodyPermissionMode = "full"
+	PatchTeamJSONBodyPermissionModeReadOnly PatchTeamJSONBodyPermissionMode = "read_only"
 )
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
@@ -584,18 +598,24 @@ type TaskStatus string
 // Team defines model for Team.
 type Team struct {
 	// ArchivedAt When the team was archived (RFC 3339); absent unless archived.
-	ArchivedAt        *string    `json:"archivedAt,omitempty"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	Directory         string     `json:"directory"`
-	Id                string     `json:"id"`
-	LeaderId          string     `json:"leaderId"`
-	Name              string     `json:"name"`
-	ProfileInstanceId string     `json:"profileInstanceId"`
-	Revision          int64      `json:"revision"`
-	Status            TeamStatus `json:"status"`
-	StatusDetail      *string    `json:"statusDetail,omitempty"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
+	ArchivedAt *string   `json:"archivedAt,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	Directory  string    `json:"directory"`
+	Id         string    `json:"id"`
+	LeaderId   string    `json:"leaderId"`
+	Name       string    `json:"name"`
+
+	// PermissionMode How freely members may act; mapped onto the engine's approval and sandbox settings.
+	PermissionMode    *TeamPermissionMode `json:"permissionMode,omitempty"`
+	ProfileInstanceId string              `json:"profileInstanceId"`
+	Revision          int64               `json:"revision"`
+	Status            TeamStatus          `json:"status"`
+	StatusDetail      *string             `json:"statusDetail,omitempty"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
 }
+
+// TeamPermissionMode How freely members may act; mapped onto the engine's approval and sandbox settings.
+type TeamPermissionMode string
 
 // TeamStatus defines model for Team.Status.
 type TeamStatus string
@@ -836,10 +856,16 @@ type DeleteTeamParams struct {
 
 // PatchTeamJSONBody defines parameters for PatchTeam.
 type PatchTeamJSONBody struct {
-	ExpectedRevision int64              `json:"expectedRevision"`
-	Name             string             `json:"name"`
-	RequestId        openapi_types.UUID `json:"requestId"`
+	ExpectedRevision int64   `json:"expectedRevision"`
+	Name             *string `json:"name,omitempty"`
+
+	// PermissionMode Applies from each member's next turn.
+	PermissionMode *PatchTeamJSONBodyPermissionMode `json:"permissionMode,omitempty"`
+	RequestId      openapi_types.UUID               `json:"requestId"`
 }
+
+// PatchTeamJSONBodyPermissionMode defines parameters for PatchTeam.
+type PatchTeamJSONBodyPermissionMode string
 
 // ListActivityParams defines parameters for ListActivity.
 type ListActivityParams struct {

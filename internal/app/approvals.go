@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -89,21 +90,34 @@ func (a *App) publishApprovalUpdated(ctx context.Context, approval domain.Approv
 }
 
 // engineResponseFor maps the stored option onto the exact native response.
-func engineResponseFor(approvalType, method, optionID string) (map[string]any, error) {
-	if approvalType != domain.ApprovalNativeTool {
+func engineResponseFor(approval domain.Approval, optionID string) (map[string]any, error) {
+	if approval.Type != domain.ApprovalNativeTool {
 		return nil, nil // non-engine cards have no protocol reply
 	}
-	switch method {
+	switch approval.Method {
 	case "item/permissions/requestApproval":
-		// Only the deny shape is verified on the target version; a grant
-		// response cannot be expressed accurately, so it is not offered.
-		if optionID != "deny" {
+		switch optionID {
+		case "deny":
+			return map[string]any{"permissions": map[string]any{}}, nil
+		case domain.DecisionGrantTurn, domain.DecisionGrantSession:
+			// A grant is exactly what was asked for, never more.
+			var asked struct {
+				Permissions json.RawMessage `json:"permissions"`
+			}
+			if json.Unmarshal([]byte(approval.Summary), &asked) != nil || len(asked.Permissions) == 0 {
+				return nil, domain.Conflict("error.approval.option_unavailable", nil)
+			}
+			scope := "turn"
+			if optionID == domain.DecisionGrantSession {
+				scope = "session"
+			}
+			return map[string]any{"permissions": asked.Permissions, "scope": scope}, nil
+		default:
 			return nil, domain.Conflict("error.approval.option_unavailable", nil)
 		}
-		return map[string]any{"permissions": map[string]any{}}, nil
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval":
 		switch optionID {
-		case "accept", "decline":
+		case domain.DecisionAcceptEngine, domain.DecisionAcceptSession, domain.DecisionDeclineEngine, domain.DecisionCancelEngine:
 			return map[string]any{"decision": optionID}, nil
 		default:
 			return nil, domain.Conflict("error.approval.option_unavailable", nil)

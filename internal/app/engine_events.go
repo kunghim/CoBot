@@ -369,6 +369,12 @@ func approvalSummary(req engine.ApprovalRequest) string {
 	if len(req.Changes) > 0 {
 		details["changes"] = req.Changes
 	}
+	if len(req.Permissions) > 0 {
+		details["permissions"] = req.Permissions
+	}
+	if req.Network {
+		details["network"] = true
+	}
 	if len(details) == 0 {
 		return req.Method
 	}
@@ -376,22 +382,22 @@ func approvalSummary(req engine.ApprovalRequest) string {
 	return string(value)
 }
 
+// nativeToolOptions are the choices Codex itself offers. "For this session"
+// lasts for the member's engine session: Codex keeps the grant until its
+// thread is restarted, and nothing in CoBot can widen it further.
 func nativeToolOptions(method string) []domain.ApprovalOption {
 	if method == "item/permissions/requestApproval" {
-		// The grant response shape is not verified on the target engine
-		// version, so only the verified deny shape is offered (F07 rule:
-		// an option that cannot be expressed accurately stays disabled).
 		return []domain.ApprovalOption{
+			{ID: domain.DecisionGrantTurn, MessageKey: "approval.option.grant_turn"},
+			{ID: domain.DecisionGrantSession, MessageKey: "approval.option.grant_session"},
 			{ID: "deny", MessageKey: "approval.option.permissions.deny"},
 		}
 	}
-	// "Always allow" (acceptForSession) is deliberately NOT offered: this
-	// build could not verify its session semantics or provide a runtime
-	// revocation, and plan 3.5 requires disabling a capability that cannot
-	// be implemented accurately (review A6; F07 stays unimplemented).
 	return []domain.ApprovalOption{
 		{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.allow_once"},
+		{ID: domain.DecisionAcceptSession, MessageKey: "approval.option.allow_session"},
 		{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.decline"},
+		{ID: domain.DecisionCancelEngine, MessageKey: "approval.option.decline_stop"},
 	}
 }
 

@@ -125,3 +125,44 @@ func TestLiveHubNeverBlocks(t *testing.T) {
 		t.Fatal("publishing blocked on a slow subscriber")
 	}
 }
+
+// A team starts in the default mode, a change applies from the next turn,
+// and only the three modes are accepted.
+func TestPermissionModeAppliesFromTheNextTurn(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	if team.PermissionMode != domain.PermissionDefault {
+		t.Fatalf("new team mode = %q", team.PermissionMode)
+	}
+	send := func(text string) {
+		if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[0].ID, Text: text, RequestID: "req-" + text}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send("one")
+	fake := h.fakeFor(t, team.ID)
+	waitUntil(t, 5*time.Second, "first turn", func() bool { return len(fake.Turns()) == 1 })
+	first := fake.Turns()[0]
+	if first.Permission != domain.PermissionDefault {
+		t.Fatalf("first turn permission = %q", first.Permission)
+	}
+
+	if _, err := h.app.PatchTeamPermissionMode(ctx, h.user, team.ID, "everything", 0); err == nil {
+		t.Fatal("an unknown mode must be refused")
+	}
+	updated, err := h.app.PatchTeamPermissionMode(ctx, h.user, team.ID, domain.PermissionFull, team.Revision)
+	if err != nil || updated.PermissionMode != domain.PermissionFull || updated.Revision != team.Revision+1 {
+		t.Fatalf("patch = %+v %v", updated, err)
+	}
+	if _, err := h.app.PatchTeamPermissionMode(ctx, h.user, team.ID, domain.PermissionReadOnly, team.Revision); err == nil {
+		t.Fatal("a stale revision must conflict")
+	}
+
+	fake.EmitTurnCompleted(first.ThreadID, first.TurnID, "completed", "ok")
+	send("two")
+	waitUntil(t, 5*time.Second, "second turn", func() bool { return len(fake.Turns()) == 2 })
+	if got := fake.Turns()[1].Permission; got != domain.PermissionFull {
+		t.Fatalf("second turn permission = %q", got)
+	}
+}

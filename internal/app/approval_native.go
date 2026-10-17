@@ -29,10 +29,10 @@ func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, op
 		return domain.Approval{}, sqlite.NormalizeError(err)
 	}
 	projectNativeFileOptions(&approval)
-	if option == "accept" && approval.Method == "item/fileChange/requestApproval" && !hasFilePreview(approval) {
+	if (option == domain.DecisionAcceptEngine || option == domain.DecisionAcceptSession) && approval.Method == "item/fileChange/requestApproval" && !hasFilePreview(approval) {
 		return domain.Approval{}, domain.Conflict("error.approval.file_preview_unavailable", nil)
 	}
-	response, err := engineResponseFor(approval.Type, approval.Method, option)
+	response, err := engineResponseFor(approval, option)
 	if err != nil {
 		return domain.Approval{}, err
 	}
@@ -87,7 +87,7 @@ func projectNativeFileOptions(card *domain.Approval) {
 		return
 	}
 	for i := range card.Options {
-		if card.Options[i].ID == "accept" {
+		if card.Options[i].ID == domain.DecisionAcceptEngine || card.Options[i].ID == domain.DecisionAcceptSession {
 			card.Options[i].Disabled = true
 			card.Options[i].DisabledReasonKey = "error.approval.file_preview_unavailable"
 		}

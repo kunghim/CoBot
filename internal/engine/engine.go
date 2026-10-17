@@ -11,13 +11,24 @@ import (
 
 // ThreadSpec describes one bot conversation thread.
 type ThreadSpec struct {
-	Cwd                   string         // must be the team directory
+	Cwd string // must be the team directory
+	// Permission is the team's mode (read_only | default | full). When set,
+	// the adapter derives the engine's sandbox and approval settings from it
+	// and Sandbox/ApprovalPolicy are ignored.
+	Permission            string
 	Sandbox               string         // read-only | workspace-write
 	ApprovalPolicy        string         // untrusted | on-request | never
 	ApprovalsReviewer     string         // user
 	Model                 string         // optional override
 	DeveloperInstructions string         // role + collaboration instructions
 	Config                map[string]any // thread-scoped config overrides
+}
+
+// TurnOptions are per-turn overrides. Permission (read_only | default |
+// full) applies from this turn on, so a mode change never needs a new thread.
+type TurnOptions struct {
+	Model      string
+	Permission string
 }
 
 // ThreadInfo is the provider-side identity of a started/resumed thread.
@@ -35,7 +46,7 @@ type Server interface {
 	ResumeThread(ctx context.Context, threadID string, spec ThreadSpec) error
 	// StartTurn dispatches one user turn and returns the provider turn id;
 	// completion arrives as notifications, not as this call's result.
-	StartTurn(ctx context.Context, threadID, text string, model string) (turnID string, err error)
+	StartTurn(ctx context.Context, threadID, text string, opts TurnOptions) (turnID string, err error)
 	InterruptTurn(ctx context.Context, threadID, turnID string) error
 	// ReplyApproval answers a pending native approval request with the exact
 	// response shape the engine expects (decision / permissions).
@@ -75,6 +86,11 @@ type ApprovalRequest struct {
 	Reason    string
 	Paths     []string // file changes involved
 	Changes   []FileChange
+	// Permissions is the extra access a permissions request asks for, in
+	// the engine's own shape; granting echoes it back.
+	Permissions json.RawMessage
+	// Network marks a command that needs network access.
+	Network   bool
 	RawParams json.RawMessage
 }
 

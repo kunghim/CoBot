@@ -212,4 +212,12 @@ func (a Approval) IsPending() bool { return a.RequestState == ApprovalStatePendi
 const (
 	DecisionAcceptEngine  = "accept"
 	DecisionDeclineEngine = "decline"
+	// DecisionAcceptSession allows this and the same kind of request for the
+	// rest of the member's engine session.
+	DecisionAcceptSession = "acceptForSession"
+	// DecisionCancelEngine declines and stops the member's current turn.
+	DecisionCancelEngine = "cancel"
+	// Permission requests: grant for this turn or for the session.
+	DecisionGrantTurn    = "grant"
+	DecisionGrantSession = "grantForSession"
 )

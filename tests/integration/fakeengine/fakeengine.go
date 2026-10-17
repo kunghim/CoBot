@@ -58,10 +58,11 @@ func (s *Server) InspectTurn(ctx context.Context, threadID, turnID string) (stri
 
 // StartedTurn records one accepted turn.
 type StartedTurn struct {
-	ThreadID string
-	TurnID   string
-	Text     string
-	Model    string
+	ThreadID   string
+	TurnID     string
+	Text       string
+	Model      string
+	Permission string
 }
 
 // Reply records one approval answer.
@@ -98,7 +99,7 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	return nil
 }
 
-func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (string, error) {
+func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engine.TurnOptions) (string, error) {
 	if s.BeforeStartTurn != nil {
 		if err := s.BeforeStartTurn(); err != nil {
 			return "", err
@@ -111,7 +112,7 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text, model string) (s
 	}
 	s.turnSeq++
 	turnID := fmt.Sprintf("turn-%d", s.turnSeq)
-	s.startedTurns = append(s.startedTurns, StartedTurn{ThreadID: threadID, TurnID: turnID, Text: text, Model: model})
+	s.startedTurns = append(s.startedTurns, StartedTurn{ThreadID: threadID, TurnID: turnID, Text: text, Model: opts.Model, Permission: opts.Permission})
 	return turnID, nil
 }
 

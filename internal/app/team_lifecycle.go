@@ -71,6 +71,44 @@ func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamI
 	return team, nil
 }
 
+// PatchTeamPermissionMode changes how freely the team's members may act.
+// Each member's next turn carries the new mode; a turn already running keeps
+// the mode it started with.
+func (a *App) PatchTeamPermissionMode(ctx context.Context, principal auth.Principal, teamID, mode string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	if principal.Kind != auth.KindUser {
+		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if !domain.ValidPermissionMode(mode) {
+		return domain.Team{}, domain.InvalidRequest("error.team.permission_mode_invalid", nil)
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	team, err := sqlite.UpdateTeamPermissionModeTx(ctx, tx, teamID, mode, expectedRevision)
+	if err != nil {
+		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
+	a.Hub.Publish()
+	return team, nil
+}
+
 // archiveBlockers is the one census for archiving. A team may be archived
 // only when it is completely idle: no running member, no queued message, no
 // pending approval, no open question, no offered hand-over and no unfinished

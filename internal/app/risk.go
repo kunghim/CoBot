@@ -130,7 +130,7 @@ func (s *Scheduler) StartRiskEval(ctx context.Context, delivery sqlite.DeliveryR
 	}()
 
 	prompt := s.riskEvalPrompt(ctx, chain, delivery)
-	if _, err := server.StartTurn(ctx, threadID, prompt, model); err != nil {
+	if _, err := server.StartTurn(ctx, threadID, prompt, engine.TurnOptions{Model: model}); err != nil {
 		// Turn start failed outright: the user decides.
 		s.finishRiskEval(threadID, "ask", "turn_start_failed")
 	}

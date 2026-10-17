@@ -529,7 +529,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	taskID := delivery.TaskID
 	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + message.RenderText()
 	s.app.TouchLease(ctx, bot.ID)
-	turnID, err := server.StartTurn(ctx, threadID, input, settings.DefaultModel)
+	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team)})
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried (D04).
@@ -800,8 +800,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	}
 	spec := engine.ThreadSpec{
 		Cwd:                   cwd,
-		Sandbox:               "workspace-write",
-		ApprovalPolicy:        "untrusted",
+		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
 		Model:                 settings.DefaultModel,
 		DeveloperInstructions: buildInstructions(team, bot, role),
@@ -895,6 +894,14 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 	extra[prefix+".required"] = true
 	extra[prefix+".default_tools_approval_mode"] = "approve"
 	return codex.ThreadConfig(extra), nil
+}
+
+// permissionMode is the team's mode, the default for a row that predates it.
+func permissionMode(team domain.Team) string {
+	if domain.ValidPermissionMode(team.PermissionMode) {
+		return team.PermissionMode
+	}
+	return domain.PermissionDefault
 }
 
 func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string {
