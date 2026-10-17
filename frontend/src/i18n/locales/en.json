@@ -118,6 +118,17 @@
   },
   "conversation": {
     "sentTo": "Sent to {{name}}",
+    "engineError": {
+      "serverOverloaded": "The model is at capacity, so this turn did not finish. Send again later or pick another model in Settings",
+      "usageLimitExceeded": "The account reached its model usage limit, so this turn did not finish. Try again when it resets",
+      "rateLimitExceeded": "The model service is rate limiting requests; send again in a moment",
+      "contextWindowExceeded": "The conversation is longer than the model can handle; start a new task or shorten the request",
+      "unauthorized": "The Codex sign-in expired; sign in again in Settings",
+      "httpConnectionFailed": "Cannot reach the model service; check the network and send again",
+      "responseStreamConnectionFailed": "Cannot reach the model service; check the network and send again",
+      "responseStreamDisconnected": "The connection to the model dropped, so this turn did not finish; send again",
+      "internalServerError": "The model service had an internal error; send again later"
+    },
     "notifiedTo": "Noted for {{name}} (no reply needed)",
     "taskCard": { "assigned": "Task assigned · owner {{name}}", "acceptance": "Done when", "open": "Open in the task board" },
     "file": { "open": "Open file", "reveal": "Show in folder" },

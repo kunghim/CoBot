@@ -38,6 +38,10 @@ describe('describeStep', () => {
     expect(phrase.key).toBe('conversation.step.cobot.notify');
     expect(phrase.params?.name).toBe('测试工程师、fe');
   });
+  it('explains known engine errors in plain words', () => {
+    expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'serverOverloaded', message: 'Selected model is at capacity.' } }), nameOf)).toEqual({ key: 'conversation.engineError.serverOverloaded' });
+    expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'other', message: 'boom' } }), nameOf)).toEqual({ key: 'conversation.step.error', params: { message: 'boom' } });
+  });
   it('describes other tools, retries and changes', () => {
     expect(describeStep(step({ kind: 'tool', detail: { server: 'fs', tool: 'read' } }), nameOf)).toEqual({ key: 'conversation.step.tool', params: { tool: 'fs.read' } });
     expect(describeStep(step({ kind: 'retry', status: 'in_progress', detail: { attempt: 3 } }), nameOf)).toEqual({ key: 'conversation.step.retrying', params: { attempt: 3 } });

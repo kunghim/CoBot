@@ -43,7 +43,8 @@ export default function RunProcess({
   const [open, setOpen] = useState<boolean | null>(null);
   const steps = mergeSteps(run.steps, active ? live : undefined);
   const shown = visibleSteps(steps, active ? live : undefined);
-  const expanded = open ?? active;
+  // A failed turn stays open so its reason is seen without a click.
+  const expanded = open ?? (active || run.status === 'failed');
 
   if (!active && shown.length === 0) {
     if (run.status === 'failed' || run.status === 'interrupted') {
@@ -187,7 +188,8 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
     case 'plan':
       return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={teamId} /> : null;
     case 'retry':
-      return typeof d.message === 'string' && d.message ? <p className="text-neutral-400">{d.message}</p> : null;
+    case 'notice':
+      return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-400">{d.message}</p> : null;
     default:
       return null;
   }

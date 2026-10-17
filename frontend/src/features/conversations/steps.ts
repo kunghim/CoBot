@@ -34,6 +34,12 @@ const collaborationTools = new Set([
   'request_merge', 'remember', 'search_memory', 'get_context', 'list_tasks', 'get_task', 'list_roles',
 ]);
 
+// Engine error codes with a plain-language explanation and what to do.
+const knownErrorCodes = new Set([
+  'serverOverloaded', 'usageLimitExceeded', 'rateLimitExceeded', 'contextWindowExceeded', 'unauthorized',
+  'httpConnectionFailed', 'responseStreamConnectionFailed', 'responseStreamDisconnected', 'internalServerError',
+]);
+
 /** One-line description of a step. */
 export function describeStep(step: RunStep, nameOf: (botId: string) => string): Phrase {
   const d = step.detail ?? {};
@@ -54,8 +60,13 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return step.status === 'in_progress'
         ? { key: 'conversation.step.retrying', params: { attempt: Number(d.attempt) || 1 } }
         : { key: 'conversation.step.retried', params: { attempt: Number(d.attempt) || 1 } };
-    case 'notice':
+    case 'notice': {
+      // Known engine error codes read in the user's language; the engine's
+      // own text stays available in the step's detail.
+      const code = text(d.code);
+      if (d.level !== 'warning' && knownErrorCodes.has(code)) return { key: `conversation.engineError.${code}` };
       return { key: d.level === 'warning' ? 'conversation.step.warning' : 'conversation.step.error', params: { message: text(d.message) } };
+    }
     case 'tool': {
       const tool = text(d.tool);
       if (text(d.server) === 'cobot' || collaborationTools.has(tool)) {
