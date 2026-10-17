@@ -540,6 +540,7 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 		ThreadID: threadID,
 		Input:    []UserInput{{Type: "text", Text: text}},
 		Model:    opts.Model,
+		Effort:   opts.Effort,
 	}
 	if policy, ok := permissionPolicies[opts.Permission]; ok {
 		params.ApprovalPolicy, params.SandboxPolicy = policy.approval, policy.sandboxPolicy()

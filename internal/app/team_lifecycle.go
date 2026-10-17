@@ -109,6 +109,43 @@ func (a *App) PatchTeamPermissionMode(ctx context.Context, principal auth.Princi
 	return team, nil
 }
 
+// PatchTeamReasoningEffort changes how hard the team's members think; it
+// applies from each member's next turn.
+func (a *App) PatchTeamReasoningEffort(ctx context.Context, principal auth.Principal, teamID, effort string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	if principal.Kind != auth.KindUser {
+		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if !domain.ValidReasoningEffort(effort) {
+		return domain.Team{}, domain.InvalidRequest("error.team.reasoning_effort_invalid", nil)
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	team, err := sqlite.UpdateTeamReasoningEffortTx(ctx, tx, teamID, effort, expectedRevision)
+	if err != nil {
+		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
+	a.Hub.Publish()
+	return team, nil
+}
+
 // archiveBlockers is the one census for archiving. A team may be archived
 // only when it is completely idle: no running member, no queued message, no
 // pending approval, no open question, no offered hand-over and no unfinished

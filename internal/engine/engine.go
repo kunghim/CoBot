@@ -27,6 +27,8 @@ type ThreadSpec struct {
 // TurnOptions are per-turn overrides. Permission (read_only | default |
 // full) applies from this turn on, so a mode change never needs a new thread.
 type TurnOptions struct {
+	// Effort is the reasoning effort for this turn; empty is the model default.
+	Effort     string
 	Model      string
 	Permission string
 }

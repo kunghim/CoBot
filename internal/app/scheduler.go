@@ -529,7 +529,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		input = update + "\n\n" + text
 	}
 	s.app.TouchLease(ctx, bot.ID)
-	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team)})
+	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried (D04).

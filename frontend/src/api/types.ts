@@ -30,7 +30,18 @@ export interface EngineStatus {
 
 export type EngineLogin = components['schemas']['EngineLogin'];
 
-export interface EngineModel { slug?: string; id?: string; displayName?: string; description?: string; family?: string }
+export interface EngineModel {
+  slug?: string;
+  id?: string;
+  displayName?: string;
+  description?: string;
+  family?: string;
+  isDefault?: boolean;
+  /** The effort the model uses when none is chosen. */
+  defaultReasoningEffort?: string;
+  /** The reasoning efforts the model offers. */
+  reasoningEfforts?: Array<{ effort: string; description?: string }>;
+}
 
 export interface ModelListResult {
   models: EngineModel[];

@@ -68,6 +68,7 @@ type StartedTurn struct {
 	Text       string
 	Model      string
 	Permission string
+	Effort     string
 }
 
 // Reply records one approval answer.
@@ -150,7 +151,7 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 	}
 	s.turnSeq++
 	turnID := fmt.Sprintf("turn-%d", s.turnSeq)
-	s.startedTurns = append(s.startedTurns, StartedTurn{ThreadID: threadID, TurnID: turnID, Text: text, Model: opts.Model, Permission: opts.Permission})
+	s.startedTurns = append(s.startedTurns, StartedTurn{ThreadID: threadID, TurnID: turnID, Text: text, Model: opts.Model, Permission: opts.Permission, Effort: opts.Effort})
 	return turnID, nil
 }
 

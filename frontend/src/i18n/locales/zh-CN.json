@@ -102,6 +102,13 @@
     "qaEngineer": { "name": "测试工程师", "summary": "编写和执行测试，报告问题。" },
     "codeReviewer": { "name": "代码审查", "summary": "审查改动的正确性与质量。" }
   },
+  "effort": {
+    "label": "思考强度",
+    "default": "默认",
+    "modelDefault": "由模型决定（当前模型默认：{{level}}）",
+    "note": "从每个成员的下一轮开始生效。强度越高，想得越多，也越慢、越费用量。",
+    "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高" }
+  },
   "permission": {
     "label": "权限模式",
     "mode": { "read_only": "只读", "default": "默认权限", "full": "完全访问" },

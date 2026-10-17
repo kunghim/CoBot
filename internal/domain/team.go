@@ -32,6 +32,9 @@ type Team struct {
 	// PermissionMode is how freely members may act (PermissionReadOnly,
 	// PermissionDefault, PermissionFull); applied from the next turn.
 	PermissionMode string `json:"permissionMode"`
+	// ReasoningEffort is how hard members think each turn (an effort the
+	// model supports, as Codex names it); empty follows the model's default.
+	ReasoningEffort string `json:"reasoningEffort,omitempty"`
 }
 
 // Team permission modes. CoBot only knows these three; each engine adapter
@@ -98,3 +101,17 @@ const (
 	EventApprovalCreated = "approval.created"
 	EventApprovalUpdated = "approval.updated"
 )
+
+// ValidReasoningEffort accepts empty (the model's default) or an effort name
+// as Codex spells them (lowercase letters and underscores).
+func ValidReasoningEffort(effort string) bool {
+	if len(effort) > 24 {
+		return false
+	}
+	for _, r := range effort {
+		if (r < 'a' || r > 'z') && r != '_' {
+			return false
+		}
+	}
+	return true
+}

@@ -1098,6 +1098,8 @@ export interface components {
              * @enum {string}
              */
             permissionMode?: "read_only" | "default" | "full";
+            /** @description How hard members think each turn; absent follows the model's default. */
+            reasoningEffort?: string;
         };
         Bot: {
             id: string;
@@ -1736,6 +1738,8 @@ export interface operations {
                      * @enum {string}
                      */
                     permissionMode?: "read_only" | "default" | "full";
+                    /** @description How hard members think from their next turn (an effort the model lists); empty follows the model's default. */
+                    reasoningEffort?: string;
                     /** Format: int64 */
                     expectedRevision: number;
                 };

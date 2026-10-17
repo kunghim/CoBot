@@ -359,13 +359,27 @@ func sanitizeModels(raw json.RawMessage) json.RawMessage {
 		if model, ok := m["model"].(string); ok {
 			entry["slug"] = model
 		}
-		for _, key := range []string{"slug", "id", "displayName", "description", "family"} {
+		for _, key := range []string{"slug", "id", "displayName", "description", "family", "isDefault", "defaultReasoningEffort"} {
 			if v, ok := m[key]; ok {
 				switch v.(type) {
 				case string, float64, bool:
 					entry[key] = v
 				}
 			}
+		}
+		// The reasoning efforts the model offers, for the composer's choice.
+		if options, ok := m["supportedReasoningEfforts"].([]any); ok {
+			efforts := []map[string]string{}
+			for _, option := range options {
+				o, _ := option.(map[string]any)
+				effort, _ := o["reasoningEffort"].(string)
+				if effort == "" {
+					continue
+				}
+				description, _ := o["description"].(string)
+				efforts = append(efforts, map[string]string{"effort": effort, "description": description})
+			}
+			entry["reasoningEfforts"] = efforts
 		}
 		if len(entry) > 0 {
 			clean = append(clean, entry)

@@ -192,6 +192,8 @@ export const api = {
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { name, expectedRevision }),
   setTeamPermissionMode: (teamId: string, permissionMode: import('./types').PermissionMode, expectedRevision?: number) =>
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { permissionMode, expectedRevision }),
+  setTeamReasoningEffort: (teamId: string, reasoningEffort: string, expectedRevision?: number) =>
+    request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { reasoningEffort, expectedRevision }),
   addBot: (teamId: string, roleId: string) =>
     request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
   listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),

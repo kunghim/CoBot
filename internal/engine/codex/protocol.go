@@ -62,6 +62,7 @@ type UserInput struct {
 
 // TurnStartParams mirrors turn/start.
 type TurnStartParams struct {
+	Effort         string         `json:"effort,omitempty"`
 	ThreadID       string         `json:"threadId"`
 	Input          []UserInput    `json:"input"`
 	Model          string         `json:"model,omitempty"`

@@ -140,6 +140,29 @@ func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	}
 }
 
+// The team's reasoning effort reaches every member's next turn; empty
+// leaves the model's own default.
+func TestTeamReasoningEffortReachesTheTurn(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.PatchTeamReasoningEffort(ctx, h.user, team.ID, "HIGH!", 0); err == nil {
+		t.Fatal("an invalid effort was accepted")
+	}
+	updated, err := h.app.PatchTeamReasoningEffort(ctx, h.user, team.ID, "high", 0)
+	if err != nil || updated.ReasoningEffort != "high" {
+		t.Fatalf("patch = %+v %v", updated, err)
+	}
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[0].ID, Text: "想清楚再做"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	if got := fake.Turns()[0].Effort; got != "high" {
+		t.Fatalf("turn effort = %q", got)
+	}
+}
+
 // A turn's usage is the sum of all its model calls, measured by how much the
 // thread total grew; a repeated report adds nothing.
 func TestTurnUsageSumsEveryModelCall(t *testing.T) {

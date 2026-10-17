@@ -102,6 +102,13 @@
     "qaEngineer": { "name": "QA engineer", "summary": "Writes and runs tests and reports problems." },
     "codeReviewer": { "name": "Code reviewer", "summary": "Reviews changes for correctness and quality." }
   },
+  "effort": {
+    "label": "Reasoning effort",
+    "default": "Default",
+    "modelDefault": "Left to the model (its default: {{level}})",
+    "note": "Applies from each member's next turn. Higher effort thinks more, takes longer and uses more.",
+    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" }
+  },
   "permission": {
     "label": "Permission mode",
     "mode": { "read_only": "Read only", "default": "Default", "full": "Full access" },

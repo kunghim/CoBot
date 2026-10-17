@@ -540,6 +540,15 @@ export function useSetTeamPermissionMode() {
   });
 }
 
+export function useSetTeamReasoningEffort() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, effort, expectedRevision }: { teamId: string; effort: string; expectedRevision?: number }) =>
+      api.setTeamReasoningEffort(teamId, effort, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteTeam() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({

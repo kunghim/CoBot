@@ -614,10 +614,13 @@ type Team struct {
 	// PermissionMode How freely members may act; mapped onto the engine's approval and sandbox settings.
 	PermissionMode    *TeamPermissionMode `json:"permissionMode,omitempty"`
 	ProfileInstanceId string              `json:"profileInstanceId"`
-	Revision          int64               `json:"revision"`
-	Status            TeamStatus          `json:"status"`
-	StatusDetail      *string             `json:"statusDetail,omitempty"`
-	UpdatedAt         time.Time           `json:"updatedAt"`
+
+	// ReasoningEffort How hard members think each turn; absent follows the model's default.
+	ReasoningEffort *string    `json:"reasoningEffort,omitempty"`
+	Revision        int64      `json:"revision"`
+	Status          TeamStatus `json:"status"`
+	StatusDetail    *string    `json:"statusDetail,omitempty"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
 // TeamPermissionMode How freely members may act; mapped onto the engine's approval and sandbox settings.
@@ -873,7 +876,10 @@ type PatchTeamJSONBody struct {
 
 	// PermissionMode Applies from each member's next turn.
 	PermissionMode *PatchTeamJSONBodyPermissionMode `json:"permissionMode,omitempty"`
-	RequestId      openapi_types.UUID               `json:"requestId"`
+
+	// ReasoningEffort How hard members think from their next turn (an effort the model lists); empty follows the model's default.
+	ReasoningEffort *string            `json:"reasoningEffort,omitempty"`
+	RequestId       openapi_types.UUID `json:"requestId"`
 }
 
 // PatchTeamJSONBodyPermissionMode defines parameters for PatchTeam.

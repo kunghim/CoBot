@@ -16,6 +16,7 @@ import ApprovalCardStack from '../approvals/ApprovalCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
+import ReasoningEffortSelect from './ReasoningEffortSelect';
 import RunProcess from './RunProcess';
 import { ExchangeLine, RoleBadge, isExchange } from './MessageCards';
 import ExchangeOverlay from './ExchangeOverlay';
@@ -245,7 +246,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
               className="block max-h-60 min-h-[44px] w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm leading-6 placeholder:text-neutral-400 focus:outline-none disabled:opacity-60"
             />
             <div className="flex items-center justify-between gap-2 px-2 pb-2">
-              <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+              <div className="flex min-w-0 items-center gap-1">
+                <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+                <ReasoningEffortSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+              </div>
               {activeRun && draft.trim() === '' ? (
                 <button
                   type="button"

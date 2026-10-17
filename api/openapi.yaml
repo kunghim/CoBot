@@ -509,6 +509,9 @@ paths:
                   type: string
                   enum: [read_only, default, full]
                   description: Applies from each member's next turn.
+                reasoningEffort:
+                  type: string
+                  description: How hard members think from their next turn (an effort the model lists); empty follows the model's default.
                 expectedRevision: { type: integer, format: int64 }
       responses:
         "200":
@@ -2096,6 +2099,9 @@ components:
           type: string
           enum: [read_only, default, full]
           description: How freely members may act; mapped onto the engine's approval and sandbox settings.
+        reasoningEffort:
+          type: string
+          description: How hard members think each turn; absent follows the model's default.
     Bot:
       type: object
       required: [id, teamId, name, roleId, isLeader, status, revision, createdAt]
