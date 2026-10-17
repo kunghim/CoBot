@@ -16,13 +16,12 @@ const (
 )
 
 // Settings is the single business-settings row of the profile database.
-// Defaults match the first-version product decisions (member/chain limit 6,
-// no budget, zh-CN).
+// Defaults match the product decisions (member limit 6, chain limit 10, no
+// budget, zh-CN).
 type Settings struct {
 	Revision     int64  `json:"revision"`
 	Language     string `json:"language"`
 	DefaultModel string `json:"defaultModel"`
-	EvalModel    string `json:"evalModel"`
 	MemberLimit  int    `json:"memberLimit"`
 	ChainLimit   int    `json:"chainLimit"`
 	BudgetScope  string `json:"budgetScope"`
@@ -83,7 +82,6 @@ func isSupportedLanguage(lang string) bool {
 type SettingsPatch struct {
 	Language     *string `json:"language"`
 	DefaultModel *string `json:"defaultModel"`
-	EvalModel    *string `json:"evalModel"`
 	MemberLimit  *int    `json:"memberLimit"`
 	ChainLimit   *int    `json:"chainLimit"`
 	BudgetScope  *string `json:"budgetScope"`
@@ -99,9 +97,6 @@ func (s Settings) Apply(p SettingsPatch) Settings {
 	}
 	if p.DefaultModel != nil {
 		out.DefaultModel = strings.TrimSpace(*p.DefaultModel)
-	}
-	if p.EvalModel != nil {
-		out.EvalModel = strings.TrimSpace(*p.EvalModel)
 	}
 	if p.MemberLimit != nil {
 		out.MemberLimit = *p.MemberLimit

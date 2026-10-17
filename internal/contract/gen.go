@@ -55,28 +55,12 @@ const (
 
 // Defines values for CollaborationRequestTool.
 const (
-	AcceptTransfer   CollaborationRequestTool = "accept_transfer"
-	AskUser          CollaborationRequestTool = "ask_user"
-	AssignTask       CollaborationRequestTool = "assign_task"
-	ConfirmTask      CollaborationRequestTool = "confirm_task"
-	CreateTask       CollaborationRequestTool = "create_task"
-	DeliverTask      CollaborationRequestTool = "deliver_task"
-	GetContext       CollaborationRequestTool = "get_context"
-	GetTask          CollaborationRequestTool = "get_task"
-	ListRoles        CollaborationRequestTool = "list_roles"
-	ListTasks        CollaborationRequestTool = "list_tasks"
-	OfferTransfer    CollaborationRequestTool = "offer_transfer"
-	ProposeTask      CollaborationRequestTool = "propose_task"
-	Remember         CollaborationRequestTool = "remember"
-	ReportCompletion CollaborationRequestTool = "report_completion"
-	RequestMember    CollaborationRequestTool = "request_member"
-	RequestMerge     CollaborationRequestTool = "request_merge"
-	ReviewTask       CollaborationRequestTool = "review_task"
-	SearchMemory     CollaborationRequestTool = "search_memory"
-	SendMessage      CollaborationRequestTool = "send_message"
-	SubmitEvidence   CollaborationRequestTool = "submit_evidence"
-	UpdateTask       CollaborationRequestTool = "update_task"
-	ViewTasks        CollaborationRequestTool = "view_tasks"
+	AskUser     CollaborationRequestTool = "ask_user"
+	CreateTask  CollaborationRequestTool = "create_task"
+	DeliverTask CollaborationRequestTool = "deliver_task"
+	ReviewTask  CollaborationRequestTool = "review_task"
+	SendMessage CollaborationRequestTool = "send_message"
+	ViewTasks   CollaborationRequestTool = "view_tasks"
 )
 
 // Defines values for EngineLoginType.
@@ -137,6 +121,54 @@ const (
 	QuestionStatusAnswered  QuestionStatus = "answered"
 	QuestionStatusCancelled QuestionStatus = "cancelled"
 	QuestionStatusOpen      QuestionStatus = "open"
+)
+
+// Defines values for RunStatus.
+const (
+	RunStatusCompleted       RunStatus = "completed"
+	RunStatusFailed          RunStatus = "failed"
+	RunStatusInterrupted     RunStatus = "interrupted"
+	RunStatusRunning         RunStatus = "running"
+	RunStatusStarting        RunStatus = "starting"
+	RunStatusUnknown         RunStatus = "unknown"
+	RunStatusWaitingApproval RunStatus = "waiting_approval"
+	RunStatusWaitingInput    RunStatus = "waiting_input"
+)
+
+// Defines values for RunStepKind.
+const (
+	RunStepKindAgent      RunStepKind = "agent"
+	RunStepKindCommand    RunStepKind = "command"
+	RunStepKindDiff       RunStepKind = "diff"
+	RunStepKindFileChange RunStepKind = "file_change"
+	RunStepKindMessage    RunStepKind = "message"
+	RunStepKindNotice     RunStepKind = "notice"
+	RunStepKindPlan       RunStepKind = "plan"
+	RunStepKindReasoning  RunStepKind = "reasoning"
+	RunStepKindRetry      RunStepKind = "retry"
+	RunStepKindTool       RunStepKind = "tool"
+	RunStepKindWebSearch  RunStepKind = "web_search"
+)
+
+// Defines values for RunStepStatus.
+const (
+	RunStepStatusCompleted   RunStepStatus = "completed"
+	RunStepStatusDeclined    RunStepStatus = "declined"
+	RunStepStatusFailed      RunStepStatus = "failed"
+	RunStepStatusInProgress  RunStepStatus = "in_progress"
+	RunStepStatusInterrupted RunStepStatus = "interrupted"
+)
+
+// Defines values for RunWithStepsStatus.
+const (
+	RunWithStepsStatusCompleted       RunWithStepsStatus = "completed"
+	RunWithStepsStatusFailed          RunWithStepsStatus = "failed"
+	RunWithStepsStatusInterrupted     RunWithStepsStatus = "interrupted"
+	RunWithStepsStatusRunning         RunWithStepsStatus = "running"
+	RunWithStepsStatusStarting        RunWithStepsStatus = "starting"
+	RunWithStepsStatusUnknown         RunWithStepsStatus = "unknown"
+	RunWithStepsStatusWaitingApproval RunWithStepsStatus = "waiting_approval"
+	RunWithStepsStatusWaitingInput    RunWithStepsStatus = "waiting_input"
 )
 
 // Defines values for SettingsBudgetScope.
@@ -339,6 +371,20 @@ type CollaborationRequest struct {
 // CollaborationRequestTool defines model for CollaborationRequest.Tool.
 type CollaborationRequestTool string
 
+// ConversationPage defines model for ConversationPage.
+type ConversationPage struct {
+	ActiveRun *Run `json:"activeRun"`
+	Bot       Bot  `json:"bot"`
+
+	// Messages Oldest first.
+	Messages    []Message `json:"messages"`
+	NextCursor  string    `json:"nextCursor"`
+	QueuedCount int       `json:"queuedCount"`
+
+	// Runs Runs started between this page's messages, with their visible steps.
+	Runs []RunWithSteps `json:"runs"`
+}
+
 // CreateTaskRequest defines model for CreateTaskRequest.
 type CreateTaskRequest struct {
 	AcceptanceCriteria *string            `json:"acceptanceCriteria,omitempty"`
@@ -462,6 +508,22 @@ type MessageDeliveryStatus string
 // MessageKind defines model for Message.Kind.
 type MessageKind string
 
+// Model One engine model, reduced to non-secret identifier fields.
+type Model struct {
+	// DefaultReasoningEffort The effort the model uses when none is chosen.
+	DefaultReasoningEffort *string `json:"defaultReasoningEffort,omitempty"`
+	Description            *string `json:"description,omitempty"`
+	DisplayName            *string `json:"displayName,omitempty"`
+	Family                 *string `json:"family,omitempty"`
+	Id                     *string `json:"id,omitempty"`
+	IsDefault              *bool   `json:"isDefault,omitempty"`
+	ReasoningEfforts       *[]struct {
+		Description string `json:"description"`
+		Effort      string `json:"effort"`
+	} `json:"reasoningEfforts,omitempty"`
+	Slug *string `json:"slug,omitempty"`
+}
+
 // OfferTransferRequest defines model for OfferTransferRequest.
 type OfferTransferRequest struct {
 	Note      *string            `json:"note,omitempty"`
@@ -501,6 +563,65 @@ type Question struct {
 // QuestionStatus defines model for Question.Status.
 type QuestionStatus string
 
+// Run defines model for Run.
+type Run struct {
+	BotId             string     `json:"botId"`
+	EndedAt           *time.Time `json:"endedAt,omitempty"`
+	EngineEpoch       *string    `json:"engineEpoch,omitempty"`
+	ErrorKey          *string    `json:"errorKey,omitempty"`
+	Id                string     `json:"id"`
+	ProviderSessionId *string    `json:"providerSessionId,omitempty"`
+	ProviderTurnId    *string    `json:"providerTurnId,omitempty"`
+	StartedAt         time.Time  `json:"startedAt"`
+	Status            RunStatus  `json:"status"`
+	TeamId            string     `json:"teamId"`
+}
+
+// RunStatus defines model for Run.Status.
+type RunStatus string
+
+// RunStep defines model for RunStep.
+type RunStep struct {
+	BotId string `json:"botId"`
+
+	// Detail Kind-specific payload.
+	Detail map[string]interface{} `json:"detail"`
+	Id     string                 `json:"id"`
+
+	// Kind The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
+	Kind      RunStepKind   `json:"kind"`
+	RunId     string        `json:"runId"`
+	Seq       int           `json:"seq"`
+	StartedAt time.Time     `json:"startedAt"`
+	Status    RunStepStatus `json:"status"`
+	TeamId    string        `json:"teamId"`
+	UpdatedAt time.Time     `json:"updatedAt"`
+}
+
+// RunStepKind The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
+type RunStepKind string
+
+// RunStepStatus defines model for RunStep.Status.
+type RunStepStatus string
+
+// RunWithSteps defines model for RunWithSteps.
+type RunWithSteps struct {
+	BotId             string             `json:"botId"`
+	EndedAt           *time.Time         `json:"endedAt,omitempty"`
+	EngineEpoch       *string            `json:"engineEpoch,omitempty"`
+	ErrorKey          *string            `json:"errorKey,omitempty"`
+	Id                string             `json:"id"`
+	ProviderSessionId *string            `json:"providerSessionId,omitempty"`
+	ProviderTurnId    *string            `json:"providerTurnId,omitempty"`
+	StartedAt         time.Time          `json:"startedAt"`
+	Status            RunWithStepsStatus `json:"status"`
+	Steps             []RunStep          `json:"steps"`
+	TeamId            string             `json:"teamId"`
+}
+
+// RunWithStepsStatus defines model for RunWithSteps.Status.
+type RunWithStepsStatus string
+
 // SessionStats defines model for SessionStats.
 type SessionStats struct {
 	Context struct {
@@ -539,7 +660,6 @@ type Settings struct {
 	ChainLimit   int                 `json:"chainLimit"`
 	DefaultModel string              `json:"defaultModel"`
 	EnginePath   string              `json:"enginePath"`
-	EvalModel    string              `json:"evalModel"`
 	Language     SettingsLanguage    `json:"language"`
 	MemberLimit  int                 `json:"memberLimit"`
 	Revision     int64               `json:"revision"`
@@ -558,7 +678,6 @@ type SettingsPatch struct {
 	ChainLimit   *int                      `json:"chainLimit,omitempty"`
 	DefaultModel *string                   `json:"defaultModel,omitempty"`
 	EnginePath   *string                   `json:"enginePath,omitempty"`
-	EvalModel    *string                   `json:"evalModel,omitempty"`
 	Language     *SettingsPatchLanguage    `json:"language,omitempty"`
 	MemberLimit  *int                      `json:"memberLimit,omitempty"`
 }
@@ -632,6 +751,13 @@ type Task struct {
 // TaskStatus defines model for Task.Status.
 type TaskStatus string
 
+// TaskDetail defines model for TaskDetail.
+type TaskDetail struct {
+	Evidence  []Evidence `json:"evidence"`
+	Task      Task       `json:"task"`
+	Transfers []Transfer `json:"transfers"`
+}
+
 // Team defines model for Team.
 type Team struct {
 	// ArchivedAt When the team was archived (RFC 3339); absent unless archived.
@@ -679,6 +805,7 @@ type ToolResult struct {
 		Code       string                  `json:"code"`
 		MessageKey string                  `json:"messageKey"`
 		Params     *map[string]interface{} `json:"params,omitempty"`
+		Status     *string                 `json:"status,omitempty"`
 	} `json:"error,omitempty"`
 	Status ToolResultStatus `json:"status"`
 }
@@ -979,6 +1106,11 @@ type CancelTaskTransferJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// InternalServiceStopJSONBody defines parameters for InternalServiceStop.
+type InternalServiceStopJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // InternalSessionLinkJSONBody defines parameters for InternalSessionLink.
 type InternalSessionLinkJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -1073,6 +1205,9 @@ type CancelTaskTransferJSONRequestBody CancelTaskTransferJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest
+
+// InternalServiceStopJSONRequestBody defines body for InternalServiceStop for application/json ContentType.
+type InternalServiceStopJSONRequestBody InternalServiceStopJSONBody
 
 // InternalSessionLinkJSONRequestBody defines body for InternalSessionLink for application/json ContentType.
 type InternalSessionLinkJSONRequestBody InternalSessionLinkJSONBody

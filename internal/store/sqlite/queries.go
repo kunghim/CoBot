@@ -50,11 +50,14 @@ type Queryer interface {
 
 // ---- settings ----
 
-const settingsColumns = `revision, language, default_model, eval_model, member_limit, chain_limit, budget_scope, budget_tokens, engine_path`
+// The settings table still has eval_model, the evaluation model of the
+// removed risk checks; nothing reads or writes it.
+
+const settingsColumns = `revision, language, default_model, member_limit, chain_limit, budget_scope, budget_tokens, engine_path`
 
 func scanSettings(row *sql.Row) (domain.Settings, error) {
 	var s domain.Settings
-	err := row.Scan(&s.Revision, &s.Language, &s.DefaultModel, &s.EvalModel, &s.MemberLimit, &s.ChainLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath)
+	err := row.Scan(&s.Revision, &s.Language, &s.DefaultModel, &s.MemberLimit, &s.ChainLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Settings{}, ErrNotFound
 	}
@@ -106,11 +109,11 @@ func UpdateSettingsTx(ctx context.Context, tx *sql.Tx, patch domain.SettingsPatc
 	_, err = tx.ExecContext(ctx, `
 		UPDATE settings SET
 			revision = revision + 1,
-			language = ?, default_model = ?, eval_model = ?,
+			language = ?, default_model = ?,
 			member_limit = ?, chain_limit = ?,
 			budget_scope = ?, budget_tokens = ?, engine_path = ?, updated_at = ?
 		WHERE id = 1`,
-		next.Language, next.DefaultModel, next.EvalModel,
+		next.Language, next.DefaultModel,
 		next.MemberLimit, next.ChainLimit,
 		next.BudgetScope, next.BudgetTokens, next.EnginePath, now)
 	if err != nil {

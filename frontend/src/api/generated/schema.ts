@@ -259,7 +259,10 @@ export interface paths {
         delete: operations["deleteTeam"];
         options?: never;
         head?: never;
-        /** Rename a team or change its permission mode */
+        /**
+         * Change exactly one of a team's name, permission mode or reasoning effort
+         * @description The body carries exactly one of name, permissionMode or reasoningEffort (otherwise 400 error.team.patch_one_field). Permission mode and reasoning effort apply from each member's next turn.
+         */
         patch: operations["patchTeam"];
         trace?: never;
     };
@@ -813,6 +816,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/service/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the core to shut down (internal, instance secret only)
+         * @description Answers 202 before shutdown begins; 409 when this core has no shutdown hook.
+         */
+        post: operations["internalServiceStop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/collaboration": {
         parameters: {
             query?: never;
@@ -1014,7 +1037,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "deliver_task" | "review_task" | "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge" | "remember" | "search_memory";
+            tool: "view_tasks" | "deliver_task" | "review_task" | "send_message" | "create_task" | "ask_user";
             arguments?: {
                 [key: string]: unknown;
             };
@@ -1032,6 +1055,7 @@ export interface components {
                 [key: string]: unknown;
             };
             error?: {
+                status?: string;
                 code: string;
                 messageKey: string;
                 params?: {
@@ -1106,7 +1130,6 @@ export interface components {
             /** @enum {string} */
             language: "zh-CN" | "en";
             defaultModel: string;
-            evalModel: string;
             memberLimit: number;
             chainLimit: number;
             /** @enum {string} */
@@ -1119,7 +1142,6 @@ export interface components {
             /** @enum {string} */
             language?: "zh-CN" | "en";
             defaultModel?: string;
-            evalModel?: string;
             memberLimit?: number;
             chainLimit?: number;
             /** @enum {string} */
@@ -1261,6 +1283,61 @@ export interface components {
             startedAt: string;
             /** Format: date-time */
             endedAt?: string;
+        };
+        RunStep: {
+            id: string;
+            runId: string;
+            teamId: string;
+            botId: string;
+            seq: number;
+            /**
+             * @description The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
+             * @enum {string}
+             */
+            kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "notice" | "retry";
+            /** @enum {string} */
+            status: "in_progress" | "completed" | "failed" | "declined" | "interrupted";
+            /** @description Kind-specific payload. */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        RunWithSteps: components["schemas"]["Run"] & {
+            steps: components["schemas"]["RunStep"][];
+        };
+        ConversationPage: {
+            /** @description Oldest first. */
+            messages: components["schemas"]["Message"][];
+            nextCursor: string;
+            bot: components["schemas"]["Bot"];
+            queuedCount: number;
+            activeRun: components["schemas"]["Run"] | null;
+            /** @description Runs started between this page's messages, with their visible steps. */
+            runs: components["schemas"]["RunWithSteps"][];
+        };
+        TaskDetail: {
+            task: components["schemas"]["Task"];
+            evidence: components["schemas"]["Evidence"][];
+            transfers: components["schemas"]["Transfer"][];
+        };
+        /** @description One engine model, reduced to non-secret identifier fields. */
+        Model: {
+            slug?: string;
+            id?: string;
+            displayName?: string;
+            description?: string;
+            family?: string;
+            isDefault?: boolean;
+            /** @description The effort the model uses when none is chosen. */
+            defaultReasoningEffort?: string;
+            reasoningEfforts?: {
+                effort: string;
+                description: string;
+            }[];
         };
     };
     responses: {
@@ -1595,9 +1672,7 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
-                            models?: {
-                                [key: string]: unknown;
-                            }[];
+                            models: components["schemas"]["Model"][];
                         };
                     };
                 };
@@ -1806,7 +1881,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Renamed team */
+            /** @description Updated team */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2027,12 +2102,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Messages plus queue state */
+            /** @description Messages plus queue state and the runs (with steps) between them */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ConversationPage"];
+                    };
+                };
             };
             404: components["responses"]["Error"];
         };
@@ -2274,7 +2353,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Task"];
+                        data?: components["schemas"]["TaskDetail"];
                     };
                 };
             };
@@ -2915,6 +2994,40 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
+        };
+    };
+    internalServiceStop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Shutdown requested */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            stopping: boolean;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     collaborationTool: {
