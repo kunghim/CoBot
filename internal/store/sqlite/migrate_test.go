@@ -328,3 +328,100 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 		t.Fatalf("expected settings event, got %+v", evs)
 	}
 }
+
+// TestUpgradePurgesSoftDeletedTeams: migration 11 removes teams that earlier
+// builds soft-deleted, with every row of theirs, and keeps live teams intact.
+func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open(filepath.Join(dir, "v10.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldSource := map[string]string{}
+	for _, path := range files {
+		name := strings.TrimPrefix(path, "migrations/")
+		if name < "00011" {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldSource[name] = string(raw)
+		}
+	}
+	old, err := NewMigratorWithFS(db, testutil.NewMapFS(oldSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	backups := filepath.Join(dir, "backups")
+	if err := old.MigrateToLatest(ctx, backups); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	for _, id := range []string{"gone", "kept"} {
+		team := domain.Team{ID: id, Name: id, LeaderID: id + "-bot", ProfileInstance: "instance"}
+		bot := domain.Bot{ID: id + "-bot", TeamID: id, Name: id, RoleID: "leader", Status: domain.BotStatusIdle, IsLeader: true}
+		folder := filepath.Join(dir, id)
+		if err := InsertTeamStaged(ctx, tx, team, folder, folder, []domain.Bot{bot}); err != nil {
+			t.Fatal(err)
+		}
+		task := domain.Task{ID: id + "-task", TeamID: id, OwnerID: bot.ID, Title: id, Status: domain.TaskTodo, Revision: 1}
+		if err := InsertTask(ctx, tx, task); err != nil {
+			t.Fatal(err)
+		}
+		message := domain.Message{ID: id + "-msg", TeamID: id, BotID: bot.ID, Kind: domain.MessageKindUser, Blocks: []byte(`[]`)}
+		if err := InsertMessage(ctx, tx, message); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO deliveries(id,message_id,team_id,target_bot_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, id+"-d", message.ID, id, bot.ID, domain.DeliveryCancelled, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET status = 'deleted' WHERE id = 'gone'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	current, err := NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := current.MigrateToLatest(ctx, backups); err != nil {
+		t.Fatal(err)
+	}
+	count := func(query, id string) int {
+		t.Helper()
+		var n int
+		if err := db.QueryRow(query, id).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	for _, query := range []string{
+		`SELECT COUNT(*) FROM teams WHERE id = ?`,
+		`SELECT COUNT(*) FROM bots WHERE team_id = ?`,
+		`SELECT COUNT(*) FROM tasks WHERE team_id = ?`,
+		`SELECT COUNT(*) FROM messages WHERE team_id = ?`,
+		`SELECT COUNT(*) FROM deliveries WHERE team_id = ?`,
+		`SELECT COUNT(*) FROM directory_bindings WHERE team_id = ?`,
+	} {
+		if n := count(query, "gone"); n != 0 {
+			t.Fatalf("%s left %d rows of the soft-deleted team", query, n)
+		}
+		if n := count(query, "kept"); n != 1 {
+			t.Fatalf("%s kept %d rows of the live team, want 1", query, n)
+		}
+	}
+}
