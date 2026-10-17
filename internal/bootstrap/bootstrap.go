@@ -33,6 +33,7 @@ import (
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/webui"
+	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
 // Options configure one core start.
@@ -219,6 +220,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		// Never overwrite user hooks or bypass native trust to force coverage.
 		logger.Warn("native hook registration unavailable", "error", err)
 	}
+	// The developer recording (`cobot trace on`) of this core: engine stdio
+	// and every HTTP exchange. It records nothing until switched on.
+	trace := wiretrace.New(paths.Root, "core")
 	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
 		settings, err := application.GetSettings(startCtx)
 		if err != nil {
@@ -235,6 +239,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			Client:    codex.ClientInfo{Name: "cobot", Title: "CoBot", Version: opts.Version},
 			Callbacks: callbacks,
 			Logger:    logger,
+			Trace:     trace,
 		})
 	}
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
@@ -348,7 +353,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		StartedAt:        info.StartedAt,
 		StartupBootstrap: startupSecret,
 		listener:         listener,
-		server:           &http.Server{Handler: apiServer.Handler()},
+		server:           &http.Server{Handler: wiretrace.Middleware(trace, apiServer.Handler())},
 		api:              apiServer,
 		lock:             lock,
 		closeLog:         closeLog,

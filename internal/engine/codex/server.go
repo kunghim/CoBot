@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
 // ServerOptions configure one team app-server process.
@@ -24,6 +27,9 @@ type ServerOptions struct {
 	Client    ClientInfo
 	Callbacks engine.Callbacks
 	Logger    *slog.Logger
+	// Trace records the raw stdin, stdout and stderr while a developer
+	// recording is on; nil records nothing.
+	Trace *wiretrace.Recorder
 }
 
 // Server is the Codex implementation of engine.Server.
@@ -43,6 +49,10 @@ type Server struct {
 	waitOnce  sync.Once
 	waitDone  chan struct{}
 	waitErr   error
+
+	trace       *wiretrace.Recorder
+	tracePeer   string
+	traceStderr *wiretrace.Lines
 }
 
 type nativeItemKey struct{ ThreadID, TurnID, ItemID string }
@@ -72,7 +82,18 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	if opts.Env != nil {
 		cmd.Env = opts.Env
 	}
-	cmd.Stderr = &stderrLog{logger: opts.Logger} // protocol is stdout-only
+	// While a recording is on, the engine also logs its own debug detail
+	// (connections, retries) to stderr, which the recording keeps.
+	tracing := opts.Trace.Active()
+	if tracing {
+		env := cmd.Env
+		if env == nil {
+			env = os.Environ()
+		}
+		cmd.Env = append(env, "RUST_LOG=debug")
+	}
+	stderrLines := wiretrace.NewLines(opts.Trace, "codex.stderr", "codex→cobot", "")
+	cmd.Stderr = wiretrace.TeeWriter(&stderrLog{logger: opts.Logger}, stderrLines) // protocol is stdout-only
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("stdin pipe: %w", err)
@@ -82,8 +103,21 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		return nil, fmt.Errorf("stdout pipe: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
+		opts.Trace.Record("codex.process", "start-failed", "", []byte(err.Error()))
 		return nil, fmt.Errorf("start codex app-server: %w", err)
 	}
+	// Every line of the three streams is recorded under this process's pid,
+	// along with how it was started and how it ended.
+	peer := fmt.Sprintf("codex#%d", cmd.Process.Pid)
+	if opts.Trace != nil {
+		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": cmd.Env})
+		opts.Trace.Record("codex.process", "start", peer, started)
+	}
+	stderrLines.SetPeer(peer)
+	stdoutLines := wiretrace.NewLines(opts.Trace, "codex.stdio", "codex→cobot", peer)
+	stdinLines := wiretrace.NewLines(opts.Trace, "codex.stdio", "cobot→codex", peer)
+	stdout = io.NopCloser(wiretrace.TeeReader(stdout, stdoutLines))
+	stdin = teeWriteCloser{Writer: wiretrace.TeeWriter(stdin, stdinLines), Closer: stdin}
 	s := &Server{
 		cmd:       cmd,
 		epoch:     domain.NewEpochID(),
@@ -94,6 +128,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		fileItems: map[nativeItemKey][]engine.FileChange{},
 		callbacks: opts.Callbacks,
 	}
+	s.trace, s.tracePeer, s.traceStderr = opts.Trace, peer, stderrLines
 	s.client = NewClient(stdin, stdout, ClientHooks{
 		OnRequest: func(req InboundRequest) { s.handleRequest(req) },
 		OnNotify:  func(method string, params json.RawMessage) { s.handleNotify(method, params) },
@@ -613,9 +648,35 @@ func (s *Server) transportExited(err error) {
 func (s *Server) waitProcess() <-chan struct{} {
 	s.waitOnce.Do(func() {
 		s.waitDone = make(chan struct{})
-		go func() { s.waitErr = s.cmd.Wait(); close(s.waitDone) }()
+		go func() {
+			s.waitErr = s.cmd.Wait()
+			s.traceExit()
+			close(s.waitDone)
+		}()
 	})
 	return s.waitDone
+}
+
+// traceExit records how the process ended, after the last stderr line.
+func (s *Server) traceExit() {
+	if s.trace == nil {
+		return
+	}
+	s.traceStderr.Flush()
+	state := map[string]any{"pid": s.cmd.Process.Pid, "error": fmt.Sprint(s.waitErr)}
+	if s.cmd.ProcessState != nil {
+		state["exitCode"] = s.cmd.ProcessState.ExitCode()
+		state["state"] = s.cmd.ProcessState.String()
+	}
+	data, _ := json.Marshal(state)
+	s.trace.Record("codex.process", "exit", s.tracePeer, data)
+}
+
+// teeWriteCloser records what is written to the engine's stdin and closes
+// the real pipe.
+type teeWriteCloser struct {
+	io.Writer
+	io.Closer
 }
 
 func (s *Server) kill() {

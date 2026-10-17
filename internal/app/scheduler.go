@@ -865,7 +865,9 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 	prefix := "mcp_servers.cobot"
 	extra[prefix+".enabled"] = true
 	extra[prefix+".command"] = s.app.MCPBinary
-	extra[prefix+".args"] = []string{"mcp"}
+	// The data root only tells the bridge where a developer recording
+	// (`cobot trace on`) would go.
+	extra[prefix+".args"] = []string{"mcp", "--data-root", s.app.Paths.Root}
 	extra[prefix+".env"] = map[string]string{
 		auth.BridgeEnvEndpoint: s.app.MCPEndpoint,
 		auth.BridgeEnvToken:    token,

@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
 // version is stamped by the build scripts via -ldflags.
@@ -41,6 +44,8 @@ func main() {
 		os.Exit(runMCP(os.Args[2:]))
 	case "hook":
 		os.Exit(runHook(os.Args[2:]))
+	case "trace":
+		os.Exit(runTrace(os.Args[2:]))
 	case "version", "--version", "-v":
 		fmt.Println(version)
 	case "help", "--help", "-h":
@@ -216,9 +221,12 @@ func mintLinkForRunningInstance(env platform.Environment, dataRoot string) strin
 // which owns the facts.
 func runMCP(args []string) int {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	dataRoot := fs.String("data-root", "", "CoBot profile, for the developer recording")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	trace := wiretrace.New(*dataRoot, "mcp")
+	defer trace.Close()
 	endpoint := os.Getenv(collaboration.BridgeEnvEndpoint)
 	token := os.Getenv(collaboration.BridgeEnvToken)
 	if endpoint == "" || token == "" {
@@ -227,12 +235,18 @@ func runMCP(args []string) int {
 		return 2
 	}
 	// A dedicated logger on stderr keeps stdout clean for the MCP stream.
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	stderr := wiretrace.NewLines(trace, "mcp.stderr", "bridge→codex", "")
+	defer stderr.Flush()
+	logger := slog.New(slog.NewTextHandler(wiretrace.TeeWriter(os.Stderr, stderr), &slog.HandlerOptions{Level: slog.LevelWarn}))
 	bridge := collaboration.NewBridge(endpoint, token, logger)
+	bridge.SetTrace(trace)
+	trace.Record("mcp.process", "start", "", []byte(strings.Join(os.Args, " ")))
 	if err := bridge.Run(context.Background()); err != nil && !errors.Is(err, io.EOF) {
-		fmt.Fprintln(os.Stderr, "cobot mcp:", err)
+		fmt.Fprintln(wiretrace.TeeWriter(os.Stderr, stderr), "cobot mcp:", err)
+		trace.Record("mcp.process", "exit", "", []byte("1 "+err.Error()))
 		return 1
 	}
+	trace.Record("mcp.process", "exit", "", []byte("0"))
 	return 0
 }
 
@@ -249,7 +263,16 @@ func runHook(args []string) int {
 		return 2
 	}
 	if *native {
-		return hookrun.RunNativeCodex(os.Stdin, os.Stdout, *root)
+		// The recording keeps what Codex handed the guard and its answer.
+		trace := wiretrace.New(*root, "hook")
+		defer trace.Close()
+		in := wiretrace.NewLines(trace, "hook.stdin", "codex→hook", "")
+		out := wiretrace.NewLines(trace, "hook.stdout", "hook→codex", "")
+		code := hookrun.RunNativeCodex(wiretrace.TeeReader(os.Stdin, in), wiretrace.TeeWriter(os.Stdout, out), *root)
+		in.Flush()
+		out.Flush()
+		trace.Record("hook.process", "exit", "", []byte(strconv.Itoa(code)))
+		return code
 	}
 	return hookrun.Run(
 		context.Background(), os.Stdin, os.Stdout,

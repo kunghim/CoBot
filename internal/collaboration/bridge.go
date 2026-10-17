@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
 // BridgeEnv names the environment a spawned bridge reads. The core passes the
@@ -36,6 +38,17 @@ type Bridge struct {
 	client   *http.Client
 	endpoint string
 	logger   *slog.Logger
+	trace    *wiretrace.Recorder
+}
+
+// SetTrace records the MCP stream and the core calls while a developer
+// recording is on.
+func (b *Bridge) SetTrace(rec *wiretrace.Recorder) {
+	if rec == nil {
+		return
+	}
+	b.trace = rec
+	b.client.Transport = &wiretrace.Transport{Rec: rec, Channel: "mcp.http"}
 }
 
 // NewBridge builds a bridge bound to one core endpoint and one bot token.
@@ -52,7 +65,21 @@ func NewBridge(endpoint, token string, logger *slog.Logger) *Bridge {
 
 // Run serves the MCP stdio transport until the client disconnects.
 func (b *Bridge) Run(ctx context.Context) error {
-	return b.Serve(ctx, &mcp.StdioTransport{})
+	if b.trace == nil {
+		return b.Serve(ctx, &mcp.StdioTransport{})
+	}
+	in := wiretrace.NewLines(b.trace, "mcp.stdio", "codex→bridge", "")
+	out := wiretrace.NewLines(b.trace, "mcp.stdio", "bridge→codex", "")
+	return b.Serve(ctx, &mcp.IOTransport{
+		Reader: io.NopCloser(wiretrace.TeeReader(os.Stdin, in)),
+		Writer: stdoutTee{Writer: wiretrace.TeeWriter(os.Stdout, out), Closer: os.Stdout},
+	})
+}
+
+// stdoutTee writes the MCP stream to stdout and to the recording.
+type stdoutTee struct {
+	io.Writer
+	io.Closer
 }
 
 // Serve runs the bridge on an arbitrary transport. Run wires stdio, which is
