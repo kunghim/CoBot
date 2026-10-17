@@ -14,6 +14,7 @@ import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
+import PermissionModeSelect from './PermissionModeSelect';
 import RunProcess from './RunProcess';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -238,6 +239,8 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </button>
         </div>
         </fieldset>
+
+        <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
 
         {blockReasonKey && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">

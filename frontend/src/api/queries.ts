@@ -11,6 +11,7 @@ import type {
   Event,
   Evidence,
   LiveSignal,
+  PermissionMode,
   ModelListResult,
   Question,
   QuestionListResult,
@@ -520,6 +521,15 @@ export function useRenameTeam() {
   return useMutation({
     mutationFn: ({ teamId, name, expectedRevision }: { teamId: string; name: string; expectedRevision?: number }) =>
       api.renameTeam(teamId, name, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetTeamPermissionMode() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, mode, expectedRevision }: { teamId: string; mode: PermissionMode; expectedRevision?: number }) =>
+      api.setTeamPermissionMode(teamId, mode, expectedRevision),
     onSuccess: invalidate,
   });
 }

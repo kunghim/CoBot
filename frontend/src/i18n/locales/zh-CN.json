@@ -102,6 +102,20 @@
     "qaEngineer": { "name": "测试工程师", "summary": "编写和执行测试，报告问题。" },
     "codeReviewer": { "name": "代码审查", "summary": "审查改动的正确性与质量。" }
   },
+  "permission": {
+    "label": "权限模式",
+    "mode": { "read_only": "只读", "default": "默认权限", "full": "完全访问" },
+    "hint": {
+      "read_only": "只能查看和分析，修改前都会问你",
+      "default": "可在团队目录内自由读写和执行，超出范围时会问你",
+      "full": "不再询问，也不受目录限制"
+    },
+    "confirmFull": {
+      "title": "切换到完全访问？",
+      "body": "成员执行任何命令、修改任何文件都不会再问你，也不受团队目录和网络限制。从每位成员的下一轮开始生效。",
+      "confirm": "切换到完全访问"
+    }
+  },
   "conversation": {
     "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
     "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
@@ -199,6 +213,16 @@
     }
   },
   "approvals": {
+    "native": {
+      "command": "要运行命令",
+      "files": "要修改 {{count}} 个文件",
+      "network": "这条命令需要联网",
+      "cwd": "执行目录：{{cwd}}",
+      "permissions": "申请额外权限",
+      "permissionNetwork": "联网",
+      "permissionRead": "读取：{{paths}}",
+      "permissionWrite": "写入：{{paths}}"
+    },
     "title": "安全审批",
     "type": {
       "native_tool": "安全审批",
@@ -254,8 +278,11 @@
       "merge": "请求合并候选版本；确认前请核对候选与证据，CoBot 不执行 Git 合并"
     },
     "option": {
-      "allow_once": "允许一次",
-      "allow_thread_session": "总是允许（本线程会话）",
+      "allow_once": "允许",
+      "allow_session": "本会话都允许",
+      "decline_stop": "拒绝并停止",
+      "grant_turn": "允许本轮",
+      "grant_session": "本会话都允许",
       "decline": "拒绝",
       "permissions.deny": "拒绝",
       "chain_continue": "继续推进",
@@ -477,6 +504,8 @@
     "error.approval.file_preview_unavailable": "尚未取得本次文件变更明细，暂不能批准；可拒绝或停止本次执行。",
     "error.internal": "内部错误，请查看服务日志",
     "error.path.outside_team": "只能打开团队目录里已存在的文件",
+    "error.team.permission_mode_invalid": "不支持的权限模式",
+    "error.team.patch_one_field": "一次只能修改一项",
     "error.path.open_failed": "无法用系统程序打开这个文件",
     "error.unauthorized.bad_bootstrap": "启动链接无效或已使用",
     "error.unauthorized.session_expired": "页面会话已过期，请重新授权",

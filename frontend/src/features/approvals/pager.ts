@@ -29,8 +29,11 @@ export function optionFallbackText(option: ApprovalOption): string {
 
 const BUILTIN_OPTION_KEYS: Record<string, string> = {
   accept: 'approval.option.allow_once',
-  acceptForSession: 'approval.option.allow_thread_session',
+  acceptForSession: 'approval.option.allow_session',
   decline: 'approval.option.decline',
+  cancel: 'approval.option.decline_stop',
+  grant: 'approval.option.grant_turn',
+  grantForSession: 'approval.option.grant_session',
   deny: 'approval.option.permissions.deny',
 };
 

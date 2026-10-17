@@ -102,6 +102,20 @@
     "qaEngineer": { "name": "QA engineer", "summary": "Writes and runs tests and reports problems." },
     "codeReviewer": { "name": "Code reviewer", "summary": "Reviews changes for correctness and quality." }
   },
+  "permission": {
+    "label": "Permission mode",
+    "mode": { "read_only": "Read only", "default": "Default", "full": "Full access" },
+    "hint": {
+      "read_only": "Can look and analyse; asks before changing anything",
+      "default": "Free to read, write and run inside the team folder; asks beyond it",
+      "full": "Never asks; not limited to the team folder"
+    },
+    "confirmFull": {
+      "title": "Switch to full access?",
+      "body": "Members will run any command and change any file without asking, beyond the team folder and network limits. Applies from each member's next turn.",
+      "confirm": "Switch to full access"
+    }
+  },
   "conversation": {
     "file": { "open": "Open file", "reveal": "Show in folder" },
     "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
@@ -201,6 +215,16 @@
     }
   },
   "approvals": {
+    "native": {
+      "command": "Wants to run a command",
+      "files": "Wants to change {{count}} files",
+      "network": "This command needs network access",
+      "cwd": "Working directory: {{cwd}}",
+      "permissions": "Asks for extra access",
+      "permissionNetwork": "Network",
+      "permissionRead": "Read: {{paths}}",
+      "permissionWrite": "Write: {{paths}}"
+    },
     "title": "Security approval",
     "type": {
       "native_tool": "Security approval",
@@ -256,8 +280,11 @@
       "merge": "Requests merging a candidate version; verify the candidate and evidence — CoBot never runs Git itself"
     },
     "option": {
-      "allow_once": "Allow once",
-      "allow_thread_session": "Always allow (this thread session)",
+      "allow_once": "Allow",
+      "allow_session": "Allow for this session",
+      "decline_stop": "Decline and stop",
+      "grant_turn": "Allow for this turn",
+      "grant_session": "Allow for this session",
       "decline": "Decline",
       "permissions.deny": "Deny",
       "chain_continue": "Continue",
@@ -481,6 +508,8 @@
     "error.approval.file_preview_unavailable": "The exact file changes are unavailable. Approval is disabled; reject or stop this execution.",
     "error.internal": "Internal error; check the service log",
     "error.path.outside_team": "Only existing files inside the team folder can be opened",
+    "error.team.permission_mode_invalid": "Unsupported permission mode",
+    "error.team.patch_one_field": "Change one thing at a time",
     "error.path.open_failed": "Could not open this file with the system program",
     "error.unauthorized.bad_bootstrap": "Startup link invalid or already used",
     "error.unauthorized.session_expired": "Page session expired; authorize again",

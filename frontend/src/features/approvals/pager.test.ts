@@ -34,7 +34,7 @@ describe('approval option labels', () => {
 
   it('falls back through id-based keys when the engine sends no messageKey', () => {
     expect(optionLabelKeys({ id: 'acceptForSession' })).toEqual([
-      'approval.option.allow_thread_session',
+      'approval.option.allow_session',
       'approval.option.unknown',
     ]);
     expect(optionLabelKeys({ id: 'mystery' })).toEqual(['approval.option.unknown']);

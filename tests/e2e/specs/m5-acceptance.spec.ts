@@ -79,7 +79,7 @@ test('three approval cards page, process, and keep history', async ({ page }) =>
   await expect(position).toContainText('1 / 3');
 
   // Processing the current card removes it and shrinks the total to two.
-  const approve = page.getByRole('button').filter({ hasText: /允许一次|Allow once/i }).filter({ visible: true });
+  const approve = page.getByRole('button').filter({ hasText: /^(允许|Allow)$/ }).filter({ visible: true });
   await approve.first().click();
   await expect(page.getByText(/\/ 3/)).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByText(/\/ 2/).first()).toBeVisible({ timeout: 15000 });
@@ -90,7 +90,7 @@ test('three approval cards page, process, and keep history', async ({ page }) =>
 
   // Cleanup: decide the rest so later specs see a quiet pager.
   for (let i = 0; i < 4; i++) {
-    const again = page.getByRole('button').filter({ hasText: /允许一次|Allow once/i }).filter({ visible: true });
+    const again = page.getByRole('button').filter({ hasText: /^(允许|Allow)$/ }).filter({ visible: true });
     if ((await again.count()) === 0) break;
     await again.first().click();
     await page.waitForTimeout(400);

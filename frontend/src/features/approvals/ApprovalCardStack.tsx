@@ -10,6 +10,7 @@ import type { ApprovalOption } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 import MergeDetails from './MergeDetails';
+import NativeApprovalBody from './NativeApprovalBody';
 
 export default function ApprovalCardStack({
   teamId,
@@ -86,9 +87,13 @@ export default function ApprovalCardStack({
         <p className="text-xs text-amber-800 dark:text-amber-200">
           {t('approvals.requester', { name: requesterName })}
         </p>
-        <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
-          {approvalSummaryText(t, approval.summary)}
-        </pre>
+        {approval.type === 'native_tool' ? (
+          <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />
+        ) : (
+          <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
+            {approvalSummaryText(t, approval.summary)}
+          </pre>
+        )}
         <MergeDetails approval={approval} />
         {approval.reason && (
           <p className="text-sm">
@@ -109,7 +114,11 @@ export default function ApprovalCardStack({
               disabled={decide.isPending || option.disabled}
               title={option.disabledReasonKey ? t(`errors.${option.disabledReasonKey}`, { defaultValue: t('approvals.optionUnavailable') }) : undefined}
               onClick={() => decideOption(option)}
-              className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-neutral-900 dark:text-amber-100 dark:hover:bg-amber-900"
+              className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                option.id === 'cancel'
+                  ? 'border-red-300 bg-white text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-neutral-900 dark:text-red-300 dark:hover:bg-red-950'
+                  : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-neutral-900 dark:text-amber-100 dark:hover:bg-amber-900'
+              }`}
             >
               {t(optionLabelKeys(option), { defaultValue: optionFallbackText(option) })}
             </button>

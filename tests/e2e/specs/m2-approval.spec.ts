@@ -39,7 +39,7 @@ test('native tool approval appears, decides, engine resumes', async ({ page, con
   // The pending card is the <section> above the composer; scope every
   // assertion to it. The work panel legitimately keeps this command in the
   // approval history, so a whole-page text lookup would match both.
-  const card = page.locator('section').filter({ hasText: 'pwsh' }).first();
+  const card = page.locator('section').filter({ hasText: 'Write-Host' }).first();
   await expect(card).toBeVisible({ timeout: 20000 });
   await expect(card).toContainText('Write-Host', { timeout: 20000 });
 

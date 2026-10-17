@@ -109,6 +109,9 @@ export type RunStatus = 'starting' | 'running' | 'waiting_approval' | 'waiting_i
 
 export type Run = components['schemas']['Run'];
 
+/** How freely a team's members may act; applies from each next turn. */
+export type PermissionMode = 'read_only' | 'default' | 'full';
+
 /** One visible step of a run (thinking, a command, a file change, a tool
  * call, a reconnect, an engine notice). `detail` is kind-specific. */
 export type RunStepKind = 'reasoning' | 'command' | 'file_change' | 'tool' | 'web_search' | 'plan' | 'retry' | 'notice';
