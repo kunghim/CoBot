@@ -20,19 +20,23 @@ const (
 
 // UsageEntry is one turn's token snapshot in the ledger.
 type UsageEntry struct {
-	ID                string    `json:"id"`
-	TeamID            string    `json:"teamId"`
-	BotID             string    `json:"botId,omitempty"`
-	Purpose           string    `json:"purpose"`
-	EngineEpoch       string    `json:"engineEpoch"`
-	ThreadID          string    `json:"threadId"`
-	TurnID            string    `json:"turnId"`
-	InputTokens       int64     `json:"inputTokens"`
-	OutputTokens      int64     `json:"outputTokens"`
-	CachedInputTokens int64     `json:"cachedInputTokens"`
-	Status            string    `json:"status"`
-	CreatedAt         time.Time `json:"createdAt"`
-	UpdatedAt         time.Time `json:"updatedAt"`
+	ID                string `json:"id"`
+	TeamID            string `json:"teamId"`
+	BotID             string `json:"botId,omitempty"`
+	Purpose           string `json:"purpose"`
+	EngineEpoch       string `json:"engineEpoch"`
+	ThreadID          string `json:"threadId"`
+	TurnID            string `json:"turnId"`
+	InputTokens       int64  `json:"inputTokens"`
+	OutputTokens      int64  `json:"outputTokens"`
+	CachedInputTokens int64  `json:"cachedInputTokens"`
+	// CacheWriteInputTokens and ReasoningOutputTokens are the parts of input
+	// written to the cache and of output spent thinking, as Codex reports them.
+	CacheWriteInputTokens int64     `json:"cacheWriteInputTokens"`
+	ReasoningOutputTokens int64     `json:"reasoningOutputTokens"`
+	Status                string    `json:"status"`
+	CreatedAt             time.Time `json:"createdAt"`
+	UpdatedAt             time.Time `json:"updatedAt"`
 }
 
 // BillableTokens is what the budget measures: input plus output. The cached

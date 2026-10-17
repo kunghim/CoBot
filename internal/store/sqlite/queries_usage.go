@@ -30,18 +30,20 @@ func UpsertUsage(ctx context.Context, tx *sql.Tx, e domain.UsageEntry) error {
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO usage_ledger
 		(id, team_id, bot_id, purpose, engine_epoch, thread_id, turn_id,
-		 input_tokens, output_tokens, cached_input_tokens, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 input_tokens, output_tokens, cached_input_tokens, cache_write_input_tokens, reasoning_output_tokens, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(engine_epoch, thread_id, turn_id) DO UPDATE SET
 			bot_id = CASE WHEN excluded.bot_id != '' THEN excluded.bot_id ELSE usage_ledger.bot_id END,
 			purpose = CASE WHEN excluded.purpose != '' THEN excluded.purpose ELSE usage_ledger.purpose END,
 			input_tokens = excluded.input_tokens,
 			output_tokens = excluded.output_tokens,
 			cached_input_tokens = excluded.cached_input_tokens,
+			cache_write_input_tokens = excluded.cache_write_input_tokens,
+			reasoning_output_tokens = excluded.reasoning_output_tokens,
 			status = excluded.status,
 			updated_at = excluded.updated_at`,
 		e.ID, e.TeamID, e.BotID, purpose, e.EngineEpoch, e.ThreadID, e.TurnID,
-		e.InputTokens, e.OutputTokens, e.CachedInputTokens, status,
+		e.InputTokens, e.OutputTokens, e.CachedInputTokens, e.CacheWriteInputTokens, e.ReasoningOutputTokens, status,
 		created.Format(time.RFC3339Nano), now)
 	if err != nil {
 		return fmt.Errorf("upsert usage: %w", err)
@@ -97,11 +99,11 @@ func GetUsage(ctx context.Context, q Queryer, epoch, threadID, turnID string) (d
 	var e domain.UsageEntry
 	var created, updated string
 	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, purpose, engine_epoch, thread_id, turn_id,
-		input_tokens, output_tokens, cached_input_tokens, status, created_at, updated_at
+		input_tokens, output_tokens, cached_input_tokens, cache_write_input_tokens, reasoning_output_tokens, status, created_at, updated_at
 		FROM usage_ledger WHERE engine_epoch = ? AND thread_id = ? AND turn_id = ?`,
 		epoch, threadID, turnID).Scan(
 		&e.ID, &e.TeamID, &e.BotID, &e.Purpose, &e.EngineEpoch, &e.ThreadID, &e.TurnID,
-		&e.InputTokens, &e.OutputTokens, &e.CachedInputTokens, &e.Status, &created, &updated)
+		&e.InputTokens, &e.OutputTokens, &e.CachedInputTokens, &e.CacheWriteInputTokens, &e.ReasoningOutputTokens, &e.Status, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.UsageEntry{}, ErrNotFound
 	}

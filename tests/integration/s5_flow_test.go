@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
@@ -135,6 +137,38 @@ func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	}
 	if fourth := turn("第四件事", 4); fourth.Text != "第四件事" {
 		t.Fatalf("roster change told twice:\n%s", fourth.Text)
+	}
+}
+
+// A turn's usage is the sum of all its model calls, measured by how much the
+// thread total grew; a repeated report adds nothing.
+func TestTurnUsageSumsEveryModelCall(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "做事"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	report := func(last, total string) {
+		raw := json.RawMessage(`{"threadId":"` + turn.ThreadID + `","turnId":"` + turn.TurnID + `","tokenUsage":{"last":` + last + `,"total":` + total + `,"modelContextWindow":258400}}`)
+		fake.Emit(engine.Notification{Method: "thread/tokenUsage/updated", ThreadID: turn.ThreadID, TurnID: turn.TurnID, TokenUsage: raw})
+	}
+	report(`{"inputTokens":1000,"cachedInputTokens":800,"cacheWriteInputTokens":0,"outputTokens":50,"reasoningOutputTokens":10,"totalTokens":1050}`,
+		`{"inputTokens":1000,"cachedInputTokens":800,"cacheWriteInputTokens":0,"outputTokens":50,"reasoningOutputTokens":10,"totalTokens":1050}`)
+	second := `{"inputTokens":3200,"cachedInputTokens":2500,"cacheWriteInputTokens":100,"outputTokens":130,"reasoningOutputTokens":30,"totalTokens":3330}`
+	report(`{"inputTokens":2200,"cachedInputTokens":1700,"cacheWriteInputTokens":100,"outputTokens":80,"reasoningOutputTokens":20,"totalTokens":2280}`, second)
+	report(`{"inputTokens":2200,"cachedInputTokens":1700,"cacheWriteInputTokens":100,"outputTokens":80,"reasoningOutputTokens":20,"totalTokens":2280}`, second)
+
+	usage, err := sqlite.GetUsage(ctx, h.app.DB, fake.Epoch(), turn.ThreadID, turn.TurnID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage.InputTokens != 3200 || usage.CachedInputTokens != 2500 || usage.CacheWriteInputTokens != 100 || usage.OutputTokens != 130 || usage.ReasoningOutputTokens != 30 {
+		t.Fatalf("turn usage = %+v", usage)
 	}
 }
 

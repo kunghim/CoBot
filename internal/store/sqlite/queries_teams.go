@@ -706,3 +706,18 @@ func SetSessionContextDigest(ctx context.Context, q Queryer, botID, digest strin
 	}
 	return nil
 }
+
+// SessionUsageSnapshot reads a member's latest engine usage snapshot.
+func SessionUsageSnapshot(ctx context.Context, q Queryer, botID string) string {
+	var snapshot string
+	_ = q.QueryRowContext(ctx, `SELECT usage_snapshot FROM provider_sessions WHERE bot_id = ?`, botID).Scan(&snapshot)
+	return snapshot
+}
+
+// SetSessionUsageSnapshot stores a member's latest engine usage snapshot.
+func SetSessionUsageSnapshot(ctx context.Context, q Queryer, botID, snapshot string) error {
+	if _, err := q.ExecContext(ctx, `UPDATE provider_sessions SET usage_snapshot = ? WHERE bot_id = ?`, snapshot, botID); err != nil {
+		return fmt.Errorf("set session usage snapshot: %w", err)
+	}
+	return nil
+}
