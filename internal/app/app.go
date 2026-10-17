@@ -27,9 +27,15 @@ import (
 // App is the application service shared by HTTP handlers, the MCP dispatcher
 // and the desktop host. It is created once by bootstrap.
 type App struct {
-	DB           *sql.DB
-	Paths        platform.Paths
-	Hub          *events.Hub
+	DB    *sql.DB
+	Paths platform.Paths
+	Hub   *events.Hub
+	// Live carries transient turn progress (steps, streamed text) to the
+	// event stream; nil disables it.
+	Live *events.LiveHub
+	// OpenLocal launches a team file for the user; nil uses the system
+	// opener (tests replace it).
+	OpenLocal    func(path string, reveal bool) error
 	InstanceID   string
 	ServiceEpoch string
 	Version      string

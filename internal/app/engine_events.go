@@ -27,6 +27,9 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		s.onRiskEvalNotification(source.server.Epoch(), n)
 		return
 	}
+	if s.onProgress(ctx, teamID, source, n) {
+		return
+	}
 
 	switch n.Method {
 	case "turn/started":
@@ -65,6 +68,21 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 			s.logger.Warn("record usage snapshot", "teamId", teamID, "error", uerr)
 		}
 	case "turn/completed":
+		source.mu.Lock()
+		ref, tracked := source.live[liveTurnKey{n.ThreadID, n.TurnID}]
+		source.mu.Unlock()
+		// Steps settle before the run does, so the reload the completion
+		// triggers never shows a finished run with a step still running.
+		if tracked {
+			source.forgetLiveRun(n.ThreadID, n.TurnID)
+			status := engine.StepInterrupted
+			if n.TurnStatus == "completed" {
+				status = engine.StepCompleted
+			}
+			if err := sqlite.CloseOpenRunSteps(ctx, s.app.DB, ref.runID, status); err != nil {
+				s.logger.Warn("settle run steps", "runId", ref.runID, "error", err)
+			}
+		}
 		s.finishRun(ctx, teamID, source, n)
 	case "account/updated", "account/login/completed":
 		s.app.invalidateEngineStatus()

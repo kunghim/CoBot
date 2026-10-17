@@ -225,6 +225,21 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		} else {
 			result["activeRun"] = run
 		}
+		// The runs whose process belongs between this page's messages: from
+		// its oldest message (open when it is the last page) up to the
+		// anchor of the newer page (open on the newest page).
+		from := ""
+		if next != "" && len(items) > 0 {
+			from = items[0].(domain.Message).CreatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		runs, e := sqlite.ListRunsWithSteps(ctx, q, in.BotID, from, sqlite.CursorValue(in.Cursor))
+		if e != nil {
+			return nil, e
+		}
+		if runs == nil {
+			runs = []domain.RunWithSteps{}
+		}
+		result["runs"] = runs
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

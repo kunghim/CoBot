@@ -276,7 +276,7 @@ func newM2Harness(t *testing.T) *m2Harness {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	a := &app.App{
-		DB: db, Paths: paths, Hub: events.NewHub(), InstanceID: "test-instance",
+		DB: db, Paths: paths, Hub: events.NewHub(), Live: events.NewLiveHub(), InstanceID: "test-instance",
 		ServiceEpoch: "epoch-0", Version: "test", Logger: logger,
 	}
 	tokens := auth.NewTokenStore(time.Hour)

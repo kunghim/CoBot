@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/events"
 )
 
 // handleSnapshot returns the consistent read clients take before following
@@ -54,6 +55,14 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	notify, unsubscribe := s.HubSubscribe()
 	defer unsubscribe()
+	// Live progress rides the same stream as its own event type. It carries
+	// no cursor: a missed signal is recovered from the stored steps.
+	var live <-chan events.Live
+	if s.App.Live != nil {
+		ch, unsubscribeLive := s.App.Live.Subscribe()
+		defer unsubscribeLive()
+		live = ch
+	}
 
 	poll := time.NewTicker(2 * time.Second)
 	defer poll.Stop()
@@ -90,6 +99,19 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			after, err = send()
 		case <-poll.C:
 			after, err = send()
+		case signal := <-live:
+			if scope.TeamID != "" && signal.TeamID != scope.TeamID || scope.BotID != "" && signal.BotID != scope.BotID {
+				continue
+			}
+			payload, merr := json.Marshal(signal)
+			if merr != nil {
+				continue
+			}
+			if _, werr := fmt.Fprintf(w, "event: cobot.live\ndata: %s\n\n", payload); werr != nil {
+				return
+			}
+			flusher.Flush()
+			continue
 		case <-heartbeat.C:
 			if _, err := fmt.Fprintf(w, ": heartbeat\n\n"); err != nil {
 				return

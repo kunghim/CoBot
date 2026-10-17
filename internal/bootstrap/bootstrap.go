@@ -194,6 +194,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		DB:           db,
 		Paths:        paths,
 		Hub:          hub,
+		Live:         events.NewLiveHub(),
 		InstanceID:   instanceID,
 		ServiceEpoch: serviceEpoch,
 		Version:      opts.Version,

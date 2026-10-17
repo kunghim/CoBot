@@ -70,3 +70,20 @@ func PageIDs(ctx context.Context, q Queryer, from, idColumn, sortColumn, scope, 
 	}
 	return ids, next, nil
 }
+
+// CursorValue returns the sort value a page cursor is anchored at (the
+// oldest row of the newer page), or "" for an empty or unreadable cursor.
+func CursorValue(cursor string) string {
+	if cursor == "" {
+		return ""
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return ""
+	}
+	var anchor pageCursor
+	if json.Unmarshal(raw, &anchor) != nil {
+		return ""
+	}
+	return anchor.Value
+}

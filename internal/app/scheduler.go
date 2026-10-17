@@ -37,6 +37,9 @@ type teamRuntime struct {
 
 	mu     sync.Mutex
 	buffer map[string]*runBuffer // runID -> accumulated agent text
+	// live resolves a turn's progress events to its run without a database
+	// read per streamed delta; entries end with the turn.
+	live map[liveTurnKey]liveRun
 }
 
 type runBuffer struct {

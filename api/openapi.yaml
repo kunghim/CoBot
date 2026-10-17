@@ -687,6 +687,36 @@ paths:
           description: Member added
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/open-path:
+    post:
+      operationId: openTeamPath
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Open (or reveal) a file inside the team folder with the system's default program
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string, description: "Link target as written by a member; absolute, relative to the team folder, or with a line suffix." }
+                reveal: { type: boolean, description: "Show the file in the file manager instead of opening it." }
+      responses:
+        "200":
+          description: Opened
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/bots/{id}/messages:
     get:
       operationId: listMessages

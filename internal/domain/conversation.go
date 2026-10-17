@@ -77,6 +77,35 @@ const (
 	RunUnknown         = "unknown"
 )
 
+// Run step kinds CoBot adds to the engine's own (reasoning, command,
+// file_change, tool, web_search, plan): engine errors/warnings and the
+// reconnect attempts of one run.
+const (
+	StepKindNotice = "notice"
+	StepKindRetry  = "retry"
+)
+
+// RunStep is one visible step of a run, as shown in the conversation's
+// process view. Detail is kind-specific JSON (see engine.Step).
+type RunStep struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"runId"`
+	TeamID    string          `json:"teamId"`
+	BotID     string          `json:"botId"`
+	Seq       int             `json:"seq"`
+	Kind      string          `json:"kind"`
+	Status    string          `json:"status"`
+	Detail    json.RawMessage `json:"detail"`
+	StartedAt time.Time       `json:"startedAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// RunWithSteps is a run plus its visible steps, for the conversation view.
+type RunWithSteps struct {
+	Run
+	Steps []RunStep `json:"steps"`
+}
+
 // Run is one dispatched turn.
 type Run struct {
 	ID                string    `json:"id"`

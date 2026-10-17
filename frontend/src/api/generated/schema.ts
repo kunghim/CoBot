@@ -331,6 +331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/open-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open (or reveal) a file inside the team folder with the system's default program */
+        post: operations["openTeamPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bots/{id}/messages": {
         parameters: {
             query?: never;
@@ -1837,6 +1854,39 @@ export interface operations {
                 content?: never;
             };
             409: components["responses"]["Error"];
+        };
+    };
+    openTeamPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description Link target as written by a member; absolute, relative to the team folder, or with a line suffix. */
+                    path: string;
+                    /** @description Show the file in the file manager instead of opening it. */
+                    reveal?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Opened */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     listMessages: {

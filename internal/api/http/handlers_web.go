@@ -108,3 +108,25 @@ func (s *Server) handleRevokeAuthorization(w http.ResponseWriter, r *http.Reques
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"revoked": true})
 }
+
+func (s *Server) handleOpenTeamPath(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+		Path      string `json:"path"`
+		Reveal    bool   `json:"reveal"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.App.OpenTeamPath(r.Context(), principal, r.PathValue("id"), req.Path, req.Reveal)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, result)
+}

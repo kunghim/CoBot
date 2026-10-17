@@ -862,6 +862,16 @@ type AddBotJSONBody struct {
 	RoleId    string             `json:"roleId"`
 }
 
+// OpenTeamPathJSONBody defines parameters for OpenTeamPath.
+type OpenTeamPathJSONBody struct {
+	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
+	Path      string             `json:"path"`
+	RequestId openapi_types.UUID `json:"requestId"`
+
+	// Reveal Show the file in the file manager instead of opening it.
+	Reveal *bool `json:"reveal,omitempty"`
+}
+
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
 type RestoreTeamJSONBody struct {
 	ExpectedRevision int64              `json:"expectedRevision"`
@@ -962,6 +972,9 @@ type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
 // AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
 type AddBotJSONRequestBody AddBotJSONBody
+
+// OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
+type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody

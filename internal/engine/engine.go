@@ -95,6 +95,60 @@ type Notification struct {
 	TurnStatus string // completed | interrupted | failed | inProgress
 	TokenUsage json.RawMessage
 	Raw        json.RawMessage
+
+	// Step is the engine-neutral form of a started/completed turn step the
+	// user should see (thinking, a command, a file change, a tool call...).
+	// Nil for steps that are not shown or are the reply itself.
+	Step *Step
+	// DeltaKind/Delta carry streamed text: message | reasoning | output.
+	DeltaKind string
+	Delta     string
+	// Problem is a turn-scoped error or warning reported by the engine.
+	Problem *Problem
+}
+
+// Step kinds shown in the conversation's process view.
+const (
+	StepReasoning  = "reasoning"
+	StepCommand    = "command"
+	StepFileChange = "file_change"
+	StepTool       = "tool"
+	StepWebSearch  = "web_search"
+	StepPlan       = "plan"
+)
+
+// Step statuses.
+const (
+	StepInProgress = "in_progress"
+	StepCompleted  = "completed"
+	StepFailed     = "failed"
+	StepDeclined   = "declined"
+	// StepInterrupted settles a step its turn ended without completing.
+	StepInterrupted = "interrupted"
+)
+
+// Step is one visible step of a turn. Detail is kind-specific JSON:
+//
+//	reasoning:   {text}
+//	command:     {command, cwd, exitCode?, durationMs?, output}
+//	file_change: {changes: [{path, kind: add|delete|update, movePath?, diff}]}
+//	tool:        {server, tool, arguments, result?, error?, durationMs?}
+//	web_search:  {query}
+//	plan:        {text}
+type Step struct {
+	ID     string
+	Kind   string
+	Status string
+	Detail json.RawMessage
+}
+
+// Problem is an engine error or warning inside a turn. WillRetry marks a
+// transient failure the engine is already retrying (e.g. reconnecting).
+type Problem struct {
+	Level     string // error | warning
+	Message   string
+	Code      string
+	WillRetry bool
 }
 
 // Callbacks is the handler set an app-server delivers events through.

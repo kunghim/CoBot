@@ -269,6 +269,15 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 				n.ItemID = item.ID
 				n.ItemType = item.Type
 				n.Text = item.Text
+				if step := normalizeStep(p.Item); step != nil {
+					if step.Status == "" {
+						step.Status = engine.StepInProgress
+						if method == "item/completed" {
+							step.Status = engine.StepCompleted
+						}
+					}
+					n.Step = step
+				}
 				if item.Type == "fileChange" {
 					var file struct {
 						Changes []engine.FileChange `json:"changes"`
@@ -294,6 +303,44 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.ThreadID = p.ThreadID
 			n.TurnID = p.TurnID
 			n.Text = p.Delta
+			n.DeltaKind, n.Delta = "message", p.Delta
+		}
+	case "item/reasoning/summaryTextDelta", "item/commandExecution/outputDelta":
+		var p struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+			ItemID   string `json:"itemId"`
+			Delta    string `json:"delta"`
+		}
+		if err := json.Unmarshal(params, &p); err == nil {
+			n.ThreadID, n.TurnID, n.ItemID, n.Delta = p.ThreadID, p.TurnID, p.ItemID, p.Delta
+			n.DeltaKind = "reasoning"
+			if method == "item/commandExecution/outputDelta" {
+				n.DeltaKind = "output"
+			}
+		}
+	case "error":
+		var p struct {
+			ThreadID  string `json:"threadId"`
+			TurnID    string `json:"turnId"`
+			WillRetry bool   `json:"willRetry"`
+			Error     struct {
+				Message        string          `json:"message"`
+				CodexErrorInfo json.RawMessage `json:"codexErrorInfo"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(params, &p); err == nil {
+			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
+			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: errorCode(p.Error.CodexErrorInfo), WillRetry: p.WillRetry}
+		}
+	case "warning":
+		var p struct {
+			ThreadID string `json:"threadId"`
+			Message  string `json:"message"`
+		}
+		if err := json.Unmarshal(params, &p); err == nil {
+			n.ThreadID = p.ThreadID
+			n.Problem = &engine.Problem{Level: "warning", Message: p.Message}
 		}
 	case "thread/tokenUsage/updated":
 		var p TokenUsageParams

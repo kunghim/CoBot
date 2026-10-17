@@ -257,3 +257,9 @@ func (s *Server) EmitExit(err error) {
 
 var _ engine.Server = (*Server)(nil)
 var _ = domain.BotStatusIdle
+
+// Emit delivers an arbitrary normalized notification, for progress events
+// (steps, deltas, problems) a scripted turn reports before it completes.
+func (s *Server) Emit(n engine.Notification) {
+	s.callbacks.OnNotification(n)
+}
