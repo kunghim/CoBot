@@ -223,6 +223,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// The developer recording (`cobot trace on`) of this core: engine stdio
 	// and every HTTP exchange. It records nothing until switched on.
 	trace := wiretrace.New(paths.Root, "core")
+	application.Trace = trace
 	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
 		settings, err := application.GetSettings(startCtx)
 		if err != nil {

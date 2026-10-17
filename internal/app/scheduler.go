@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -766,7 +767,14 @@ type threadLoadedChecker interface {
 	ThreadLoaded(threadID string) bool
 }
 
-func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server, runID string) (string, error) {
+func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server, runID string) (threadID string, err error) {
+	defer func() {
+		// A recording names the member behind each engine thread.
+		if err == nil && s.app.Trace != nil {
+			meta, _ := json.Marshal(map[string]string{"threadId": threadID, "botId": bot.ID, "botName": bot.Name, "roleId": bot.RoleID, "teamId": team.ID, "teamName": team.Name})
+			s.app.Trace.Record("cobot.meta", "thread-bound", "", meta)
+		}
+	}()
 	role, err := roles.Default(bot.RoleID)
 	if err != nil {
 		return "", err

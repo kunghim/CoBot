@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/engine/codex"
@@ -24,6 +28,7 @@ Usage:
   cobot trace on       [--profile p | --data-root dir]   start recording (no restart needed)
   cobot trace off      [--profile p | --data-root dir]   stop; adds Codex's own records
   cobot trace status   [--profile p | --data-root dir]
+  cobot trace view     [--no-open] [session]             open a recording (default: the latest) in the browser
   cobot trace protocol [--write-baseline file]           compare this Codex's protocol with CoBot's baseline
 
 Recordings go to <data root>/traces/<start time>/, one JSONL file per process.
@@ -38,6 +43,7 @@ func runTrace(args []string) int {
 	profile := flags.String("profile", string(platform.EnvDevelopment), "data profile: development or production")
 	dataRoot := flags.String("data-root", "", "explicit data root")
 	writeBaseline := flags.String("write-baseline", "", "protocol: write this Codex's protocol listing to the file")
+	noOpen := flags.Bool("no-open", false, "view: print the address without opening a browser")
 	if err := flags.Parse(args[1:]); err != nil {
 		return 2
 	}
@@ -80,6 +86,8 @@ func runTrace(args []string) int {
 		printSessionFiles(session.Dir(paths.Root))
 	case "protocol":
 		return runTraceProtocol(paths, *writeBaseline)
+	case "view":
+		return runTraceView(paths, flags.Arg(0), *noOpen)
 	default:
 		fmt.Fprint(os.Stderr, traceUsage)
 		return 2
@@ -262,4 +270,52 @@ func protocolReport(baseline, current codex.ProtocolFacts, diff codex.ProtocolDi
 		fmt.Fprintf(&b, "### %s\n\n```diff\n%s\n```\n\n", name, strings.Join(groups[name], "\n"))
 	}
 	return b.String()
+}
+
+// runTraceView indexes one recording, writes its report.md, and serves it to
+// a local browser page until interrupted.
+func runTraceView(paths platform.Paths, name string, noOpen bool) int {
+	if name == "" {
+		entries, _ := os.ReadDir(wiretrace.TracesDir(paths.Root))
+		for _, entry := range entries {
+			if entry.IsDir() && entry.Name() > name {
+				name = entry.Name()
+			}
+		}
+		if name == "" {
+			fmt.Fprintln(os.Stderr, "no recording yet; start one with `cobot trace on`")
+			return 1
+		}
+	}
+	dir := filepath.Join(wiretrace.TracesDir(paths.Root), filepath.Base(name))
+	if active, ok := wiretrace.ActiveSession(paths.Root); ok && active.Name == filepath.Base(name) {
+		fmt.Println("note: this recording is still on; the view shows what it holds right now")
+	}
+	started := time.Now()
+	idx, err := wiretrace.Load(dir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	summary := idx.Summarize(codex.HandledMessages, codex.HandledItemTypes)
+	report := filepath.Join(dir, "report.md")
+	if err := os.WriteFile(report, []byte(summary.Markdown()), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	host := listener.Addr().String()
+	server := &http.Server{Handler: wiretrace.NewViewer(idx, summary).Handler(host)}
+	go func() { _ = server.Serve(listener) }()
+	url := "http://" + host + "/"
+	fmt.Printf("%s: %d records read in %s\nreport: %s\nview:   %s   (Ctrl+C to stop)\n", filepath.Base(dir), len(idx.Rows), time.Since(started).Round(time.Millisecond), report, url)
+	launchBrowser(url, noOpen)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	_ = server.Close()
+	return 0
 }

@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -240,7 +239,8 @@ func runMCP(args []string) int {
 	logger := slog.New(slog.NewTextHandler(wiretrace.TeeWriter(os.Stderr, stderr), &slog.HandlerOptions{Level: slog.LevelWarn}))
 	bridge := collaboration.NewBridge(endpoint, token, logger)
 	bridge.SetTrace(trace)
-	trace.Record("mcp.process", "start", "", []byte(strings.Join(os.Args, " ")))
+	started, _ := json.Marshal(map[string]any{"args": os.Args, "botId": os.Getenv(auth.BridgeEnvBotID)})
+	trace.Record("mcp.process", "start", "", started)
 	if err := bridge.Run(context.Background()); err != nil && !errors.Is(err, io.EOF) {
 		fmt.Fprintln(wiretrace.TeeWriter(os.Stderr, stderr), "cobot mcp:", err)
 		trace.Record("mcp.process", "exit", "", []byte("1 "+err.Error()))

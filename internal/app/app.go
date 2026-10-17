@@ -21,6 +21,7 @@ import (
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/internal/wiretrace"
 	"sync/atomic"
 )
 
@@ -55,6 +56,10 @@ type App struct {
 	MCPBinary string
 	// MCPEndpoint is the loopback address the bridge calls back on.
 	MCPEndpoint string
+
+	// Trace is the developer recording (`cobot trace on`); the app adds who a
+	// thread belongs to, so a recording can name both ends. Nil records nothing.
+	Trace *wiretrace.Recorder
 
 	// Events is the local durable event ledger (H08). Nil disables file
 	// appending; the database stays the primary store either way.
