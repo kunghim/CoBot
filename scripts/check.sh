@@ -6,6 +6,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo "==> public file policy"
+node scripts/check-public-files.mjs
+node --test scripts/repository-policy.test.mjs
+
 echo "==> gofmt"
 bad=$(gofmt -l cmd internal tests || true)
 if [ -n "$bad" ]; then

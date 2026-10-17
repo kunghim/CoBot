@@ -1,7 +1,7 @@
 .tmp/
 .idea/
 
-# docs 整体只放本机资料，不随仓库交付；需要公开的文件由维护者决定后单独放出
+# Private by default; publish selected documents through scripts/public-files-policy.json.
 /docs/**
 
 # Historical protocol experiments are maintained locally.
@@ -74,8 +74,9 @@ test-results/
 Thumbs.db
 Desktop.ini
 
-# Root dotfiles and dot-directories are private unless explicitly allowed.
-# Keep this last so earlier exceptions cannot expose root-local settings.
+# BEGIN managed public file exceptions
+# Root hidden entries are private unless explicitly listed in the policy.
 /.*
 !/.github/
 !/.gitignore
+# END managed public file exceptions
