@@ -1,19 +1,19 @@
 name: Bug report / 问题反馈
 description: Report a reproducible problem / 提交可复现的问题
-labels: [bug]
+labels: [bug, "status: needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        English and Chinese are welcome. Search existing issues first.
-        欢迎使用中文或英文，请先搜索已有 Issue。
+        English and Chinese are welcome; one report is enough. Search existing issues first.
+        欢迎使用中文或英文，无需重复提交双语副本；请先搜索已有 Issue。
         Do not post vulnerabilities, credentials, startup links, databases or raw traces.
         不要公开漏洞细节、凭据、启动链接、数据库或原始 trace；安全问题见 SECURITY.md。
   - type: textarea
     id: environment
     attributes:
       label: Environment / 环境
-      description: CoBot version or commit, OS/architecture, Web or desktop, Codex version. For source builds, include Go and Node versions.
+      description: Include what you know; unknown versions are OK. CoBot version/commit, OS/architecture, Web/desktop, Codex version. Source builds may include Go/Node. / 填写已知信息即可，不清楚的版本可标记未知。
       placeholder: "CoBot: ...\nOS / architecture: ...\nWeb or desktop: ...\nCodex: ..."
     validations:
       required: true

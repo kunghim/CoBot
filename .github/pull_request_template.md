@@ -1,4 +1,5 @@
 <!-- English or Chinese is welcome. / 欢迎使用中文或英文。 -->
+<!-- One PR is enough; no separate translation PR is needed. / 无需为翻译另发重复 PR。 -->
 
 ## Problem and change / 问题与改动
 
@@ -9,6 +10,8 @@
 
 <!-- Commands, results and limitations. Separate automated, real Codex and native platform checks. -->
 <!-- 写明命令、结果和未测范围，区分自动化、真实 Codex 和原生平台验证。 -->
+<!-- Say why a check was skipped; do not mark an untested platform as verified. -->
+<!-- 未运行的检查请说明原因，不要把未测平台标为通过。 -->
 
 ## Screenshots / 截图
 
