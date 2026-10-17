@@ -9,7 +9,7 @@ export function orderBotsLeaderFirst(bots: Bot[]): Bot[] {
   return [...leader, ...members];
 }
 
-export interface BotContext {
+interface BotContext {
   item: TeamWithBots;
   team: Team;
   bot: Bot;

@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { applyLiveSignal, forgetLiveRuns, liveRunsSnapshot, mergeSteps, resetLiveStore } from '../../api/live';
 import type { Message, Run, RunStep, RunWithSteps } from '../../api/types';
 import { buildTimeline } from './ConversationView';
+import { messageText } from './delivery';
+import { isExchange, taskCardOf } from './ExchangeLine';
 import { linkTarget } from './links';
-import { isExchange } from './MessageCards';
 import { describeStep, displayCommand, durationPhrase, runPhase, visibleSteps } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({
@@ -37,6 +38,8 @@ describe('describeStep', () => {
   it('describes a member working with its sub-agents', () => {
     expect(describeStep(step({ kind: 'agent', detail: { tool: 'spawnAgent', agents: 2, prompt: 'x' } }), nameOf)).toEqual({ key: 'conversation.step.agent.spawnAgent', params: { count: 2 } });
     expect(describeStep(step({ kind: 'agent', detail: { activity: 'completed', agent: '/root/tester' } }), nameOf)).toEqual({ key: 'conversation.step.agent.activity.completed', params: { agent: '/root/tester' } });
+    expect(describeStep(step({ kind: 'agent', detail: { tool: 'newAgentTool', agents: 1 } }), nameOf).key).toBe('conversation.step.agent.other');
+    expect(describeStep(step({ kind: 'agent', detail: { activity: 'paused', agent: '/root/tester' } }), nameOf).key).toBe('conversation.step.agent.other');
   });
   it('tells a delivery, an accepted review and a sent-back task apart', () => {
     const tool = (name: string, args: Record<string, unknown>) => describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: name, arguments: args } }), nameOf).key;
@@ -158,5 +161,22 @@ describe('exchange lines', () => {
     expect(isExchange(assignment)).toBe(true);
     expect(isExchange({ ...base, botId: 'lead', kind: 'system', sourceBotId: 'fe', blocks: [{ type: 'text', text: '提交验收' }] } as Message)).toBe(true);
     expect(isExchange({ ...base, botId: 'lead', kind: 'system', blocks: [{ type: 'text', text: '这一轮被中断' }] } as Message)).toBe(false);
+  });
+});
+
+describe('task assignments', () => {
+  const blocks = [
+    { type: 'text', text: '你被指派了任务：登录页' },
+    { type: 'task', text: JSON.stringify({ taskId: 'task-1', title: '登录页', acceptanceCriteria: '能登录', ownerId: 'fe' }) },
+  ];
+  it('reads the card and keeps its JSON out of the text', () => {
+    expect(taskCardOf(blocks)).toEqual(expect.objectContaining({ taskId: 'task-1', title: '登录页' }));
+    expect(messageText({ blocks } as never)).toBe('你被指派了任务：登录页');
+    expect(taskCardOf([{ type: 'task', text: '{broken' }])).toBeNull();
+  });
+  it('reads an assignment written before the card block existed', () => {
+    const legacy = taskCardOf([{ type: 'text', text: '你被指派了任务：登录页\n任务 ID：task-9\n详细要求：做表单\n完成标准：能登录\n且能退出' }]);
+    expect(legacy).toEqual({ title: '登录页', taskId: 'task-9' });
+    expect(taskCardOf([{ type: 'text', text: '普通系统消息' }])).toBeNull();
   });
 });

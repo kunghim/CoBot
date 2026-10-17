@@ -19,7 +19,7 @@ import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
-import { ExchangeLine, RoleBadge, isExchange } from './MessageCards';
+import { ExchangeLine, RoleBadge, isExchange } from './ExchangeLine';
 import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';

@@ -2,7 +2,7 @@
 // (absolute, drive-letter, file://, or relative) goes to the core to open
 // inside the team folder; every other scheme (javascript:, data:, ...) is
 // blocked.
-export type LinkTarget = { kind: 'web' } | { kind: 'local'; path: string } | { kind: 'blocked' };
+type LinkTarget = { kind: 'web' } | { kind: 'local'; path: string } | { kind: 'blocked' };
 
 export function linkTarget(href: string): LinkTarget {
   const value = href.trim();

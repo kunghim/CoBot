@@ -9,7 +9,7 @@ import { ArrowDown, Loader2, X } from 'lucide-react';
 import { useExchanges } from '../../api/queries';
 import { messageText } from './delivery';
 import Markdown from './Markdown';
-import { RoleBadge } from './MessageCards';
+import { RoleBadge } from './ExchangeLine';
 
 // Older pages fetched at most while looking for the clicked message.
 const maxSearchPages = 20;

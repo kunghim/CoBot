@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message } from '../../api/types';
-import { deliveryLabelKey, messageText, runStatusLabelKey } from './delivery';
+import { deliveryLabelKey, messageText } from './delivery';
 
 describe('delivery status labels', () => {
   it('maps every real delivery status onto its own key', () => {
@@ -15,12 +15,6 @@ describe('delivery status labels', () => {
     expect(deliveryLabelKey('unknown')).toBe('conversation.delivery.unknown');
     expect(deliveryLabelKey(undefined)).toBe('conversation.delivery.unknown');
     expect(deliveryLabelKey('surprise')).toBe('conversation.delivery.unknown');
-  });
-
-  it('maps run statuses with an unknown fallback', () => {
-    expect(runStatusLabelKey('running')).toBe('conversation.run.running');
-    expect(runStatusLabelKey('waiting_approval')).toBe('conversation.run.waiting_approval');
-    expect(runStatusLabelKey('nonsense')).toBe('conversation.run.unknown');
   });
 });
 

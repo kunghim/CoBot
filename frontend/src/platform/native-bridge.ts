@@ -3,7 +3,7 @@
 // bridge is declared structurally here instead of statically importing it.
 // Browser detection falls back to the pure-HTTP startup flow.
 
-export interface DesktopBridge {
+interface DesktopBridge {
   /** Waits for the core to be ready and returns a one-time bootstrap secret
    * plus the loopback endpoint. */
   Bootstrap(): Promise<{ secret: string; endpoint: string }>;

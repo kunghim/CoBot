@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityItem } from '../../api/types';
 import { describeActivity } from './describe';
-import { taskCardOf } from '../conversations/MessageCards';
-import { messageText } from '../conversations/delivery';
 
 const t = (key: string, params?: Record<string, unknown>) => (params ? `${key}${JSON.stringify(params)}` : key);
 const names: Record<string, string> = { lead: '队长', qa: '测试工程师', fe: '前端开发' };
@@ -34,22 +32,5 @@ describe('describeActivity', () => {
   });
   it('keeps a removed member by the name it had', () => {
     expect(describeActivity(item('bot.deleted', { name: '后端开发' }), nameOf, t).text).toContain('后端开发');
-  });
-});
-
-describe('task card', () => {
-  const blocks = [
-    { type: 'text', text: '你被指派了任务：登录页' },
-    { type: 'task', text: JSON.stringify({ taskId: 'task-1', title: '登录页', acceptanceCriteria: '能登录', ownerId: 'fe' }) },
-  ];
-  it('reads the card and keeps its JSON out of the text', () => {
-    expect(taskCardOf(blocks)).toEqual(expect.objectContaining({ taskId: 'task-1', title: '登录页' }));
-    expect(messageText({ blocks } as never)).toBe('你被指派了任务：登录页');
-    expect(taskCardOf([{ type: 'task', text: '{broken' }])).toBeNull();
-  });
-  it('reads an assignment written before the card block existed', () => {
-    const legacy = taskCardOf([{ type: 'text', text: '你被指派了任务：登录页\n任务 ID：task-9\n详细要求：做表单\n完成标准：能登录\n且能退出' }]);
-    expect(legacy).toEqual({ title: '登录页', taskId: 'task-9', description: '做表单', acceptanceCriteria: '能登录\n且能退出' });
-    expect(taskCardOf([{ type: 'text', text: '普通系统消息' }])).toBeNull();
   });
 });

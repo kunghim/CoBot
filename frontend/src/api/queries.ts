@@ -1,31 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { applyLiveSignal } from './live';
-import type {
-  Approval,
-  Bot,
-  ConversationResult,
-  CreateTeamResult,
-  EngineStatus,
-  Event,
-  Evidence,
-  LiveSignal,
-  PermissionMode,
-  ModelListResult,
-  Question,
-  QuestionListResult,
-  RoleListResult,
-  SendMessageResult,
-  Settings,
-  SettingsPatch,
-  Snapshot,
-  Status,
-  Task,
-  TaskDetailResult,
-  TaskListResult,
-  TeamListResult,
-  Transfer,
-} from './types';
+import type { Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
 import { api, apiUrl, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
@@ -356,7 +332,7 @@ export function useEngineModels(enabled: boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// M3: tasks, transfers, questions, collaboration records
+// M3: tasks, transfers, questions
 // ---------------------------------------------------------------------------
 
 /** GET /teams/{id}/tasks: the team board; the server narrows a member's
@@ -589,27 +565,3 @@ export function useRevokeAuthorization() {
     },
   });
 }
-
-export type {
-  Approval,
-  Bot,
-  ConversationResult,
-  CreateTeamResult,
-  EngineStatus,
-  Event,
-  Evidence,
-  ModelListResult,
-  Question,
-  QuestionListResult,
-  RoleListResult,
-  SendMessageResult,
-  Snapshot,
-  Status,
-  Settings,
-  SettingsPatch,
-  Task,
-  TaskDetailResult,
-  TaskListResult,
-  TeamListResult,
-  Transfer,
-};

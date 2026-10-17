@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-export interface PageControl {
+interface PageControl {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   isFetchNextPageError: boolean;

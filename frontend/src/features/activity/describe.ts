@@ -4,7 +4,7 @@ import type { ActivityItem } from '../../api/types';
 import { parseNativeRequest } from '../approvals/nativeRequest';
 import { displayCommand } from '../conversations/steps';
 
-export interface ActivityLine {
+interface ActivityLine {
   text: string;
   /** A message or question excerpt shown under the sentence. */
   quote?: string;

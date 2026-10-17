@@ -1,10 +1,9 @@
-// A tiny bus for "show this in the work panel": a task card in the
-// conversation or an activity entry asks for a tab (and a task to open);
-// the work panel and the layout listen. No state lives here beyond the last
-// request, which the panel consumes.
+// A tiny bus for "show this in the work panel": an activity entry asks for
+// a tab (and a task to open); the work panel and the layout listen. No state
+// lives here beyond the last request, which the panel consumes.
 import { useEffect } from 'react';
 
-export type WorkPanelTab = 'tasks' | 'approvals' | 'activity' | 'memory';
+type WorkPanelTab = 'tasks' | 'approvals' | 'activity' | 'memory';
 export interface WorkPanelRequest {
   tab: WorkPanelTab;
   taskId?: string;

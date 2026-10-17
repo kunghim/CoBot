@@ -50,7 +50,6 @@
     "directoryFixed": "A team's folder cannot change after creation.",
     "membersLocked": "Existing members cannot be changed here; tick new roles to add them.",
     "save": "Save",
-    "deletedMember": "Deleted member",
     "directoryArchived": "This folder belongs to the archived team “{{teamName}}”. Restore that team to keep using it.",
     "goRestore": "Restore it",
     "directoryClaimed": "This folder is already used by team “{{teamName}}”; a new team cannot be created here",
@@ -86,10 +85,7 @@
       "waiting_input": "Needs input",
       "interrupted": "Interrupted",
       "unknown": "Needs verification"
-    },
-    "tools": {"add": "Add member"},
-    "roleLabel": "Member role",
-    "chooseRole": "Select a role"
+    }
   },
   "scenario": {
     "software": { "name": "Software development" }
@@ -259,16 +255,12 @@
     },
     "placeholder": "Message {{name}}…",
     "send": "Send",
-    "sending": "Sending…",
-    "messageRequired": "Message cannot be empty",
-    "sendFailed": "Failed to send",
     "queuedBanner": "{{count}} message(s) received, queued",
     "queuedBanner_one": "{{count}} message received, queued",
     "queuedBanner_other": "{{count}} messages received, queued",
     "cancelQueued": "Cancel queued message",
     "interrupt": "Stop",
     "interruptRequested": "Stop requested; waiting for the engine",
-    "activeRun": "Running: {{status}}",
     "blocked": {
       "archived": "The team is archived; messages cannot be sent",
       "directory_missing": "The team's project folder is not where it was. The team resumes by itself once the folder is back; until then it is read-only",
@@ -280,16 +272,6 @@
       "dispatching": "Sending",
       "accepted": "Sent",
       "cancelled": "Cancelled",
-      "unknown": "Needs verification"
-    },
-    "run": {
-      "starting": "Starting",
-      "running": "Running",
-      "waiting_approval": "Waiting for approval",
-      "waiting_input": "Needs input",
-      "completed": "Completed",
-      "failed": "Failed",
-      "interrupted": "Interrupted",
       "unknown": "Needs verification"
     }
   },
@@ -315,18 +297,12 @@
     },
     "requester": "Requested by: {{name}}",
     "reason": "Reason",
-    "summary": "Request",
     "prev": "Previous approval card",
     "next": "Next approval card",
     "position": "Card {{index}} of {{total}}",
     "deciding": "Submitting…",
-    "decideFailed": "Failed to submit the decision",
-    "historyTitle": "Approvals",
     "historyEmpty": "No decided approvals yet",
     "historyLoadFailed": "Failed to load approval history",
-    "chosenOption": "Chosen",
-    "decidedBy": "Decided by {{actor}} at {{time}}",
-    "responseState": "Response",
     "response": {
       "queued": "Received, queued for delivery",
       "sent": "Delivered to engine",
@@ -343,10 +319,7 @@
     "reportedEvidence": "These are Agent-reported test and review results for this candidate.",
     "testReport": "Test report",
     "reviewReport": "Review report",
-    "requestedAt": "Requested at {{time}}",
-    "originalOptions": "Original choices",
     "comment": "Comment",
-    "laterInvalidated": "This request was later invalidated; its decision is preserved.",
     "laterInvalidatedShort": "later invalidated",
     "you": "You",
     "decisionBy": "{{actor}}: {{choice}}",
@@ -458,18 +431,16 @@
   "memories": {
     "empty": "No memories yet",
     "loadFailed": "Failed to load memories",
-    "readOnlyHint": "Read-only record; the member stores methods through its own tools",
+    "readOnlyHint": "Read-only record: methods and preferences the member saved earlier, handed to its new threads; delete what is no longer needed",
     "delete": "Delete"
   },
   "panel": {
     "noSelection": "Pick a member on the left first",
     "tablist": "Work panel pages",
-    "notReadyYet": "Coming in a later milestone",
     "tabs": {
       "tasks": "Tasks",
       "approvals": "Approvals",
       "activity": "Activity",
-      "collab": "Collaboration",
       "memory": "Memories"
     }
   },
@@ -533,11 +504,6 @@
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
     "cancel": "No longer needed"
   },
-  "collab": {
-    "empty": "No collaboration records yet",
-    "loadFailed": "Failed to load collaboration records",
-    "readOnly": "Read-only record; message the member in the conversation to talk"
-  },
   "engine": {
     "hook": "Safety hook",
     "hookTrusted": "Authorized",
@@ -555,10 +521,7 @@
     "cancelLogin": "Cancel sign-in",
     "logout": "Sign out of Codex",
     "waitingLogin": "Waiting for sign-in (checked every 3s, up to 2 minutes)…",
-    "loginTimeout": "Sign-in timed out; check the Codex login window in the browser",
-    "loginFailed": "Failed to start sign-in",
-    "loginCancelFailed": "Failed to cancel sign-in",
-    "logoutFailed": "Failed to sign out"
+    "loginTimeout": "Sign-in timed out; check the Codex login window in the browser"
   },
   "settings": {
     "authorizations": "Live authorizations",
@@ -591,7 +554,6 @@
       "about": "Version and where data is stored on this machine."
     },
     "language": "Language",
-    "engine": "Codex engine",
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
     "engineError": "Engine unavailable",
@@ -615,8 +577,7 @@
     "profileProduction": "Production",
     "dataRoot": "Data root",
     "saved": "Saved",
-    "saveFailed": "Save failed",
-    "logout": "Sign out"
+    "saveFailed": "Save failed"
   },
   "auth": {
     "authorizing": "Authorizing…",
@@ -625,7 +586,6 @@
     "retry": "Retry"
   },
   "status": {
-    "idle": "Idle",
     "loading": "Loading…",
     "error": "Failed to load"
   },
@@ -745,10 +705,6 @@
     "error.transfer.task_changed": "The task changed, so the transfer is stale",
     "error.transfer.already_offered": "This task already has a pending transfer",
     "error.chain.binding_missing": "This chain confirmation is missing its chain binding; refresh and retry",
-    "error.memory.body_required": "Memory body cannot be empty",
-    "error.memory.too_long": "Memory is too long: at most {{max}} characters",
-    "error.memory.looks_secret": "The body looks like a secret (key/password) and was refused; store working methods and preferences only",
-    "error.memory.duplicate": "The same memory already exists and is not recorded twice",
     "error.team.not_archived": "Team status is {{status}}; only archived teams or teams whose folder is gone can be deleted",
     "error.team.open_work": "The team still has unfinished work and cannot be archived yet: running members {{activeRuns}}, queued messages {{queuedDeliveries}}, pending approvals {{pendingApprovals}}, open questions {{openQuestions}}, offered hand-overs {{offeredTransfers}}, open tasks {{openTasks}}",
     "error.bot.leader_delete": "The captain cannot be deleted; remove the team instead",

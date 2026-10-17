@@ -27,12 +27,19 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
   return {};
 }
 
-// CoBot's own collaboration tools, described as what the member did.
+// CoBot's own collaboration tools, described as what the member did. Names
+// after ask_user are no longer offered; they stay so runs stored before still
+// read in plain language.
 const collaborationTools = new Set([
-  'deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'propose_task', 'assign_task', 'update_task', 'submit_evidence',
-  'report_completion', 'confirm_task', 'offer_transfer', 'accept_transfer', 'ask_user', 'request_member',
-  'request_merge', 'remember', 'search_memory', 'get_context', 'list_tasks', 'get_task', 'list_roles',
+  'deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'ask_user',
+  'propose_task', 'assign_task', 'update_task', 'submit_evidence', 'report_completion', 'confirm_task', 'offer_transfer',
+  'accept_transfer', 'request_member', 'request_merge', 'remember', 'search_memory', 'get_context', 'list_tasks', 'get_task', 'list_roles',
 ]);
+
+// Codex sub-agent tools and activity kinds with their own wording; anything
+// newer reads as the generic sub-agent line instead of a raw key.
+const agentTools = new Set(['spawnAgent', 'sendInput', 'sendMessage', 'followupTask', 'wait', 'listAgents', 'resumeAgent', 'interruptAgent', 'closeAgent']);
+const agentActivities = new Set(['started', 'interacted', 'completed', 'interrupted']);
 
 // Engine error codes with a plain-language explanation and what to do.
 const knownErrorCodes = new Set([
@@ -52,8 +59,10 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: 'conversation.step.diff', params: { count: Number(d.files) || 0 } };
     case 'agent': {
       // A member working with its own Codex sub-agents.
-      if (text(d.activity)) return { key: `conversation.step.agent.activity.${text(d.activity)}`, params: { agent: text(d.agent) } };
-      return { key: `conversation.step.agent.${text(d.tool) || 'other'}`, params: { count: Number(d.agents) || 1 } };
+      const activity = text(d.activity);
+      if (agentActivities.has(activity)) return { key: `conversation.step.agent.activity.${activity}`, params: { agent: text(d.agent) } };
+      const tool = text(d.tool);
+      return { key: `conversation.step.agent.${agentTools.has(tool) ? tool : 'other'}`, params: { count: Number(d.agents) || 1 } };
     }
     case 'command':
       return { key: step.status === 'in_progress' ? 'conversation.step.commandRunning' : 'conversation.step.command' };
@@ -137,7 +146,7 @@ export function displayCommand(command: string): string {
 
 /** How long a turn may go without any sign of progress before the status
  * line says the model is slow to answer. */
-export const slowAfterSeconds = 15;
+const slowAfterSeconds = 15;
 
 /** What a running turn is doing now, for the status line in the flow.
  * `quietSeconds` is how long the turn has run without any sign of

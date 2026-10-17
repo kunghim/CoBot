@@ -1,7 +1,7 @@
 // WorkPanel is the right column: 任务 (team board with questions the user
 // owes), 审批 (decided history), 动态 (what the team did, member-to-member
-// messages included) and 记忆 (the member's working methods). Conversations
-// and activity entries can ask it to show a tab or open a task.
+// messages included) and 记忆 (the member's working methods). Activity
+// entries can ask it to show a tab or open a task.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';

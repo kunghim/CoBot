@@ -1,4 +1,4 @@
-// Pure delivery/run label mapping and message text extraction. Raw HTML is
+// Pure delivery label mapping and message text extraction. Raw HTML is
 // never rendered anywhere in the app; React escapes plain text for us.
 import type { Message, TextBlock } from '../../api/types';
 
@@ -16,22 +16,6 @@ export function deliveryLabelKey(status: string | undefined): string {
       return `conversation.delivery.${status}`;
     default:
       return 'conversation.delivery.unknown';
-  }
-}
-
-/** i18n key of an active run's honest status text. */
-export function runStatusLabelKey(status: string): string {
-  switch (status) {
-    case 'starting':
-    case 'running':
-    case 'waiting_approval':
-    case 'waiting_input':
-    case 'completed':
-    case 'failed':
-    case 'interrupted':
-      return `conversation.run.${status}`;
-    default:
-      return 'conversation.run.unknown';
   }
 }
 

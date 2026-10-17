@@ -50,7 +50,6 @@
     "directoryFixed": "团队的工作目录在创建后不能修改。",
     "membersLocked": "已在团队中的成员不能在这里修改；勾选新角色即可添加。",
     "save": "保存",
-    "deletedMember": "已删除的成员",
     "directoryArchived": "该目录属于已归档的团队「{{teamName}}」。如需继续使用，请恢复该团队。",
     "goRestore": "去恢复",
     "directoryClaimed": "该目录已被团队「{{teamName}}」使用，不能再创建新团队",
@@ -86,10 +85,7 @@
       "waiting_input": "需要输入",
       "interrupted": "已中断",
       "unknown": "待核对"
-    },
-    "tools": {"add": "添加成员"},
-    "roleLabel": "成员角色",
-    "chooseRole": "选择角色"
+    }
   },
   "scenario": {
     "software": { "name": "软件开发" }
@@ -259,14 +255,10 @@
     },
     "placeholder": "给 {{name}} 发消息……",
     "send": "发送",
-    "sending": "发送中…",
-    "messageRequired": "消息不能为空",
-    "sendFailed": "发送失败",
     "queuedBanner": "已收下 {{count}} 条，排队中",
     "cancelQueued": "取消排队消息",
     "interrupt": "停止",
     "interruptRequested": "已请求停止，等待引擎响应",
-    "activeRun": "正在执行：{{status}}",
     "blocked": {
       "archived": "团队已归档，暂时无法发送消息",
       "directory_missing": "团队的项目目录不在原位置，放回后会自动恢复；在此之前只能查看",
@@ -278,16 +270,6 @@
       "dispatching": "发送中",
       "accepted": "已发送",
       "cancelled": "已取消",
-      "unknown": "待核对"
-    },
-    "run": {
-      "starting": "启动中",
-      "running": "运行中",
-      "waiting_approval": "等你审批",
-      "waiting_input": "需要输入",
-      "completed": "已完成",
-      "failed": "已失败",
-      "interrupted": "已中断",
       "unknown": "待核对"
     }
   },
@@ -313,18 +295,12 @@
     },
     "requester": "发起者：{{name}}",
     "reason": "理由",
-    "summary": "请求内容",
     "prev": "上一张审批卡",
     "next": "下一张审批卡",
     "position": "第 {{index}} / {{total}} 张",
     "deciding": "提交中…",
-    "decideFailed": "审批提交失败",
-    "historyTitle": "审批",
     "historyEmpty": "还没有已处理的审批记录",
     "historyLoadFailed": "审批历史加载失败",
-    "chosenOption": "所选",
-    "decidedBy": "{{actor}} 于 {{time}} 处理",
-    "responseState": "送达状态",
     "response": {
       "queued": "已收下，排队送达",
       "sent": "已送达引擎",
@@ -341,10 +317,7 @@
     "reportedEvidence": "以下是 Agent 为该候选版本提交的测试与审查报告。",
     "testReport": "测试报告",
     "reviewReport": "审查报告",
-    "requestedAt": "申请时间：{{time}}",
-    "originalOptions": "原始选项",
     "comment": "意见",
-    "laterInvalidated": "该申请后来已失效，原决定仍保留。",
     "laterInvalidatedShort": "之后已失效",
     "you": "你",
     "decisionBy": "{{actor}}：{{choice}}",
@@ -456,18 +429,16 @@
   "memories": {
     "empty": "暂无记忆",
     "loadFailed": "记忆加载失败",
-    "readOnlyHint": "只读记录；成员通过自己的工具记录方法与偏好",
+    "readOnlyHint": "只读记录：成员以前记下的方法与偏好，会带进它的新会话；不需要的可以删除",
     "delete": "删除"
   },
   "panel": {
     "noSelection": "先在左侧选择一个成员",
     "tablist": "工作面板页面",
-    "notReadyYet": "即将在后续里程碑提供",
     "tabs": {
       "tasks": "任务",
       "approvals": "审批",
       "activity": "动态",
-      "collab": "协作",
       "memory": "记忆"
     }
   },
@@ -529,11 +500,6 @@
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
     "cancel": "不再需要"
   },
-  "collab": {
-    "empty": "暂无协作记录",
-    "loadFailed": "协作记录加载失败",
-    "readOnly": "只读记录；想沟通请在会话中给相关成员发消息"
-  },
   "engine": {
     "hook": "安全钩子",
     "hookTrusted": "已授权",
@@ -551,10 +517,7 @@
     "cancelLogin": "取消登录",
     "logout": "退出 Codex 登录",
     "waitingLogin": "等待登录完成（每 3 秒检查一次，最多 2 分钟）…",
-    "loginTimeout": "登录等待超时，请检查浏览器中的 Codex 登录窗口",
-    "loginFailed": "登录启动失败",
-    "loginCancelFailed": "取消登录失败",
-    "logoutFailed": "退出登录失败"
+    "loginTimeout": "登录等待超时，请检查浏览器中的 Codex 登录窗口"
   },
   "settings": {
     "authorizations": "在线授权",
@@ -587,7 +550,6 @@
       "about": "版本与本机数据位置。"
     },
     "language": "语言",
-    "engine": "Codex 引擎",
     "engineNotConfigured": "未检测到已配置的引擎",
     "engineReady": "引擎可用",
     "engineError": "引擎不可用",
@@ -611,8 +573,7 @@
     "profileProduction": "生产",
     "dataRoot": "数据目录",
     "saved": "已保存",
-    "saveFailed": "保存失败",
-    "logout": "退出登录"
+    "saveFailed": "保存失败"
   },
   "auth": {
     "authorizing": "正在授权…",
@@ -621,7 +582,6 @@
     "retry": "重试"
   },
   "status": {
-    "idle": "空闲",
     "loading": "加载中…",
     "error": "加载失败"
   },
@@ -741,10 +701,6 @@
     "error.transfer.task_changed": "任务已被修改，转交已失效",
     "error.transfer.already_offered": "该任务已有进行中的转交",
     "error.chain.binding_missing": "协作链确认缺少链信息，请刷新后重试",
-    "error.memory.body_required": "记忆内容不能为空",
-    "error.memory.too_long": "记忆过长，最多 {{max}} 个字符",
-    "error.memory.looks_secret": "内容疑似秘密（密钥/密码），拒绝写入记忆；请只记录工作方法与偏好",
-    "error.memory.duplicate": "相同的记忆已存在，不会重复记录",
     "error.team.not_archived": "团队当前状态为 {{status}}，只能删除已归档或目录不在的团队",
     "error.team.open_work": "团队还有未完成的工作，暂不能归档：进行中的成员 {{activeRuns}}、排队的消息 {{queuedDeliveries}}、待处理审批 {{pendingApprovals}}、待回答问题 {{openQuestions}}、待接收的交接 {{offeredTransfers}}、未完成任务 {{openTasks}}",
     "error.bot.leader_delete": "队长不能删除；请先处理团队本身",

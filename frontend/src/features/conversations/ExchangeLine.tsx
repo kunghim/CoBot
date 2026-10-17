@@ -14,24 +14,22 @@ export function RoleBadge({ name }: { name: string }) {
   );
 }
 
-export interface TaskCardData {
+/** What identifies an assignment; only its presence matters for drawing. */
+interface TaskCardData {
   taskId: string;
   title: string;
-  description?: string;
-  acceptanceCriteria?: string;
-  ownerId?: string;
 }
 
 // Assignments written before the task block existed carry the same facts in
 // this fixed text form.
-const legacyAssignment = /^你被指派了任务：(.*)\n任务 ID：(\S+)\n详细要求：([\s\S]*?)\n完成标准：([\s\S]*)$/;
+const legacyAssignment = /^你被指派了任务：(.*)\n任务 ID：(\S+)\n详细要求：[\s\S]*?\n完成标准：[\s\S]*$/;
 
 /** Reads the task of an assignment message, if it is one. */
 export function taskCardOf(blocks: Array<{ type: string; text: string }>): TaskCardData | null {
   const block = blocks.find((entry) => entry.type === 'task');
   if (!block) {
     const legacy = blocks.length === 1 ? legacyAssignment.exec(blocks[0].text) : null;
-    return legacy ? { title: legacy[1], taskId: legacy[2], description: legacy[3], acceptanceCriteria: legacy[4] } : null;
+    return legacy ? { title: legacy[1], taskId: legacy[2] } : null;
   }
   try {
     const data = JSON.parse(block.text) as TaskCardData;

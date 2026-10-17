@@ -17,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-export interface OkEnvelope<T> {
+interface OkEnvelope<T> {
   data: T;
   requestId: string;
 }
@@ -54,7 +54,7 @@ function setEndpoint(endpoint: string): void {
 }
 
 /** Every query waits for the native handoff before choosing its HTTP origin. */
-export function initializeTransport(): Promise<void> {
+function initializeTransport(): Promise<void> {
   if (!transportReady) transportReady = (async () => {
     const bridge = desktopBridge();
     if (bridge) { const handoff = await bridge.Bootstrap(); setEndpoint(handoff.endpoint); bootstrapSecret = handoff.secret; }
@@ -83,7 +83,7 @@ function csrfToken(): string {
   return entry ? decodeURIComponent(entry.slice(csrfCookieName.length + 1)) : '';
 }
 
-export type UnauthorizedListener = () => void;
+type UnauthorizedListener = () => void;
 const unauthorizedListeners = new Set<UnauthorizedListener>();
 
 /** Subscribes to session-loss notifications (SSE 401, expired cookie...). */
@@ -181,13 +181,11 @@ export const api = {
     }
     return result;
   },
-  logout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {}),
 
   // Teams, roles and members (M2).
   listTeams: (cursor?: string) => request<import('./types').TeamListResult>('GET', '/api/v1/teams' + pageQuery({ cursor })),
   createTeam: (body: { name: string; directory: string; initialRoleIds: string[] }) =>
     request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
-  getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
   renameTeam: (teamId: string, name: string, expectedRevision?: number) =>
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { name, expectedRevision }),
   setTeamPermissionMode: (teamId: string, permissionMode: import('./types').PermissionMode, expectedRevision?: number) =>
@@ -245,7 +243,7 @@ export const api = {
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
-  // Tasks, transfers, questions and collaboration records (M3).
+  // Tasks, transfers and questions (M3).
   listTasks: (params: { teamId: string; ownerId?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.ownerId) query.set('ownerId', params.ownerId);
@@ -308,8 +306,6 @@ export const api = {
   deleteMemory: (botId: string, memoryId: string) =>
     request<{ deleted: boolean }>('DELETE', `/api/v1/bots/${botId}/memories/${memoryId}`),
   pickDirectory: () => request<{ path: string; cancelled: boolean }>('POST', '/api/v1/directories/pick', {}),
-  listDirectories: (path?: string) =>
-    request<import('./types').DirectoryListResult>('GET', `/api/v1/directories${path ? `?path=${encodeURIComponent(path)}` : ''}`),
   warmTeam: (teamId: string) => request<{ warming: boolean }>('POST', `/api/v1/teams/${teamId}/warm`, {}),
   openTeamPath: (teamId: string, path: string, reveal = false) =>
     request<{ path: string }>('POST', `/api/v1/teams/${teamId}/open-path`, { path, reveal }),

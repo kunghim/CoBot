@@ -141,8 +141,8 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {/* Work panel: all five pages are real (tasks, approvals, activity,
-          collaboration, memories). */}
+      {/* Work panel: four tabs (tasks, approvals, activity, memories).
+          Member-to-member exchanges open over the conversation instead. */}
       {panelOpen && (
         <aside
           aria-label={t('nav.workPanel')}

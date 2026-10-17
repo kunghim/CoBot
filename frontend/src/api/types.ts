@@ -58,8 +58,6 @@ export type TeamStatus = 'active' | 'archived' | 'deleted' | 'directory_missing'
 
 export type Team = components['schemas']['Team'];
 
-export type BotStatus = 'idle' | 'queued' | 'working' | 'waiting_approval' | 'waiting_input' | 'interrupted' | 'unknown';
-
 export type Bot = components['schemas']['Bot'];
 
 /** One team with its members; the list projection used everywhere. */
@@ -104,8 +102,6 @@ export interface RoleListResult {
 // Conversations, messages and runs
 // ---------------------------------------------------------------------------
 
-export type MessageKind = 'user' | 'assistant' | 'collaboration' | 'system';
-
 /** accepted only means the engine accepted the turn, never that it is done. */
 export type DeliveryStatus =
   | 'waiting_dependency'
@@ -118,8 +114,6 @@ export type DeliveryStatus =
 export type TextBlock = components['schemas']['TextBlock'];
 
 export type Message = components['schemas']['Message'];
-
-export type RunStatus = 'starting' | 'running' | 'waiting_approval' | 'waiting_input' | 'completed' | 'failed' | 'interrupted' | 'unknown';
 
 export type Run = components['schemas']['Run'];
 
@@ -188,13 +182,6 @@ export interface InterruptRunResult {
 // Approvals
 // ---------------------------------------------------------------------------
 
-export type ApprovalRequestState = 'pending' | 'decided' | 'invalidated';
-
-/** queued/sent/confirmed/unknown/expired: a decision is not a confirmed reply. */
-export type ApprovalResponseState = 'queued' | 'sent' | 'confirmed' | 'unknown' | 'expired';
-
-export type ApprovalType = 'native_tool' | 'collaboration' | 'recruitment' | 'recovery' | 'merge' | 'chain';
-
 export type ApprovalOption = components['schemas']['ApprovalOption'];
 
 export type ApprovalDecision = components['schemas']['ApprovalDecision'];
@@ -212,9 +199,9 @@ export interface ApprovalListResult {
 // M5: activity, memories, directories, authorizations, team management
 // ---------------------------------------------------------------------------
 
-/** GET /teams/{id}/activity — one durable product event. */
-/** An activity entry: the event plus the facts to describe it (task
- * title, who sent what to whom, ...); absent for records deleted since. */
+/** GET /teams/{id}/activity — one durable product event plus the facts to
+ * describe it (task title, who sent what to whom, ...); absent for records
+ * deleted since. */
 export type ActivityItem = components['schemas']['Event'] & { detail?: Record<string, unknown> };
 
 /** GET /bots/{id}/memories */
@@ -224,12 +211,6 @@ export interface MemoryListResult {
 }
 
 export type Memory = components['schemas']['Memory'];
-
-/** GET /directories — subdirectory names only. */
-export interface DirectoryListResult {
-  path: string;
-  children: string[];
-}
 
 /** POST /directories/check */
 export interface DirectoryCheckResult {
@@ -254,13 +235,13 @@ export interface AuthorizationBinding {
 }
 
 // ---------------------------------------------------------------------------
-// Snapshot (hand-written: the generated one predates teams/engine)
+// Snapshot: settings, teams and engine at one event seq, for startup
 // ---------------------------------------------------------------------------
 
 export type Snapshot = components['schemas']['Snapshot'];
 
 // ---------------------------------------------------------------------------
-// M3: tasks, evidence, transfers, questions, collaboration records
+// M3: tasks, evidence, transfers, questions
 // ---------------------------------------------------------------------------
 
 /** done only through confirm (evidence-backed); a chat message never changes
@@ -270,8 +251,6 @@ export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'cancelled';
 export type Task = components['schemas']['Task'];
 
 export type Evidence = components['schemas']['Evidence'];
-
-export type TransferStatus = 'offered' | 'accepted' | 'cancelled' | 'stale';
 
 export type Transfer = components['schemas']['Transfer'];
 
@@ -287,8 +266,6 @@ export interface TaskDetailResult {
   evidence: Evidence[];
   transfers: Transfer[];
 }
-
-export type QuestionStatus = 'open' | 'answered' | 'cancelled';
 
 /** ask_user output: user input, never a security authorization. */
 export type Question = components['schemas']['Question'];
