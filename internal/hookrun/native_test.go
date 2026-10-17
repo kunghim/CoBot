@@ -176,7 +176,7 @@ func TestVerifyNativeConfigAcceptsOnlyCoBotsGuard(t *testing.T) {
 }
 
 func TestPlainWindowsPathsSkipPowerShell(t *testing.T) {
-	for _, path := range []string{`E:\Project\GitHub\CoBot\.tmp\bin\cobot.exe`, `C:\Users\kungh\.cobot-trial`, `D:/a_b-c/x.exe`} {
+	for _, path := range []string{`E:\Projects\CoBot\.tmp\bin\cobot.exe`, `C:\Users\tester\.cobot-trial`, `D:/a_b-c/x.exe`} {
 		if !plainWindowsPath(path) {
 			t.Errorf("%s should run unquoted", path)
 		}
