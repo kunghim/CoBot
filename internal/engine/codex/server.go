@@ -551,6 +551,18 @@ func (s *Server) setParent(child, parent string) {
 	if s.parents == nil {
 		s.parents = map[string]string{}
 	}
+	// A sub-agent's own items name the agent it talks to, its parent among
+	// them; taking that as a new link would loop the tree.
+	for up, i := parent, 0; i < 16; i++ {
+		if up == child {
+			return
+		}
+		next, ok := s.parents[up]
+		if !ok {
+			break
+		}
+		up = next
+	}
 	s.parents[child] = parent
 }
 

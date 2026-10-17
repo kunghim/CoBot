@@ -34,12 +34,20 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	case "turn/started":
 		if run, ok := s.runForThread(ctx, source, n.ThreadID, n.TurnID); ok && s.app.Paths.Root != "" {
 			if run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval {
-				err := hookrun.WriteNativeBinding(s.app.Paths.Root, hookrun.NativeBinding{
-					ThreadID: n.ThreadID, TurnID: n.TurnID, BotID: run.BotID, RunID: run.ID,
-					EngineEpoch: source.server.Epoch(), InstanceID: s.app.InstanceID, ServiceEpoch: s.app.ServiceEpoch,
-				})
-				if err != nil {
-					s.logger.Warn("native hook turn binding unavailable", "error", err)
+				// A sub-agent's tool calls reach the hook under the member's
+				// session with the sub-agent's turn, so its turn is bound there too.
+				threads := []string{n.ThreadID}
+				if root := rootOf(source, n.ThreadID); root != n.ThreadID {
+					threads = append(threads, root)
+				}
+				for _, thread := range threads {
+					err := hookrun.WriteNativeBinding(s.app.Paths.Root, hookrun.NativeBinding{
+						ThreadID: thread, TurnID: n.TurnID, BotID: run.BotID, RunID: run.ID,
+						EngineEpoch: source.server.Epoch(), InstanceID: s.app.InstanceID, ServiceEpoch: s.app.ServiceEpoch,
+					})
+					if err != nil {
+						s.logger.Warn("native hook turn binding unavailable", "error", err)
+					}
 				}
 			}
 		}
@@ -55,6 +63,10 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		source.mu.Unlock()
 		if tracked && ref.subAgent != "" {
 			source.forgetLiveRun(n.ThreadID, n.TurnID)
+			if s.app.Paths.Root != "" {
+				hookrun.RemoveNativeBinding(s.app.Paths.Root, n.ThreadID, n.TurnID)
+				hookrun.RemoveNativeBinding(s.app.Paths.Root, rootOf(source, n.ThreadID), n.TurnID)
+			}
 			return
 		}
 		// Steps settle before the run does, so the reload the completion

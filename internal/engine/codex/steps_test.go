@@ -100,6 +100,8 @@ func TestSubAgentThreadsLeadBackToTheMember(t *testing.T) {
 	server.handleNotify("item/started", json.RawMessage(`{"threadId":"member","turnId":"t1","item":{"type":"collabAgentToolCall","id":"c1","tool":"spawnAgent","senderThreadId":"member","receiverThreadIds":["child"],"prompt":"查一下测试","agentsStates":{},"status":"inProgress"}}`))
 	server.handleNotify("thread/started", json.RawMessage(`{"thread":{"id":"grandchild","parentThreadId":"child"}}`))
 	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"member","turnId":"t1","item":{"type":"subAgentActivity","id":"a1","kind":"completed","agentPath":"/root/tester","agentThreadId":"other"}}`))
+	// A sub-agent messaging its parent names the parent; that is no new link.
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"child","turnId":"t2","item":{"type":"subAgentActivity","id":"a2","kind":"interacted","agentPath":"/root","agentThreadId":"member"}}`))
 
 	for thread, want := range map[string]string{"child": "member", "grandchild": "member", "other": "member", "member": "member", "stranger": "stranger"} {
 		if root := server.RootThread(thread); root != want {
