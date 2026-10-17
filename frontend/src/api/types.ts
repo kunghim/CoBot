@@ -199,7 +199,9 @@ export interface ApprovalListResult {
 // ---------------------------------------------------------------------------
 
 /** GET /teams/{id}/activity — one durable product event. */
-export type ActivityItem = components['schemas']['Event'];
+/** An activity entry: the event plus the facts to describe it (task
+ * title, who sent what to whom, ...); absent for records deleted since. */
+export type ActivityItem = components['schemas']['Event'] & { detail?: Record<string, unknown> };
 
 /** GET /bots/{id}/memories */
 export interface MemoryListResult {
@@ -283,8 +285,3 @@ export interface QuestionListResult {
   nextCursor: string;
 }
 
-/** GET /bots/{id}/collaboration */
-export interface CollaborationListResult {
-  items: Message[];
-  nextCursor: string;
-}

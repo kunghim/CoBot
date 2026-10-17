@@ -277,7 +277,6 @@ export const api = {
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
-  listCollaboration: (botId: string, cursor?: string) => request<import('./types').CollaborationListResult>('GET', `/api/v1/bots/${botId}/collaboration` + pageQuery({ cursor })),
 
   // Team lifecycle (M4 backend, M5 surface).
   archiveTeam: (teamId: string, expectedRevision?: number) =>

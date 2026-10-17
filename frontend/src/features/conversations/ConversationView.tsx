@@ -16,6 +16,7 @@ import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
 import RunProcess from './RunProcess';
+import { IncomingMessage, OutgoingMessage, TaskCard, taskCardOf } from './MessageCards';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
@@ -157,6 +158,8 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
               <li key={entry.message.id}>
                 <MessageRow
                   message={entry.message}
+                  botId={bot.id}
+                  nameOf={nameOf}
                   teamId={team.id}
                   isLastUser={lastUserMessage?.id === entry.message.id}
                   showCancel={lastQueuedMessage?.id === entry.message.id}
@@ -289,6 +292,8 @@ export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeR
 
 function MessageRow({
   message,
+  botId,
+  nameOf,
   teamId,
   isLastUser,
   showCancel,
@@ -296,6 +301,8 @@ function MessageRow({
   onCancelQueued,
 }: {
   message: Message;
+  botId: string;
+  nameOf: (botId: string) => string;
   teamId: string;
   isLastUser: boolean;
   showCancel: boolean;
@@ -317,7 +324,18 @@ function MessageRow({
     } catch { /* A malformed record remains visible as escaped text. */ }
   }
 
-  if (message.kind === 'collaboration' || message.kind === 'system') {
+  if (message.kind === 'collaboration') {
+    // In the sender's conversation it is what the member sent; in the
+    // recipient's, what it received.
+    return message.sourceBotId === botId && message.botId !== botId
+      ? <OutgoingMessage to={nameOf(message.botId)} text={text} teamId={teamId} />
+      : <IncomingMessage from={nameOf(message.sourceBotId ?? '')} text={text} teamId={teamId} />;
+  }
+
+  const card = message.kind === 'system' ? taskCardOf(message.blocks) : null;
+  if (card) return <TaskCard card={card} owner={nameOf(card.ownerId ?? message.botId)} teamId={teamId} />;
+
+  if (message.kind === 'system') {
     return (
       <div className="flex justify-center">
         <span className="max-w-[85%] whitespace-pre-wrap text-center text-xs text-neutral-400">{text}</span>

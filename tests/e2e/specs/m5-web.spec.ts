@@ -8,7 +8,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 // The five work-panel pages are all real in M5: tasks create, activity
-// records, memories and collaboration show honest empty states, and the
+// records and memories show honest empty states, and the
 // team's archive/restore verbs really pause and resume dispatch.
 test('work panel pages show real data and team lifecycle verbs work', async ({ page }) => {
   const teamDir = join(process.env.COBOT_E2E_ROOT!, 'm5-' + Date.now());
@@ -42,16 +42,19 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await panel.getByRole('button', { name: /^创建$|^Create$/ }).click();
   await expect(panel.getByText('e2e任务')).toBeVisible({ timeout: 15000 });
 
-  // Activity tab: the task.created event is a durable fact.
+  // Activity tab: the new task reads as a sentence and leads back to it.
   await panel.getByRole('tab', { name: /动态|Activity/ }).click();
-  await expect(panel.getByText(/任务已创建|Task created/).first()).toBeVisible({ timeout: 15000 });
+  const created = panel.getByRole('button', { name: /创建任务「e2e任务」/ }).first();
+  await expect(created).toBeVisible({ timeout: 15000 });
+  await created.click();
+  await expect(panel.getByRole('tab', { name: /^任务$|^Tasks$/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.locator('li[id^="task-"]').filter({ hasText: 'e2e任务' }).getByRole('button').first()).toHaveAttribute('aria-expanded', 'true');
 
-  // Memory and collaboration tabs show honest empty states, not fabricated
-  // data and not "coming later".
+  // The memory tab shows an honest empty state; member-to-member messages
+  // live in conversations and activity, so there is no collaboration tab.
   await panel.getByRole('tab', { name: /记忆|Memories/ }).click();
   await expect(panel.getByText(/暂无记忆|No memories yet/)).toBeVisible();
-  await panel.getByRole('tab', { name: /协作/ }).click();
-  await expect(panel.getByText(/暂无协作记录|No collaboration records/)).toBeVisible();
+  await expect(panel.getByRole('tab', { name: /协作/ })).toHaveCount(0);
 
   // Team lifecycle: a team with an unfinished task cannot be archived; the
   // refusal names what is left.

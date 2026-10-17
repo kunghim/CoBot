@@ -54,6 +54,8 @@ function joinBlocks(value: unknown): string {
   if (!Array.isArray(value)) return '';
   const parts: string[] = [];
   for (const entry of value) {
+    // A task block is the card's data, not text to read.
+    if (entry && typeof entry === 'object' && (entry as TextBlock).type === 'task') continue;
     if (entry && typeof entry === 'object' && 'text' in entry) {
       const text = (entry as TextBlock).text;
       if (typeof text === 'string') parts.push(text);

@@ -117,6 +117,8 @@
     }
   },
   "conversation": {
+    "sentTo": "已发给 {{name}}",
+    "taskCard": { "assigned": "任务指派 · 负责人 {{name}}", "acceptance": "完成标准", "open": "在任务面板查看" },
     "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
     "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
     "duration": { "seconds": "{{s}} 秒", "minutes": "{{m}} 分 {{s}} 秒" },
@@ -266,6 +268,14 @@
     "originalOptions": "原始选项",
     "comment": "意见",
     "laterInvalidated": "该申请后来已失效，原决定仍保留。",
+    "laterInvalidatedShort": "之后已失效",
+    "you": "你",
+    "decisionBy": "{{actor}}：{{choice}}",
+    "reasonCode": {
+      "over_limit": "成员之间的协作次数达到上限",
+      "risk_zone": "协作进入需要你确认的阶段",
+      "unresolved_run": "上次执行在进程退出后状态未知"
+    },
     "openConversation": "查看申请者会话",
     "feedback": "{{type}}结果：{{decision}}",
     "feedbackDecision": {"approve": "已批准", "reject": "已拒绝"}
@@ -294,6 +304,46 @@
     }
   },
   "activity": {
+    "someone": "成员",
+    "untitledTask": "未命名任务",
+    "files": "{{count}} 个文件",
+    "pending": "待处理",
+    "decided": "已处理",
+    "closed": "已失效",
+    "decision": {
+      "accept": "已允许",
+      "acceptForSession": "本会话已允许",
+      "decline": "已拒绝",
+      "cancel": "已拒绝并停止",
+      "grant": "已允许本轮",
+      "grantForSession": "本会话已允许",
+      "deny": "已拒绝",
+      "approve": "已批准",
+      "reject": "已拒绝",
+      "continue": "已继续",
+      "stop": "已停止",
+      "rerun": "已重跑",
+      "abandon": "已放弃"
+    },
+    "line": {
+      "taskCreated": "创建任务「{{title}}」，负责人 {{owner}}",
+      "taskStatus": "任务「{{title}}」→ {{status}}",
+      "taskStatusBy": "{{actor}} 把任务「{{title}}」改为{{status}}",
+      "taskAssigned": "任务「{{title}}」转给 {{owner}}",
+      "taskEvidence": "{{actor}} 为「{{title}}」提交了完成证据",
+      "taskUpdated": "任务「{{title}}」有更新",
+      "transferOffered": "{{from}} 提议把「{{title}}」交给 {{to}}",
+      "transferAccepted": "{{to}} 接手了「{{title}}」",
+      "questionCreated": "{{actor}} 向你提问",
+      "questionAnswered": "你回答了 {{actor}} 的提问",
+      "approval": "{{actor}} 申请{{kind}} · {{state}}",
+      "botAdded": "{{name}} 加入了团队",
+      "botDeleted": "移除了成员 {{name}}",
+      "message": "{{from}} → {{to}}",
+      "memory": "{{actor}} 记下了一条工作方法",
+      "memoryDeleted": "删除了 {{actor}} 的一条记忆",
+      "budgetPaused": "预算用尽，{{actor}} 的新一轮已暂停"
+    },
     "empty": "暂无动态",
     "loadFailed": "动态加载失败",
     "type": {

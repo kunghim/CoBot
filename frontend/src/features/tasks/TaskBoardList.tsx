@@ -3,7 +3,7 @@ import LoadMore from '../../components/LoadMore';
 // honest status flow, dependency chips, evidence, and two-phase transfers.
 // The server authorizes every action; this component only decides which
 // controls to show for the current state.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { useCreateTask, useTasks } from '../../api/queries';
@@ -12,12 +12,30 @@ import { apiErrorMessage } from '../../i18n/errors';
 import TaskDetail from './TaskDetail';
 import { boardOrder, ownerLabel, statusTone } from './taskFlow';
 
-export default function TaskBoardList({ teamId, viewBotId, bots }: { teamId: string; viewBotId?: string; bots: Bot[] }) {
+export default function TaskBoardList({
+  teamId,
+  viewBotId,
+  bots,
+  focusTaskId,
+  focusNonce,
+}: {
+  teamId: string;
+  viewBotId?: string;
+  bots: Bot[];
+  /** A task a conversation card or activity entry asked to show. */
+  focusTaskId?: string;
+  focusNonce?: number;
+}) {
   const { t } = useTranslation();
   const tasks = useTasks(teamId, true, viewBotId);
   const create = useCreateTask(teamId);
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusTaskId) return;
+    setExpandedId(focusTaskId);
+    requestAnimationFrame(() => document.getElementById(`task-${focusTaskId}`)?.scrollIntoView({ block: 'nearest' }));
+  }, [focusTaskId, focusNonce]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
@@ -160,7 +178,7 @@ function TaskRow({
 }) {
   const { t } = useTranslation();
   return (
-    <li className="rounded-md border border-neutral-200 dark:border-neutral-700">
+    <li id={`task-${task.id}`} className="rounded-md border border-neutral-200 dark:border-neutral-700">
       <button
         type="button"
         onClick={onToggle}

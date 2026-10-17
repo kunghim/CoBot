@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Home, PanelLeftOpen, PanelRightOpen, Settings } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTeams } from '../api/queries';
 import WorkPanel from '../components/WorkPanel';
+import { useWorkPanelRequests } from './workPanelNav';
 import TeamList from '../features/teams/TeamList';
 import { useSelectedBot } from './SelectedBotContext';
 import { rememberWorkspacePath } from './workspacePath';
@@ -51,6 +52,8 @@ export default function Layout() {
   const { t } = useTranslation();
   const [listOpen, setListOpen] = useState(startsOpen);
   const [panelOpen, setPanelOpen] = useState(startsOpen);
+  // Showing something in the work panel opens it first.
+  useWorkPanelRequests(useCallback(() => setPanelOpen(true), []));
   const { botId, setBotId } = useSelectedBot();
   const location = useLocation();
   useEffect(() => rememberWorkspacePath(location.pathname + location.search), [location.pathname, location.search]);

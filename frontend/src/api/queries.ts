@@ -4,7 +4,6 @@ import { applyLiveSignal } from './live';
 import type {
   Approval,
   Bot,
-  CollaborationListResult,
   ConversationResult,
   CreateTeamResult,
   EngineStatus,
@@ -42,7 +41,6 @@ export const queryKeys = {
   tasks: (teamId: string) => ['tasks', teamId] as const,
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
   questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
-  collaboration: (botId: string) => ['collaboration', botId] as const,
 };
 
 export function useStatus() {
@@ -463,12 +461,6 @@ export function useCancelQuestion(teamId: string) {
   });
 }
 
-/** GET /bots/{id}/collaboration: the read-only exchange of the selected
- * member; the user reads a named member's whole record. */
-export function useCollaboration(botId: string | null, enabled = true) {
-  return usePagedItems(queryKeys.collaboration(botId ?? ''), (cursor) => api.listCollaboration(botId as string, cursor), botId !== null && enabled, true);
-}
-
 // ---------------------------------------------------------------------------
 // M5: activity, memories, team lifecycle, authorizations
 // ---------------------------------------------------------------------------
@@ -572,7 +564,6 @@ export function useRevokeAuthorization() {
 export type {
   Approval,
   Bot,
-  CollaborationListResult,
   ConversationResult,
   CreateTeamResult,
   EngineStatus,

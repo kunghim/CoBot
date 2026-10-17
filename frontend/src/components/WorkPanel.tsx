@@ -1,29 +1,38 @@
-// WorkPanel is the right column. All five tabs are real: 任务 (team board
-// with questions the user owes), 审批 (decided history), 动态 (the durable
-// event record), 协作 (the selected member's read-only record) and 记忆 (the
-// member's working methods).
-import { useState } from 'react';
+// WorkPanel is the right column: 任务 (team board with questions the user
+// owes), 审批 (decided history), 动态 (what the team did, member-to-member
+// messages included) and 记忆 (the member's working methods). Conversations
+// and activity entries can ask it to show a tab or open a task.
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
 import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
-import CollaborationList from '../features/collaboration/CollaborationList';
 import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
+import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
 
-type TabId = 'tasks' | 'approvals' | 'activity' | 'collab' | 'memory';
+type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
 
-const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'collab', 'memory'];
+const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'memory'];
 
 export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
   const { t } = useTranslation();
   const { botId } = useSelectedBot();
   const teams = useTeams(true);
-  const [tab, setTab] = useState<TabId>('tasks');
+  const [initial] = useState(takePendingWorkPanelRequest);
+  const [tab, setTab] = useState<TabId>(initial?.tab ?? 'tasks');
+  const [focus, setFocus] = useState<WorkPanelRequest | null>(initial);
+  useWorkPanelRequests(
+    useCallback((request: WorkPanelRequest) => {
+      takePendingWorkPanelRequest();
+      setTab(request.tab);
+      setFocus(request);
+    }, []),
+  );
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
   const scope = context ? `${context.bot.name} · ${context.team.name}` : '';
@@ -99,14 +108,11 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         {context && tab === 'tasks' && (
           <div key={context.bot.id}>
             <QuestionList teamId={context.team.id} viewBotId={context.bot.id} />
-            <TaskBoardList teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />
+            <TaskBoardList teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} focusTaskId={focus?.taskId} focusNonce={focus?.nonce} />
           </div>
         )}
         {context && tab === 'approvals' && <ApprovalHistoryList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} />}
-        {context && tab === 'collab' && (
-          <CollaborationList key={context.bot.id} botId={context.bot.id} bots={context.item.bots} />
-        )}
-        {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} />}
+        {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />}
         {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
         </fieldset>
       </div>

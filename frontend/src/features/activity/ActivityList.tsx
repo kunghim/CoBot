@@ -1,14 +1,19 @@
-import LoadMore from '../../components/LoadMore';
-// ActivityList is the 动态 tab: the team's durable event record, newest
-// first. It is a record of what happened, never a chat and never a place to
-// act (the plan's rule: 结论仍需写回任务).
+// ActivityList is the 动态 tab: what the team did, newest first, each entry
+// said in plain words (who did what to which task, who told whom what). It
+// is a record, never a place to act; entries link to the task or the
+// conversation they are about.
 import { useTranslation } from 'react-i18next';
 import { useActivity } from '../../api/queries';
-import type { ActivityItem } from '../../api/types';
+import type { ActivityItem, Bot } from '../../api/types';
+import { useSelectedBot } from '../../app/SelectedBotContext';
+import { showInWorkPanel } from '../../app/workPanelNav';
+import LoadMore from '../../components/LoadMore';
+import { describeActivity } from './describe';
 
-export default function ActivityList({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
+export default function ActivityList({ teamId, viewBotId, bots }: { teamId: string; viewBotId?: string; bots: Bot[] }) {
   const { t, i18n } = useTranslation();
   const activity = useActivity(teamId, true, viewBotId);
+  const { setBotId } = useSelectedBot();
 
   if (activity.isPending) {
     return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
@@ -20,29 +25,69 @@ export default function ActivityList({ teamId, viewBotId }: { teamId: string; vi
   if (items.length === 0) {
     return <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('activity.empty')}</p>;
   }
-  const formatTime = (iso: string) => new Date(iso).toLocaleString(i18n.language);
+  const names = new Map(bots.map((bot) => [bot.id, bot.name]));
+  const nameOf = (id: unknown) => (typeof id === 'string' && id ? names.get(id) ?? t('activity.someone') : t('activity.someone'));
+  const formatTime = (iso: string) => {
+    const date = new Date(iso);
+    const sameDay = date.toDateString() === new Date().toDateString();
+    return sameDay ? date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' }) : date.toLocaleString(i18n.language, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <><ul className="space-y-1 px-3 py-2">
-      {items.map((item) => (
-        <ActivityRow key={item.id} item={item} formatTime={formatTime} />
-      ))}
-    </ul><LoadMore page={activity} /></>
+    <>
+      <ul className="divide-y divide-neutral-100 px-3 py-1 dark:divide-neutral-800">
+        {items.map((item) => (
+          <ActivityRow
+            key={item.id}
+            item={item}
+            time={formatTime(item.createdAt)}
+            nameOf={nameOf}
+            openConversation={(botId) => setBotId(botId)}
+          />
+        ))}
+      </ul>
+      <LoadMore page={activity} />
+    </>
   );
 }
 
-function ActivityRow({ item, formatTime }: { item: ActivityItem; formatTime: (iso: string) => string }) {
+function ActivityRow({
+  item,
+  time,
+  nameOf,
+  openConversation,
+}: {
+  item: ActivityItem;
+  time: string;
+  nameOf: (id: unknown) => string;
+  openConversation: (botId: string) => void;
+}) {
   const { t } = useTranslation();
-  return (
-    <li className="rounded-md border border-neutral-100 px-2 py-1.5 text-xs dark:border-neutral-800">
-      <span className="font-medium text-neutral-700 dark:text-neutral-300">
-        {t(`activity.type.${item.type}`, { defaultValue: item.type })}
+  const line = describeActivity(item, nameOf, t);
+  const target = line.taskId
+    ? () => showInWorkPanel('tasks', line.taskId)
+    : line.conversationBotId
+      ? () => openConversation(line.conversationBotId!)
+      : line.approvals
+        ? () => showInWorkPanel('approvals')
+        : undefined;
+  const body = (
+    <>
+      <span className="flex items-baseline gap-2">
+        <span className="min-w-0 flex-1 text-neutral-800 dark:text-neutral-200">{line.text}</span>
+        <span className="shrink-0 text-[11px] text-neutral-400">{time}</span>
       </span>
-      <span className="ml-1 text-neutral-400">· {formatTime(item.createdAt)}</span>
-      {item.resourceId && (
-        <span className="block truncate text-[11px] text-neutral-400" title={item.resourceId}>
-          {item.resourceId.slice(0, 8)}
-        </span>
+      {line.quote && <span className="mt-0.5 line-clamp-2 break-all text-neutral-500 dark:text-neutral-400">{line.quote}</span>}
+    </>
+  );
+  return (
+    <li className="py-2 text-xs">
+      {target ? (
+        <button type="button" onClick={target} className="block w-full rounded text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/60">
+          {body}
+        </button>
+      ) : (
+        <div>{body}</div>
       )}
     </li>
   );

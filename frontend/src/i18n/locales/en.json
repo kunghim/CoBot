@@ -117,6 +117,8 @@
     }
   },
   "conversation": {
+    "sentTo": "Sent to {{name}}",
+    "taskCard": { "assigned": "Task assigned · owner {{name}}", "acceptance": "Done when", "open": "Open in the task board" },
     "file": { "open": "Open file", "reveal": "Show in folder" },
     "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
     "duration": { "seconds": "{{s}}s", "minutes": "{{m}}m {{s}}s" },
@@ -268,6 +270,14 @@
     "originalOptions": "Original choices",
     "comment": "Comment",
     "laterInvalidated": "This request was later invalidated; its decision is preserved.",
+    "laterInvalidatedShort": "later invalidated",
+    "you": "You",
+    "decisionBy": "{{actor}}: {{choice}}",
+    "reasonCode": {
+      "over_limit": "Members reached the collaboration limit",
+      "risk_zone": "The collaboration needs your confirmation",
+      "unresolved_run": "The last run's state is unknown after the process exited"
+    },
     "openConversation": "Open requester conversation",
     "feedback": "{{type}} result: {{decision}}",
     "feedbackDecision": {"approve": "Approved", "reject": "Rejected"}
@@ -296,6 +306,46 @@
     }
   },
   "activity": {
+    "someone": "A member",
+    "untitledTask": "Untitled task",
+    "files": "{{count}} files",
+    "pending": "pending",
+    "decided": "decided",
+    "closed": "closed",
+    "decision": {
+      "accept": "allowed",
+      "acceptForSession": "allowed for the session",
+      "decline": "declined",
+      "cancel": "declined and stopped",
+      "grant": "allowed for the turn",
+      "grantForSession": "allowed for the session",
+      "deny": "declined",
+      "approve": "approved",
+      "reject": "rejected",
+      "continue": "continued",
+      "stop": "stopped",
+      "rerun": "rerun",
+      "abandon": "abandoned"
+    },
+    "line": {
+      "taskCreated": "Created “{{title}}” for {{owner}}",
+      "taskStatus": "“{{title}}” → {{status}}",
+      "taskStatusBy": "{{actor}} moved “{{title}}” to {{status}}",
+      "taskAssigned": "“{{title}}” reassigned to {{owner}}",
+      "taskEvidence": "{{actor}} submitted evidence for “{{title}}”",
+      "taskUpdated": "“{{title}}” was updated",
+      "transferOffered": "{{from}} offered “{{title}}” to {{to}}",
+      "transferAccepted": "{{to}} took over “{{title}}”",
+      "questionCreated": "{{actor}} asked you",
+      "questionAnswered": "You answered {{actor}}",
+      "approval": "{{actor}} asked for {{kind}} · {{state}}",
+      "botAdded": "{{name}} joined the team",
+      "botDeleted": "Removed {{name}}",
+      "message": "{{from}} → {{to}}",
+      "memory": "{{actor}} saved a working method",
+      "memoryDeleted": "Deleted a memory of {{actor}}",
+      "budgetPaused": "Budget spent; {{actor}}'s next turn is paused"
+    },
     "empty": "No activity yet",
     "loadFailed": "Failed to load activity",
     "type": {
