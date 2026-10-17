@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MoreHorizontal } from 'lucide-react';
+import { Check, Lock, MoreHorizontal } from 'lucide-react';
 import { api } from '../../api/client';
-import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRoles } from '../../api/queries';
+import { useArchiveTeam, useDeleteBot, useDeleteTeam, useRenameTeam, useRoles } from '../../api/queries';
 import type { TeamWithBots } from '../../api/types';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useDialogFocus } from '../../components/useDialogFocus';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import { apiErrorMessage } from '../../i18n/errors';
 
-type Dialog = 'archive' | 'deleteTeam' | 'addMember' | 'deleteMember' | null;
+type Dialog = 'archive' | 'deleteTeam' | 'edit' | 'deleteMember' | null;
 
 const itemClass =
   'block w-full px-3 py-1.5 text-left text-sm hover:bg-neutral-100 disabled:opacity-50 dark:hover:bg-neutral-800';
@@ -18,7 +18,7 @@ const itemClass =
 /**
  * TeamMenu keeps the team list clean: every team action sits behind one
  * "more" button. What it offers follows the team's state — an active team
- * can add or delete members and be archived (only when idle; it then moves
+ * can be edited (name, new members), lose members and be archived (only when idle; it then moves
  * to Settings), and a team whose folder is gone can only be deleted. Each
  * action that changes the team asks first and shows a refusal inside its
  * dialog.
@@ -65,7 +65,7 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
 
   const entries: { key: string; label: string; danger?: boolean; run: () => void }[] = [];
   if (team.status === 'active') {
-    entries.push({ key: 'add', label: t('team.tools.add'), run: () => choose('addMember') });
+    entries.push({ key: 'edit', label: t('team.edit'), run: () => choose('edit') });
     if (bots.some((bot) => !bot.isLeader)) {
       entries.push({ key: 'deleteMember', label: t('team.deleteMember'), run: () => choose('deleteMember') });
     }
@@ -156,82 +156,186 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
           )
         }
       />
-      {dialog === 'addMember' && <AddMemberDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === 'edit' && <EditTeamDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === 'deleteMember' && <DeleteMemberDialog item={item} onClose={() => setDialog(null)} />}
     </>
   );
 }
 
-/** AddMemberDialog adds one member of a chosen role to an active team. */
-function AddMemberDialog({ item, onClose }: { item: TeamWithBots; onClose: () => void }) {
+/**
+ * EditTeamDialog edits what may change after creation: the team name, and
+ * new members added from the team's roles. Existing members are shown locked
+ * (they cannot be changed here) and the folder is shown read-only, because a
+ * team keeps its folder for life.
+ */
+function EditTeamDialog({ item, onClose }: { item: TeamWithBots; onClose: () => void }) {
   const { t } = useTranslation();
-  const { team } = item;
+  const { team, bots } = item;
   const qc = useQueryClient();
   const roles = useRoles(true);
-  const [roleId, setRoleId] = useState('');
-  const add = useMutation({
-    mutationFn: () => api.addBot(team.id, roleId),
-    onSuccess: () => {
+  const rename = useRenameTeam();
+  const [name, setName] = useState(team.name);
+  const [adding, setAdding] = useState<ReadonlySet<string>>(() => new Set());
+  const [saving, setSaving] = useState(false);
+  const [errorText, setErrorText] = useState('');
+  const dialogRef = useDialogFocus(true, onClose, saving);
+
+  const library = roles.data?.items ?? [];
+  const present = new Set(bots.map((bot) => bot.roleId));
+  const scenario = roles.data?.scenarios?.[0];
+  const offered = (scenario ? scenario.roleIds : library.filter((role) => role.id !== 'leader').map((role) => role.id))
+    .filter((id) => !present.has(id))
+    .map((id) => library.find((role) => role.id === id))
+    .filter((role) => role !== undefined);
+  const summaryOf = (roleId: string) => {
+    const role = library.find((entry) => entry.id === roleId);
+    return role?.summaryKey ? t(role.summaryKey, { defaultValue: '' }) : '';
+  };
+  const trimmed = name.trim();
+  const changed = trimmed !== team.name || adding.size > 0;
+
+  const save = async () => {
+    if (!trimmed || !changed) return;
+    setSaving(true);
+    setErrorText('');
+    try {
+      if (trimmed !== team.name) {
+        await rename.mutateAsync({ teamId: team.id, name: trimmed, expectedRevision: team.revision });
+      }
+      for (const roleId of adding) {
+        await api.addBot(team.id, roleId);
+        setAdding((prev) => {
+          const next = new Set(prev);
+          next.delete(roleId);
+          return next;
+        });
+      }
       void qc.invalidateQueries();
       onClose();
-    },
-  });
-  const dialogRef = useDialogFocus(true, onClose, add.isPending);
+    } catch (error) {
+      // Members added before a failure stay added; the dialog keeps what is
+      // left so it can be saved again.
+      void qc.invalidateQueries();
+      setErrorText(apiErrorMessage(t, error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const card = (key: string, label: string, summary: string, selected: boolean, locked: boolean, onToggle?: () => void) => (
+    <button
+      key={key}
+      type="button"
+      role="checkbox"
+      aria-checked={selected}
+      aria-disabled={locked}
+      onClick={() => {
+        if (!locked && onToggle) onToggle();
+      }}
+      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-left ${
+        selected
+          ? 'border-neutral-900 bg-neutral-50 dark:border-neutral-200 dark:bg-neutral-800'
+          : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-700 dark:hover:border-neutral-500'
+      } ${locked ? 'cursor-default opacity-70' : ''}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+          selected
+            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
+            : 'border-neutral-300 dark:border-neutral-600'
+        }`}
+      >
+        {locked ? <Lock size={10} /> : selected ? <Check size={12} /> : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{label}</span>
+        {summary && <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">{summary}</span>}
+      </span>
+    </button>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={() => !add.isPending && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={() => !saving && onClose()}>
       <form
         ref={dialogRef as React.RefObject<HTMLFormElement>}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`add-member-${team.id}`}
+        aria-labelledby={`edit-team-${team.id}`}
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          if (roleId) add.mutate();
+          void save();
         }}
-        className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        className="max-h-full w-full max-w-xl overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
       >
-        <h2 id={`add-member-${team.id}`} className="text-sm font-semibold">
-          {t('team.tools.add')} · {team.name}
+        <h2 id={`edit-team-${team.id}`} className="text-base font-semibold">
+          {t('team.edit')}
         </h2>
-        <label className="mt-3 block text-sm">
-          <span className="text-neutral-500">{t('team.roleLabel')}</span>
-          <select
-            value={roleId}
-            onChange={(event) => setRoleId(event.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-2 py-1.5 dark:border-neutral-700"
-          >
-            <option value="">{t('team.chooseRole')}</option>
-            {roles.data?.items
-              .filter((role) => role.id !== 'leader')
-              .map((role) => (
-                <option value={role.id} key={role.id}>
-                  {t(role.nameKey, { defaultValue: role.name })}
-                </option>
-              ))}
-          </select>
+
+        <div className="mt-4 text-sm">
+          <span className="text-neutral-500 dark:text-neutral-400">{t('team.directory')}</span>
+          <p className="mt-1 break-all rounded-md bg-neutral-100 px-3 py-1.5 font-mono text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+            {team.directory}
+          </p>
+          <p className="mt-1 text-xs text-neutral-400">{t('team.directoryFixed')}</p>
+        </div>
+
+        <label className="mt-4 block text-sm">
+          <span className="text-neutral-500 dark:text-neutral-400">{t('team.name')}</span>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
+          />
         </label>
-        {roles.isError && (
-          <p role="alert" className="mt-2 text-xs text-red-600">
-            {t('team.loadFailed')}
+
+        <fieldset className="mt-4">
+          <legend className="text-sm text-neutral-500 dark:text-neutral-400">{t('team.members')}</legend>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {bots.map((bot) => card(bot.id, bot.name, summaryOf(bot.roleId), true, true))}
+            {offered.map((role) =>
+              card(
+                role.id,
+                t(role.nameKey, { defaultValue: role.name }),
+                role.summaryKey ? t(role.summaryKey, { defaultValue: '' }) : '',
+                adding.has(role.id),
+                false,
+                () =>
+                  setAdding((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(role.id)) next.delete(role.id);
+                    else next.add(role.id);
+                    return next;
+                  }),
+              ),
+            )}
+          </div>
+          <p className="mt-1 text-xs text-neutral-400">{t('team.membersLocked')}</p>
+        </fieldset>
+
+        {errorText && (
+          <p className="mt-3 text-sm text-red-600" role="alert">
+            {errorText}
           </p>
         )}
-        {add.isError && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
-            {apiErrorMessage(t, add.error)}
-          </p>
-        )}
+
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={add.isPending} className="rounded-md px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 disabled:opacity-50 dark:hover:text-neutral-100"
+          >
             {t('team.cancel')}
           </button>
           <button
             type="submit"
-            disabled={add.isPending || !roleId}
+            disabled={saving || !trimmed || !changed}
             className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
           >
-            {add.isPending ? t('status.loading') : t('team.tools.add')}
+            {saving ? t('status.loading') : t('team.save')}
           </button>
         </div>
       </form>

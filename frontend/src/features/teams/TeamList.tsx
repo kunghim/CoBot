@@ -154,26 +154,28 @@ function TeamRow({
   return (
     <li className={`rounded-md ${missing ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-center gap-1">
+        {/* The whole row toggles the team; only the trailing menu does
+            something else. */}
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          aria-label={expanded ? t('team.collapse', { name: team.name }) : t('team.expand', { name: team.name })}
           title={expanded ? t('team.collapse', { name: team.name }) : t('team.expand', { name: team.name })}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          className="flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
-          {expanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-        </button>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</span>
-        {badgeKey && (
-          <span
-            className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-            role="status"
-            title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}
-          >
-            {t(badgeKey)}
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-neutral-400" aria-hidden="true">
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
-        )}
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</span>
+          {badgeKey && (
+            <span
+              className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+              title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}
+            >
+              {t(badgeKey)}
+            </span>
+          )}
+        </button>
         <TeamMenu item={item} />
       </div>
       {expanded && (

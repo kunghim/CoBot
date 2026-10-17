@@ -188,6 +188,8 @@ export const api = {
   createTeam: (body: { name: string; directory: string; initialRoleIds: string[] }) =>
     request<import('./types').CreateTeamResult>('POST', '/api/v1/teams', body),
   getTeam: (teamId: string) => request<import('./types').TeamWithBots>('GET', `/api/v1/teams/${teamId}`),
+  renameTeam: (teamId: string, name: string, expectedRevision?: number) =>
+    request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { name, expectedRevision }),
   addBot: (teamId: string, roleId: string) =>
     request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
   listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),

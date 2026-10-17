@@ -64,6 +64,8 @@ func (a *App) PatchTeamName(ctx context.Context, principal auth.Principal, teamI
 	if err := tx.Commit(); err != nil {
 		return domain.Team{}, err
 	}
+	// The folder marker carries the team name; keep it in step.
+	team = a.checkTeamDirectory(ctx, team)
 	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
 	a.Hub.Publish()
 	return team, nil

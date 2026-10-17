@@ -82,7 +82,7 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   await expect(row).toBeVisible({ timeout: 15000 });
 
   // Members are deleted from the same menu: pick one, then confirm.
-  const expand = row.getByRole('button', { name: /展开团队|Expand team/ });
+  const expand = row.locator('button[aria-expanded="false"]:not([aria-haspopup])');
   if ((await expand.count()) > 0) await expand.click();
   await expect(row.getByRole('button', { name: /测试工程师|QA engineer/ })).toBeVisible({ timeout: 15000 });
   await row.getByRole('button', { name: /团队操作|Actions for/ }).click();
@@ -91,6 +91,18 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   await deleteMember.getByRole('radio', { name: /测试工程师|QA engineer/ }).check();
   await deleteMember.getByRole('button', { name: /删除成员|Delete member/ }).click();
   await expect(row.getByRole('button', { name: /测试工程师|QA engineer/ })).toHaveCount(0, { timeout: 15000 });
+
+  // Editing renames the team and adds members back; existing members and the
+  // folder stay as they are.
+  await row.getByRole('button', { name: /团队操作|Actions for/ }).click();
+  await page.getByRole('menuitem', { name: /编辑团队|Edit team/ }).click();
+  const edit = page.getByRole('dialog');
+  await expect(edit.getByText(teamDir)).toBeVisible();
+  await edit.getByLabel(/团队名称|Team name/).fill(label + '-改');
+  await edit.getByRole('checkbox', { name: /测试工程师|QA engineer/ }).click();
+  await edit.getByRole('button', { name: /^保存$|^Save$/ }).click();
+  await expect(sidebar.getByText(label + '-改')).toBeVisible({ timeout: 15000 });
+  await expect(row.getByRole('button', { name: /测试工程师|QA engineer/ })).toBeVisible({ timeout: 15000 });
 
   await row.getByRole('button', { name: /团队操作|Actions for/ }).click();
   await page.getByRole('menuitem', { name: /归档团队|Archive team/ }).click();

@@ -502,6 +502,15 @@ export function useRestoreTeam() {
   });
 }
 
+export function useRenameTeam() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ teamId, name, expectedRevision }: { teamId: string; name: string; expectedRevision?: number }) =>
+      api.renameTeam(teamId, name, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteTeam() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({

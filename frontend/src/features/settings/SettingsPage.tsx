@@ -81,7 +81,7 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={back}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
           <ArrowLeft size={16} aria-hidden={true} />
           {t('settings.back')}
