@@ -103,3 +103,20 @@ func within(root, path string) bool {
 	}
 	return rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
+
+// WarmTeam starts the team's engine in the background when the user opens
+// the team, so the first message does not wait for engine start-up.
+func (a *App) WarmTeam(ctx context.Context, principal auth.Principal, teamID string) (map[string]any, error) {
+	if principal.Kind != auth.KindUser {
+		return nil, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	team, directory, err := sqlite.GetTeam(ctx, a.DB, teamID)
+	if err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+	if team.Status != domain.TeamStatusActive || a.Scheduler == nil {
+		return map[string]any{"warming": false}, nil
+	}
+	a.Scheduler.Warm(team.ID, directory)
+	return map[string]any{"warming": true}, nil
+}

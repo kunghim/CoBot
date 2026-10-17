@@ -901,3 +901,19 @@ func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string
 	b.WriteString(collaborationEtiquette)
 	return b.String()
 }
+
+// Warm starts a team's engine ahead of its first turn: opening a team in the
+// UI is the moment a message is likely to follow, and engine start-up then
+// overlaps with the user's typing instead of delaying the first reply. It
+// never blocks the caller; a failure is left for the real dispatch to report.
+func (s *Scheduler) Warm(teamID, cwd string) {
+	if s.runtime(teamID) != nil {
+		return
+	}
+	go func() {
+		// EnsureTeamServer serializes with dispatch on the team lock.
+		if _, err := s.EnsureTeamServer(s.ctx, teamID, cwd); err != nil {
+			s.logger.Info("engine warm-up failed", "teamId", teamID, "error", err)
+		}
+	}()
+}

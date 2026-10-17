@@ -184,3 +184,30 @@ func TestBroadcastAndNotifyOnly(t *testing.T) {
 		t.Fatalf("broadcast messages = %d (%v), want one per recipient", messages, err)
 	}
 }
+
+// Opening a team starts its engine before any message, and starts no turn.
+func TestWarmTeamStartsEngineAhead(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeam(t, nil)
+	if h.app.EngineEpochOfTeam(team.ID) != "" {
+		t.Fatal("engine running before warm-up")
+	}
+	result, err := h.app.WarmTeam(ctx, h.user, team.ID)
+	if err != nil || result["warming"] != true {
+		t.Fatalf("warm = %v %v", result, err)
+	}
+	waitUntil(t, 5*time.Second, "engine warm", func() bool { return h.app.EngineEpochOfTeam(team.ID) != "" })
+	if turns := h.fakeFor(t, team.ID).Turns(); len(turns) != 0 {
+		t.Fatalf("warm-up started turns: %+v", turns)
+	}
+	// Warming again is a no-op on a running engine.
+	epoch := h.app.EngineEpochOfTeam(team.ID)
+	if _, err := h.app.WarmTeam(ctx, h.user, team.ID); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if h.app.EngineEpochOfTeam(team.ID) != epoch {
+		t.Fatal("a second warm-up replaced the engine")
+	}
+}

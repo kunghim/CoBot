@@ -691,6 +691,32 @@ paths:
           description: Member added
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/warm:
+    post:
+      operationId: warmTeam
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start the team's engine in the background ahead of the first message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Warm-up started (or not needed)
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/open-path:
     post:
       operationId: openTeamPath

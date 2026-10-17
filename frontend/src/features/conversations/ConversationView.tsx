@@ -10,6 +10,7 @@ import { ArrowUp, Loader2, Square, X } from 'lucide-react';
 import { useCancelMessage, useConversation, useInterruptRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
 import { forgetLiveRuns, useLiveRuns } from '../../api/live';
+import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
@@ -60,6 +61,12 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const messages = conv.data?.messages ?? [];
   const activeRun = conv.data?.activeRun ?? null;
   const queuedCount = conv.data?.queuedCount ?? 0;
+
+  // Opening a team starts its engine in the background, so the first
+  // message does not wait for engine start-up.
+  useEffect(() => {
+    if (team.status === 'active') api.warmTeam(team.id).catch(() => undefined);
+  }, [team.id, team.status]);
 
   const liveRuns = useLiveRuns();
   const runs = conv.data?.runs ?? [];

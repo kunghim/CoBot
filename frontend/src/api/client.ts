@@ -300,6 +300,7 @@ export const api = {
   pickDirectory: () => request<{ path: string; cancelled: boolean }>('POST', '/api/v1/directories/pick', {}),
   listDirectories: (path?: string) =>
     request<import('./types').DirectoryListResult>('GET', `/api/v1/directories${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+  warmTeam: (teamId: string) => request<{ warming: boolean }>('POST', `/api/v1/teams/${teamId}/warm`, {}),
   openTeamPath: (teamId: string, path: string, reveal = false) =>
     request<{ path: string }>('POST', `/api/v1/teams/${teamId}/open-path`, { path, reveal }),
   checkDirectory: (path: string) =>

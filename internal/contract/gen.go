@@ -914,6 +914,11 @@ type ListTasksParams struct {
 	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// WarmTeamJSONBody defines parameters for WarmTeam.
+type WarmTeamJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // AcceptTaskTransferJSONBody defines parameters for AcceptTaskTransfer.
 type AcceptTaskTransferJSONBody struct {
 	ExpectedRevision int64              `json:"expectedRevision"`
@@ -1007,6 +1012,9 @@ type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest
+
+// WarmTeamJSONRequestBody defines body for WarmTeam for application/json ContentType.
+type WarmTeamJSONRequestBody WarmTeamJSONBody
 
 // AcceptTaskTransferJSONRequestBody defines body for AcceptTaskTransfer for application/json ContentType.
 type AcceptTaskTransferJSONRequestBody AcceptTaskTransferJSONBody
