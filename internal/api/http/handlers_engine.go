@@ -110,3 +110,17 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, r, http.StatusOK, models)
 }
+
+// handleBotStats returns one member's session statistics.
+func (s *Server) handleBotStats(w http.ResponseWriter, r *http.Request) {
+	p, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	stats, err := s.App.BotStats(r.Context(), p, r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, stats)
+}

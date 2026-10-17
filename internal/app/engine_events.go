@@ -68,6 +68,8 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		s.finishRun(ctx, teamID, source, n)
 	case "account/updated", "account/login/completed":
 		s.app.invalidateEngineStatus()
+	case "account/rateLimits/updated":
+		s.app.recordRateLimits(n.Raw)
 	case "hook/completed":
 		var result struct {
 			Run struct {

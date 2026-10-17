@@ -540,6 +540,12 @@ export function useSetTeamPermissionMode() {
   });
 }
 
+/** A member's session statistics; refreshed with every change the event
+ * stream announces, like the rest of the page. */
+export function useBotStats(botId: string) {
+  return useQuery({ queryKey: ['botStats', botId], queryFn: () => api.getBotStats(botId), enabled: botId !== '' });
+}
+
 export function useSetTeamReasoningEffort() {
   const invalidate = useInvalidateTeamScope();
   return useMutation({

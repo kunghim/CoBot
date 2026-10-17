@@ -43,6 +43,9 @@ export interface EngineModel {
   reasoningEfforts?: Array<{ effort: string; description?: string }>;
 }
 
+/** GET /bots/{id}/stats: a member's conversation in numbers. */
+export type SessionStats = components['schemas']['SessionStats'];
+
 export interface ModelListResult {
   models: EngineModel[];
 }

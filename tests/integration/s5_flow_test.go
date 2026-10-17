@@ -140,6 +140,47 @@ func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	}
 }
 
+// A member's statistics come from what the engine reported: turns, steps,
+// usage, the context in use and the account's limits.
+func TestSessionStatsReadWhatTheEngineReported(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "跑测试"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	emit := func(n engine.Notification) {
+		n.ThreadID, n.TurnID = turn.ThreadID, turn.TurnID
+		fake.Emit(n)
+	}
+	emit(engine.Notification{Method: "item/started", Step: &engine.Step{ID: "cmd-1", Kind: engine.StepCommand, Status: engine.StepInProgress, Detail: json.RawMessage(`{"command":"go test"}`)}})
+	time.Sleep(20 * time.Millisecond)
+	emit(engine.Notification{Method: "item/completed", Step: &engine.Step{ID: "cmd-1", Kind: engine.StepCommand, Status: engine.StepCompleted, Detail: json.RawMessage(`{"command":"go test","exitCode":0}`)}})
+	usage := `{"inputTokens":5000,"cachedInputTokens":4000,"cacheWriteInputTokens":0,"outputTokens":200,"reasoningOutputTokens":0,"totalTokens":5200}`
+	emit(engine.Notification{Method: "thread/tokenUsage/updated", TokenUsage: json.RawMessage(`{"threadId":"` + turn.ThreadID + `","turnId":"` + turn.TurnID + `","tokenUsage":{"last":` + usage + `,"total":` + usage + `,"modelContextWindow":258400}}`)})
+	fake.Emit(engine.Notification{Method: "account/rateLimits/updated", Raw: json.RawMessage(`{"rateLimits":{"primary":{"usedPercent":3,"windowDurationMins":300},"secondary":{"usedPercent":79,"windowDurationMins":10080}}}`)})
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "通过")
+	waitUntil(t, 5*time.Second, "turn ended", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID)
+		return errors.Is(err, sqlite.ErrNotFound)
+	})
+
+	stats, err := h.app.BotStats(ctx, h.user, bot.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Turns != 1 || stats.Steps != 1 || stats.ToolMs <= 0 || stats.Tokens.Input != 5000 || stats.Tokens.CachedRead != 4000 || stats.Tokens.Output != 200 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	if stats.Context.Used != 5200 || stats.Context.Window != 258400 || !strings.Contains(string(stats.RateLimits), `"usedPercent":79`) {
+		t.Fatalf("context/limits = %+v %s", stats.Context, stats.RateLimits)
+	}
+}
+
 // The team's reasoning effort reaches every member's next turn; empty
 // leaves the model's own default.
 func TestTeamReasoningEffortReachesTheTurn(t *testing.T) {

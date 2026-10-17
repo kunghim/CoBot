@@ -623,6 +623,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bots/{id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One member's session statistics, read off what the engine reported (no model call) */
+        get: operations["getBotStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bots/{id}/collaboration": {
         parameters: {
             query?: never;
@@ -897,6 +914,49 @@ export interface components {
             sourceBotId?: string;
             /** Format: date-time */
             createdAt: string;
+        };
+        SessionStats: {
+            turns: number;
+            steps: number;
+            /**
+             * Format: int64
+             * @description Turn time less tools and approval waits.
+             */
+            modelMs: number;
+            /** Format: int64 */
+            toolMs: number;
+            /**
+             * Format: int64
+             * @description Estimated time to first token: turn start to its first step, averaged.
+             */
+            firstStepMs?: number;
+            /** @description Estimated output speed over the model time. */
+            outputTokensPerSecond?: number;
+            tokens: {
+                /** Format: int64 */
+                input: number;
+                /** Format: int64 */
+                cachedRead: number;
+                /** Format: int64 */
+                cacheWrite: number;
+                /** Format: int64 */
+                output: number;
+                /** Format: int64 */
+                reasoning: number;
+            };
+            context: {
+                /**
+                 * Format: int64
+                 * @description Tokens of the last model call: the context in use.
+                 */
+                used: number;
+                /** Format: int64 */
+                window?: number;
+            };
+            /** @description The account's latest rate limits, as Codex reports them. */
+            rateLimits?: {
+                [key: string]: unknown;
+            };
         };
         Memory: {
             id: string;
@@ -2495,6 +2555,31 @@ export interface operations {
                 };
             };
             409: components["responses"]["Error"];
+        };
+    };
+    getBotStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session statistics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["SessionStats"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
         };
     };
     listCollaboration: {

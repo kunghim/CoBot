@@ -7,6 +7,7 @@ package codex
 // handled". TestHandledListsMatchTheCode keeps this list honest.
 var HandledMessages = []string{
 	"account/login/completed",
+	"account/rateLimits/updated",
 	"account/updated",
 	"error",
 	"hook/completed",

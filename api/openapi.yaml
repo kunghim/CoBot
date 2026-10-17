@@ -1355,6 +1355,30 @@ paths:
                       data: { $ref: "#/components/schemas/Question" }
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/stats:
+    get:
+      operationId: getBotStats
+      security:
+        - SessionCookie: []
+      summary: One member's session statistics, read off what the engine reported (no model call)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/SessionStats" }
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/bots/{id}/collaboration:
     get:
       operationId: listCollaboration
@@ -1872,6 +1896,32 @@ components:
         runId: { type: string }
         sourceBotId: { type: string }
         createdAt: { type: string, format: date-time }
+    SessionStats:
+      type: object
+      required: [turns, steps, modelMs, toolMs, tokens, context]
+      properties:
+        turns: { type: integer }
+        steps: { type: integer }
+        modelMs: { type: integer, format: int64, description: "Turn time less tools and approval waits." }
+        toolMs: { type: integer, format: int64 }
+        firstStepMs: { type: integer, format: int64, description: "Estimated time to first token: turn start to its first step, averaged." }
+        outputTokensPerSecond: { type: number, description: "Estimated output speed over the model time." }
+        tokens:
+          type: object
+          required: [input, cachedRead, cacheWrite, output, reasoning]
+          properties:
+            input: { type: integer, format: int64 }
+            cachedRead: { type: integer, format: int64 }
+            cacheWrite: { type: integer, format: int64 }
+            output: { type: integer, format: int64 }
+            reasoning: { type: integer, format: int64 }
+        context:
+          type: object
+          required: [used]
+          properties:
+            used: { type: integer, format: int64, description: "Tokens of the last model call: the context in use." }
+            window: { type: integer, format: int64 }
+        rateLimits: { type: object, additionalProperties: true, description: "The account's latest rate limits, as Codex reports them." }
     Memory:
       type: object
       required: [id, teamId, botId, body, createdAt]

@@ -501,6 +501,37 @@ type Question struct {
 // QuestionStatus defines model for Question.Status.
 type QuestionStatus string
 
+// SessionStats defines model for SessionStats.
+type SessionStats struct {
+	Context struct {
+		// Used Tokens of the last model call: the context in use.
+		Used   int64  `json:"used"`
+		Window *int64 `json:"window,omitempty"`
+	} `json:"context"`
+
+	// FirstStepMs Estimated time to first token: turn start to its first step, averaged.
+	FirstStepMs *int64 `json:"firstStepMs,omitempty"`
+
+	// ModelMs Turn time less tools and approval waits.
+	ModelMs int64 `json:"modelMs"`
+
+	// OutputTokensPerSecond Estimated output speed over the model time.
+	OutputTokensPerSecond *float32 `json:"outputTokensPerSecond,omitempty"`
+
+	// RateLimits The account's latest rate limits, as Codex reports them.
+	RateLimits *map[string]interface{} `json:"rateLimits,omitempty"`
+	Steps      int                     `json:"steps"`
+	Tokens     struct {
+		CacheWrite int64 `json:"cacheWrite"`
+		CachedRead int64 `json:"cachedRead"`
+		Input      int64 `json:"input"`
+		Output     int64 `json:"output"`
+		Reasoning  int64 `json:"reasoning"`
+	} `json:"tokens"`
+	ToolMs int64 `json:"toolMs"`
+	Turns  int   `json:"turns"`
+}
+
 // Settings defines model for Settings.
 type Settings struct {
 	BudgetScope  SettingsBudgetScope `json:"budgetScope"`

@@ -65,6 +65,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/login/cancel", s.handleEngineLoginCancel)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleEngineLogout)
 	mux.HandleFunc("GET /api/v1/models", s.handleModels)
+	mux.HandleFunc("GET /api/v1/bots/{id}/stats", s.handleBotStats)
 
 	// Teams, roles and members.
 	mux.HandleFunc("GET /api/v1/teams", s.handleListTeams)

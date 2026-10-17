@@ -17,6 +17,7 @@ import { deliveryLabelKey, messageText } from './delivery';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
+import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
 import { ExchangeLine, RoleBadge, isExchange } from './MessageCards';
 import ExchangeOverlay from './ExchangeOverlay';
@@ -289,6 +290,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </div>
         </fieldset>
 
+        <SessionStatsBar botId={bot.id} />
         {blockReasonKey && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t(blockReasonKey, { status: team.status })}
