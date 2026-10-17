@@ -32,8 +32,8 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 
 	switch n.Method {
 	case "turn/started":
-		if runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID); runID != "" && s.app.Paths.Root != "" {
-			if run, err := sqlite.GetRun(ctx, s.app.DB, runID); err == nil && (run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval) {
+		if run, ok := s.runForThread(ctx, source, n.ThreadID, n.TurnID); ok && s.app.Paths.Root != "" {
+			if run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval {
 				err := hookrun.WriteNativeBinding(s.app.Paths.Root, hookrun.NativeBinding{
 					ThreadID: n.ThreadID, TurnID: n.TurnID, BotID: run.BotID, RunID: run.ID,
 					EngineEpoch: source.server.Epoch(), InstanceID: s.app.InstanceID, ServiceEpoch: s.app.ServiceEpoch,
@@ -53,6 +53,10 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 		source.mu.Lock()
 		ref, tracked := source.live[liveTurnKey{n.ThreadID, n.TurnID}]
 		source.mu.Unlock()
+		if tracked && ref.subAgent != "" {
+			source.forgetLiveRun(n.ThreadID, n.TurnID)
+			return
+		}
 		// Steps settle before the run does, so the reload the completion
 		// triggers never shows a finished run with a step still running.
 		if tracked {
@@ -276,16 +280,16 @@ func joinTexts(parts []string) string {
 func (s *Scheduler) onApproval(teamID string, source *teamRuntime, req engine.ApprovalRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	botID, err := s.app.botByThread(ctx, source.server.Epoch(), req.ThreadID)
+	// A sub-agent asks on behalf of the member whose thread spawned it.
+	botID, err := s.app.botByThread(ctx, source.server.Epoch(), rootOf(source, req.ThreadID))
 	if err != nil {
 		s.logger.Error("approval for unknown thread", "threadId", req.ThreadID, "method", req.Method)
 		// Cannot route: decline explicitly rather than hang the engine.
 		_ = source.server.ReplyApproval(ctx, req.RequestID, map[string]any{"decision": domain.DecisionDeclineEngine})
 		return
 	}
-	runID := s.findRunByTurn(ctx, source.server.Epoch(), req.ThreadID, req.TurnID)
-	run, err := sqlite.GetRun(ctx, s.app.DB, runID)
-	if err != nil {
+	run, found := s.runForThread(ctx, source, req.ThreadID, req.TurnID)
+	if !found || run.BotID != botID {
 		_ = source.server.ReplyApproval(ctx, req.RequestID, map[string]any{"decision": domain.DecisionDeclineEngine})
 		return
 	}

@@ -4,7 +4,7 @@
 // expands into the same steps.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Brain, Check, ChevronDown, ChevronRight, FileDiff, Globe, ListChecks, Loader2, Minus, RefreshCw, TerminalSquare, TriangleAlert, Wrench, X } from 'lucide-react';
+import { Bot, Brain, Check, ChevronDown, ChevronRight, FileDiff, Globe, ListChecks, Loader2, Minus, RefreshCw, TerminalSquare, TriangleAlert, Wrench, X } from 'lucide-react';
 import type { RunStep, RunWithSteps } from '../../api/types';
 import type { LiveRun } from '../../api/live';
 import { mergeSteps } from '../../api/live';
@@ -98,6 +98,7 @@ const kindIcon: Record<string, typeof Brain> = {
   plan: ListChecks,
   retry: RefreshCw,
   notice: TriangleAlert,
+  agent: Bot,
 };
 
 function StatusMark({ status, running }: { status: string; running: boolean }) {
@@ -149,6 +150,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
         className="flex w-full min-w-0 items-center gap-1.5 text-left enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100"
       >
         <Icon size={12} className="shrink-0" aria-hidden="true" />
+        {typeof d.subAgentThread === 'string' && <span className="shrink-0 rounded bg-violet-100 px-1 text-[10px] text-violet-700 dark:bg-violet-950 dark:text-violet-300">{t('conversation.step.agent.badge')}</span>}
         <span className={step.kind === 'command' ? 'shrink-0' : 'min-w-0 truncate'}>{t(phrase.key, phrase.params)}</span>
         {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-[11px] text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
         {step.kind === 'command' && typeof d.exitCode === 'number' && d.exitCode !== 0 && <span className="shrink-0 text-red-500">{t('conversation.step.exitCode', { code: d.exitCode })}</span>}
@@ -197,6 +199,8 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
     }
     case 'plan':
       return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={teamId} /> : null;
+    case 'agent':
+      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={teamId} /></div> : null;
     case 'retry':
     case 'notice':
       return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-400">{d.message}</p> : null;

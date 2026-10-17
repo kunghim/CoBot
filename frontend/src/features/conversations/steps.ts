@@ -48,6 +48,11 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: 'conversation.step.reasoning' };
     case 'message':
       return { key: 'conversation.step.message' };
+    case 'agent': {
+      // A member working with its own Codex sub-agents.
+      if (text(d.activity)) return { key: `conversation.step.agent.activity.${text(d.activity)}`, params: { agent: text(d.agent) } };
+      return { key: `conversation.step.agent.${text(d.tool) || 'other'}`, params: { count: Number(d.agents) || 1 } };
+    }
     case 'command':
       return { key: step.status === 'in_progress' ? 'conversation.step.commandRunning' : 'conversation.step.command' };
     case 'file_change': {

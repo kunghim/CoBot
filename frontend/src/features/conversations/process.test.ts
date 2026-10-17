@@ -34,6 +34,10 @@ describe('describeStep', () => {
     const fromString = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'create_task', arguments: '{"title":"做页面","ownerId":"qa"}' } }), nameOf);
     expect(fromString.params).toEqual(expect.objectContaining({ title: '做页面', name: '测试工程师' }));
   });
+  it('describes a member working with its sub-agents', () => {
+    expect(describeStep(step({ kind: 'agent', detail: { tool: 'spawnAgent', agents: 2, prompt: 'x' } }), nameOf)).toEqual({ key: 'conversation.step.agent.spawnAgent', params: { count: 2 } });
+    expect(describeStep(step({ kind: 'agent', detail: { activity: 'completed', agent: '/root/tester' } }), nameOf)).toEqual({ key: 'conversation.step.agent.activity.completed', params: { agent: '/root/tester' } });
+  });
   it('tells a delivery, an accepted review and a sent-back task apart', () => {
     const tool = (name: string, args: Record<string, unknown>) => describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: name, arguments: args } }), nameOf).key;
     expect(tool('deliver_task', { taskId: 't', summary: 's' })).toBe('conversation.step.cobot.deliver_task');

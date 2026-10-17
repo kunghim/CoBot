@@ -52,6 +52,8 @@ type Server struct {
 
 	loaded map[string]bool   // threads this app-server has loaded
 	phases map[string]string // agent message item -> phase, while it streams
+	// parents maps a sub-agent thread to the thread that spawned it.
+	parents map[string]string
 
 	trace       *wiretrace.Recorder
 	tracePeer   string
@@ -284,6 +286,19 @@ func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemI
 func (s *Server) handleNotify(method string, params json.RawMessage) {
 	n := engine.Notification{Method: method, Raw: params}
 	switch method {
+	case "thread/started":
+		// A sub-agent's thread names its parent; its activity belongs to
+		// the member whose thread spawned it.
+		var p struct {
+			Thread struct {
+				ID             string `json:"id"`
+				ParentThreadID string `json:"parentThreadId"`
+			} `json:"thread"`
+		}
+		if json.Unmarshal(params, &p) == nil && p.Thread.ID != "" {
+			n.ThreadID = p.Thread.ID
+			s.setParent(p.Thread.ID, p.Thread.ParentThreadID)
+		}
 	case "thread/closed", "thread/status/changed":
 		// A thread Codex closed or unloaded needs a resume before its next turn.
 		var p struct {
@@ -332,6 +347,7 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 					// the item completes.
 					s.setItemPhase(item.ID, item.Phase, method == "item/completed")
 				}
+				s.learnSubAgents(p.ThreadID, p.Item)
 				if step := normalizeStep(p.Item); step != nil {
 					if step.Status == "" {
 						step.Status = engine.StepInProgress
@@ -479,6 +495,58 @@ func (s *Server) ThreadLoaded(threadID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.loaded[threadID]
+}
+
+// learnSubAgents records the threads a member's sub-agent items name.
+func (s *Server) learnSubAgents(threadID string, raw json.RawMessage) {
+	var item struct {
+		Type              string   `json:"type"`
+		SenderThreadID    string   `json:"senderThreadId"`
+		ReceiverThreadIDs []string `json:"receiverThreadIds"`
+		AgentThreadID     string   `json:"agentThreadId"`
+	}
+	if json.Unmarshal(raw, &item) != nil {
+		return
+	}
+	switch item.Type {
+	case "collabAgentToolCall":
+		sender := item.SenderThreadID
+		if sender == "" {
+			sender = threadID
+		}
+		for _, receiver := range item.ReceiverThreadIDs {
+			s.setParent(receiver, sender)
+		}
+	case "subAgentActivity":
+		s.setParent(item.AgentThreadID, threadID)
+	}
+}
+
+func (s *Server) setParent(child, parent string) {
+	if child == "" || parent == "" || child == parent {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.parents == nil {
+		s.parents = map[string]string{}
+	}
+	s.parents[child] = parent
+}
+
+// RootThread is the thread a (sub-agent) thread descends from: a member's own
+// thread, or the thread itself when it has no known parent.
+func (s *Server) RootThread(threadID string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := 0; i < 16; i++ {
+		parent, ok := s.parents[threadID]
+		if !ok {
+			return threadID
+		}
+		threadID = parent
+	}
+	return threadID
 }
 
 func (s *Server) setItemPhase(itemID, phase string, done bool) {

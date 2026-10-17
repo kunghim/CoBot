@@ -42,6 +42,31 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 		}
 		step.Kind = engine.StepMessage
 		detail = map[string]any{"text": item.Text}
+	case "collabAgentToolCall":
+		var item struct {
+			Tool              string   `json:"tool"`
+			Prompt            *string  `json:"prompt"`
+			Model             *string  `json:"model"`
+			ReceiverThreadIDs []string `json:"receiverThreadIds"`
+		}
+		_ = json.Unmarshal(raw, &item)
+		step.Kind = engine.StepAgent
+		out := map[string]any{"tool": item.Tool, "agents": len(item.ReceiverThreadIDs)}
+		if item.Prompt != nil {
+			out["prompt"] = clipHead(*item.Prompt, maxStepOutput)
+		}
+		if item.Model != nil {
+			out["model"] = *item.Model
+		}
+		detail = out
+	case "subAgentActivity":
+		var item struct {
+			Kind      string `json:"kind"`
+			AgentPath string `json:"agentPath"`
+		}
+		_ = json.Unmarshal(raw, &item)
+		step.Kind = engine.StepAgent
+		detail = map[string]any{"activity": item.Kind, "agent": item.AgentPath}
 	case "reasoning":
 		var item struct {
 			Summary []string `json:"summary"`

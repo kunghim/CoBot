@@ -35,6 +35,7 @@ type Server struct {
 	loaded            map[string]bool
 	resumes           int
 	instructions      []string
+	parents           map[string]string
 	startedTurns      []StartedTurn
 	interrupted       []string
 	steers            []Steer
@@ -95,6 +96,30 @@ func (s *Server) Unload(threadID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.loaded, threadID)
+}
+
+// SpawnSubAgent plays a member's thread spawning a Codex sub-agent.
+func (s *Server) SpawnSubAgent(child, parent string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.parents == nil {
+		s.parents = map[string]string{}
+	}
+	s.parents[child] = parent
+}
+
+// RootThread mirrors the Codex adapter: a sub-agent leads to its member.
+func (s *Server) RootThread(threadID string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := 0; i < 16; i++ {
+		parent, ok := s.parents[threadID]
+		if !ok {
+			return threadID
+		}
+		threadID = parent
+	}
+	return threadID
 }
 
 // Instructions lists the developer instructions of every started thread.

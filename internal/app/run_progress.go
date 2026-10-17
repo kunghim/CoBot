@@ -18,7 +18,10 @@ type liveTurnKey struct{ threadID, turnID string }
 // seen so far in it.
 type liveRun struct {
 	teamID, botID, runID string
-	retries              int
+	// subAgent is set when the turn is a sub-agent's, working inside the
+	// member's run; its steps are kept apart from the member's own.
+	subAgent string
+	retries  int
 	// retryOpen is true while the retry step still says "reconnecting".
 	retryOpen bool
 }
@@ -43,6 +46,12 @@ func (s *Scheduler) resolveLiveRun(ctx context.Context, teamID string, rt *teamR
 		return ref, true
 	}
 	runID := s.findRunByTurn(ctx, rt.server.Epoch(), threadID, turnID)
+	subAgent := ""
+	if runID == "" {
+		// A sub-agent's turn has its own ids: it works inside the live run
+		// of the member whose thread spawned it.
+		runID, subAgent = s.subAgentRun(ctx, rt, threadID)
+	}
 	if runID == "" {
 		return liveRun{}, false
 	}
@@ -50,7 +59,7 @@ func (s *Scheduler) resolveLiveRun(ctx context.Context, teamID string, rt *teamR
 	if err != nil {
 		return liveRun{}, false
 	}
-	ref = liveRun{teamID: teamID, botID: run.BotID, runID: run.ID}
+	ref = liveRun{teamID: teamID, botID: run.BotID, runID: run.ID, subAgent: subAgent}
 	rt.mu.Lock()
 	if rt.live == nil {
 		rt.live = map[liveTurnKey]liveRun{}
@@ -104,13 +113,26 @@ func (s *Scheduler) onProgress(ctx context.Context, teamID string, rt *teamRunti
 		s.saveStep(ctx, ref, domain.RunStep{ID: "cobot-notice-" + domain.NewID(), Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
 	case n.Step != nil:
 		s.settleRetry(ctx, rt, n, &ref)
-		s.saveStep(ctx, ref, domain.RunStep{ID: n.Step.ID, Kind: n.Step.Kind, Status: n.Step.Status, Detail: n.Step.Detail})
+		step := domain.RunStep{ID: n.Step.ID, Kind: n.Step.Kind, Status: n.Step.Status, Detail: n.Step.Detail}
+		if ref.subAgent != "" {
+			step.ID, step.Detail = subAgentStep(ref.subAgent, step.ID, step.Detail)
+		}
+		s.saveStep(ctx, ref, step)
 	default:
 		if n.Delta == "" {
 			return true
 		}
 		s.settleRetry(ctx, rt, n, &ref)
-		s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: n.ItemID, Kind: n.DeltaKind, Text: n.Delta})
+		itemID, kind := n.ItemID, n.DeltaKind
+		if ref.subAgent != "" {
+			// A sub-agent's answer is its result, shown with its steps, never
+			// streamed as the member's reply.
+			itemID, _ = subAgentStep(ref.subAgent, itemID, nil)
+			if kind == "message" {
+				kind = "commentary"
+			}
+		}
+		s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: itemID, Kind: kind, Text: n.Delta})
 	}
 	return true
 }

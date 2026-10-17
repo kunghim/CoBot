@@ -21,6 +21,7 @@ var HandledMessages = []string{
 	"item/started",
 	"mcpServer/elicitation/request",
 	"thread/closed",
+	"thread/started",
 	"thread/status/changed",
 	"thread/tokenUsage/updated",
 	"turn/completed",
@@ -32,11 +33,13 @@ var HandledMessages = []string{
 // visible step; other item types arrive but show nothing.
 var HandledItemTypes = []string{
 	"agentMessage",
+	"collabAgentToolCall",
 	"commandExecution",
 	"dynamicToolCall",
 	"fileChange",
 	"mcpToolCall",
 	"plan",
 	"reasoning",
+	"subAgentActivity",
 	"webSearch",
 }

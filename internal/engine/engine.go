@@ -144,6 +144,9 @@ const (
 	// StepMessage is what the model says while it works (Codex commentary);
 	// it sits among the steps, not in the reply.
 	StepMessage = "message"
+	// StepAgent is a member working with its own Codex sub-agents: spawning,
+	// instructing, waiting for or closing one, and their activity.
+	StepAgent = "agent"
 )
 
 // Step statuses.

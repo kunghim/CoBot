@@ -197,6 +197,25 @@
     "step": {
       "reasoning": "Thinking",
       "message": "Note",
+      "agent": {
+        "badge": "Sub-agent",
+        "spawnAgent": "Spawned {{count}} sub-agent(s)",
+        "sendInput": "Instructed a sub-agent",
+        "sendMessage": "Messaged a sub-agent",
+        "followupTask": "Gave a sub-agent a follow-up task",
+        "wait": "Waited for sub-agents",
+        "listAgents": "Looked at sub-agents",
+        "resumeAgent": "Resumed a sub-agent",
+        "interruptAgent": "Interrupted a sub-agent",
+        "closeAgent": "Closed a sub-agent",
+        "other": "Worked with sub-agents",
+        "activity": {
+          "started": "Sub-agent {{agent}} started",
+          "interacted": "Sub-agent {{agent}} made progress",
+          "completed": "Sub-agent {{agent}} finished",
+          "interrupted": "Sub-agent {{agent}} was interrupted"
+        }
+      },
       "command": "Ran a command",
       "commandRunning": "Running a command",
       "fileChange": "Changed {{count}} files",

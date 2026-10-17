@@ -140,6 +140,50 @@ func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	}
 }
 
+// A Codex sub-agent a member spawns works inside the member's run: its steps
+// join the member's process, its approvals reach the user as the member's,
+// its usage counts to the member, and its turn ending does not end the
+// member's turn.
+func TestSubAgentWorkBelongsToTheMember(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	bot := bots[0]
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bot.ID, Text: "让子智能体查测试"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	fake.SpawnSubAgent("child-thread", turn.ThreadID)
+	child := func(n engine.Notification) {
+		n.ThreadID, n.TurnID = "child-thread", "child-turn"
+		fake.Emit(n)
+	}
+	child(engine.Notification{Method: "turn/started"})
+	child(engine.Notification{Method: "item/completed", Step: &engine.Step{ID: "cmd-1", Kind: engine.StepCommand, Status: engine.StepCompleted, Detail: json.RawMessage(`{"command":"go test"}`)}})
+	usage := `{"inputTokens":700,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":30,"reasoningOutputTokens":0,"totalTokens":730}`
+	child(engine.Notification{Method: "thread/tokenUsage/updated", TokenUsage: json.RawMessage(`{"threadId":"child-thread","turnId":"child-turn","tokenUsage":{"last":` + usage + `,"total":` + usage + `}}`)})
+	fake.EmitApproval("sub-approval", "child-thread", "child-turn", "rm -rf build")
+	child(engine.Notification{Method: "turn/completed", TurnStatus: "completed", Raw: json.RawMessage(`{"threadId":"child-thread","turn":{"id":"child-turn","status":"completed"}}`)})
+
+	runID := h.runStatusID(t, bot.ID)
+	waitUntil(t, 5*time.Second, "sub-agent step stored", func() bool {
+		step, err := sqlite.GetRunStep(ctx, h.app.DB, runID, "sub-d-thread:cmd-1")
+		return err == nil && strings.Contains(string(step.Detail), "child-thread")
+	})
+	var pending int
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM approvals WHERE requester_bot_id = ? AND run_id = ? AND request_state = 'pending'`, bot.ID, runID).Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("sub-agent approval cards = %d (%v)", pending, err)
+	}
+	if usage, err := sqlite.GetUsage(ctx, h.app.DB, fake.Epoch(), "child-thread", "child-turn"); err != nil || usage.BotID != bot.ID || usage.InputTokens != 700 {
+		t.Fatalf("sub-agent usage = %+v %v", usage, err)
+	}
+	if run, err := sqlite.FindActiveRun(ctx, h.app.DB, bot.ID); err != nil || run.ID != runID {
+		t.Fatalf("the sub-agent ending ended the member's turn: %+v %v", run, err)
+	}
+}
+
 // A member's statistics come from what the engine reported: turns, steps,
 // usage, the context in use and the account's limits.
 func TestSessionStatsReadWhatTheEngineReported(t *testing.T) {

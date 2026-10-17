@@ -70,10 +70,17 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 	if err := json.Unmarshal(raw, &p); err != nil || p.TurnID == "" {
 		return nil // malformed usage never crashes the notification loop
 	}
-	botID, _ := a.botByThread(ctx, epoch, p.ThreadID)
+	// A sub-agent's usage counts to the member that spawned it; only the
+	// member's own thread is the session snapshot.
+	root := p.ThreadID
+	if a.Scheduler != nil {
+		root = a.Scheduler.RootThread(teamID, p.ThreadID)
+	}
+	botID, _ := a.botByThread(ctx, epoch, root)
 	call := p.TokenUsage.Last
 	var previous usageSnapshot
-	if botID != "" {
+	own := root == p.ThreadID
+	if botID != "" && own {
 		_ = json.Unmarshal([]byte(sqlite.SessionUsageSnapshot(ctx, a.DB, botID)), &previous)
 		if previous.ThreadID == p.ThreadID && previous.Total.TotalTokens > 0 && p.TokenUsage.Total.TotalTokens >= previous.Total.TotalTokens {
 			call = p.TokenUsage.Total.minus(previous.Total)
@@ -94,7 +101,7 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 	entry.CachedInputTokens += call.CachedInputTokens
 	entry.CacheWriteInputTokens += call.CacheWriteInputTokens
 	entry.ReasoningOutputTokens += call.ReasoningOutputTokens
-	if botID != "" {
+	if botID != "" && own {
 		snapshot := usageSnapshot{ThreadID: p.ThreadID, Total: p.TokenUsage.Total, Last: p.TokenUsage.Last}
 		if p.TokenUsage.ModelContextWindow != nil {
 			snapshot.ContextWindow = *p.TokenUsage.ModelContextWindow

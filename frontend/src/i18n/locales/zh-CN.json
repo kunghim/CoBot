@@ -197,6 +197,25 @@
     "step": {
       "reasoning": "思考",
       "message": "说明",
+      "agent": {
+        "badge": "子智能体",
+        "spawnAgent": "派生了 {{count}} 个子智能体",
+        "sendInput": "给子智能体发了指令",
+        "sendMessage": "给子智能体发了消息",
+        "followupTask": "给子智能体追加了任务",
+        "wait": "等待子智能体完成",
+        "listAgents": "查看子智能体",
+        "resumeAgent": "恢复了子智能体",
+        "interruptAgent": "中断了子智能体",
+        "closeAgent": "关闭了子智能体",
+        "other": "使用子智能体",
+        "activity": {
+          "started": "子智能体 {{agent}} 开始工作",
+          "interacted": "子智能体 {{agent}} 有新进展",
+          "completed": "子智能体 {{agent}} 完成",
+          "interrupted": "子智能体 {{agent}} 被中断"
+        }
+      },
       "command": "运行了命令",
       "commandRunning": "正在运行命令",
       "fileChange": "修改了 {{count}} 个文件",

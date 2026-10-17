@@ -90,3 +90,26 @@ func TestCommentaryIsAStepAndOnlyTheAnswerIsTheReply(t *testing.T) {
 		t.Fatalf("answer and unknown-phase deltas = %+v / %+v", got[4], got[5])
 	}
 }
+
+// A sub-agent's thread is traced back to the member thread that spawned it,
+// from the thread itself and from the member's sub-agent items, which show
+// as agent steps.
+func TestSubAgentThreadsLeadBackToTheMember(t *testing.T) {
+	var got []engine.Notification
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnNotification: func(n engine.Notification) { got = append(got, n) }}}
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"member","turnId":"t1","item":{"type":"collabAgentToolCall","id":"c1","tool":"spawnAgent","senderThreadId":"member","receiverThreadIds":["child"],"prompt":"查一下测试","agentsStates":{},"status":"inProgress"}}`))
+	server.handleNotify("thread/started", json.RawMessage(`{"thread":{"id":"grandchild","parentThreadId":"child"}}`))
+	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"member","turnId":"t1","item":{"type":"subAgentActivity","id":"a1","kind":"completed","agentPath":"/root/tester","agentThreadId":"other"}}`))
+
+	for thread, want := range map[string]string{"child": "member", "grandchild": "member", "other": "member", "member": "member", "stranger": "stranger"} {
+		if root := server.RootThread(thread); root != want {
+			t.Fatalf("root of %s = %s, want %s", thread, root, want)
+		}
+	}
+	if s := got[0].Step; s == nil || s.Kind != engine.StepAgent || !strings.Contains(string(s.Detail), `"tool":"spawnAgent"`) || !strings.Contains(string(s.Detail), "查一下测试") {
+		t.Fatalf("spawn step = %+v", got[0].Step)
+	}
+	if s := got[2].Step; s == nil || s.Kind != engine.StepAgent || !strings.Contains(string(s.Detail), `"activity":"completed"`) {
+		t.Fatalf("activity step = %+v", got[2].Step)
+	}
+}
