@@ -18,6 +18,10 @@ import (
 // database itself.
 type App interface {
 	ValidateToolRun(ctx context.Context, principal auth.Principal) error
+	ViewTasks(ctx context.Context, principal auth.Principal, taskID string) (map[string]any, error)
+	DeliverTask(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string) (domain.Task, error)
+	ReviewTask(ctx context.Context, principal auth.Principal, taskID string, accept bool, comment string) (domain.Task, error)
+	WaitingTasksOf(ctx context.Context, teamID, botID string) []string
 	SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in app.CreateTaskInput) (domain.Task, error)
@@ -77,6 +81,36 @@ const dispatchTimeout = 30 * time.Second
 type ToolCall struct {
 	Name      string
 	Arguments json.RawMessage
+	// CallID is the engine's id for this call (bridge transport metadata).
+	CallID string
+}
+
+// withDerivedKey gives a write without an idempotencyKey one derived from the
+// engine's call id and the arguments: a retry of the same call replays, two
+// different calls inside one code cell (which share the call id) stay apart,
+// and the model never has to invent a key.
+func withDerivedKey(call ToolCall) ToolCall {
+	if call.CallID == "" || !IsSideEffectTool(call.Name) {
+		return call
+	}
+	args := map[string]any{}
+	if len(call.Arguments) > 0 && json.Unmarshal(call.Arguments, &args) != nil {
+		return call
+	}
+	if key, _ := args["idempotencyKey"].(string); key != "" {
+		return call
+	}
+	hash := canonicalArgsHash(call.Arguments)
+	args["idempotencyKey"] = "call:" + call.CallID + ":" + hash[:16]
+	if len(args["idempotencyKey"].(string)) > 128 {
+		args["idempotencyKey"] = "call:" + hash
+	}
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return call
+	}
+	call.Arguments = raw
+	return call
 }
 
 func decodeArgs(raw json.RawMessage, dst any) error {
@@ -120,6 +154,7 @@ func asToolError(err error, target **ToolError) bool {
 // different arguments is rejected. Read tools and keyless calls pass through
 // to the router, where each write tool still enforces key presence.
 func (d *Dispatcher) CallTool(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
+	call = withDerivedKey(call)
 	if IsSideEffectTool(call.Name) {
 		if err := d.app.ValidateToolRun(ctx, principal); err != nil {
 			return errorResult(err)
@@ -176,6 +211,60 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 	defer cancel()
 
 	switch call.Name {
+	case "view_tasks":
+		var args struct {
+			TaskID string `json:"taskId"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		data, err := d.app.ViewTasks(ctx, principal, args.TaskID)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusOK, Data: data}
+
+	case "deliver_task":
+		var args struct {
+			TaskID       string   `json:"taskId"`
+			Summary      string   `json:"summary"`
+			ArtifactRefs []string `json:"artifactRefs"`
+			RequestID    string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		task, err := d.app.DeliverTask(ctx, principal, args.TaskID, args.Summary, args.ArtifactRefs)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
+	case "review_task":
+		var args struct {
+			TaskID    string `json:"taskId"`
+			Decision  string `json:"decision"`
+			Comment   string `json:"comment"`
+			RequestID string `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		if args.Decision != "accept" && args.Decision != "reject" {
+			return rejected("invalid_request", "error.task.review_decision", nil)
+		}
+		task, err := d.app.ReviewTask(ctx, principal, args.TaskID, args.Decision == "accept", args.Comment)
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+
 	case "get_context":
 		var args struct {
 			TaskID string `json:"taskId"`
@@ -264,6 +353,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 			if err != nil {
 				return errorResult(err)
 			}
+			d.noteWaiting(ctx, principal, targets[0], result)
 			return ToolResult{Status: StatusAccepted, Data: result}
 		}
 		// One message per recipient, each its own idempotent write so a
@@ -275,6 +365,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 				return errorResult(err)
 			}
 			result["targetBotId"] = target
+			d.noteWaiting(ctx, principal, target, result)
 			results = append(results, result)
 		}
 		return ToolResult{Status: StatusAccepted, Data: map[string]any{"status": "accepted", "recipients": results}}
@@ -589,11 +680,11 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 }
 
 func rejected(code, messageKey string, params map[string]any) ToolResult {
-	return ToolResult{Status: StatusRejected, Error: &ToolError{Status: StatusRejected, Code: code, MessageKey: messageKey, Params: params}}
+	return ToolResult{Status: StatusRejected, Error: withHint(&ToolError{Status: StatusRejected, Code: code, MessageKey: messageKey, Params: params})}
 }
 
 func errorResult(err error) ToolResult {
-	te := toolError(err)
+	te := withHint(toolError(err))
 	return ToolResult{Status: te.Status, Error: te}
 }
 
@@ -647,4 +738,12 @@ func perRecipient(p auth.Principal, target string) auth.Principal {
 	write.Key = recipientKey(write.Key, target)
 	p.Write = &write
 	return p
+}
+
+// noteWaiting tells the sender when the recipient's task still waits for
+// another one, so nobody is set to work before its task has reached it.
+func (d *Dispatcher) noteWaiting(ctx context.Context, principal auth.Principal, target string, result map[string]any) {
+	if waiting := d.app.WaitingTasksOf(ctx, principal.TeamID, target); len(waiting) > 0 {
+		result["note"] = "对方的任务还没送到它手上：" + strings.Join(waiting, "；") + "。前置任务完成后系统会自动把任务送过去，不必现在叫它开工。"
+	}
 }

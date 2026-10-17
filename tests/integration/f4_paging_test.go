@@ -40,7 +40,8 @@ func TestAssignmentCarriesFullTaskRequirementsAndIdentity(t *testing.T) {
 	fake := h.fakeFor(t, team.ID)
 	waitUntil(t, 5*time.Second, "task requirements dispatched", func() bool { return len(fake.Turns()) == 1 })
 	text := fake.Turns()[0].Text
-	for _, required := range []string{task.ID, task.OwnerID, "版本：1", task.Description, task.AcceptanceCriteria} {
+	// The member is the recipient; the revision is CoBot's business, not the model's.
+	for _, required := range []string{task.ID, task.Description, task.AcceptanceCriteria} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("missing task requirement: %s", required)
 		}

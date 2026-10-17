@@ -954,10 +954,12 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge" | "remember" | "search_memory";
+            tool: "view_tasks" | "deliver_task" | "review_task" | "get_context" | "list_tasks" | "get_task" | "list_roles" | "send_message" | "create_task" | "propose_task" | "assign_task" | "update_task" | "submit_evidence" | "report_completion" | "confirm_task" | "offer_transfer" | "accept_transfer" | "ask_user" | "request_member" | "request_merge" | "remember" | "search_memory";
             arguments?: {
                 [key: string]: unknown;
             };
+            /** @description Bridge-only: the engine's id for this tool call; a write without an idempotencyKey derives its key from it. */
+            callId?: string;
             /** @description Bridge-only native transport identity, never a model argument. */
             providerThreadId?: string;
             /** @description Bridge-only native transport identity, never a model argument. */

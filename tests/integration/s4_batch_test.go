@@ -248,7 +248,7 @@ func TestReviewWakesTheLeader(t *testing.T) {
 
 	waitUntil(t, 5*time.Second, "leader woken", func() bool { return len(fake.Turns()) == 2 })
 	notice := fake.Turns()[1]
-	if !strings.Contains(notice.Text, "把任务「登录接口」提交验收") || !strings.Contains(notice.Text, "confirm_task") {
+	if !strings.Contains(notice.Text, "交付了任务「登录接口」") || !strings.Contains(notice.Text, "review_task") || !strings.Contains(notice.Text, "返回 200") {
 		t.Fatalf("leader input:\n%s", notice.Text)
 	}
 	var leaderMessages int

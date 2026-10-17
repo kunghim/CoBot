@@ -60,6 +60,7 @@ const (
 	AssignTask       CollaborationRequestTool = "assign_task"
 	ConfirmTask      CollaborationRequestTool = "confirm_task"
 	CreateTask       CollaborationRequestTool = "create_task"
+	DeliverTask      CollaborationRequestTool = "deliver_task"
 	GetContext       CollaborationRequestTool = "get_context"
 	GetTask          CollaborationRequestTool = "get_task"
 	ListRoles        CollaborationRequestTool = "list_roles"
@@ -70,10 +71,12 @@ const (
 	ReportCompletion CollaborationRequestTool = "report_completion"
 	RequestMember    CollaborationRequestTool = "request_member"
 	RequestMerge     CollaborationRequestTool = "request_merge"
+	ReviewTask       CollaborationRequestTool = "review_task"
 	SearchMemory     CollaborationRequestTool = "search_memory"
 	SendMessage      CollaborationRequestTool = "send_message"
 	SubmitEvidence   CollaborationRequestTool = "submit_evidence"
 	UpdateTask       CollaborationRequestTool = "update_task"
+	ViewTasks        CollaborationRequestTool = "view_tasks"
 )
 
 // Defines values for EngineLoginType.
@@ -320,6 +323,9 @@ type BotStatus string
 // CollaborationRequest defines model for CollaborationRequest.
 type CollaborationRequest struct {
 	Arguments *map[string]interface{} `json:"arguments,omitempty"`
+
+	// CallId Bridge-only: the engine's id for this tool call; a write without an idempotencyKey derives its key from it.
+	CallId *string `json:"callId,omitempty"`
 
 	// ProviderThreadId Bridge-only native transport identity, never a model argument.
 	ProviderThreadId *string `json:"providerThreadId,omitempty"`

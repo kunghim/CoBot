@@ -12,15 +12,9 @@ import (
 	"github.com/kunghim/CoBot/internal/collaboration"
 )
 
-// collaborationTools is the advertised surface; keeping it in one place makes
-// a missing or extra tool a test failure rather than a silent drift.
-var collaborationTools = []string{
-	"get_context", "list_tasks", "get_task", "list_roles", "send_message",
-	"create_task", "propose_task", "assign_task", "update_task",
-	"submit_evidence", "report_completion", "confirm_task",
-	"offer_transfer", "accept_transfer", "ask_user", "request_member", "request_merge",
-	"remember", "search_memory",
-}
+// memberTools is the surface a member's bridge advertises; keeping it in one
+// place makes a missing or extra tool a test failure rather than a drift.
+var memberTools = []string{"send_message", "ask_user", "deliver_task", "view_tasks"}
 
 // TestMCPBridgeProtocol drives the real stdio bridge over an in-memory MCP
 // transport pair against the live HTTP collaboration route. The bridge holds
@@ -37,6 +31,7 @@ func TestMCPBridgeProtocol(t *testing.T) {
 
 	t.Setenv(collaboration.BridgeEnvEndpoint, h.api.URL)
 	t.Setenv(collaboration.BridgeEnvToken, writeToken)
+	t.Setenv(collaboration.BridgeEnvRole, collaboration.RoleMember)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	bridge := collaboration.NewBridge(h.api.URL, "", slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
@@ -49,7 +44,7 @@ func TestMCPBridgeProtocol(t *testing.T) {
 	}
 	defer session.Close()
 
-	// The handshake advertises exactly the collaboration tools, no more.
+	// The handshake advertises exactly the member's tools, no more.
 	tools, err := session.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("list tools: %v", err)
@@ -58,32 +53,32 @@ func TestMCPBridgeProtocol(t *testing.T) {
 	for _, tool := range tools.Tools {
 		advertised[tool.Name] = true
 	}
-	for _, want := range collaborationTools {
+	for _, want := range memberTools {
 		if !advertised[want] {
 			t.Errorf("tool %q is missing from the advertised list", want)
 		}
 	}
-	if len(advertised) != len(collaborationTools) {
-		t.Errorf("advertised %d tools, want %d", len(advertised), len(collaborationTools))
+	if len(advertised) != len(memberTools) {
+		t.Errorf("advertised %d tools, want %d", len(advertised), len(memberTools))
 	}
 
 	// A read tool round-trips through the bridge into the core and back.
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "get_context",
+		Name:      "view_tasks",
 		Arguments: map[string]any{},
 	})
 	if err != nil {
-		t.Fatalf("call get_context: %v", err)
+		t.Fatalf("call view_tasks: %v", err)
 	}
 	if res.IsError {
-		t.Fatalf("get_context failed: %+v", res.Content)
+		t.Fatalf("view_tasks failed: %+v", res.Content)
 	}
 	if len(res.Content) == 0 {
-		t.Fatal("get_context returned no content")
+		t.Fatal("view_tasks returned no content")
 	}
 
-	// A write tool without an idempotency key is refused by the core and
-	// reported as a readable failure, not a transport error.
+	// A write with neither an idempotency key nor the engine's call id is
+	// refused by the core and reported as a readable failure.
 	bad, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "send_message",
 		Arguments: map[string]any{"targetBotId": captainID, "text": "hi"},
@@ -95,13 +90,13 @@ func TestMCPBridgeProtocol(t *testing.T) {
 		t.Fatal("send_message without idempotencyKey must be reported as an error result")
 	}
 
-	// With the key the same call is accepted; "accepted" means the fact is
-	// persisted in the core, never that a turn ran.
+	// Codex names every call; the core derives the key from that, so the
+	// model never invents one. "accepted" means the fact is persisted in the
+	// core, never that a turn ran.
 	okRes, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "send_message",
-		Arguments: map[string]any{
-			"targetBotId": captainID, "text": "开始吧", "idempotencyKey": "bridge-1",
-		},
+		Name:      "send_message",
+		Meta:      mcp.Meta{"callId": "exec-bridge-1"},
+		Arguments: map[string]any{"targetBotId": captainID, "text": "开始吧"},
 	})
 	if err != nil {
 		t.Fatalf("call send_message: %v", err)

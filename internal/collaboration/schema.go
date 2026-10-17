@@ -25,6 +25,16 @@ func toolSchema(name string) json.RawMessage {
 	}
 	limit := func() { add("limit", map[string]any{"type": "integer", "minimum": 1, "maximum": 100}, false) }
 	switch name {
+	case "view_tasks":
+		add("taskId", text("Optional: one task to read in full; omit to list every task of the team."), false)
+	case "deliver_task":
+		add("taskId", text("The task you own and are delivering."), true)
+		add("summary", text("What you produced, how to run or open it, and the checks you actually ran with their results."), true)
+		add("artifactRefs", strings("Optional paths of the produced files."), false)
+	case "review_task":
+		add("taskId", text("The delivered task to review."), true)
+		add("decision", map[string]any{"type": "string", "enum": []string{"accept", "reject"}, "description": "accept completes the task; reject sends it back to its owner."}, true)
+		add("comment", map[string]any{"type": "string", "description": "Required for reject: what is missing. Optional for accept."}, false)
 	case "get_context":
 		add("taskId", text("Optional task whose current context is requested."), false)
 	case "list_tasks":
@@ -34,7 +44,7 @@ func toolSchema(name string) json.RawMessage {
 		task()
 	case "list_roles":
 	case "send_message":
-		add("targetBotIds", strings("Recipient member IDs from get_context, all in this team; one message reaches each."), false)
+		add("targetBotIds", strings("Recipient member IDs (from the team roster in your instructions); one message reaches each."), false)
 		add("targetBotId", text("A single recipient member ID; use targetBotIds for several."), false)
 		add("text", text("Message to the recipients."), true)
 		add("taskId", text("Related task ID, when applicable."), false)
@@ -44,9 +54,9 @@ func toolSchema(name string) json.RawMessage {
 		add("description", map[string]any{"type": "string", "description": "Work to perform."}, false)
 		add("acceptanceCriteria", text("Observable conditions required for completion."), true)
 		if name == "create_task" {
-			add("ownerId", text("Exactly one team member ID from get_context."), true)
+			add("ownerId", text("Exactly one team member ID from the team roster in your instructions."), true)
 			add("parentId", text("Optional organizational parent task."), false)
-			add("dependencyIds", strings("Tasks that must be done before execution."), false)
+			add("dependencyIds", strings("Task IDs that must be done first; this task reaches its owner only after they are."), false)
 		}
 	case "assign_task":
 		task()
@@ -99,7 +109,10 @@ func toolSchema(name string) json.RawMessage {
 	default:
 		panic("missing MCP schema: " + name)
 	}
-	if IsSideEffectTool(name) {
+	// The tools offered today derive their idempotency key from the engine's
+	// call id, so the model never has to invent one; the legacy tools still
+	// advertise it for the sessions that learned them.
+	if IsSideEffectTool(name) && !offered(name) {
 		add("idempotencyKey", map[string]any{"type": "string", "minLength": 1, "maxLength": 128, "description": "Stable unique key for this operation. Reuse only to retry identical arguments."}, true)
 	}
 	shape := map[string]any{"type": "object", "properties": props, "required": required, "additionalProperties": false}

@@ -16,15 +16,12 @@ import (
 // collaborationEtiquette keeps member traffic to what moves the work: every
 // message that needs no action still costs the recipient a turn.
 const collaborationEtiquette = `
-# 协作礼仪
-- 需要对方处理、回答、验收或确认时发普通消息，例如交付成果、汇报完成、报告问题。只是顺带告知、对方不需要做任何事时才设 notifyOnly，对方下一轮会看到，不会被唤醒。
-- 做完自己的任务：先提交证据，再用 report_completion 提交验收；队长会收到通知，不必另发一遍“完成了”。
-- 同一内容要告诉几个人时，用 targetBotIds 一次发完。
+# 协作约定
+- 有人交付、被打回、收到需要处理的消息时，系统会唤醒对应的人。派完活、交付完或在等别人时，直接结束这一轮，不要等待或反复查看进度。
+- 只处理已经送到你手上的任务。你名下的任务还在等前置任务完成时，不要提前开工；有人催你，简短说明即可，任务送到后系统会唤醒你。
+- 同一内容要告诉几个人时，用 targetBotIds 一次发完。只是顺带告知、对方不需要做任何事时才设 notifyOnly。
 - 不要发“收到”“好的”“明白”这类没有新信息的消息，也不要为了表示确认而回复。
-
-# 证据
-- 证据与任务规模相称：小任务写清怎么运行或打开成果，加上实际执行的测试命令和结果即可。
-- 不要计算文件哈希、冻结“候选版本”，也不要为同一结论反复复测或重复提交证据。只有涉及 Git 合并时才需要写明 commit。
+- 交付说明与任务规模相称：写清怎么运行或查看成果、实际做了哪些验证和结果即可。
 `
 
 // SendMessageFromBot delivers a bot-to-bot message. It is stored first, then

@@ -29,7 +29,7 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
 
 // CoBot's own collaboration tools, described as what the member did.
 const collaborationTools = new Set([
-  'send_message', 'create_task', 'propose_task', 'assign_task', 'update_task', 'submit_evidence',
+  'deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'propose_task', 'assign_task', 'update_task', 'submit_evidence',
   'report_completion', 'confirm_task', 'offer_transfer', 'accept_transfer', 'ask_user', 'request_member',
   'request_merge', 'remember', 'search_memory', 'get_context', 'list_tasks', 'get_task', 'list_roles',
 ]);
@@ -74,7 +74,10 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
         const recipients = Array.isArray(args.targetBotIds) ? args.targetBotIds.filter((id): id is string => typeof id === 'string') : [];
         const target = text(args.targetBotId) || text(args.ownerId) || text(args.toBotId);
         const names = (recipients.length ? recipients : target ? [target] : []).map(nameOf).join('、');
-        const key = tool === 'send_message' && args.notifyOnly === true ? 'conversation.step.cobot.notify' : `conversation.step.cobot.${tool}`;
+        const key =
+          tool === 'send_message' && args.notifyOnly === true ? 'conversation.step.cobot.notify'
+          : tool === 'review_task' ? (args.decision === 'reject' ? 'conversation.step.cobot.review_reject' : 'conversation.step.cobot.review_accept')
+          : `conversation.step.cobot.${tool}`;
         return {
           key: collaborationTools.has(tool) ? key : 'conversation.step.tool',
           params: {

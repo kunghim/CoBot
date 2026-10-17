@@ -96,38 +96,13 @@ func (b *Bridge) Serve(ctx context.Context, transport mcp.Transport) error {
 	return server.Run(ctx, transport)
 }
 
-// register adds every collaboration tool with its schema.
+// register adds the tools of this bridge's role with their schemas.
 func (b *Bridge) register(server *mcp.Server) {
-	tools := []struct {
-		name        string
-		description string
-	}{
-		{"get_context", "读取当前 Bot 的团队、成员、任务与最近协作上下文"},
-		{"list_tasks", "列出本团队任务（可按状态过滤）"},
-		{"get_task", "读取一个任务及其证据与转交记录"},
-		{"list_roles", "列出内置角色库（仅队长可见完整库）"},
-		{"send_message", "给同团队成员发消息；同一内容发给多人用 targetBotIds 一次发完；只告知进展、不需要对方处理时设 notifyOnly=true，对方下一轮会看到但不会被唤醒（accepted 仅表示已持久化）"},
-		{"create_task", "创建任务并指派唯一负责人（仅队长）"},
-		{"propose_task", "以成员身份向队长提交任务提议（不直接建任务）"},
-		{"assign_task", "更换任务负责人（仅队长，按安全换人规则）"},
-		{"update_task", "更新任务状态（owner/队长，done 需 confirm_task）"},
-		{"submit_evidence", "为任务提交证据引用（owner 或队长）"},
-		{"report_completion", "报告完成，任务进入 review（不直接 done）"},
-		{"confirm_task", "确认任务完成为 done（仅队长或用户，需证据）"},
-		{"offer_transfer", "提议转交任务给同团队成员（owner）"},
-		{"accept_transfer", "接受转交并正式更换负责人（目标成员）"},
-		{"ask_user", "向用户提问；返回 waiting 项并请结束当前工作"},
-		{"request_member", "请求用户批准引入指定角色成员（仅队长）"},
-		{"request_merge", "请求用户批准合并指定候选版本（绑定 SHA 与证据）"},
-		{"remember", "记录你的工作方法或偏好（只存方法：不存任务证据、秘密或大段源码；同来源同正文不会重建）"},
-		{"search_memory", "检索你自己的记忆（按归属过滤，默认最多 10 条、共 6000 字符）"},
-	}
-	for _, tool := range tools {
-		tool := tool
+	for _, name := range ToolsForRole(os.Getenv(BridgeEnvRole)) {
 		mcp.AddTool(server, &mcp.Tool{
-			Name:        tool.name,
-			Description: tool.description,
-			InputSchema: toolSchema(tool.name),
+			Name:        name,
+			Description: toolDescriptions[name],
+			InputSchema: toolSchema(name),
 		}, func(ctx context.Context, req *mcp.CallToolRequest, _ json.RawMessage) (*mcp.CallToolResult, any, error) {
 			return b.callTool(ctx, req.Params.Name, req.Params.Arguments, req.Params.Meta)
 		})
@@ -156,8 +131,10 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 		}
 	}
 	threadID, turnID := nativeTurnIdentity(meta)
+	callID, _ := meta["callId"].(string)
 	body, err := json.Marshal(map[string]any{
 		"providerThreadId": threadID, "providerTurnId": turnID,
+		"callId":    callID,
 		"tool":      name,
 		"arguments": json.RawMessage(args),
 		"requestId": newRequestID(),

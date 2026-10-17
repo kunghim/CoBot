@@ -34,6 +34,13 @@ describe('describeStep', () => {
     const fromString = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'create_task', arguments: '{"title":"做页面","ownerId":"qa"}' } }), nameOf);
     expect(fromString.params).toEqual(expect.objectContaining({ title: '做页面', name: '测试工程师' }));
   });
+  it('tells a delivery, an accepted review and a sent-back task apart', () => {
+    const tool = (name: string, args: Record<string, unknown>) => describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: name, arguments: args } }), nameOf).key;
+    expect(tool('deliver_task', { taskId: 't', summary: 's' })).toBe('conversation.step.cobot.deliver_task');
+    expect(tool('review_task', { taskId: 't', decision: 'accept' })).toBe('conversation.step.cobot.review_accept');
+    expect(tool('review_task', { taskId: 't', decision: 'reject', comment: 'x' })).toBe('conversation.step.cobot.review_reject');
+    expect(tool('view_tasks', {})).toBe('conversation.step.cobot.view_tasks');
+  });
   it('names every recipient of a broadcast and tells a note from a message', () => {
     const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotIds: ['qa', 'fe'], text: 'x', notifyOnly: true } } }), nameOf);
     expect(phrase.key).toBe('conversation.step.cobot.notify');

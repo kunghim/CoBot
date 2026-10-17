@@ -24,6 +24,9 @@ import (
 const (
 	BridgeEnvBotID    = "COBOT_BOT_ID"
 	BridgeEnvLeaseDir = "COBOT_LEASE_DIR"
+	// BridgeEnvRole is "leader" or "member": the bridge offers the model only
+	// the tools of that role.
+	BridgeEnvRole = "COBOT_BOT_ROLE"
 )
 
 const (

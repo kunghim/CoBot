@@ -690,3 +690,19 @@ func PurgeBotTx(ctx context.Context, tx *sql.Tx, botID string) error {
 	}
 	return nil
 }
+
+// SessionContextDigest reads what a member's thread has already been told.
+func SessionContextDigest(ctx context.Context, q Queryer, botID string) string {
+	var digest string
+	_ = q.QueryRowContext(ctx, `SELECT context_digest FROM provider_sessions WHERE bot_id = ?`, botID).Scan(&digest)
+	return digest
+}
+
+// SetSessionContextDigest records what a member's thread has been told; a new
+// thread resets it to what its instructions carried.
+func SetSessionContextDigest(ctx context.Context, q Queryer, botID, digest string) error {
+	if _, err := q.ExecContext(ctx, `UPDATE provider_sessions SET context_digest = ? WHERE bot_id = ?`, digest, botID); err != nil {
+		return fmt.Errorf("set session context digest: %w", err)
+	}
+	return nil
+}

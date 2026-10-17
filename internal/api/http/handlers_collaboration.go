@@ -18,6 +18,7 @@ type collaborationRequest struct {
 	Arguments        json.RawMessage `json:"arguments"`
 	ProviderThreadID string          `json:"providerThreadId,omitempty"`
 	ProviderTurnID   string          `json:"providerTurnId,omitempty"`
+	CallID           string          `json:"callId,omitempty"`
 }
 
 // collaborationResponse matches what the bridge decodes. The status is the
@@ -80,6 +81,7 @@ func (s *Server) handleCollaboration(w http.ResponseWriter, r *http.Request) {
 	result := s.Dispatcher.CallTool(r.Context(), principal, collaboration.ToolCall{
 		Name:      req.Tool,
 		Arguments: req.Arguments,
+		CallID:    req.CallID,
 	})
 	body := collaborationResponse{Status: result.Status, Data: result.Data}
 	if result.Error != nil {

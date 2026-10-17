@@ -179,6 +179,10 @@
       "noOutput": "没有输出",
       "cobot": {
         "send_message": "给 {{name}} 发送了消息",
+        "deliver_task": "交付了任务",
+        "review_accept": "验收通过",
+        "review_reject": "打回了任务",
+        "view_tasks": "查看任务",
         "notify": "通知了 {{name}}",
         "create_task": "创建任务「{{title}}」，负责人 {{name}}",
         "propose_task": "提出任务「{{title}}」",

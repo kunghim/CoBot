@@ -55,7 +55,7 @@ func TestRetainedMCPBridgeBindsEveryCallToNativeTurn(t *testing.T) {
 	write := func(turn fakeengine.StartedTurn, text string, wantError bool) {
 		t.Helper()
 		native, _ := json.Marshal(map[string]any{"thread_id": turn.ThreadID, "turn_id": turn.TurnID})
-		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "remember", Meta: mcp.Meta{"x-codex-turn-metadata": string(native)}, Arguments: map[string]any{"body": text, "idempotencyKey": text}})
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "send_message", Meta: mcp.Meta{"x-codex-turn-metadata": string(native), "callId": text}, Arguments: map[string]any{"targetBotId": bots[0].ID, "text": text, "notifyOnly": true}})
 		if err != nil || result.IsError != wantError {
 			t.Fatalf("native bridge result: %+v / %v", result, err)
 		}

@@ -67,14 +67,15 @@ func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 	}
 	defer session.Close()
 
-	call := func(tool string, args map[string]any) (*mcp.CallToolResult, error) {
-		return session.CallTool(context.Background(), &mcp.CallToolParams{Name: tool, Arguments: args})
+	// callID stands in for the id Codex gives every tool call.
+	call := func(tool string, args map[string]any, callID string) (*mcp.CallToolResult, error) {
+		return session.CallTool(context.Background(), &mcp.CallToolParams{Name: tool, Arguments: args, Meta: mcp.Meta{"callId": callID}})
 	}
 
 	// Missing lease: the side effect is refused; the reason is honest.
-	res, err := call("remember", map[string]any{"body": "提交前先 gofmt", "idempotencyKey": "key-1"})
+	res, err := call("send_message", map[string]any{"targetBotId": bots[0].ID, "text": "开始了"}, "key-1")
 	if err != nil {
-		t.Fatalf("remember call: %v", err)
+		t.Fatalf("send call: %v", err)
 	}
 	if !res.IsError || !strings.Contains(mustText(t, res), "error.lease.missing") {
 		t.Fatalf("missing lease text = %q, want an IsError naming error.lease.missing", mustText(t, res))
@@ -86,12 +87,12 @@ func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	res, err = call("remember", map[string]any{"body": "提交前先 gofmt", "idempotencyKey": "key-1"})
+	res, err = call("send_message", map[string]any{"targetBotId": bots[0].ID, "text": "开始了"}, "key-1")
 	if err != nil {
-		t.Fatalf("remember with lease: %v", err)
+		t.Fatalf("send with lease: %v", err)
 	}
 	if res.IsError {
-		t.Fatalf("fresh lease remember = %+v, want success", res)
+		t.Fatalf("fresh lease send = %+v, want success", res)
 	}
 
 	// Stale lease: side effects are refused again...
@@ -99,9 +100,9 @@ func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 	if err := platform.WriteLease(leaseRoot, stale); err != nil {
 		t.Fatal(err)
 	}
-	res, err = call("remember", map[string]any{"body": "又一条", "idempotencyKey": "key-2"})
+	res, err = call("send_message", map[string]any{"targetBotId": bots[0].ID, "text": "又一条"}, "key-2")
 	if err != nil {
-		t.Fatalf("remember stale: %v", err)
+		t.Fatalf("send stale: %v", err)
 	}
 	if !res.IsError || !strings.Contains(mustText(t, res), "error.lease.expired") {
 		t.Fatalf("stale lease text = %q, want IsError error.lease.expired", mustText(t, res))
@@ -109,9 +110,9 @@ func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 
 	// ...but read tools still work, so the model can inspect state and
 	// report honestly instead of being blind.
-	res, err = call("get_context", map[string]any{})
+	res, err = call("view_tasks", map[string]any{}, "read-1")
 	if err != nil {
-		t.Fatalf("get_context: %v", err)
+		t.Fatalf("view_tasks: %v", err)
 	}
 	if res.IsError {
 		t.Fatalf("read tool under stale lease = %+v, want success", res)

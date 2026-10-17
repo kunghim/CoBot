@@ -34,6 +34,7 @@ type Server struct {
 	threads           map[string]bool
 	loaded            map[string]bool
 	resumes           int
+	instructions      []string
 	startedTurns      []StartedTurn
 	interrupted       []string
 	steers            []Steer
@@ -95,6 +96,13 @@ func (s *Server) Unload(threadID string) {
 	delete(s.loaded, threadID)
 }
 
+// Instructions lists the developer instructions of every started thread.
+func (s *Server) Instructions() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.instructions...)
+}
+
 // Resumes counts thread/resume calls.
 func (s *Server) Resumes() int {
 	s.mu.Lock()
@@ -111,6 +119,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	id := fmt.Sprintf("thread-%d", s.threadSeq)
 	s.threads[id] = true
 	s.loaded[id] = true
+	s.instructions = append(s.instructions, spec.DeveloperInstructions)
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: "fake"}, nil
 }
 

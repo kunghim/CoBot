@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -515,15 +514,17 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return s.failStart(ctx, run.ID, bot.ID, "error.engine.thread_failed")
 	}
-	// The context is rebuilt on every dispatch so the bot sees the current
-	// team, member list and task instead of trusting a stale model memory.
-	// A task-assignment message carries its task id in run_id.
-	taskID := delivery.TaskID
+	// The thread keeps everything it was told; a turn adds only what changed
+	// since (see turnContext), then the incoming messages.
 	text := message.RenderText()
 	if len(batch) > 0 {
 		text = s.batchInput(ctx, append([]domain.Message{message}, batch...))
 	}
-	input := s.app.BuildContext(ctx, bot, taskID) + "\n\n" + text
+	update, told := s.app.turnContext(ctx, bot, run.ID, parseDigest(sqlite.SessionContextDigest(ctx, s.app.DB, bot.ID)))
+	input := text
+	if update != "" {
+		input = update + "\n\n" + text
+	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team)})
 	if err != nil {
@@ -543,6 +544,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, run.ID, domain.DeliveryAccepted, domain.DeliveryDispatching); err != nil {
 		return err
 	}
+	// The thread has now heard this turn's update.
+	if err := sqlite.SetSessionContextDigest(ctx, tx, bot.ID, told.String()); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
@@ -550,6 +555,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: message.ID})
 	s.app.Hub.Publish()
 	s.logger.Info("run started", "botId", bot.ID, "runId", run.ID, "threadId", threadID)
+	s.app.startAssignedTasks(ctx, run.ID, bot.ID)
 
 	// The engine may spawn this bot's MCP bridge at any moment inside the
 	// turn; the lease must already be fresh when it asks to act (H06).
@@ -798,12 +804,13 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	if err != nil {
 		return "", err
 	}
+	instructions, told := s.app.threadInstructions(ctx, team, bot, role)
 	spec := engine.ThreadSpec{
 		Cwd:                   cwd,
 		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
 		Model:                 settings.DefaultModel,
-		DeveloperInstructions: buildInstructions(team, bot, role),
+		DeveloperInstructions: instructions,
 		Config:                config,
 	}
 	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
@@ -855,14 +862,16 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	}); err != nil {
 		return "", err
 	}
+	// A new thread knows exactly what its instructions told it.
+	if err := sqlite.SetSessionContextDigest(ctx, tx, bot.ID, told.String()); err != nil {
+		return "", err
+	}
 	if err := tx.Commit(); err != nil {
 		return "", err
 	}
 	return info.ThreadID, nil
 }
 
-// buildInstructions assembles the first-turn role context. Later BuildContext
-// (tasks/memories/collaboration) extends this per dispatch.
 // threadConfig is the per-thread engine configuration. It merges the
 // platform defaults with this bot's collaboration bridge.
 //
@@ -896,6 +905,8 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 		// without HTTP (H06).
 		auth.BridgeEnvBotID:    bot.ID,
 		auth.BridgeEnvLeaseDir: s.app.LeaseDir(),
+		// The bridge offers only the tools of this member's role.
+		auth.BridgeEnvRole: bridgeRole(team, bot),
 	}
 	// The tools are CoBot's own structured collaboration surface, so they
 	// never need a user approval round trip; the core enforces permissions.
@@ -912,18 +923,6 @@ func permissionMode(team domain.Team) string {
 	return domain.PermissionDefault
 }
 
-func buildInstructions(team domain.Team, bot domain.Bot, role roles.Role) string {
-	var b strings.Builder
-	b.WriteString(role.Instructions)
-	b.WriteString("\n\n# 团队\n")
-	fmt.Fprintf(&b, "团队名称：%s\n", team.Name)
-	fmt.Fprintf(&b, "团队工作目录：%s\n", team.Directory)
-	fmt.Fprintf(&b, "你的名字：%s（角色：%s）\n", bot.Name, role.Name)
-	b.WriteString("与同团队成员的结构化协作由宿主工具提供；没有工具时直接用文字回复。用用户的语言交流。\n")
-	b.WriteString(collaborationEtiquette)
-	return b.String()
-}
-
 // Warm starts a team's engine ahead of its first turn: opening a team in the
 // UI is the moment a message is likely to follow, and engine start-up then
 // overlaps with the user's typing instead of delaying the first reply. It
@@ -938,4 +937,13 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 			s.logger.Info("engine warm-up failed", "teamId", teamID, "error", err)
 		}
 	}()
+}
+
+// bridgeRole is the tool set a member's bridge offers: "leader" for the
+// team's leader, "member" for everyone else.
+func bridgeRole(team domain.Team, bot domain.Bot) string {
+	if bot.IsLeader || team.LeaderID == bot.ID {
+		return "leader"
+	}
+	return "member"
 }

@@ -179,6 +179,10 @@
       "noOutput": "No output",
       "cobot": {
         "send_message": "Sent a message to {{name}}",
+        "deliver_task": "Delivered the task",
+        "review_accept": "Accepted the delivery",
+        "review_reject": "Sent the task back",
+        "view_tasks": "Looked at the tasks",
         "notify": "Left a note for {{name}}",
         "create_task": "Created task “{{title}}” for {{name}}",
         "propose_task": "Proposed task “{{title}}”",

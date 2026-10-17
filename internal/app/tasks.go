@@ -791,6 +791,12 @@ var _ = time.Now
 // wakes nobody. It reports the leader to wake, or "" when the leader itself
 // moved the task.
 func (a *App) enqueueReviewNoticeLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, task domain.Task) (string, error) {
+	return a.enqueueDeliveryNoticeLocked(ctx, tx, principal, task, "")
+}
+
+// enqueueDeliveryNoticeLocked is the review notice carrying what the member
+// said it delivered, so the leader can judge it without looking it up.
+func (a *App) enqueueDeliveryNoticeLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, task domain.Task, summary string) (string, error) {
 	if principal.Kind != auth.KindBot {
 		return "", nil
 	}
@@ -805,7 +811,11 @@ func (a *App) enqueueReviewNoticeLocked(ctx context.Context, tx *sql.Tx, princip
 	if err != nil {
 		return "", err
 	}
-	text := fmt.Sprintf("%s 把任务「%s」提交验收（任务 ID：%s）。请对照完成标准查看它的证据：符合就用 confirm_task 确认完成；不符合就用 update_task 改回 doing，并告诉负责人缺什么。", reporter.Name, task.Title, task.ID)
+	text := fmt.Sprintf("%s 交付了任务「%s」（任务 ID：%s）。", reporter.Name, task.Title, task.ID)
+	if strings.TrimSpace(summary) != "" {
+		text += "\n交付说明：" + strings.TrimSpace(summary)
+	}
+	text += fmt.Sprintf("\n完成标准：%s\n请对照完成标准核对：通过就用 review_task 选 accept；不通过就选 reject 并写明缺什么，任务会退回给负责人。", task.AcceptanceCriteria)
 	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 	if err != nil {
 		return "", err
