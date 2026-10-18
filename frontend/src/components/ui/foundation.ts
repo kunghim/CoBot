@@ -25,6 +25,16 @@ export const interactive = {
   selected: 'bg-neutral-900/[0.08] text-neutral-900 dark:bg-white/[0.1] dark:text-neutral-50',
 } as const;
 
+/**
+ * The same layers as fixed classes, to show a state without the pointer
+ * (state matrices in the gallery). Not for live components.
+ */
+export const shownState = {
+  hover: 'bg-neutral-900/[0.06] dark:bg-white/[0.07]',
+  pressed: 'bg-neutral-900/[0.1] dark:bg-white/[0.12]',
+  focus: 'outline outline-2 outline-offset-2 outline-signal-500',
+} as const;
+
 /** Layers, lowest first. Anything that floats uses one of these. */
 export const layer = {
   sticky: 'z-10',

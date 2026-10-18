@@ -1,7 +1,7 @@
 // Gallery: feedback, data display and page structure.
 import { useState } from 'react';
 import { Inbox, Plus } from 'lucide-react';
-import { Alert, Badge, Button, Card, CodeBlock, Count, DescriptionList, Divider, EmptyState, Kbd, List, ListRow, PageHeader, PanelHeader, PanelToggle, ProgressBar, Section, Skeleton, Spinner, Stat, StatusDot, Table, Tag, Toolbar, useToast } from '../components/ui';
+import { Accordion, Alert, Badge, Button, Card, CodeBlock, CopyButton, Count, DescriptionList, Divider, EmptyState, Kbd, List, ListRow, PageHeader, PanelHeader, PanelToggle, ProgressBar, ProgressRing, Section, Skeleton, Spinner, Stat, StatusDot, Table, Tag, Toolbar, useToast } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 interface UsageRow {
@@ -33,7 +33,7 @@ export default function FeedbackData() {
         id="toast"
         name="Toast 消息"
         file="components/ui/Toast.tsx"
-        use="一件事完成了，但结果不在眼前（已保存、已复制、已撤销）。成功的 2.5 秒后自动消失；失败的一直留着，直到点关闭。最多同时三条。"
+        use="一件事完成了，但结果不在眼前（已保存、已复制、已撤销）。从窗口顶部居中落下；成功的 2.5 秒后自动消失，失败的一直留着，直到点关闭。最多同时三条。"
         avoid="和某个字段有关的错误写在字段下面；需要用户立刻决定的事用对话框。"
         a11y="成功用 polite、失败用 assertive 读出；鼠标停在上面时不会消失。"
       >
@@ -47,7 +47,7 @@ export default function FeedbackData() {
         </Demo>
       </Doc>
 
-      <Doc id="alert" name="Alert 提示条" file="components/ui/Feedback.tsx" use="页面里需要读到的情况：引擎未登录、目录丢失、额度快用完。写清发生了什么和怎么办，最多带一个操作。">
+      <Doc id="alert" name="Alert 提示条" file="components/ui/Feedback.tsx" use="页面里需要读到的情况：引擎未登录、目录丢失、额度快用完。它是页面内容的一部分，放在相关内容的上方（比如会话顶部、设置分组顶部），不浮起、不自动消失。写清发生了什么和怎么办，最多带一个操作。" avoid="一闪而过的结果用 Toast；需要马上决定的用对话框。">
         <Demo>
           <div className="space-y-3">
             <Alert tone="info" title="头像库还没下载">成员暂时显示默认头像。可以到“设置 → 外观”检查更新。</Alert>
@@ -78,6 +78,19 @@ export default function FeedbackData() {
               </div>
             </div>
           </div>
+        </Demo>
+      </Doc>
+
+      <Doc id="progress-ring" name="ProgressRing 环形进度" file="components/ui/Feedback.tsx" use="一个比例需要一眼看出时（上下文已用多少、额度用了多少），放在统计栏或卡片角上。" a11y="以 progressbar 读出百分比。">
+        <Demo>
+          <Matrix
+            items={[
+              { label: '上下文 23%', node: <ProgressRing value={23} label="上下文已用" /> },
+              { label: '额度 79%（警告）', node: <ProgressRing value={79} label="本周额度" tone="warning" /> },
+              { label: '超限（错误）', node: <ProgressRing value={100} label="预算" tone="danger" /> },
+              { label: '小号，不显示数字', node: <ProgressRing value={45} label="上下文已用" size={16} showValue={false} /> },
+            ]}
+          />
         </Demo>
       </Doc>
 
@@ -171,6 +184,25 @@ export default function FeedbackData() {
             </div>
             <div className="lg:col-span-2">
               <CodeBlock label="PowerShell" copyLabel="复制" copiedLabel="已复制">{'cobot serve --profile production'}</CodeBlock>
+            </div>
+          </div>
+        </Demo>
+      </Doc>
+
+      <Doc id="accordion" name="Accordion 折叠面板 · CopyButton 复制按钮" file="components/ui/Display.tsx" use="折叠面板：可以分别展开的几段内容（任务的交付记录、高级设置）。复制按钮：一个值旁边的复制，点后图标短暂变成对勾、读屏器读出“已复制”。">
+        <Demo surface="raised">
+          <div className="space-y-4">
+            <Accordion
+              defaultOpen={['delivery']}
+              items={[
+                { id: 'delivery', title: '交付记录', meta: '2 次', content: '前端开发 09:52 交付：添加和删除可用，本地保存已完成，已用 Playwright 验证。' },
+                { id: 'criteria', title: '验收标准', content: '刷新后数据仍在；空输入不能添加；删除需要确认。' },
+                { id: 'advanced', title: '高级设置', content: '协作轮次上限、预算等。' },
+              ]}
+            />
+            <div className="flex items-center gap-2 font-mono text-xs">
+              C:\Users\me\.cobot
+              <CopyButton value="C:\Users\me\.cobot" copyLabel="复制路径" copiedLabel="已复制" />
             </div>
           </div>
         </Demo>

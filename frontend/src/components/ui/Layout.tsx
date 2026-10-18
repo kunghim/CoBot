@@ -2,7 +2,7 @@
 // side panel toggles. Panels open and close from the same place with the
 // same pair of icons, so the control never jumps.
 import type { ReactNode } from 'react';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Copy, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Square, X } from 'lucide-react';
 import { IconButton } from './Button';
 import { cx } from './foundation';
 
@@ -63,4 +63,58 @@ export function Toolbar({ label, children }: { label: string; children: ReactNod
 export function PanelToggle({ side, open, onToggle, openLabel, closeLabel }: { side: 'left' | 'right'; open: boolean; onToggle: () => void; openLabel: string; closeLabel: string }) {
   const icon = side === 'left' ? (open ? PanelLeftClose : PanelLeftOpen) : open ? PanelRightClose : PanelRightOpen;
   return <IconButton icon={icon} label={open ? closeLabel : openLabel} aria-expanded={open} onClick={onToggle} size="sm" />;
+}
+
+/** The window controls of a frameless desktop window on Windows. */
+export interface WindowControls {
+  minimizeLabel: string;
+  maximizeLabel: string;
+  restoreLabel: string;
+  closeLabel: string;
+  maximized: boolean;
+  onMinimize: () => void;
+  onToggleMaximize: () => void;
+  onClose: () => void;
+}
+
+/**
+ * The app's own title bar in the desktop shell, where the system bar is
+ * hidden: the panel toggles sit at its two ends, the middle drags the
+ * window, and it follows CoBot's theme instead of the system's. On macOS
+ * the system traffic lights stay on the left; on Windows the bar draws
+ * minimize, maximize and close itself. The web app has no title bar; the
+ * toggles stay in the conversation header there.
+ */
+export function AppTitleBar({ platform, title, left, right, windowControls }: { platform: 'windows' | 'mac'; title: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls }) {
+  const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
+  const control = 'flex h-full w-11 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-900/[0.07] hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
+  return (
+    <div
+      style={{ ['--wails-draggable' as string]: 'drag' }}
+      className="flex h-10 shrink-0 select-none items-center border-b border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900"
+      onDoubleClick={windowControls?.onToggleMaximize}
+    >
+      {platform === 'mac' && <span className="w-[76px] shrink-0" aria-hidden />}
+      <div className="flex items-center gap-1 px-2" style={noDrag}>
+        {left}
+      </div>
+      <div className="min-w-0 flex-1 truncate text-center text-xs font-medium text-neutral-600 dark:text-neutral-300">{title}</div>
+      <div className="flex items-center gap-1 px-2" style={noDrag}>
+        {right}
+      </div>
+      {platform === 'windows' && windowControls && (
+        <div className="flex h-full items-stretch" style={noDrag}>
+          <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={control}>
+            <Minus size={15} aria-hidden />
+          </button>
+          <button type="button" aria-label={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} title={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} onClick={windowControls.onToggleMaximize} className={control}>
+            {windowControls.maximized ? <Copy size={13} aria-hidden /> : <Square size={12} aria-hidden />}
+          </button>
+          <button type="button" aria-label={windowControls.closeLabel} title={windowControls.closeLabel} onClick={windowControls.onClose} className={cx(control, 'hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white')}>
+            <X size={16} aria-hidden />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -28,10 +28,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** An icon after the label, e.g. a chevron for menus. */
   trailingIcon?: (props: { size?: number; 'aria-hidden'?: boolean }) => ReactNode;
   block?: boolean;
+  /** rounded: pages, settings and forms. pill: actions in conversation cards and floating cards (approvals, questions). */
+  shape?: 'rounded' | 'pill';
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'secondary', size = 'md', loading = false, icon: Icon, trailingIcon: Trailing, block = false, className, children, disabled, type = 'button', ...rest },
+  { variant = 'secondary', size = 'md', loading = false, icon: Icon, trailingIcon: Trailing, block = false, shape = 'rounded', className, children, disabled, type = 'button', ...rest },
   ref,
 ) {
   const px = iconSize[size];
@@ -42,7 +44,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        'inline-flex shrink-0 select-none items-center justify-center rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex shrink-0 select-none items-center justify-center font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        shape === 'pill' ? 'rounded-full' : 'rounded-lg',
         variant !== 'link' && controlHeight[size],
         variant !== 'link' && padding[size],
         variant === 'link' && (size === 'sm' ? 'text-xs' : 'text-sm'),
@@ -67,13 +70,15 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   variant?: 'ghost' | 'secondary' | 'primary';
   /** For toggles (a panel open, a filter on). */
   pressed?: boolean;
+  /** square: toolbars and headers. circle: send/stop and actions on round surfaces. */
+  shape?: 'square' | 'circle';
 }
 
 const square: Record<ControlSize, string> = { sm: 'h-7 w-7', md: 'h-9 w-9', lg: 'h-11 w-11' };
 
 /** A button that is only an icon. It always has a label and a tooltip. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, icon: Icon, size = 'md', variant = 'ghost', pressed, className, type = 'button', ...rest },
+  { label, icon: Icon, size = 'md', variant = 'ghost', pressed, shape = 'square', className, type = 'button', ...rest },
   ref,
 ) {
   return (
@@ -84,7 +89,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       title={label}
       aria-pressed={pressed}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex shrink-0 items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        shape === 'circle' ? 'rounded-full' : 'rounded-lg',
         square[size],
         variant === 'ghost' && `text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 ${interactive.hover} ${interactive.pressed}`,
         variant === 'secondary' && variantClass.secondary,

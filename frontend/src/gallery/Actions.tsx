@@ -1,7 +1,7 @@
 // Gallery: actions and form controls.
 import { useState } from 'react';
 import { ChevronDown, Filter, FolderOpen, Moon, Monitor, Plus, Save, Sun, Trash2 } from 'lucide-react';
-import { Button, ButtonGroup, Checkbox, Combobox, Field, Fieldset, FileDrop, IconButton, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle } from '../components/ui';
+import { Button, ButtonGroup, Checkbox, Combobox, Field, Fieldset, FileDrop, IconButton, Icons, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle, iconMeaning, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 export default function Actions() {
@@ -18,6 +18,7 @@ export default function Actions() {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [file, setFile] = useState('');
+  const [language, setLanguage] = useState('zh-CN');
 
   return (
     <Chapter id="actions" title="操作与表单" intro="按钮触发动作；表单控件改变一个值。设置类的控件改了就生效（保存成功用 Toast 告知），对话框里的表单点按钮才提交。">
@@ -40,16 +41,34 @@ export default function Actions() {
             ]}
           />
         </Demo>
-        <Demo title="状态（悬停和按下请直接在页面上试）">
+        <Demo title="形状：rounded 用于页面、设置、表单；pill 用于会话里的卡片和浮动卡片（审批、提问）">
           <Matrix
             items={[
-              { label: '静止', node: <Button variant="primary">保存修改</Button> },
-              { label: '加载中', node: <Button variant="primary" loading>保存中</Button> },
-              { label: '禁用', node: <Button variant="primary" disabled>保存修改</Button> },
-              { label: '次要 · 禁用', node: <Button disabled>选择目录</Button> },
-              { label: '带后置图标', node: <Button trailingIcon={ChevronDown}>更多</Button> },
+              { label: 'rounded（默认）', node: <Button variant="primary">保存修改</Button> },
+              { label: 'pill 主要', node: <Button variant="primary" shape="pill">允许</Button> },
+              { label: 'pill 次要', node: <Button shape="pill">本会话都允许</Button> },
+              { label: 'pill 文字', node: <Button variant="ghost" shape="pill">跳过</Button> },
+              { label: 'pill 小', node: <Button size="sm" shape="pill" variant="primary">发送</Button> },
             ]}
           />
+        </Demo>
+        <Demo title="状态对照（静态示意：不用鼠标也能看出每种状态）">
+          <div className="space-y-4">
+            {(['primary', 'secondary', 'ghost'] as const).map((variant) => (
+              <Matrix
+                key={variant}
+                items={[
+                  { label: `${variant} · 静止`, node: <Button variant={variant}>保存修改</Button> },
+                  { label: '悬停', node: <Button variant={variant} className={variant === 'primary' ? 'bg-neutral-700 dark:bg-neutral-300' : variant === 'secondary' ? 'bg-neutral-50 dark:bg-neutral-800' : shownState.hover}>保存修改</Button> },
+                  { label: '按下', node: <Button variant={variant} className={variant === 'primary' ? 'bg-neutral-800 dark:bg-neutral-400' : variant === 'secondary' ? 'bg-neutral-100 dark:bg-neutral-700' : shownState.pressed}>保存修改</Button> },
+                  { label: '键盘焦点', node: <Button variant={variant} className={shownState.focus}>保存修改</Button> },
+                  { label: '加载中', node: <Button variant={variant} loading>保存中</Button> },
+                  { label: '禁用', node: <Button variant={variant} disabled>保存修改</Button> },
+                ]}
+              />
+            ))}
+            <Matrix items={[{ label: '带后置图标', node: <Button trailingIcon={ChevronDown}>更多</Button> }]} />
+          </div>
         </Demo>
         <Demo title="尺寸：sm 28 · md 36（默认）· lg 44">
           <Matrix
@@ -63,21 +82,30 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="icon-button" name="IconButton 图标按钮" file="components/ui/Button.tsx" use="空间有限、图标含义足够明确的操作：收起面板、关闭、更多。" avoid="含义不明显的操作（用带文字的按钮）。" a11y="label 必填，同时作为读屏名称和悬停提示；开关类用 pressed。">
-        <Demo>
+      <Doc id="icon-button" name="IconButton 图标按钮" file="components/ui/Button.tsx" use="空间有限、图标含义足够明确的操作：收起面板、关闭、更多、复制。方形用于工具栏和标题栏；圆形用于发送、停止，以及圆角卡片上的翻页、关闭。" avoid="含义不明显的操作（用带文字的按钮）。" a11y="label 必填，同时作为读屏名称和悬停提示；开关类用 pressed。">
+        <Demo title="常用操作（ghost，方形）">
+          <div className="flex flex-wrap gap-1">
+            {(['add', 'edit', 'copy', 'search', 'filter', 'refresh', 'openFolder', 'archive', 'delete', 'more', 'close', 'panelLeftClose', 'panelRightClose'] as const).map((name) => (
+              <IconButton key={name} icon={Icons[name]} label={iconMeaning[name]} />
+            ))}
+          </div>
+        </Demo>
+        <Demo title="变体、形状与状态">
           <Matrix
             items={[
-              { label: 'ghost（默认）', node: <IconButton icon={Filter} label="筛选" /> },
-              { label: 'secondary', node: <IconButton icon={Filter} label="筛选" variant="secondary" /> },
-              { label: 'primary', node: <IconButton icon={Plus} label="新建" variant="primary" /> },
-              { label: 'pressed 开启', node: <IconButton icon={Filter} label="筛选" pressed /> },
-              { label: 'disabled', node: <IconButton icon={Filter} label="筛选" disabled /> },
-              { label: 'sm', node: <IconButton icon={Filter} label="筛选" size="sm" /> },
+              { label: 'ghost（默认）', node: <IconButton icon={Icons.filter} label="筛选" /> },
+              { label: '悬停（示意）', node: <IconButton icon={Icons.filter} label="筛选" className={shownState.hover} /> },
+              { label: 'pressed 开启', node: <IconButton icon={Icons.filter} label="筛选" pressed /> },
+              { label: 'secondary', node: <IconButton icon={Icons.more} label="更多操作" variant="secondary" /> },
+              { label: 'primary', node: <IconButton icon={Icons.add} label="新建" variant="primary" /> },
+              { label: 'circle 发送', node: <IconButton icon={Icons.send} label="发送" variant="primary" shape="circle" size="sm" /> },
+              { label: 'circle 翻页', node: <IconButton icon={Icons.next} label="下一张" shape="circle" size="sm" /> },
+              { label: 'disabled', node: <IconButton icon={Icons.delete} label="删除" disabled /> },
+              { label: 'sm · md · lg', node: <span className="flex items-center gap-1"><IconButton icon={Icons.settings} label="设置" size="sm" /><IconButton icon={Icons.settings} label="设置" /><IconButton icon={Icons.settings} label="设置" size="lg" /></span> },
             ]}
           />
         </Demo>
       </Doc>
-
       <Doc id="button-group" name="ButtonGroup 按钮组" file="components/ui/Button.tsx" use="几个并列且相关的操作。" avoid="互斥的选择（用 SegmentedControl）。">
         <Demo>
           <ButtonGroup label="排序">
@@ -129,11 +157,11 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="select" name="Select 下拉 · Combobox 可搜索下拉" file="components/ui/Input.tsx · Combobox.tsx" use="Select：选项少且固定（语言）。Combobox：选项多、需要打字筛选（模型、角色）。" avoid="2–4 个选项且要一眼看全时用 SegmentedControl 或 RadioGroup。" a11y="Combobox：上下键移动、回车选择、Esc 关闭。">
+      <Doc id="select" name="Select 下拉 · Combobox 可搜索下拉" file="components/ui/Select.tsx · Combobox.tsx" use="Select：选项少且固定（语言）。Combobox：选项多、需要打字筛选（模型、角色）。" avoid="2–4 个选项且要一眼看全时用 SegmentedControl 或 RadioGroup。" a11y="Combobox：上下键移动、回车选择、Esc 关闭。">
         <Demo surface="raised">
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="界面语言">
-              <Select options={[{ value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }]} defaultValue="zh-CN" />
+              <Select value={language} onChange={setLanguage} options={[{ value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }, { value: 'ja', label: '日本語', description: '还没有翻译', disabled: true }]} />
             </Field>
             <Field label="默认模型">
               <Combobox

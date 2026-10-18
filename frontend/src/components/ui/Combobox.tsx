@@ -3,9 +3,10 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { controlHeight, cx, layer, surface, type ControlSize } from './foundation';
-import { controlFrame } from './Input';
+import { controlFrame } from './controlFrame';
 import { useField } from './Field';
 import { useDismiss } from './useDismiss';
+import { placementClass, useFloatingPlacement } from './useFloating';
 
 export interface ComboboxOption {
   value: string;
@@ -17,7 +18,9 @@ export function Combobox({ options, value, onChange, placeholder, emptyText, siz
   const field = useField();
   const listId = useId();
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
+  const placement = useFloatingPlacement(panel, open, 'bottom-start');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const selected = options.find((option) => option.value === value);
@@ -75,7 +78,7 @@ export function Combobox({ options, value, onChange, placeholder, emptyText, siz
         <ChevronsUpDown size={15} aria-hidden className="shrink-0 text-neutral-400" />
       </div>
       {open && (
-        <ul id={listId} role="listbox" className={cx('absolute left-0 right-0 top-full mt-1 max-h-64 animate-pop-in overflow-y-auto rounded-xl p-1', surface.overlay, layer.dropdown)}>
+        <ul ref={panel} id={listId} role="listbox" className={cx('absolute right-0 max-h-64 animate-pop-in overflow-y-auto rounded-xl p-1', surface.overlay, layer.dropdown, placementClass[placement])}>
           {shown.length === 0 && <li className="px-3 py-2 text-sm text-neutral-500">{emptyText}</li>}
           {shown.map((option, index) => (
             <li

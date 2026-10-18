@@ -32,7 +32,7 @@ export function RailItem({ icon: Icon, label, current = false, onClick, href, ba
 }
 
 /** A row of a side navigation or list that leads somewhere. */
-export function NavItem({ icon: Icon, label, current = false, onClick, trailing, leading, description }: { icon?: IconType; label: ReactNode; current?: boolean; onClick?: () => void; trailing?: ReactNode; leading?: ReactNode; description?: ReactNode }) {
+export function NavItem({ icon: Icon, label, current = false, onClick, trailing, leading, description, className }: { icon?: IconType; label: ReactNode; current?: boolean; onClick?: () => void; trailing?: ReactNode; leading?: ReactNode; description?: ReactNode; className?: string }) {
   return (
     <button
       type="button"
@@ -41,6 +41,7 @@ export function NavItem({ icon: Icon, label, current = false, onClick, trailing,
       className={cx(
         'relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
         current ? cx(interactive.selected, 'font-medium') : cx('text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-50', interactive.hover),
+        className,
       )}
     >
       {current && <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-signal-500" />}

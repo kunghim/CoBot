@@ -1,7 +1,7 @@
 // Gallery: navigation and things that float.
 import { useState } from 'react';
 import { Archive, Copy, Home, MoreHorizontal, Palette, Pencil, Settings, Settings2, Smile, Trash2, Users } from 'lucide-react';
-import { AlertDialog, Breadcrumbs, Button, Count, Dialog, Field, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, Steps, TabPanel, Tabs, TextInput, Tooltip, Tree } from '../components/ui';
+import { AlertDialog, Breadcrumbs, Button, Count, Dialog, Field, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, Steps, TabPanel, Tabs, TextInput, Tooltip, Tree, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 export default function NavigationOverlays() {
@@ -37,6 +37,25 @@ export default function NavigationOverlays() {
                 <NavItem key={id as string} icon={Icon as typeof Settings2} label={label as string} current={nav === id} onClick={() => setNav(id as string)} />
               ))}
             </NavSection>
+          </div>
+        </Demo>
+        <Demo title="状态对照（静态示意），放在侧栏底色上" surface="sunken">
+          <div className="flex flex-wrap gap-4">
+            {[
+              ['静止', ''],
+              ['悬停', shownState.hover],
+              ['按下', shownState.pressed],
+              ['键盘焦点', shownState.focus],
+            ].map(([label, cls]) => (
+              <div key={label} className="w-40 space-y-1">
+                <NavItem icon={Palette} label="外观" className={cls} onClick={() => undefined} />
+                <p className="px-2.5 text-[11px] text-neutral-500">{label}</p>
+              </div>
+            ))}
+            <div className="w-40 space-y-1">
+              <NavItem icon={Palette} label="外观" current onClick={() => undefined} />
+              <p className="px-2.5 text-[11px] text-neutral-500">当前</p>
+            </div>
           </div>
         </Demo>
       </Doc>

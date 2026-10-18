@@ -13,14 +13,14 @@ export default function Patterns() {
 
   return (
     <Chapter id="patterns" title="交互模式、文案与禁止事项" intro="跨组件的约定。新界面先在这里找做法；这里没有的，先补进画廊再用。">
-      <Doc id="saving" name="保存反馈" file="useToast + Field" use="设置项改了就保存。成功：右下角 Toast“已保存”。失败：错误写在那个设置项下面，值回到保存前，同时给一条失败 Toast。" avoid="不要在每个设置项旁边显示“已保存”。">
+      <Doc id="saving" name="保存反馈" file="useToast + Field" use="设置项改了就保存。成功：窗口顶部居中弹出 Toast“已保存”。失败：错误写在那个设置项下面，值回到保存前，同时给一条失败 Toast。" avoid="不要在每个设置项旁边显示“已保存”。">
         <Demo surface="raised">
           <div className="grid max-w-xl gap-5">
             <Field label="界面语言">
               <Select
                 value={language}
-                onChange={(event) => {
-                  setLanguage(event.target.value);
+                onChange={(next) => {
+                  setLanguage(next);
                   toast.show({ title: '已保存' });
                 }}
                 options={[{ value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }]}
@@ -100,11 +100,11 @@ export default function Patterns() {
         <DoDont
           goodNote="保存成功用 Toast；字段下面只放错误。"
           badNote="每个字段旁边一行绿色“已保存”。"
-          good={<Field label="语言"><Select options={[{ value: 'zh', label: '简体中文' }]} /></Field>}
+          good={<Field label="语言"><Select value="zh" onChange={() => undefined} options={[{ value: 'zh', label: '简体中文' }]} /></Field>}
           bad={
             <div className="space-y-1.5">
               <div className="flex justify-between text-sm"><span>语言</span><span className="text-xs text-green-600">已保存</span></div>
-              <Select options={[{ value: 'zh', label: '简体中文' }]} />
+              <Select value="zh" onChange={() => undefined} options={[{ value: 'zh', label: '简体中文' }]} />
             </div>
           }
         />

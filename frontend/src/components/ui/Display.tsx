@@ -1,7 +1,7 @@
 // Showing data: cards, lists, tables, key–value lists, code, statistics and
 // dividers. Machine values (paths, ids, numbers) use the monospace face.
-import { useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, Copy } from 'lucide-react';
 import { cx, interactive, surface } from './foundation';
 
 /** A raised group of related content. */
@@ -168,6 +168,72 @@ export function Divider({ label }: { label?: ReactNode }) {
       <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
       {label}
       <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+    </div>
+  );
+}
+
+/** Copies a value and says so for a moment; the label changes to confirm. */
+export function CopyButton({ value, copyLabel, copiedLabel, size = 'sm' }: { value: string; copyLabel: string; copiedLabel: string; size?: 'sm' | 'md' }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(value);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      }}
+      aria-label={copied ? copiedLabel : copyLabel}
+      title={copied ? copiedLabel : copyLabel}
+      className={cx('inline-flex items-center justify-center rounded-md text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100', interactive.hover, size === 'sm' ? 'h-7 w-7' : 'h-9 w-9')}
+    >
+      {copied ? <Check size={14} aria-hidden className="text-emerald-500" /> : <Copy size={14} aria-hidden />}
+    </button>
+  );
+}
+
+/**
+ * Sections that open and close one by one (details of a task, advanced
+ * settings). Each header is a button; several may be open at once.
+ */
+export function Accordion({ items, defaultOpen = [] }: { items: Array<{ id: string; title: ReactNode; content: ReactNode; meta?: ReactNode }>; defaultOpen?: string[] }) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set(defaultOpen));
+  const id = useId();
+  return (
+    <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+      {items.map((item) => {
+        const expanded = open.has(item.id);
+        return (
+          <div key={item.id}>
+            <h3>
+              <button
+                type="button"
+                id={`${id}-${item.id}-header`}
+                aria-expanded={expanded}
+                aria-controls={`${id}-${item.id}-panel`}
+                onClick={() =>
+                  setOpen((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(item.id)) next.delete(item.id);
+                    else next.add(item.id);
+                    return next;
+                  })
+                }
+                className={cx('flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-neutral-900 dark:text-neutral-50', interactive.hover)}
+              >
+                <span className="min-w-0 flex-1">{item.title}</span>
+                {item.meta && <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">{item.meta}</span>}
+                <ChevronDown size={16} aria-hidden className={cx('shrink-0 text-neutral-400 transition-transform', expanded && 'rotate-180')} />
+              </button>
+            </h3>
+            {expanded && (
+              <div id={`${id}-${item.id}-panel`} role="region" aria-labelledby={`${id}-${item.id}-header`} className="px-4 pb-4 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                {item.content}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

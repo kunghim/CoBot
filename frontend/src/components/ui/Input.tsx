@@ -1,13 +1,12 @@
 // Text entry: single line, multi line, search and numbers, plus the native
 // select. Inside a Field they take its id and descriptions automatically.
-import { forwardRef, useLayoutEffect, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { ChevronDown, Minus, Plus, Search, X } from 'lucide-react';
+import { forwardRef, useLayoutEffect, useRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { controlHeight, cx, interactive, type ControlSize } from './foundation';
 import { useField } from './Field';
 
-/** The frame every text control shares: border, focus ring, invalid state. */
-export const controlFrame =
-  'rounded-lg border border-neutral-300 bg-white text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 hover:border-neutral-400 focus-within:border-signal-500 focus-within:ring-2 focus-within:ring-signal-500/25 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600';
+import { controlFrame } from './controlFrame';
+
 const invalidFrame = 'border-red-500 hover:border-red-500 focus-within:border-red-500 focus-within:ring-red-500/25 dark:border-red-500';
 const disabledFrame = 'opacity-60 cursor-not-allowed';
 
@@ -112,10 +111,10 @@ export function SearchInput({ value, onChange, placeholder, label, clearLabel, s
   );
 }
 
-/** A whole number with steppers; the value is clamped on commit. */
+/** A number with up and down steppers on the right; arrow keys step too. */
 export function NumberInput({ value, onChange, min, max, step = 1, size = 'md', unit, id, disabled, decreaseLabel, increaseLabel }: { value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number; size?: ControlSize; unit?: string; id?: string; disabled?: boolean; decreaseLabel: string; increaseLabel: string }) {
   const clamp = (next: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, next));
-  const stepButton = 'flex h-full items-center px-2 text-neutral-500 hover:text-neutral-900 disabled:opacity-40 dark:hover:text-neutral-100';
+  const stepButton = 'flex h-1/2 w-6 items-center justify-center text-neutral-400 transition-colors hover:bg-neutral-900/[0.06] hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
   return (
     <TextInput
       id={id}
@@ -128,52 +127,20 @@ export function NumberInput({ value, onChange, min, max, step = 1, size = 'md', 
       step={step}
       disabled={disabled}
       onChange={(event) => onChange(clamp(Number(event.target.value)))}
-      className="pr-0 [&_input]:[appearance:textfield] [&_input::-webkit-inner-spin-button]:appearance-none"
+      className="pr-0 [&_input]:[appearance:textfield] [&_input::-webkit-inner-spin-button]:appearance-none [&_input::-webkit-outer-spin-button]:appearance-none"
       suffix={
         <span className="flex h-full items-center">
           {unit && <span className="mr-2 text-xs">{unit}</span>}
-          <button type="button" aria-label={decreaseLabel} title={decreaseLabel} disabled={disabled || (min !== undefined && value <= min)} onClick={() => onChange(clamp(value - step))} className={stepButton}>
-            <Minus size={14} aria-hidden />
-          </button>
-          <button type="button" aria-label={increaseLabel} title={increaseLabel} disabled={disabled || (max !== undefined && value >= max)} onClick={() => onChange(clamp(value + step))} className={stepButton}>
-            <Plus size={14} aria-hidden />
-          </button>
+          <span className="flex h-full flex-col overflow-hidden rounded-r-lg border-l border-neutral-200 dark:border-neutral-700">
+            <button type="button" tabIndex={-1} aria-label={increaseLabel} title={increaseLabel} disabled={disabled || (max !== undefined && value >= max)} onClick={() => onChange(clamp(value + step))} className={stepButton}>
+              <ChevronUp size={13} aria-hidden />
+            </button>
+            <button type="button" tabIndex={-1} aria-label={decreaseLabel} title={decreaseLabel} disabled={disabled || (min !== undefined && value <= min)} onClick={() => onChange(clamp(value - step))} className={cx(stepButton, 'border-t border-neutral-200 dark:border-neutral-700')}>
+              <ChevronDown size={13} aria-hidden />
+            </button>
+          </span>
         </span>
       }
     />
   );
 }
-
-export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
-  size?: ControlSize;
-  invalid?: boolean;
-  options: Array<{ value: string; label: string; disabled?: boolean }>;
-}
-
-/** The native select: right for short, fixed lists; it works everywhere. */
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { size = 'md', invalid, options, className, id, ...rest },
-  ref,
-) {
-  const field = useField();
-  const isInvalid = invalid ?? field?.invalid ?? false;
-  return (
-    <div className={cx('relative', controlFrame, controlHeight[size], isInvalid && invalidFrame, rest.disabled && disabledFrame, className)}>
-      <select
-        ref={ref}
-        id={id ?? field?.id}
-        aria-describedby={field?.describedBy}
-        aria-invalid={isInvalid || undefined}
-        className="h-full w-full cursor-pointer appearance-none rounded-lg bg-transparent pl-3 pr-9 outline-none disabled:cursor-not-allowed"
-        {...rest}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown size={16} aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-    </div>
-  );
-});

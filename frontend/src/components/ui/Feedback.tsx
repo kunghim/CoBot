@@ -80,7 +80,7 @@ export function Tag({ children, onRemove, removeLabel }: { children: ReactNode; 
     <span className="inline-flex items-center gap-1 rounded-md bg-neutral-900/[0.06] py-0.5 pl-2 pr-1 text-xs text-neutral-700 dark:bg-white/[0.08] dark:text-neutral-200">
       {children}
       {onRemove && (
-        <button type="button" onClick={onRemove} aria-label={removeLabel} title={removeLabel} className="rounded p-0.5 text-neutral-400 hover:bg-neutral-900/[0.08] hover:text-neutral-700 dark:hover:bg-white/[0.1] dark:hover:text-neutral-100">
+        <button type="button" onClick={onRemove} aria-label={removeLabel} title={removeLabel} className="-my-0.5 flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-900/[0.08] hover:text-neutral-700 dark:hover:bg-white/[0.1] dark:hover:text-neutral-100">
           <X size={12} aria-hidden />
         </button>
       )}
@@ -110,4 +110,22 @@ export function Count({ value, tone = 'neutral', label }: { value: number; tone?
 /** A key on the keyboard, in shortcut hints. */
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-neutral-300 bg-white px-1 font-mono text-[11px] text-neutral-600 shadow-[0_1px_0_rgb(0_0_0/0.08)] dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{children}</kbd>;
+}
+
+/** Progress around a circle, for a share that matters at a glance (context used). */
+export function ProgressRing({ value, label, size = 36, tone = 'neutral', showValue = true }: { value: number; label: string; size?: number; tone?: Tone; showValue?: boolean }) {
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(100, Math.max(0, value));
+  const color = { neutral: 'text-signal-500', info: 'text-sky-500', success: 'text-emerald-500', warning: 'text-amber-500', danger: 'text-red-500' }[tone];
+  return (
+    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamped)} className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-neutral-900/[0.08] dark:stroke-white/[0.1]" />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} strokeLinecap="round" stroke="currentColor" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - clamped / 100)} className={cx('transition-[stroke-dashoffset]', color)} />
+      </svg>
+      {showValue && <span className="absolute font-mono text-[10px] font-semibold tabular-nums">{Math.round(clamped)}</span>}
+    </span>
+  );
 }

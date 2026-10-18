@@ -34,6 +34,7 @@
 
   /* Motion: things that appear rise slightly into place; nothing bounces. */
   --animate-pop-in: pop-in 160ms ease-out;
+  --animate-drop-in: drop-in 180ms ease-out;
   --animate-fade-in: fade-in 160ms ease-out;
   --animate-slide-in-right: slide-in-right 200ms ease-out;
   --animate-slide-in-left: slide-in-left 200ms ease-out;
@@ -43,6 +44,9 @@
 
 @keyframes pop-in {
   from { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(-8px); }
 }
 @keyframes fade-in {
   from { opacity: 0; }

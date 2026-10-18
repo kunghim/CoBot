@@ -3,21 +3,14 @@
 // words naming a control, never the only place information lives. Dialog:
 // a task that needs the page to wait. AlertDialog: confirm something that
 // cannot be undone. Sheet: a side panel over the page on narrow screens.
-import { cloneElement, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useDialogFocus } from '../useDialogFocus';
 import { Button } from './Button';
 import { cx, layer, surface } from './foundation';
 import { useDismiss } from './useDismiss';
 
-type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
-
-const placementClass: Record<Placement, string> = {
-  'bottom-start': 'left-0 top-full mt-1.5',
-  'bottom-end': 'right-0 top-full mt-1.5',
-  'top-start': 'left-0 bottom-full mb-1.5',
-  'top-end': 'right-0 bottom-full mb-1.5',
-};
+import { placementClass, useFloatingPlacement, type Placement } from './useFloating';
 
 export interface MenuItem {
   id: string;
@@ -36,6 +29,8 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
   const root = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const panel = useRef<HTMLDivElement>(null);
+  const placed = useFloatingPlacement(panel, open, placement);
   const menuId = useId();
   const close = useCallback(() => setOpen(false), []);
   useDismiss(root, open, () => {
@@ -82,7 +77,7 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
         },
       } as Record<string, unknown>)}
       {open && (
-        <div id={menuId} role="menu" aria-label={label} onKeyDown={onKeyDown} className={cx('absolute min-w-52 animate-pop-in rounded-xl p-1', surface.overlay, layer.dropdown, placementClass[placement])}>
+        <div ref={panel} id={menuId} role="menu" aria-label={label} onKeyDown={onKeyDown} className={cx('absolute min-w-52 animate-pop-in rounded-xl p-1', surface.overlay, layer.dropdown, placementClass[placed])}>
           {items.map((item, index) =>
             item === 'separator' ? (
               <div key={`separator-${index}`} role="separator" className="my-1 h-px bg-neutral-200 dark:bg-neutral-700" />
@@ -122,13 +117,15 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
 export function Popover({ trigger, children, placement = 'bottom-start', label, className }: { trigger: ReactElement; children: ReactNode; placement?: Placement; label: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const placed = useFloatingPlacement(panel, open, placement);
   const panelId = useId();
   useDismiss(root, open, () => setOpen(false));
   return (
     <div ref={root} className="relative inline-flex">
       {cloneElement(trigger, { 'aria-expanded': open, 'aria-controls': panelId, onClick: () => setOpen((value) => !value) } as Record<string, unknown>)}
       {open && (
-        <div id={panelId} role="dialog" aria-label={label} className={cx('absolute w-72 animate-pop-in rounded-xl p-4 text-sm', surface.overlay, layer.dropdown, placementClass[placement], className)}>
+        <div ref={panel} id={panelId} role="dialog" aria-label={label} className={cx('absolute w-72 animate-pop-in rounded-xl p-4 text-sm', surface.overlay, layer.dropdown, placementClass[placed], className)}>
           {children}
         </div>
       )}
@@ -139,8 +136,20 @@ export function Popover({ trigger, children, placement = 'bottom-start', label, 
 /** A few words naming the control under the pointer or focus. */
 export function Tooltip({ content, children, side = 'top' }: { content: ReactNode; children: ReactElement; side?: 'top' | 'bottom' }) {
   const [shown, setShown] = useState(false);
+  const [shift, setShift] = useState(0);
+  const tip = useRef<HTMLSpanElement>(null);
   const id = useId();
   const timer = useRef<number>(0);
+  // Keep the tip inside the window near its edges.
+  useLayoutEffect(() => {
+    if (!shown || !tip.current) {
+      setShift(0);
+      return;
+    }
+    const rect = tip.current.getBoundingClientRect();
+    if (rect.left < 8) setShift(8 - rect.left);
+    else if (rect.right > window.innerWidth - 8) setShift(window.innerWidth - 8 - rect.right);
+  }, [shown]);
   const show = () => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setShown(true), 400);
@@ -154,7 +163,7 @@ export function Tooltip({ content, children, side = 'top' }: { content: ReactNod
     <span className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={() => setShown(true)} onBlur={hide} onKeyDown={(event) => event.key === 'Escape' && hide()}>
       {cloneElement(children, { 'aria-describedby': shown ? id : undefined } as Record<string, unknown>)}
       {shown && (
-        <span id={id} role="tooltip" className={cx('pointer-events-none absolute left-1/2 w-max max-w-60 -translate-x-1/2 animate-fade-in rounded-md bg-neutral-900 px-2 py-1 text-xs text-white shadow-lg dark:bg-neutral-100 dark:text-neutral-900', layer.tooltip, side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5')}>
+        <span ref={tip} id={id} role="tooltip" style={shift ? { marginLeft: shift } : undefined} className={cx('pointer-events-none absolute left-1/2 w-max max-w-60 -translate-x-1/2 animate-fade-in rounded-md bg-neutral-900 px-2 py-1 text-xs text-white shadow-lg dark:bg-neutral-100 dark:text-neutral-900', layer.tooltip, side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5')}>
           {content}
         </span>
       )}

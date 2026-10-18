@@ -1,5 +1,5 @@
 // Toast: a short note that something happened, away from where it happened
-// ("Saved", "Copied"). Success leaves by itself; a failure stays until it is
+// ("Saved", "Copied"), dropping in at the top center of the window. Success leaves by itself; a failure stays until it is
 // closed and says what to do. Errors about a field go under the field, not
 // in a toast. Screen readers hear every toast.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -58,7 +58,7 @@ export function ToastProvider({ children, closeLabel }: { children: ReactNode; c
 
 function ToastRegion({ toasts, dismiss, closeLabel }: { toasts: ToastEntry[]; dismiss: (id: number) => void; closeLabel: string }) {
   return (
-    <div className={cx('pointer-events-none fixed bottom-4 right-4 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col gap-2', layer.toast)}>
+    <div className={cx('pointer-events-none fixed left-1/2 top-4 flex w-[24rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-2', layer.toast)}>
       <div aria-live="polite" role="status" className="flex flex-col gap-2">
         {toasts.filter((toast) => toast.tone !== 'danger').map((toast) => (
           <ToastCard key={toast.id} toast={toast} dismiss={dismiss} closeLabel={closeLabel} />
@@ -87,7 +87,7 @@ export function ToastCard({ toast, dismiss, closeLabel }: { toast: ToastEntry; d
     <div
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="pointer-events-auto flex animate-pop-in items-start gap-3 rounded-xl bg-white p-3.5 shadow-xl ring-1 ring-neutral-900/10 dark:bg-neutral-800 dark:ring-white/10"
+      className="pointer-events-auto flex animate-drop-in items-start gap-3 rounded-xl bg-white p-3.5 shadow-xl ring-1 ring-neutral-900/10 dark:bg-neutral-800 dark:ring-white/10"
     >
       <Icon size={18} aria-hidden className={cx('mt-px shrink-0', iconTone[tone])} />
       <div className="min-w-0 flex-1 text-sm">

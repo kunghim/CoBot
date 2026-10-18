@@ -1,8 +1,7 @@
 // Gallery: the rules everything is built from — principles, color, type,
 // space, shape, depth, motion, focus and icons.
-import { Bell, Home, Settings } from 'lucide-react';
 import { Chapter, Demo, Doc, Rules } from './parts';
-import { cx, toneSoft, toneSolid } from '../components/ui';
+import { Icons, cx, iconMeaning, toneSoft, toneSolid, type IconName } from '../components/ui';
 
 // Written out in full so the class names exist in the built CSS.
 const NEUTRALS: Array<[string, string]> = [
@@ -153,22 +152,43 @@ export default function Foundations() {
         </Demo>
       </Doc>
 
-      <Doc id="icons" name="图标" file="lucide-react" use="只用 lucide 图标。尺寸：14（小控件、行内）、16（按钮、导航项）、18（图标栏、对话框）。图标和文字用同一种颜色。" avoid="同一个功能不要用两个不同的图标；只有图标的按钮必须有文字标签（IconButton 的 label）。">
+      <Doc
+        id="icons"
+        name="图标"
+        file="components/ui/icons.ts（Icons）"
+        use="只用 lucide 图标，并且按意思从 Icons 里取（Icons.team、Icons.delete），不在页面里随手挑。一个意思只有一个图标。尺寸：14（行内、小控件）、16（按钮、导航项）、18（图标栏、对话框）。图标和旁边文字同色。"
+        avoid="不要同一个功能用两个图标；只有图标的按钮必须有文字标签（IconButton 的 label）。需要新的意思，先加进 Icons 和这张表。"
+      >
         <Demo>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {(Object.keys(Icons) as IconName[]).map((name) => {
+              const Icon = Icons[name];
+              return (
+                <div key={name} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs hover:bg-neutral-900/[0.04] dark:hover:bg-white/[0.05]">
+                  <Icon size={16} aria-hidden className="shrink-0 text-neutral-700 dark:text-neutral-200" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-neutral-800 dark:text-neutral-100">{iconMeaning[name]}</span>
+                    <code className="block truncate font-mono text-[10px] text-neutral-500">Icons.{name}</code>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Demo>
+        <Demo title="尺寸">
           <div className="flex items-end gap-6 text-xs text-neutral-700 dark:text-neutral-200">
             {[14, 16, 18].map((size) => (
               <div key={size} className="flex flex-col items-center gap-2">
                 <span className="flex gap-2">
-                  <Home size={size} aria-hidden />
-                  <Settings size={size} aria-hidden />
-                  <Bell size={size} aria-hidden />
+                  <Icons.home size={size} aria-hidden />
+                  <Icons.settings size={size} aria-hidden />
+                  <Icons.notification size={size} aria-hidden />
                 </span>
                 {size}px
               </div>
             ))}
           </div>
         </Demo>
-      </Doc>
-    </Chapter>
+      </Doc>    </Chapter>
   );
 }
