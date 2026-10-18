@@ -6,12 +6,13 @@
 # Output is summarized under .tmp/dist with SHA-256 checksums.
 param(
     [Parameter(Mandatory = $true)][ValidateSet("server", "desktop")][string]$Target,
-    [string]$Version = "0.1.0-dev"
+    [string]$Version = "0.1.0-dev",
+    [string]$OutputDirectory
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
-$dist = Join-Path $root ".tmp\dist"
+$dist = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $root ".tmp\dist" }
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
 if (-not (Test-Path "frontend\node_modules")) {
