@@ -42,7 +42,7 @@ func Locate(configuredPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w (not on PATH and no configured path)", ErrNotFound)
 	}
-	return found, nil
+	return resolveLauncher(found), nil
 }
 
 // VersionSupported reports whether a `codex --version` result is at least
@@ -84,6 +84,7 @@ func ProbeVersion(ctx context.Context, binary string) (string, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
+	hideChildWindow(cmd)
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("codex --version: %w", err)
 	}

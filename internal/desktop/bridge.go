@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -59,6 +60,29 @@ func NewBridge(environment platform.Environment, version string, extraOrigins []
 	return &Bridge{environment: environment, version: version, extraOrigins: extraOrigins}
 }
 
+// resolveHelperBinary picks the binary Codex launches for the MCP/hook bridge,
+// from the directory holding the shell.
+//
+// The engine starts that bridge as a child process, and Windows allocates a
+// console window for every console-subsystem child, which flashed a terminal
+// next to the app each time a team started. The desktop package therefore ships
+// cobot-helper, the same bridge linked with the GUI subsystem. When it is
+// missing (a development tree), the console binary is used instead so the app
+// still starts.
+func resolveHelperBinary(dir string) string {
+	if runtime.GOOS == "windows" {
+		candidate := filepath.Join(dir, "cobot-helper.exe")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	name := "cobot"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(dir, name)
+}
+
 // StartCore boots (or adopts) the product core. Called from OnStartup.
 func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 	b.mu.Lock()
@@ -67,17 +91,14 @@ func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 	if err != nil {
 		return err
 	}
-	name := "cobot"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
+	dir := filepath.Dir(executable)
 	core, err := bootstrap.Start(ctx, bootstrap.Options{
 		Environment:     b.environment,
 		DataRoot:        dataRoot,
 		Version:         b.version,
 		ConsoleLog:      true,
 		ExtraOrigins:    b.extraOrigins,
-		HelperBinary:    filepath.Join(filepath.Dir(executable), name),
+		HelperBinary:    resolveHelperBinary(dir),
 		EngineSelfCheck: true,
 	})
 	if err == nil {
@@ -217,6 +238,31 @@ func (b *Bridge) OpenDirectory() (string, error) {
 	return wailsruntime.OpenDirectoryDialog(ctx, wailsruntime.OpenDialogOptions{
 		Title: "Select team working directory",
 	})
+}
+
+// OpenLoginURL hands official sign-in to the user's default browser instead
+// of a new WebView, so that browser's existing account session can be used.
+func (b *Bridge) OpenLoginURL(rawURL string) error {
+	if err := validateLoginURL(rawURL); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	ctx := b.wailsCtx
+	b.mu.Unlock()
+	if ctx == nil {
+		return fmt.Errorf("application context is not ready")
+	}
+	wailsruntime.BrowserOpenURL(ctx, rawURL)
+	return nil
+}
+
+func validateLoginURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host != "auth.openai.com" || u.User != nil {
+		// Do not put the authorization URL or its query parameters in errors.
+		return fmt.Errorf("invalid official sign-in URL")
+	}
+	return nil
 }
 
 // Quit asks the host to shut down; OnShutdown then stops the owned core with

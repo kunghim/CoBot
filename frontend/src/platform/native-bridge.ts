@@ -9,6 +9,8 @@ interface DesktopBridge {
   Bootstrap(): Promise<{ secret: string; endpoint: string }>;
   /** Opens the native directory picker; returns the chosen path or empty. */
   OpenDirectory(): Promise<string>;
+  /** Opens official sign-in in the system default browser. */
+  OpenLoginURL(url: string): Promise<void>;
   /** Asks the host to quit the application. */
   Quit(): Promise<void>;
 }
