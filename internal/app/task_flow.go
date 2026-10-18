@@ -324,7 +324,7 @@ func (a *App) taskLines(ctx context.Context, teamID, ownerID string) ([]TaskLine
 					continue
 				}
 			}
-			if depTask.Status != domain.TaskDone {
+			if blocksDependents(depTask) {
 				line.WaitingOn = append(line.WaitingOn, depTask.Title)
 			}
 		}

@@ -7,6 +7,19 @@ import (
 	"testing"
 )
 
+func TestLaunchesProgramCoversEveryDesktop(t *testing.T) {
+	for _, path := range []string{`C:\t\run.BAT`, `C:\t\a.vbs`, `C:\t\x.url`, "/t/Tool.app", "/t/start.command", "/t/a.desktop", "/t/b.sh", "/t/c.jar"} {
+		if !launchesProgram(path) {
+			t.Errorf("%s runs code when opened", path)
+		}
+	}
+	for _, path := range []string{`C:\t\index.html`, "/t/README.md", "/t/shot.png", "/t/dir", "/t/report.pdf"} {
+		if launchesProgram(path) {
+			t.Errorf("%s is content and may be opened", path)
+		}
+	}
+}
+
 func TestResolveTeamPathOnlyOpensFilesInsideTheTeam(t *testing.T) {
 	root := t.TempDir()
 	team := filepath.Join(root, "team")

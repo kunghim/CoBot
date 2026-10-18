@@ -681,6 +681,13 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 	}
 	err := s.client.Call(ctx, "turn/start", params, &res)
 	if err != nil {
+		var refused *RPCError
+		if errors.As(err, &refused) {
+			// Codex answered: the turn did not start. The thread may be one it
+			// no longer holds, so the next turn resumes it first.
+			s.setLoaded(threadID, false)
+			return "", fmt.Errorf("turn/start: %w: %w", engine.ErrRejected, err)
+		}
 		return "", fmt.Errorf("turn/start: %w", err)
 	}
 	if res.Turn.ID == "" {

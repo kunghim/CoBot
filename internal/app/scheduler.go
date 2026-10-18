@@ -244,13 +244,22 @@ func (s *Scheduler) launch(botID string) {
 	}()
 }
 
+// dispatchTimeout bounds one dispatch, which on a team's first turn also
+// starts the engine and the member's thread. turnStartTimeout bounds only
+// turn/start: past it the turn's outcome is unknown and needs verifying, so a
+// slow engine start-up must not eat into it.
+const (
+	dispatchTimeout  = 2 * time.Minute
+	turnStartTimeout = 30 * time.Second
+)
+
 func (s *Scheduler) dispatchSafely(botID string) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			s.logger.Error("dispatch panic", "botId", botID, "panic", rec)
 		}
 	}()
-	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, dispatchTimeout)
 	defer cancel()
 	if err := s.dispatch(ctx, botID); err != nil {
 		s.logger.Warn("dispatch failed", "botId", botID, "error", err)
@@ -500,7 +509,15 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		input = update + "\n\n" + text
 	}
 	s.app.TouchLease(ctx, bot.ID)
-	turnID, err := server.StartTurn(ctx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
+	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	cancelTurn()
+	if errors.Is(err, engine.ErrRejected) {
+		// The engine answered with a refusal, so no turn exists: the run
+		// failed, and there is nothing to verify or recover.
+		s.logger.Warn("turn/start rejected", "botId", bot.ID, "runId", run.ID, "error", err)
+		return s.failStart(ctx, run.ID, bot.ID, "error.engine.turn_rejected")
+	}
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried (D04).

@@ -215,7 +215,8 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	return sqlite.GetTask(ctx, a.DB, task.ID)
 }
 
-// dependenciesSatisfied reports whether every dependency of the task is done.
+// dependenciesSatisfied reports whether no dependency of the task still
+// blocks it: each is done, or cancelled and so never going to be.
 func (a *App) dependenciesSatisfied(ctx context.Context, q sqlite.Queryer, taskID string) (bool, error) {
 	task, err := sqlite.GetTask(ctx, q, taskID)
 	if err != nil {
@@ -226,11 +227,18 @@ func (a *App) dependenciesSatisfied(ctx context.Context, q sqlite.Queryer, taskI
 		if err != nil {
 			return false, err
 		}
-		if depTask.Status != domain.TaskDone {
+		if blocksDependents(depTask) {
 			return false, nil
 		}
 	}
 	return true, nil
+}
+
+// blocksDependents reports whether a task still holds back the tasks that
+// depend on it. A cancelled task will never be done, so waiting for it would
+// park its dependents forever; the leader is told instead and decides.
+func blocksDependents(task domain.Task) bool {
+	return task.Status != domain.TaskDone && task.Status != domain.TaskCancelled
 }
 
 // enqueueAssignmentLocked creates the one task-assignment delivery for an
@@ -484,12 +492,19 @@ func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, ta
 	if err != nil {
 		return domain.Task{}, sqlite.NormalizeError(err)
 	}
+	var released []domain.Task
+	leaderToWake := ""
 	if status == domain.TaskCancelled {
 		if err := a.cancelUndeliveriesForTaskLocked(ctx, tx, task.ID, ""); err != nil {
 			return domain.Task{}, err
 		}
+		if released, err = a.activateDependentDeliveriesLocked(ctx, tx, task.ID); err != nil {
+			return domain.Task{}, err
+		}
+		if leaderToWake, err = a.enqueueDependencyCancelledNoticeLocked(ctx, tx, principal, updated, released); err != nil {
+			return domain.Task{}, err
+		}
 	}
-	leaderToWake := ""
 	if status == domain.TaskReview && task.Status != domain.TaskReview {
 		leaderToWake, err = a.enqueueReviewNoticeLocked(ctx, tx, principal, updated)
 		if err != nil {
@@ -508,10 +523,89 @@ func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, ta
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID, Revision: updated.Revision,
 		Payload: mustJSON(map[string]any{"change": "status", "status": updated.Status})})
 	a.Hub.Publish()
+	for _, dependent := range released {
+		a.recordTaskUpdated(ctx, dependent)
+	}
 	if a.Scheduler != nil {
 		a.Scheduler.Wake(task.OwnerID)
+		for _, dependent := range released {
+			a.Scheduler.Wake(dependent.OwnerID)
+		}
 	}
 	return updated, nil
+}
+
+// enqueueDependencyCancelledNoticeLocked tells the leader that a cancelled
+// task had tasks waiting on it, which of them now reached their owners and
+// which still wait for something else, as a message that wakes it. It reports
+// the leader to wake, or "" when nothing depended on the task or the leader
+// cancelled it itself.
+func (a *App) enqueueDependencyCancelledNoticeLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, cancelled domain.Task, released []domain.Task) (string, error) {
+	team, _, err := sqlite.GetTeam(ctx, tx, cancelled.TeamID)
+	if err != nil {
+		return "", err
+	}
+	if team.LeaderID == "" || (principal.Kind == auth.KindBot && principal.BotID == team.LeaderID) {
+		return "", nil
+	}
+	ids, err := sqlite.ListDependentTasks(ctx, tx, cancelled.ID)
+	if err != nil {
+		return "", err
+	}
+	releasedIDs := map[string]bool{}
+	for _, task := range released {
+		releasedIDs[task.ID] = true
+	}
+	var started, waiting []string
+	for _, id := range ids {
+		dependent, err := sqlite.GetTask(ctx, tx, id)
+		if err != nil {
+			return "", err
+		}
+		if !blocksDependents(dependent) {
+			continue
+		}
+		owner, _ := sqlite.GetBot(ctx, tx, dependent.OwnerID)
+		line := fmt.Sprintf("「%s」（任务 ID：%s，负责人：%s）", dependent.Title, dependent.ID, owner.Name)
+		if releasedIDs[id] {
+			started = append(started, line)
+		} else {
+			waiting = append(waiting, line)
+		}
+	}
+	if len(started) == 0 && len(waiting) == 0 {
+		return "", nil
+	}
+	text := fmt.Sprintf("任务「%s」（任务 ID：%s）已被取消，依赖它的任务不再等它。", cancelled.Title, cancelled.ID)
+	if len(started) > 0 {
+		text += "\n已送到负责人手上：" + strings.Join(started, "、")
+	}
+	if len(waiting) > 0 {
+		text += "\n仍在等其他前置任务：" + strings.Join(waiting, "、")
+	}
+	text += "\n请判断这些任务没有被取消的前置任务是否还成立：需要调整就告诉负责人，超出你能决定的就问用户。"
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return "", err
+	}
+	message := domain.Message{
+		ID: domain.NewID(), TeamID: cancelled.TeamID, BotID: team.LeaderID,
+		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: cancelled.ID,
+	}
+	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+		return "", err
+	}
+	chain := ""
+	if principal.Kind == auth.KindBot {
+		chain = chainOfRunLocked(ctx, tx, principal.BotID)
+	}
+	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+		ID: domain.NewID(), MessageID: message.ID, TeamID: cancelled.TeamID, TargetBotID: team.LeaderID,
+		Status: domain.DeliveryQueued, ChainID: chain, SourceRunID: principal.RunID, Kind: "dependency_cancelled",
+	}); err != nil {
+		return "", err
+	}
+	return team.LeaderID, nil
 }
 
 func validTaskTransition(from, to string) bool {
