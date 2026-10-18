@@ -105,6 +105,7 @@ the agent you already trust.
 | Windows standalone server build | Builds and runs |
 | Windows desktop shell (Wails/WebView2) | Compiles; not yet verified at runtime |
 | macOS (Web / desktop) | Cross-compiles; `.app` packaging reviewed statically only; native runtime, installation, signing and notarization not yet verified |
+| Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
 
 With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
 questions, native file approvals and rejections, collaboration limits, reconnecting after a
@@ -125,22 +126,49 @@ not yet.
 
 ## Quick start
 
-**You need:** Go 1.25.12+, Node.js 24+ (npm 11+), and the [Codex CLI](https://github.com/openai/codex)
-installed (verified with 0.161.0).
+This preview is built from source. Start with the **Windows local Web** version;
+macOS instructions are for unverified source trials, not a verified native release.
+
+**Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
+(minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
+For agent work, install the [Codex CLI](https://github.com/openai/codex) on `PATH`
+(minimum and verified version: 0.161.0), with an account that can use Codex and
+network access to its service. Go and Node are build tools; the resulting CoBot
+executable still needs Codex for agent work. Local-first does not mean offline
+model execution.
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+powershell -NoProfile -File scripts/build.ps1 -Target server
+.\.tmp\dist\cobot.exe serve
+```
+
+### macOS (Bash; native runtime unverified)
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
 cd CoBot
 npm ci --prefix frontend
-./scripts/build.sh --target server        # Windows: powershell -File scripts/build.ps1 -Target server
-
-.tmp/dist/cobot serve                     # development profile, data in ~/.cobot-dev
+./scripts/build.sh --target server
+./.tmp/dist/cobot serve
 ```
+
+Run these commands in a terminal on the same computer as your browser and team
+files. This starts the local Web app, not the desktop shell or a remote server.
+The build writes `.tmp/dist/cobot.exe` on Windows or `.tmp/dist/cobot` on macOS,
+with a `.sha256` checksum. It does not install CoBot on `PATH`; use the full
+relative path shown above. Keep the terminal open while using CoBot.
 
 Your default browser opens CoBot, already signed in. Behind the scenes it uses a one-time
 startup link (valid 60 seconds, also printed in the terminal; `--no-open` only prints it).
-Running `cobot serve` again opens a fresh link to the running instance.
-Then:
+This authorizes the local CoBot page; it does not sign you in to Codex. Treat
+startup links like passwords. If the browser does not open, use the printed link.
+If the link expires, rerun the same executable with `serve` in another terminal:
+it opens a fresh link to the existing instance, without starting a second one.
 
 The interface initially opens in Chinese. To switch to English, open
 **设置 (Settings) → 通用 (General) → 语言 (Language)** and select **English**.
@@ -151,10 +179,27 @@ This preference is saved for subsequent visits; agent replies are not translated
    CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
    both, with a button to authorize again if that failed.
 2. **New team:** choose a working directory and the members you want.
-3. **Message the leader** with what you want built.
+3. **Message the leader** with a small, checkable goal. For example: "Inspect this
+   project and propose three improvements. Do not edit files yet." Agent replies
+   follow the conversation and role instructions, not the interface language.
 
-Use `cobot serve --profile production` for everyday use (data in `~/.cobot`).
-Treat startup links like passwords.
+Closing the browser leaves the service running. To stop it, press **Ctrl+C in
+the terminal that started it** and wait for shutdown to finish.
+
+The commands above use the default **development** profile (`~/.cobot-dev`).
+For everyday use, stop that instance and run
+`.\.tmp\dist\cobot.exe serve --profile production` on Windows or
+`./.tmp/dist/cobot serve --profile production` on macOS. The production profile
+uses `~/.cobot` and has separate settings, Codex login and teams; your preview
+setup does not transfer automatically. `~` means your home directory. For an
+isolated trial, add `--data-root <absolute-path-to-an-empty-directory>`.
+
+If Settings cannot find Codex, check `codex --version` in the terminal used to
+launch CoBot. After installing or updating Codex, reopen that terminal, restart
+CoBot with the same profile and data root, and retry the check in Settings.
+Do not attach startup links or raw trace recordings to a help request;
+[Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a) accepts English
+and Chinese.
 
 ## Development
 
