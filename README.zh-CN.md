@@ -84,6 +84,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | Windows 独立服务构建 | 可构建、可运行 |
 | Windows 桌面壳（Wails/WebView2） | 可编译；尚未实机验证 |
 | macOS（Web / 桌面） | 可交叉编译；`.app` 打包仅做过静态核对；原生运行、安装、签名与公证尚未验证 |
+| Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
 
 在 Windows 上用真实 Codex 验证过的内容：登录、多成员并行、任务交接与提问、原生文件审批与拒绝、
 协作限轮、断线重连、正常退出、崩溃恢复和升级。
@@ -97,28 +98,66 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 
 ## 快速开始
 
-**前置条件**：Go 1.25.12+、Node.js 24+（npm 11+），已安装 [Codex CLI](https://github.com/openai/codex)
-（已验证版本 0.161.0）。
+当前预览版从源码构建，建议先试用 **Windows 本机 Web 版**。
+macOS 命令仅供源码试用，原生运行尚未验证，不代表已验证的发行版。
+
+**构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
+以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
+让 Agent 工作还需在 `PATH` 上安装 [Codex CLI](https://github.com/openai/codex)
+（最低及已验证版本为 0.161.0），具备可使用 Codex 的账号和访问其服务的网络。
+Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
+
+### Windows（PowerShell）
+
+```powershell
+git clone https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+powershell -NoProfile -File scripts/build.ps1 -Target server
+.\.tmp\dist\cobot.exe serve
+```
+
+### macOS（Bash；原生运行未验证）
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
 cd CoBot
 npm ci --prefix frontend
-./scripts/build.sh --target server        # Windows：powershell -File scripts/build.ps1 -Target server
-
-.tmp/dist/cobot serve                     # 开发 profile，数据在 ~/.cobot-dev
+./scripts/build.sh --target server
+./.tmp/dist/cobot serve
 ```
 
-默认浏览器会自动打开 CoBot，直接可用。背后用的是一次性启动链接（60 秒内、仅一次有效，
-终端里也会打印；加 `--no-open` 则只打印不打开）。再运行一次 `cobot serve` 会为正在运行的实例打开一个新链接。然后：
+请在浏览器和团队文件所在的同一台电脑运行这些命令。这启动的是本机 Web 应用，
+不是桌面壳或远程服务器。Windows 产物为 `.tmp/dist/cobot.exe`，macOS 为 `.tmp/dist/cobot`，
+旁边附有 `.sha256` 校验和。脚本不会将 CoBot 加入 `PATH`，请使用上面的完整相对路径。
+使用期间保持启动终端开启。
+
+默认浏览器会自动打开并登录本机 CoBot 页面，这不等于已登录 Codex。一次性启动链接
+仅在 60 秒内、单次有效，终端里也会打印；加 `--no-open` 则只打印不打开。
+浏览器未打开时可使用终端链接；链接过期后，在另一个终端用相同路径再次运行 `serve`，
+会为原实例打开新链接，不会启动第二个实例。启动链接要像密码一样对待。
+
+界面初始为中文，可在 **设置 → 通用 → 语言** 切换 English，偏好会保存。然后：
 
 1. **设置**：登录 Codex。CoBot 使用自己的私有 Codex 环境，需要在 CoBot 里登录一次，重启后仍然有效。
    然后选择默认模型。CoBot 启动时会自动找到 Codex 并授权它的安全钩子；设置页会展示这两项状态，
    授权失败时可以点按钮重新授权。
 2. **新建团队**：选择工作目录和需要的成员。
-3. **给队长发消息**，说明你想做什么。
+3. **给队长发消息**，先给一个小而可检查的目标，例如：“查看这个项目并提出三项改进建议，
+   暂时不要修改文件。”模型回复取决于对话和角色指令，不由界面语言自动翻译。
 
-日常使用请运行 `cobot serve --profile production`（数据在 `~/.cobot`）。启动链接要像密码一样对待。
+关闭浏览器不会停止服务。退出时，在启动服务的终端按 **Ctrl+C**，等待正常关闭完成。
+
+上述命令默认使用 **development** profile（`~/.cobot-dev`）。日常使用时，先停止试用实例，
+再在 Windows 运行 `.\.tmp\dist\cobot.exe serve --profile production`，
+或在 macOS 运行 `./.tmp/dist/cobot serve --profile production`。
+production 数据位于 `~/.cobot`，设置、Codex 登录和团队均独立，试用配置不会自动转移。
+`~` 表示用户主目录；隔离试用可加 `--data-root <空目录的绝对路径>`。
+
+设置页找不到 Codex 时，在启动 CoBot 的终端检查 `codex --version`。
+安装或更新 Codex 后，重新打开终端，以相同 profile 和数据根重启 CoBot，再从设置页重试检查。
+求助时不要附带启动链接或原始 trace；[Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
+接受中文和英文。
 
 ## 参与开发
 
