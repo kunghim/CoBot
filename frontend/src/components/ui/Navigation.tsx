@@ -31,19 +31,19 @@ export function RailItem({ icon: Icon, label, current = false, onClick, href, ba
   );
 }
 
-/** A row of a side navigation or list that leads somewhere. */
-export function NavItem({ icon: Icon, label, current = false, onClick, trailing, leading, description, className }: { icon?: IconType; label: ReactNode; current?: boolean; onClick?: () => void; trailing?: ReactNode; leading?: ReactNode; description?: ReactNode; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={current ? 'page' : undefined}
-      className={cx(
-        'relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
-        current ? cx(interactive.selected, 'font-medium') : cx('text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-50', interactive.hover),
-        className,
-      )}
-    >
+/**
+ * A row of a side navigation or list that leads somewhere. With href it is a
+ * link (it can open in a new tab); onClick then handles a plain click, so a
+ * router can navigate without reloading.
+ */
+export function NavItem({ icon: Icon, label, current = false, onClick, href, trailing, leading, description, className }: { icon?: IconType; label: ReactNode; current?: boolean; onClick?: () => void; href?: string; trailing?: ReactNode; leading?: ReactNode; description?: ReactNode; className?: string }) {
+  const classes = cx(
+    'relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+    current ? cx(interactive.selected, 'font-medium') : cx('text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-50', interactive.hover),
+    className,
+  );
+  const content = (
+    <>
       {current && <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-signal-500" />}
       {leading ?? (Icon && <Icon size={16} aria-hidden />)}
       <span className="min-w-0 flex-1">
@@ -51,6 +51,27 @@ export function NavItem({ icon: Icon, label, current = false, onClick, trailing,
         {description && <span className="block truncate text-xs font-normal text-neutral-500 dark:text-neutral-400">{description}</span>}
       </span>
       {trailing}
+    </>
+  );
+  if (href) {
+    return (
+      <a
+        href={href}
+        aria-current={current ? 'page' : undefined}
+        className={classes}
+        onClick={(event) => {
+          if (!onClick || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onClick();
+        }}
+      >
+        {content}
+      </a>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} aria-current={current ? 'page' : undefined} className={classes}>
+      {content}
     </button>
   );
 }

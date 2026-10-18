@@ -231,7 +231,7 @@ export function AlertDialog({ open, onCancel, onConfirm, title, description, con
     <Modal open={open} onClose={onCancel} busy={busy} position="center" width="max-w-sm" role="alertdialog" labelledBy={`${id}-title`} describedBy={`${id}-description`}>
       <div className="p-6">
         <h2 id={`${id}-title`} className="text-base font-semibold text-neutral-900 dark:text-neutral-50">{title}</h2>
-        <p id={`${id}-description`} className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{description}</p>
+        <p id={`${id}-description`} className="mt-2 whitespace-pre-line text-sm leading-6 text-neutral-600 dark:text-neutral-300">{description}</p>
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>}
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel} disabled={busy}>{cancelLabel}</Button>

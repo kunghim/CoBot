@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAvatarCatalog, useRoles, useSetBotAvatar, useSetRoleAvatar } from '../../api/queries';
 import type { AvatarRef, Bot, Role } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
+import { Button, ListRow } from '../../components/ui';
 import Avatar from './Avatar';
 import AvatarPicker from './AvatarPicker';
 import { composedStart } from './render';
@@ -59,34 +60,35 @@ export function RoleAvatarRow({ role }: { role: Role }) {
   const name = t(role.nameKey, { defaultValue: role.name });
   const save = (avatar: AvatarRef | null) => setAvatar.mutate({ roleId: role.id, avatar }, { onSuccess: () => setOpen(false) });
   return (
-    <li className="flex items-center gap-3 py-2.5">
-      <Avatar bot={{ roleId: role.id, isLeader }} size="lg" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{name}</p>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">{role.avatar ? t('avatar.custom') : t('avatar.default')}</p>
-      </div>
-      <button
-        type="button"
-        onClick={() => {
-          setAvatar.reset();
-          setOpen(true);
-        }}
-        className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-      >
-        {t('avatar.change')}
-      </button>
-      <AvatarPicker
-        open={open}
-        title={t('avatar.roleTitle', { name })}
-        start={composedStart(catalog.data, role.id, null, role.avatar)}
-        currentPicture={pictureOf(role.avatar)}
-        hasOwn={!!role.avatar}
-        pending={setAvatar.isPending}
-        errorText={setAvatar.isError ? apiErrorMessage(t, setAvatar.error) : ''}
-        onSave={save}
-        onClose={() => setOpen(false)}
-      />
-    </li>
+    <ListRow
+      leading={<Avatar bot={{ roleId: role.id, isLeader }} size="lg" />}
+      title={name}
+      description={role.avatar ? t('avatar.custom') : t('avatar.default')}
+      trailing={
+        <>
+          <Button
+            size="sm"
+            onClick={() => {
+              setAvatar.reset();
+              setOpen(true);
+            }}
+          >
+            {t('avatar.change')}
+          </Button>
+          <AvatarPicker
+            open={open}
+            title={t('avatar.roleTitle', { name })}
+            start={composedStart(catalog.data, role.id, null, role.avatar)}
+            currentPicture={pictureOf(role.avatar)}
+            hasOwn={!!role.avatar}
+            pending={setAvatar.isPending}
+            errorText={setAvatar.isError ? apiErrorMessage(t, setAvatar.error) : ''}
+            onSave={save}
+            onClose={() => setOpen(false)}
+          />
+        </>
+      }
+    />
   );
 }
 

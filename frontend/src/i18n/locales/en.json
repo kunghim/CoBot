@@ -1,6 +1,6 @@
 {
   "app": { "title": "CoBot" },
-  "common": { "close": "Close" },
+  "common": { "close": "Close", "cancel": "Cancel", "clearSearch": "Clear search", "decrease": "Decrease", "increase": "Increase" },
   "nav": {
     "home": "Home",
     "settings": "Settings",
@@ -537,7 +537,6 @@
     "revoke": "Revoke",
     "title": "Settings",
     "back": "Back",
-    "saving": "Saving…",
     "version": "Version",
     "modelsNeedEngine": "Models can be chosen once Codex is available; see Codex engine first.",
     "limitsTitle": "Collaboration limits",
