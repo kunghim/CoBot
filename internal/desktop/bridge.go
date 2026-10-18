@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -237,6 +238,31 @@ func (b *Bridge) OpenDirectory() (string, error) {
 	return wailsruntime.OpenDirectoryDialog(ctx, wailsruntime.OpenDialogOptions{
 		Title: "Select team working directory",
 	})
+}
+
+// OpenLoginURL hands official sign-in to the user's default browser instead
+// of a new WebView, so that browser's existing account session can be used.
+func (b *Bridge) OpenLoginURL(rawURL string) error {
+	if err := validateLoginURL(rawURL); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	ctx := b.wailsCtx
+	b.mu.Unlock()
+	if ctx == nil {
+		return fmt.Errorf("application context is not ready")
+	}
+	wailsruntime.BrowserOpenURL(ctx, rawURL)
+	return nil
+}
+
+func validateLoginURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host != "auth.openai.com" || u.User != nil {
+		// Do not put the authorization URL or its query parameters in errors.
+		return fmt.Errorf("invalid official sign-in URL")
+	}
+	return nil
 }
 
 // Quit asks the host to shut down; OnShutdown then stops the owned core with
