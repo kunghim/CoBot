@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoBot 录像</title>
+<style>
+:root {
+  --bg: #fafaf9; --panel: #ffffff; --line: #e7e5e4; --text: #1c1917; --muted: #78716c; --soft: #f5f5f4;
+  --accent: #2563eb; --warn: #b45309; --warn-bg: #fef3c7; --bad: #b91c1c; --bad-bg: #fee2e2; --sel: #dbeafe;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0a09; --panel: #1c1917; --line: #292524; --text: #f5f5f4; --muted: #a8a29e; --soft: #262321;
+    --accent: #60a5fa; --warn: #fbbf24; --warn-bg: #3b2a06; --bad: #f87171; --bad-bg: #3f1212; --sel: #1e3a5f; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, "Microsoft YaHei UI", sans-serif; }
+body { display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+header .meta { color: var(--muted); font-size: 12px; }
+.tabs { margin-left: auto; display: flex; gap: 4px; }
+.tabs button { border: 1px solid var(--line); background: transparent; color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+.tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+main { flex: 1; min-height: 0; display: flex; }
+#overview { flex: 1; overflow: auto; padding: 16px; }
+#overview section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; max-width: 1100px; }
+#overview h2 { font-size: 13px; margin: 0 0 8px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.stat b { display: block; font-size: 18px; }
+.stat span { color: var(--muted); font-size: 12px; }
+table { border-collapse: collapse; width: 100%; }
+td, th { text-align: left; padding: 4px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; border-top: 0; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; width: 70px; }
+.bar { height: 6px; background: var(--accent); border-radius: 3px; opacity: .6; }
+a.jump { color: var(--accent); cursor: pointer; text-decoration: none; white-space: nowrap; }
+a.jump:hover { text-decoration: underline; }
+.empty { color: var(--muted); }
+code { font-family: var(--mono); font-size: 12px; }
+#timeline { flex: 1; min-width: 0; display: none; flex-direction: column; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.filters label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.filters .count { color: var(--muted); font-size: 11px; }
+.filters input[type=search], .filters select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+.split { flex: 1; min-height: 0; display: flex; }
+.listpane { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; }
+.listhead { display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 28px; border-bottom: 1px solid var(--line); background: var(--soft); color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.listhead .t { width: 88px; flex: none; }
+.listhead .who { width: 280px; flex: none; }
+.listhead .kind { width: 230px; flex: none; }
+#list { flex: 1; min-height: 0; overflow: auto; position: relative; }
+#spacer { position: relative; }
+.row { position: absolute; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; }
+.row:hover { background: var(--soft); }
+.row.sel { background: var(--sel); }
+.row .t { font-family: var(--mono); font-size: 11.5px; color: var(--muted); width: 88px; flex: none; }
+.row .who { width: 280px; flex: none; overflow: hidden; text-overflow: ellipsis; }
+.row .who i { color: var(--muted); font-style: normal; padding: 0 3px; }
+.row .kind { font-family: var(--mono); font-size: 12px; width: 230px; flex: none; overflow: hidden; text-overflow: ellipsis; }
+.row .sum { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.badge { font-size: 11px; padding: 0 6px; border-radius: 4px; flex: none; }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.badge.fold { background: var(--soft); color: var(--muted); }
+#detail { flex: 1 1 40%; min-width: 320px; max-width: 50%; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 14px; }
+#detail[hidden] { display: none; }
+#detail .head { display: flex; align-items: flex-start; gap: 8px; }
+#detail h3 { font-size: 13px; margin: 0 0 6px; flex: 1; min-width: 0; }
+#detail .close { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+#detail .close:hover { color: var(--text); }
+.tree { font-family: var(--mono); font-size: 12px; background: var(--soft); padding: 8px 10px; border-radius: 6px; word-break: break-all; }
+.tree details { padding-left: 14px; }
+.tree > details { padding-left: 0; }
+.tree summary { cursor: pointer; list-style: none; margin-left: -12px; }
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before { content: '▸'; display: inline-block; width: 12px; color: var(--muted); }
+.tree details[open] > summary::before { content: '▾'; }
+.tree .leaf { padding-left: 14px; white-space: pre-wrap; }
+.tree .k { color: var(--accent); }
+.tree .s { color: #15803d; }
+.tree .n { color: #b45309; }
+.tree .z { color: var(--muted); }
+.tree .meta { color: var(--muted); }
+@media (prefers-color-scheme: dark) { .tree .s { color: #86efac; } .tree .n { color: #fbbf24; } }
+#detail .facts { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+#detail .tools { display: flex; gap: 6px; margin-bottom: 8px; }
+#detail .tools button { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+#detail pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; background: var(--soft); padding: 10px; border-radius: 6px; margin: 0; }
+#detail .members div { padding: 2px 0; cursor: pointer; border-bottom: 1px solid var(--line); }
+#detail .members div:hover { color: var(--accent); }
+@media (max-width: 900px) { .split { flex-direction: column; } #detail { max-width: none; border-left: 0; border-top: 1px solid var(--line); } .row .who { width: 160px; } .row .kind { width: 140px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>CoBot 录像</h1>
+  <span class="meta" id="meta"></span>
+  <nav class="tabs">
+    <button id="tab-overview" class="on">总览</button>
+    <button id="tab-timeline">时间线</button>
+  </nav>
+</header>
+<main>
+  <div id="overview"></div>
+  <div id="timeline">
+    <div class="filters" id="filters"></div>
+    <div class="split">
+      <div class="listpane">
+        <div class="listhead"><span class="t">时间</span><span class="who">发送方 → 接收方</span><span class="kind">类型</span><span>内容</span><span id="total" style="margin-left:auto"></span></div>
+        <div id="list"><div id="spacer"></div></div>
+      </div>
+      <aside id="detail" hidden></aside>
+    </div>
+  </div>
+</main>
+<script>
+const ROW = 26, PAGE = 200;
+// [key, label, shown by default, hover text]
+const GROUPS = [
+  ['codex', 'CoBot ⇄ Codex', true, 'CoBot 和 Codex 之间的消息：建会话、开始一轮、Codex 回报做了什么、报错重连、审批'],
+  ['mcp', '协作工具', true, '成员调用 CoBot 协作工具（发消息、建任务、提交证据等）和 CoBot 的返回'],
+  ['hook', '安全检查', true, 'Codex 每次执行命令前问 CoBot 能不能执行，以及得到的答复'],
+  ['process', '进程与说明', true, 'Codex 进程的启动和退出，以及录像补充的“哪个会话属于哪个成员”'],
+  ['log', 'Codex 调试日志', false, 'Codex 自己打印的详细日志：连网、走代理、重试。条数很多，查网络问题时再打开'],
+  ['http', 'HTTP', false, '所有发给 CoBot 的网页请求和响应，以及页面实时推送。查页面问题时再打开'],
+  ['rollout', 'Codex 本地记录', false, 'Codex 自己存下的会话文件，能看到它实际发给模型的内容'],
+];
+const state = { groups: new Set(GROUPS.filter(g => g[2]).map(g => g[0])), who: '', q: '', fold: true, anomaly: false, total: 0, pages: new Map(), selected: -1, version: 0 };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const api = async (path) => (await fetch(path)).json();
+const query = () => new URLSearchParams({ groups: [...state.groups].join(','), who: state.who, q: state.q, fold: state.fold ? '1' : '0', anomaly: state.anomaly ? '1' : '0' }).toString();
+let summary, groupCounts;
+
+function show(tab) {
+  $('tab-overview').classList.toggle('on', tab === 'overview');
+  $('tab-timeline').classList.toggle('on', tab === 'timeline');
+  $('overview').style.display = tab === 'overview' ? 'block' : 'none';
+  $('timeline').style.display = tab === 'timeline' ? 'flex' : 'none';
+  if (tab === 'timeline') render();
+}
+$('tab-overview').onclick = () => show('overview');
+$('tab-timeline').onclick = () => show('timeline');
+
+function countTable(title, counts, note, bars) {
+  const max = Math.max(1, ...counts.map(c => c.count));
+  const body = counts.length ? `<table><tr><th>名称</th><th class="num">次数</th>${bars ? '<th></th>' : ''}<th></th></tr>${counts.map(c =>
+    `<tr><td><code>${esc(c.name)}</code></td><td class="num">${c.count}</td>${bars ? `<td style="width:30%"><div class="bar" style="width:${(c.count / max * 100).toFixed(1)}%"></div></td>` : ''}<td><a class="jump" data-id="${c.first}">看第一条</a></td></tr>`).join('')}</table>` : '<p class="empty">无</p>';
+  return `<section><h2>${title}</h2>${note ? `<p class="empty" style="margin-top:-4px">${note}</p>` : ''}${body}</section>`;
+}
+
+function renderOverview() {
+  const s = summary;
+  const minutes = `${Math.floor(s.seconds / 60)} 分 ${s.seconds % 60} 秒`;
+  $('meta').textContent = `${s.session} · ${s.start} — ${s.end}`;
+  const channel = (name) => s.channels.find(c => c.name === name)?.count ?? 0;
+  let html = `<section><div class="stats">
+    <div class="stat"><b>${minutes}</b><span>时长</span></div>
+    <div class="stat"><b>${s.members.length}</b><span>成员：${esc(s.members.join('、') || '—')}</span></div>
+    <div class="stat"><b>${channel('CoBot → Codex')}</b><span>CoBot → Codex</span></div>
+    <div class="stat"><b>${channel('Codex → CoBot')}</b><span>Codex → CoBot</span></div>
+    <div class="stat"><b>${s.rows}</b><span>记录总数</span></div></div></section>`;
+  html += countTable('CoBot 没有处理的 Codex 消息', s.unhandled, 'Codex 发来了，但 CoBot 的代码里没有对应处理；Codex 新增的东西通常在这里。');
+  html += countTable('CoBot 不展示的条目类型', s.unknownItems, '这一轮里 Codex 做了这些事，但 CoBot 的过程视图不会显示。');
+  html += `<section><h2>重连</h2>${s.reconnects.length ? `<table><tr><th>开始</th><th>成员</th><th class="num">次数</th><th class="num">耗时</th><th>结果</th><th></th></tr>${s.reconnects.map(r =>
+    `<tr><td><code>${esc(r.start)}</code></td><td>${esc(r.who || '—')}</td><td class="num">${r.attempts}</td><td class="num">${r.seconds} 秒</td><td>${esc(r.outcome)}</td><td><a class="jump" data-id="${r.first}">跳到时间线</a></td></tr>`).join('')}</table>` : '<p class="empty">无</p>'}</section>`;
+  html += `<section><h2>异常（${s.anomalies.length} 种）</h2>${s.anomalies.length ? `<table><tr><th>首次</th><th>类别</th><th>成员</th><th>内容</th><th class="num">次数</th><th></th></tr>${s.anomalies.map(a =>
+    `<tr><td><code>${esc(a.time)}</code></td><td>${esc(a.kind)}</td><td>${esc(a.who || '—')}</td><td>${esc(a.text)}</td><td class="num">${a.count}</td><td><a class="jump" data-id="${a.first}">跳到时间线</a></td></tr>`).join('')}</table>` : '<p class="empty">无</p>'}</section>`;
+  html += countTable('各通道记录数', s.channels, '', true);
+  html += countTable('CoBot 与 Codex 之间的消息类型', s.messages, '', true);
+  $('overview').innerHTML = html;
+}
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a.jump');
+  if (link) jumpTo(Number(link.dataset.id));
+});
+
+function renderFilters() {
+  const members = summary.members.map(m => `<option ${state.who === m ? 'selected' : ''}>${esc(m)}</option>`).join('');
+  $('filters').innerHTML = GROUPS.map(([key, name, , hint]) =>
+    `<label title="${esc(hint)}（共 ${groupCounts[key] ?? 0} 条）"><input type="checkbox" data-group="${key}" ${state.groups.has(key) ? 'checked' : ''}>${name}<span class="count">${groupCounts[key] ?? 0}</span></label>`).join('') +
+    `<select id="who" title="只看和这个成员有关的记录"><option value="">全部成员</option>${members}</select>
+     <input type="search" id="q" placeholder="搜索类型或内容" title="按类型、内容或收发方搜索，例如 turn/start、Reconnecting、send_message" value="${esc(state.q)}">
+     <label title="只显示报错、警告、重连、请求失败、安全检查拒绝"><input type="checkbox" id="anomaly" ${state.anomaly ? 'checked' : ''}>只看异常</label>
+     <label title="Codex 的回复是一个字一个字推送的；勾上后同一段回复合成一行，显示条数和整句话"><input type="checkbox" id="fold" ${state.fold ? 'checked' : ''}>折叠逐字增量</label>`;
+  $('filters').querySelectorAll('[data-group]').forEach(box => box.onchange = () => { box.checked ? state.groups.add(box.dataset.group) : state.groups.delete(box.dataset.group); reset(); });
+  $('who').onchange = (e) => { state.who = e.target.value; reset(); };
+  let timer;
+  $('q').oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value.trim(); reset(); }, 250); };
+  $('anomaly').onchange = (e) => { state.anomaly = e.target.checked; reset(); };
+  $('fold').onchange = (e) => { state.fold = e.target.checked; reset(); };
+}
+
+async function reset(keepScroll) {
+  state.version++;
+  state.pages = new Map();
+  const first = await api(`/api/rows?offset=0&limit=${PAGE}&${query()}`);
+  state.total = first.total;
+  state.pages.set(0, first.rows);
+  $('total').textContent = `共 ${state.total} 条`;
+  $('spacer').style.height = `${state.total * ROW}px`;
+  if (!keepScroll) $('list').scrollTop = 0;
+  render();
+}
+
+async function loadPage(page) {
+  if (state.pages.has(page)) return;
+  state.pages.set(page, null);
+  const version = state.version;
+  const data = await api(`/api/rows?offset=${page * PAGE}&limit=${PAGE}&${query()}`);
+  if (version !== state.version) return;
+  state.pages.set(page, data.rows);
+  render();
+}
+
+function render() {
+  const list = $('list');
+  const from = Math.max(0, Math.floor(list.scrollTop / ROW) - 10);
+  const to = Math.min(state.total, Math.ceil((list.scrollTop + list.clientHeight) / ROW) + 10);
+  let html = '';
+  for (let i = from; i < to; i++) {
+    const page = Math.floor(i / PAGE);
+    const rows = state.pages.get(page);
+    if (!rows) { loadPage(page); continue; }
+    const r = rows[i - page * PAGE];
+    if (!r) continue;
+    const badge = r.anomaly ? `<span class="badge ${/拒绝|出错|退出|失败|ERROR|报错|HTTP/.test(r.anomaly) ? 'bad' : 'warn'}">${esc(r.anomaly)}</span>` : '';
+    const fold = r.folded ? `<span class="badge fold">×${r.folded}</span>` : '';
+    html += `<div class="row ${r.id === state.selected ? 'sel' : ''}" style="top:${i * ROW}px" data-id="${r.id}" data-folded="${r.folded || 0}">
+      <span class="t">${esc(r.t)}</span><span class="who">${esc(r.from)}<i>→</i>${esc(r.to)}</span>
+      <span class="kind" title="${esc(r.kind)}">${esc(r.kind)}</span>${fold}${badge}<span class="sum">${esc(r.summary)}</span></div>`;
+  }
+  $('spacer').innerHTML = html;
+}
+$('list').addEventListener('scroll', () => requestAnimationFrame(render));
+$('spacer').addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  select(Number(row.dataset.id), Number(row.dataset.folded));
+});
+
+// A JSON value as a tree of <details>: objects and arrays fold, the first
+// two levels start open.
+function tree(value, key, depth) {
+  const label = key === undefined ? '' : typeof key === 'number' ? `<span class="z">${key}</span>: ` : `<span class="k">${esc(JSON.stringify(key))}</span>: `;
+  if (value !== null && typeof value === 'object') {
+    const isArray = Array.isArray(value);
+    const entries = isArray ? value.map((v, i) => [i, v]) : Object.entries(value);
+    const [open, close] = isArray ? ['[', ']'] : ['{', '}'];
+    if (!entries.length) return `<div class="leaf">${label}${open}${close}</div>`;
+    return `<details${depth < 2 ? ' open' : ''}><summary>${label}${open}<span class="meta"> ${entries.length} 项 </span>${close}</summary>` +
+      entries.map(([k, v]) => tree(v, k, depth + 1)).join('') + `</details>`;
+  }
+  const cls = typeof value === 'string' ? 's' : typeof value === 'number' ? 'n' : 'z';
+  return `<div class="leaf">${label}<span class="${cls}">${esc(JSON.stringify(value))}</span></div>`;
+}
+
+function closeDetail() {
+  state.selected = -1;
+  $('detail').hidden = true;
+  render();
+}
+
+async function select(id, folded) {
+  state.selected = id;
+  render();
+  const data = await api(`/api/raw?id=${id}`);
+  const r = data.row;
+  $('detail').hidden = false;
+  let html = `<div class="head"><h3>#${r.id} ${esc(r.from)} → ${esc(r.to)}</h3><button class="close" id="close" title="关闭" aria-label="关闭">×</button></div>
+    <div class="facts">${esc(r.t)} · 通道 <code>${esc(r.ch)}</code> · 方向 <code>${esc(r.dir)}</code> · ${esc(r.kind)} · ${data.bytes} 字节${r.who ? ' · 成员 ' + esc(r.who) : ''}${r.anomaly ? ' · ' + esc(r.anomaly) : ''}</div>`;
+  if (folded > 1) {
+    const group = await api(`/api/group?id=${id}&${query()}`);
+    html += `<div class="facts">这一行折叠了 ${group.rows.length} 条连续的逐字增量，点任意一条看它的原文：</div><div class="members">${group.rows.map(m =>
+      `<div data-id="${m.id}"><code>${esc(m.t)}</code> ${esc(m.summary)}</div>`).join('')}</div><br>`;
+  }
+  if (data.binary) {
+    html += '<p class="empty">这条记录不是文本（原文以 base64 保存在录像文件里）。</p>';
+  } else {
+    const json = data.pretty ? '<button id="as-tree">树形</button><button id="as-raw">原文</button><button id="expand">全部展开</button><button id="collapse">全部收起</button>' : '';
+    html += `<div class="tools">${json}<button id="copy">复制原文</button></div><div id="body"></div>`;
+  }
+  $('detail').innerHTML = html;
+  $('close').onclick = closeDetail;
+  $('detail').querySelectorAll('.members div').forEach(div => div.onclick = () => select(Number(div.dataset.id), 0));
+  if (data.binary) return;
+  const body = $('body');
+  const showRaw = () => { body.innerHTML = '<pre></pre>'; body.firstChild.textContent = data.raw; };
+  const showTree = () => { body.innerHTML = `<div class="tree">${tree(JSON.parse(data.raw), undefined, 0)}</div>`; };
+  const setOpen = (open) => { showTree(); body.querySelectorAll('details').forEach(d => { d.open = open; }); };
+  if (data.pretty) {
+    showTree();
+    $('as-tree').onclick = showTree;
+    $('as-raw').onclick = showRaw;
+    $('expand').onclick = () => setOpen(true);
+    $('collapse').onclick = () => setOpen(false);
+  } else {
+    showRaw();
+  }
+  $('copy').onclick = () => navigator.clipboard.writeText(data.raw);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('detail').hidden) closeDetail(); });
+
+async function jumpTo(id) {
+  const data = await api(`/api/raw?id=${id}`);
+  state.groups.add(data.row.group);
+  state.who = ''; state.q = ''; state.anomaly = false;
+  renderFilters();
+  show('timeline');
+  await reset();
+  const { index } = await api(`/api/locate?id=${id}&${query()}`);
+  if (index >= 0) $('list').scrollTop = Math.max(0, index * ROW - $('list').clientHeight / 2);
+  await select(id, 0);
+}
+
+(async () => {
+  const data = await api('/api/summary');
+  summary = data.summary; groupCounts = data.groups;
+  renderOverview();
+  renderFilters();
+  await reset();
+})();
+</script>
+</body>
+</html>

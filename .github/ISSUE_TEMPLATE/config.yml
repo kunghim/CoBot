@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and help / 使用提问
+    url: https://github.com/kunghim/CoBot/discussions/categories/q-a
+    about: Ask usage and setup questions in English or Chinese. / 中文或英文使用、安装问题请到问答区。
+  - name: Show and tell / 成果展示
+    url: https://github.com/kunghim/CoBot/discussions/categories/show-and-tell
+    about: Share what you built with CoBot, with private data removed. / 分享使用 CoBot 完成的成果，请先移除私人资料。
+  - name: Security reporting / 安全问题报告
+    url: https://github.com/kunghim/CoBot/blob/main/SECURITY.md
+    about: Read the private reporting instructions; do not post vulnerability details in a public issue. / 请先阅读私密报告说明，不要公开漏洞细节。

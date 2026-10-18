@@ -1,0 +1,82 @@
+.tmp/
+.idea/
+
+# Private by default; publish selected documents through scripts/public-files-policy.json.
+/docs/**
+
+# Historical protocol experiments are maintained locally.
+/experiments/**
+
+# Private AI coding instructions and local assistant settings.
+# Ignore rules do not untrack existing files or remove Git history.
+**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
+**/[Aa][Gg][Ee][Nn][Tt].[Mm][Dd]
+**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]
+**/[Gg][Ee][Mm][Ii][Nn][Ii].[Mm][Dd]
+**/AGENTS.override.md
+**/CLAUDE.local.md
+**/.mcp.json
+**/.claude/
+**/.codex/
+**/.agents/
+**/.cursor/
+**/.zcode/
+**/.deepseek/
+**/.kimi/
+**/.github/copilot-instructions.md
+**/.github/instructions/
+**/.cursorrules
+**/.cursorignore
+
+# 产品构建与依赖（源码、迁移、角色、生成API类型仍应提交）
+/internal/webui/dist/
+# 在仓库根目录直接 go build 产生的可执行文件
+/cobot
+/cobot.exe
+/cobot-desktop
+/cobot-desktop.exe
+node_modules/
+/frontend/wailsjs/
+/frontend/coverage/
+/frontend/playwright-report/
+/frontend/test-results/
+coverage/
+coverage.out
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# 本机配置、运行数据与日志
+/.cobot/
+/.cobot-dev/
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/auth.json
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+*.jsonl
+**/traces/
+**/credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 操作系统缓存
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# BEGIN managed public file exceptions
+# Root hidden entries are private unless explicitly listed in the policy.
+/.*
+!/.github/
+!/.gitignore
+# END managed public file exceptions

@@ -1,0 +1,2380 @@
+openapi: 3.0.3
+info:
+  title: CoBot local API
+  version: "0.1.0"
+  description: >
+    Public wire contract of the loopback CoBot core. Success responses are
+    {data, requestId}; errors are {error:{code,messageKey,params}, requestId}.
+    The /internal/v1 routes serve same-user helper processes (instance
+    secret) and the bot MCP bridge (bot token); browser sessions never reach
+    them.
+servers:
+  - url: http://127.0.0.1:0
+paths:
+  /api/v1/status:
+    get:
+      operationId: getStatus
+      # Anonymous by design: the capability probe and the bootstrap exchange
+      # run before a session exists.
+      security: []
+      summary: Environment, capability and authorization status (anonymous readable)
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Status"
+  /api/v1/session/bootstrap:
+    post:
+      operationId: exchangeBootstrap
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Exchange a one-time startup secret for a page session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, secret]
+              properties:
+                requestId: { type: string, format: uuid }
+                secret: { type: string }
+      responses:
+        "200":
+          description: Session established (sets HttpOnly session + CSRF cookies)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BootstrapResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings:
+    get:
+      operationId: getSettings
+      security:
+        - SessionCookie: []
+      summary: Business settings of this profile
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateSettings
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Update business settings with optimistic concurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, patch, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+                patch:
+                  $ref: "#/components/schemas/SettingsPatch"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/snapshot:
+    get:
+      operationId: getSnapshot
+      security:
+        - SessionCookie: []
+      summary: Consistent read of visible entities plus the event cursor
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Snapshot"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      security:
+        - SessionCookie: []
+      summary: Durable event stream (fetch SSE) after a cursor
+      parameters:
+        - name: after
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: teamId
+          in: query
+          schema: { type: string }
+        - name: botId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: text/event-stream of cobot.event frames; each data payload is one Event
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >-
+                  Frames shaped as "id: <seq>", "event: cobot.event",
+                  "data: <Event JSON>", then a blank line.
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/engine:
+    get:
+      operationId: getEngine
+      security:
+        - SessionCookie: []
+      summary: Non-secret Codex engine status for this profile
+      responses:
+        "200":
+          description: Engine status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/EngineStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/engine/check:
+    post:
+      operationId: checkEngine
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Re-run the Codex self-check, including native hook trust
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Fresh engine status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/EngineStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/login:
+    post:
+      operationId: engineLogin
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start the official Codex login flow (engine auth, not page bootstrap)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Login flow started; completion arrives via events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/EngineLogin" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/login/cancel:
+    post:
+      operationId: engineLoginCancel
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Cancel a pending Codex login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Login cancelled
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/logout:
+    post:
+      operationId: engineLogout
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: End the engine (Codex) session for this profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Engine session ended
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/models:
+    get:
+      operationId: listModels
+      security:
+        - SessionCookie: []
+      summary: Engine-provided model list (non-secret)
+      responses:
+        "200":
+          description: Models
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [models]
+                        properties:
+                          models:
+                            type: array
+                            items: { $ref: "#/components/schemas/Model" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/session/logout:
+    post:
+      operationId: sessionLogout
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: End the current page session
+      responses:
+        "200":
+          description: Logged out
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/roles:
+    get:
+      operationId: listRoles
+      security:
+        - SessionCookie: []
+      summary: Built-in role library
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                nameKey: { type: string }
+                                summaryKey: { type: string }
+                                name: { type: string }
+                                contentVersion: { type: string }
+                                scenarios:
+                                  type: array
+                                  items: { type: string }
+                          scenarios:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, nameKey, name, roleIds, defaultRoleIds]
+                              properties:
+                                id: { type: string }
+                                nameKey: { type: string }
+                                name: { type: string }
+                                roleIds:
+                                  type: array
+                                  items: { type: string }
+                                defaultRoleIds:
+                                  type: array
+                                  items: { type: string }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams:
+    get:
+      operationId: listTeams
+      security:
+        - SessionCookie: []
+      summary: Teams with their members
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 100, minimum: 1 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Teams
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/TeamWithBots"
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createTeam
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Create a team bound to one working directory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, name, directory]
+              properties:
+                requestId: { type: string, format: uuid }
+                name: { type: string }
+                directory: { type: string }
+                initialRoleIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Team created (staged, then activated)
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}:
+    get:
+      operationId: getTeam
+      security:
+        - SessionCookie: []
+      summary: One team with members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/TeamWithBots" }
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: patchTeam
+      security:
+        - SessionCookie: []
+      summary: Change exactly one of a team's name, permission mode or reasoning effort
+      description: >-
+        The body carries exactly one of name, permissionMode or
+        reasoningEffort (otherwise 400 error.team.patch_one_field).
+        Permission mode and reasoning effort apply from each member's next
+        turn.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                name: { type: string }
+                permissionMode:
+                  type: string
+                  enum: [read_only, default, full]
+                  description: Applies from each member's next turn.
+                reasoningEffort:
+                  type: string
+                  description: How hard members think from their next turn (an effort the model lists); empty follows the model's default.
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Updated team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteTeam
+      security:
+        - SessionCookie: []
+      summary: Soft-delete an archived team with no unfinished work; user files are never touched
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "200":
+          description: Deleted team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/archive:
+    post:
+      operationId: archiveTeam
+      security:
+        - SessionCookie: []
+      summary: 'Archive a team (dispatch pauses; queued work and tasks are kept)'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Archived team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/restore:
+    post:
+      operationId: restoreTeam
+      security:
+        - SessionCookie: []
+      summary: Restore an archived team; queued work resumes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Restored team
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}:
+    delete:
+      operationId: deleteBot
+      security:
+        - SessionCookie: []
+      summary: Tombstone a member with no unfinished work; history is kept
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "200":
+          description: Deleted member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Bot" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/bots:
+    post:
+      operationId: addBot
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Add one member of an existing role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, roleId]
+              properties:
+                requestId: { type: string, format: uuid }
+                roleId: { type: string }
+      responses:
+        "201":
+          description: Member added
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/warm:
+    post:
+      operationId: warmTeam
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start the team's engine in the background ahead of the first message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Warm-up started (or not needed)
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/open-path:
+    post:
+      operationId: openTeamPath
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Open (or reveal) a file inside the team folder with the system's default program
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string, description: "Link target as written by a member; absolute, relative to the team folder, or with a line suffix." }
+                reveal: { type: boolean, description: "Show the file in the file manager instead of opening it." }
+      responses:
+        "200":
+          description: Opened
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/messages:
+    get:
+      operationId: listMessages
+      security:
+        - SessionCookie: []
+      summary: Conversation history of one bot
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: before
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Messages plus queue state and the runs (with steps) between them
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ConversationPage" }
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: sendMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Send a user message (persisted and queued; answered with 202)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "202":
+          description: Message persisted and queued
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/messages/{id}/cancel:
+    post:
+      operationId: cancelMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Cancel a queued (not yet dispatched) user message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Message cancelled
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/runs/{id}/interrupt:
+    post:
+      operationId: interruptRun
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Request an engine-side stop of one run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Interrupt requested; final state arrives via events
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/approvals:
+    get:
+      operationId: listApprovals
+      security:
+        - SessionCookie: []
+      summary: Pending cards (oldest first) or decided history
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: teamId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, history] }
+        - name: requesterBotId
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Approvals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Approval" }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/approvals/{id}/decisions:
+    post:
+      operationId: decideApproval
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Decide once (CAS); response delivery is tracked separately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, optionId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                optionId: { type: string }
+                comment: { type: string }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Decided approval (with responseState)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Approval" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/tasks:
+    get:
+      operationId: listTasks
+      security:
+        - SessionCookie: []
+      summary: Project a team's task board
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ownerId
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Task" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createTask
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Create a task with a unique owner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTaskRequest" }
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Task" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/tasks/{id}:
+    get:
+      operationId: getTask
+      security:
+        - SessionCookie: []
+      summary: One task with its evidence and transfer history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/TaskDetail" }
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: patchTask
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Change status, or change owner through the transfer safety rules
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PatchTaskRequest" }
+      responses:
+        "200":
+          description: Updated task
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/tasks/{id}/evidence:
+    post:
+      operationId: submitTaskEvidence
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Record a proof reference for a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitEvidenceRequest" }
+      responses:
+        "201":
+          description: Evidence recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Evidence" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/tasks/{id}/confirm:
+    post:
+      operationId: confirmTask
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Confirm a review task as done against evidence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                evidenceIds:
+                  type: array
+                  items: { type: string }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Confirmed task
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/tasks/{id}/transfers:
+    post:
+      operationId: offerTaskTransfer
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Offer a two-phase hand-over; the owner is unchanged until accepted
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferTransferRequest" }
+      responses:
+        "201":
+          description: Offered transfer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Transfer" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/transfers/{id}/accept:
+    post:
+      operationId: acceptTaskTransfer
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Accept and swap the owner atomically
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "200":
+          description: Transferred task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Task" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/transfers/{id}/cancel:
+    post:
+      operationId: cancelTaskTransfer
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Withdraw a live offer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Cancelled transfer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Transfer" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/questions:
+    get:
+      operationId: listQuestions
+      security:
+        - SessionCookie: []
+      summary: Page a team's user questions
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: teamId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, answered, cancelled] }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Questions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Question" }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/questions/{id}/answers:
+    post:
+      operationId: answerQuestion
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Answer as the user; delivered as a user message, never an authorization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnswerQuestionRequest" }
+      responses:
+        "200":
+          description: Answered question
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Question" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/questions/{id}/cancel:
+    post:
+      operationId: cancelQuestion
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Withdraw a still-open question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Cancelled question
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Question" }
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/stats:
+    get:
+      operationId: getBotStats
+      security:
+        - SessionCookie: []
+      summary: One member's session statistics, read off what the engine reported (no model call)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/SessionStats" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/collaboration:
+    get:
+      operationId: listCollaboration
+      security:
+        - SessionCookie: []
+      summary: Read-only record of one member's exchanges with a peer
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: teamId
+          in: query
+          description: The team both members belong to; required with peerBotId.
+          schema: { type: string }
+        - name: peerBotId
+          in: query
+          description: Limit the record to messages between the member and this peer.
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Collaboration messages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Message" }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/activity:
+    get:
+      operationId: listActivity
+      security:
+        - SessionCookie: []
+      summary: Newest-first team activity feed (events)
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Activity events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Event" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/memories:
+    get:
+      operationId: listMemories
+      security:
+        - SessionCookie: []
+      summary: Live memories of one member (user reads any member; a bot only itself)
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: viewBotId
+          in: query
+          description: Selected member projection; a leader selects the whole team.
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Memories
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Memory" }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/memories/{memoryId}:
+    delete:
+      operationId: deleteMemory
+      security:
+        - SessionCookie: []
+      summary: Tombstone one memory; the same fact is never recreated automatically
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: memoryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted: { type: boolean }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories:
+    get:
+      operationId: listDirectories
+      security:
+        - SessionCookie: []
+      summary: Immediate subdirectories of one path for the Web picker (names only)
+      parameters:
+        - name: path
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Child directories
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          path: { type: string }
+                          children:
+                            type: array
+                            items: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories/pick:
+    post:
+      operationId: pickDirectory
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Show the native folder chooser on this machine and return the chosen path
+      description: >-
+        Blocks until the user chooses or cancels. The path is only a
+        suggestion; team creation validates it as usual.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chosen path, or cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [path, cancelled]
+                        properties:
+                          path: { type: string }
+                          cancelled: { type: boolean }
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /api/v1/directories/check:
+    post:
+      operationId: checkDirectory
+      security:
+        - SessionCookie: []
+      summary: Validate a directory for team creation without touching anything
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+      responses:
+        "200":
+          description: Verdict
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          canonical: { type: string }
+                          ok: { type: boolean }
+                          duplicate: { type: boolean }
+                          nested: { type: boolean }
+                          claimed:
+                            type: boolean
+                            description: Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it.
+                          teamId: { type: string }
+                          teamName: { type: string }
+                          archived:
+                            type: boolean
+                            description: The folder belongs to an archived team; restoring that team is the way to use it again.
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/authorizations:
+    get:
+      operationId: listAuthorizations
+      security:
+        - SessionCookie: []
+      summary: Live bridge credentials without their token values
+      responses:
+        "200":
+          description: Authorizations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                botId: { type: string }
+                                teamId: { type: string }
+                                engineEpoch: { type: string }
+                                expiresAt: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/authorizations/{id}/revoke:
+
+    post:
+      operationId: revokeAuthorization
+      security:
+        - SessionCookie: []
+      summary: Revoke every live credential of one member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked: { type: boolean }
+        "404":
+          $ref: "#/components/responses/Error"
+  /internal/v1/session/link:
+    post:
+      operationId: internalSessionLink
+      security:
+        - InstanceSecret: []
+      summary: Mint a one-time bootstrap secret (internal, instance secret only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: One-time bootstrap secret
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          bootstrapSecret: { type: string }
+                          endpoint: { type: string }
+                          expiresAt: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /internal/v1/service/stop:
+    post:
+      operationId: internalServiceStop
+      security:
+        - InstanceSecret: []
+      summary: Ask the core to shut down (internal, instance secret only)
+      description: >-
+        Answers 202 before shutdown begins; 409 when this core has no
+        shutdown hook.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Shutdown requested
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [stopping]
+                        properties:
+                          stopping: { type: boolean }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /internal/v1/collaboration:
+    post:
+      operationId: collaborationTool
+      summary: The MCP bridge's only core route; identity comes from the bot token
+      security:
+        - BotToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollaborationRequest" }
+      responses:
+        "200":
+          description: Tool outcome; the status carries accept/reject/waiting
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ToolResult" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    InstanceSecret:
+      type: apiKey
+      in: header
+      name: X-Instance-Secret
+      description: Local instance secret for internal endpoints; only a process holding this profile's runtime credential may mint bootstrap links.
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: cobot_session
+      description: Browser page session minted from a one-time startup link; paired with the cobot_csrf header on writes.
+    CSRFToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Required on cookie-authenticated writes; mirrors the cobot_csrf cookie.
+    BotToken:
+      type: apiKey
+      in: header
+      name: X-Bot-Token
+      description: Bot bridge credential minted by the core; bound to one bot and engine epoch.
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    Task:
+      type: object
+      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt, dependencyIds, createdBy]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        ownerId: { type: string }
+        parentId: { type: string }
+        title: { type: string }
+        description: { type: string }
+        acceptanceCriteria: { type: string }
+        status: { type: string, enum: [todo, doing, review, done, cancelled] }
+        blockedReason: { type: string }
+        dependencyIds:
+          type: array
+          items: { type: string }
+        revision: { type: integer, format: int64 }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Evidence:
+      type: object
+      required: [id, taskId, authorId, summary, createdAt, artifactRefs]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        authorId: { type: string }
+        summary: { type: string }
+        artifactRefs:
+          type: array
+          items: { type: string }
+        candidateRef: { type: string }
+        testResult: { type: string }
+        reviewResult: { type: string }
+        createdAt: { type: string, format: date-time }
+    Transfer:
+      type: object
+      required: [id, taskId, fromBotId, toBotId, taskRevision, status, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        fromBotId: { type: string }
+        toBotId: { type: string }
+        taskRevision: { type: integer, format: int64 }
+        note: { type: string }
+        status: { type: string, enum: [offered, accepted, cancelled, stale] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Question:
+      type: object
+      required: [id, teamId, requesterBotId, question, options, status, revision, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        requesterBotId: { type: string }
+        taskId: { type: string }
+        runId: { type: string }
+        question: { type: string }
+        options:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [open, answered, cancelled] }
+        answerText: { type: string }
+        answerMessageId: { type: string }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        answeredAt: { type: string, format: date-time }
+    Message:
+      type: object
+      required: [id, teamId, botId, kind, blocks, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        kind: { type: string, enum: [user, assistant, collaboration, system] }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/TextBlock" }
+        requestId: { type: string }
+        deliveryStatus: { type: string, enum: [waiting_dependency, queued, dispatching, accepted, cancelled, unknown] }
+        runId: { type: string }
+        sourceBotId: { type: string }
+        createdAt: { type: string, format: date-time }
+    SessionStats:
+      type: object
+      required: [turns, steps, modelMs, toolMs, tokens, context]
+      properties:
+        turns: { type: integer }
+        steps: { type: integer }
+        modelMs: { type: integer, format: int64, description: "Turn time less tools and approval waits." }
+        toolMs: { type: integer, format: int64 }
+        firstStepMs: { type: integer, format: int64, description: "Estimated time to first token: turn start to its first step, averaged." }
+        outputTokensPerSecond: { type: number, description: "Estimated output speed over the model time." }
+        tokens:
+          type: object
+          required: [input, cachedRead, cacheWrite, output, reasoning]
+          properties:
+            input: { type: integer, format: int64 }
+            cachedRead: { type: integer, format: int64 }
+            cacheWrite: { type: integer, format: int64 }
+            output: { type: integer, format: int64 }
+            reasoning: { type: integer, format: int64 }
+        context:
+          type: object
+          required: [used]
+          properties:
+            used: { type: integer, format: int64, description: "Tokens of the last model call: the context in use." }
+            window: { type: integer, format: int64 }
+        rateLimits: { type: object, additionalProperties: true, description: "The account's latest rate limits, as Codex reports them." }
+    Memory:
+      type: object
+      required: [id, teamId, botId, body, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        body: { type: string }
+        sourceRunId: { type: string }
+        sourceTaskId: { type: string }
+        createdAt: { type: string, format: date-time }
+    CreateTaskRequest:
+      type: object
+      required: [requestId, title, ownerId]
+      properties:
+        requestId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        acceptanceCriteria: { type: string }
+        ownerId: { type: string }
+        parentId: { type: string }
+        dependencyIds:
+          type: array
+          items: { type: string }
+    PatchTaskRequest:
+      type: object
+      required: [requestId, expectedRevision]
+      properties:
+        requestId: { type: string, format: uuid }
+        status: { type: string, enum: [todo, doing, review, cancelled] }
+        blockedReason: { type: string }
+        ownerId: { type: string }
+        expectedRevision: { type: integer, format: int64 }
+    SubmitEvidenceRequest:
+      type: object
+      required: [requestId, summary]
+      properties:
+        requestId: { type: string, format: uuid }
+        summary: { type: string }
+        artifactRefs:
+          type: array
+          items: { type: string }
+        candidateRef: { type: string }
+        testResult: { type: string }
+        reviewResult: { type: string }
+    OfferTransferRequest:
+      type: object
+      required: [requestId, toBotId]
+      properties:
+        requestId: { type: string, format: uuid }
+        toBotId: { type: string }
+        note: { type: string }
+    AnswerQuestionRequest:
+      type: object
+      required: [requestId, answerText, expectedRevision]
+      properties:
+        requestId: { type: string, format: uuid }
+        answerText: { type: string }
+        expectedRevision: { type: integer, format: int64 }
+    CollaborationRequest:
+      type: object
+      required: [requestId, tool]
+      properties:
+        requestId: { type: string, format: uuid }
+        tool:
+          type: string
+          enum: [view_tasks, deliver_task, review_task, send_message, create_task, ask_user]
+        arguments: { type: object, additionalProperties: true }
+        callId: { type: string, description: "Bridge-only: the engine's id for this tool call; a write without an idempotencyKey derives its key from it." }
+        providerThreadId: { type: string, description: "Bridge-only native transport identity, never a model argument." }
+        providerTurnId: { type: string, description: "Bridge-only native transport identity, never a model argument." }
+    ToolResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, accepted, duplicate, waiting, rejected, unavailable] }
+        data: { type: object, additionalProperties: true }
+        error:
+          type: object
+          required: [code, messageKey]
+          properties:
+            status: { type: string }
+            code: { type: string }
+            messageKey: { type: string }
+            params: { type: object, additionalProperties: true }
+    Envelope:
+      type: object
+      required: [data, requestId]
+      properties:
+        data: {}
+        requestId: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error, requestId]
+      properties:
+        error:
+          type: object
+          required: [code, messageKey]
+          properties:
+            code:
+              type: string
+              enum:
+                - invalid_request
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - idempotency_conflict
+                - revision_conflict
+                - capability_missing
+                - engine_unavailable
+                - internal
+            messageKey: { type: string }
+            params:
+              type: object
+              additionalProperties: true
+        requestId: { type: string }
+    EngineLogin:
+      type: object
+      required: [type, loginId, authUrl]
+      properties:
+        type: { type: string, enum: [chatgpt] }
+        loginId: { type: string }
+        authUrl: { type: string, format: uri }
+    EngineStatus:
+      type: object
+      required: [status, loggedIn]
+      properties:
+        status:
+          type: string
+          enum: [not_configured, ready, error, starting]
+        binaryPath: { type: string }
+        version: { type: string }
+        protocol: { type: string }
+        loggedIn: { type: boolean }
+        capabilities:
+          type: array
+          items: { type: string }
+        errorKey: { type: string }
+    Status:
+      type: object
+      required:
+        [product, version, profile, environment, dataRoot, endpoint, instanceId, serviceEpoch, startedAt, authorized, engine, sessionCookieName, csrfCookieName]
+      properties:
+        sessionCookieName: { type: string }
+        csrfCookieName: { type: string }
+        product: { type: string }
+        version: { type: string }
+        profile: { type: string, enum: [development, production] }
+        environment: { type: string, enum: [development, production] }
+        dataRoot: { type: string }
+        endpoint: { type: string }
+        instanceId: { type: string }
+        serviceEpoch: { type: string }
+        startedAt: { type: string, format: date-time }
+        authorized: { type: boolean }
+        engine: { $ref: "#/components/schemas/EngineStatus" }
+    BootstrapResult:
+      type: object
+      required: [sessionExpiresAt, userId, sessionCookieName, csrfCookieName]
+      properties:
+        sessionCookieName: { type: string }
+        csrfCookieName: { type: string }
+        sessionExpiresAt: { type: string, format: date-time }
+        userId: { type: string }
+        bearerToken:
+          type: string
+          description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
+        bearerExpiresAt: { type: string, format: date-time }
+    Settings:
+      type: object
+      required:
+        [revision, language, defaultModel, memberLimit, chainLimit, budgetScope, budgetTokens, enginePath]
+      properties:
+        revision: { type: integer, format: int64 }
+        language: { type: string, enum: [zh-CN, en] }
+        defaultModel: { type: string }
+        memberLimit: { type: integer }
+        chainLimit: { type: integer }
+        budgetScope: { type: string, enum: ["", bot, team] }
+        budgetTokens: { type: integer, format: int64 }
+        enginePath: { type: string }
+    SettingsPatch:
+      type: object
+      properties:
+        language: { type: string, enum: [zh-CN, en] }
+        defaultModel: { type: string }
+        memberLimit: { type: integer }
+        chainLimit: { type: integer }
+        budgetScope: { type: string, enum: ["", bot, team] }
+        budgetTokens: { type: integer, format: int64 }
+        enginePath: { type: string }
+    Snapshot:
+      type: object
+      required: [seq, instanceId, settings, teams, engine]
+      properties:
+        seq: { type: integer, format: int64 }
+        instanceId: { type: string }
+        settings: { $ref: "#/components/schemas/Settings" }
+        teams:
+          type: array
+          items: { $ref: "#/components/schemas/TeamWithBots" }
+        engine: { $ref: "#/components/schemas/EngineStatus" }
+    Team:
+      type: object
+      required: [id, name, profileInstanceId, leaderId, directory, status, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        profileInstanceId: { type: string }
+        leaderId: { type: string }
+        directory: { type: string }
+        status:
+          type: string
+          enum: [active, archived, deleted, directory_missing]
+        statusDetail: { type: string }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt:
+          type: string
+          description: When the team was archived (RFC 3339); absent unless archived.
+        permissionMode:
+          type: string
+          enum: [read_only, default, full]
+          description: How freely members may act; mapped onto the engine's approval and sandbox settings.
+        reasoningEffort:
+          type: string
+          description: How hard members think each turn; absent follows the model's default.
+    Bot:
+      type: object
+      required: [id, teamId, name, roleId, isLeader, status, revision, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        name: { type: string }
+        roleId: { type: string }
+        roleVersion: { type: string }
+        isLeader: { type: boolean }
+        status:
+          type: string
+          enum: [idle, queued, working, waiting_approval, waiting_input, interrupted, unknown]
+        currentRunId: { type: string }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+    TeamWithBots:
+      type: object
+      required: [team, bots]
+      properties:
+        team: { $ref: "#/components/schemas/Team" }
+        bots:
+          type: array
+          items: { $ref: "#/components/schemas/Bot" }
+    ApprovalOption:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        messageKey: { type: string }
+        text: { type: string }
+        disabled: { type: boolean }
+        disabledReasonKey: { type: string }
+    ApprovalDecision:
+      type: object
+      required: [optionId, actor, decidedAt]
+      properties:
+        optionId: { type: string }
+        comment: { type: string }
+        actor: { type: string }
+        decidedAt: { type: string, format: date-time }
+    Approval:
+      type: object
+      required: [id, teamId, requesterBotId, type, summary, options, requestState, revision, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        requesterBotId: { type: string }
+        runId: { type: string }
+        type: { type: string, enum: [native_tool, recovery, chain] }
+        method: { type: string }
+        summary: { type: string }
+        reason: { type: string }
+        options:
+          type: array
+          items: { $ref: "#/components/schemas/ApprovalOption" }
+        requestState: { type: string, enum: [pending, decided, invalidated] }
+        decision: { $ref: "#/components/schemas/ApprovalDecision" }
+        responseState: { type: string, enum: [queued, sent, unknown, expired] }
+        createdAt: { type: string, format: date-time }
+        revision: { type: integer, format: int64 }
+    Event:
+      type: object
+      required: [seq, id, instanceId, type, teamId, botId, resourceId, revision, payload, createdAt]
+      properties:
+        seq: { type: integer, format: int64 }
+        id: { type: string }
+        instanceId: { type: string }
+        type: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        resourceId: { type: string }
+        revision: { type: integer, format: int64 }
+        payload: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+    TextBlock:
+      type: object
+      required: [type, text]
+      properties:
+        type: { type: string }
+        text: { type: string }
+    Run:
+      type: object
+      required: [id, teamId, botId, status, startedAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        providerSessionId: { type: string }
+        providerTurnId: { type: string }
+        engineEpoch: { type: string }
+        status: { type: string, enum: [starting, running, waiting_approval, waiting_input, completed, failed, interrupted, unknown] }
+        errorKey: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+    RunStep:
+      type: object
+      required: [id, runId, teamId, botId, seq, kind, status, detail, startedAt, updatedAt]
+      properties:
+        id: { type: string }
+        runId: { type: string }
+        teamId: { type: string }
+        botId: { type: string }
+        seq: { type: integer }
+        kind:
+          type: string
+          enum: [reasoning, command, file_change, tool, web_search, plan, message, agent, diff, notice, retry]
+          description: The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
+        status:
+          type: string
+          enum: [in_progress, completed, failed, declined, interrupted]
+        detail:
+          type: object
+          additionalProperties: true
+          description: Kind-specific payload.
+        startedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RunWithSteps:
+      allOf:
+        - $ref: "#/components/schemas/Run"
+        - type: object
+          required: [steps]
+          properties:
+            steps:
+              type: array
+              items: { $ref: "#/components/schemas/RunStep" }
+    ConversationPage:
+      type: object
+      required: [messages, nextCursor, bot, queuedCount, activeRun, runs]
+      properties:
+        messages:
+          type: array
+          description: Oldest first.
+          items: { $ref: "#/components/schemas/Message" }
+        nextCursor: { type: string }
+        bot: { $ref: "#/components/schemas/Bot" }
+        queuedCount: { type: integer }
+        activeRun:
+          allOf:
+            - $ref: "#/components/schemas/Run"
+          nullable: true
+        runs:
+          type: array
+          description: Runs started between this page's messages, with their visible steps.
+          items: { $ref: "#/components/schemas/RunWithSteps" }
+    TaskDetail:
+      type: object
+      required: [task, evidence, transfers]
+      properties:
+        task: { $ref: "#/components/schemas/Task" }
+        evidence:
+          type: array
+          items: { $ref: "#/components/schemas/Evidence" }
+        transfers:
+          type: array
+          items: { $ref: "#/components/schemas/Transfer" }
+    Model:
+      type: object
+      description: One engine model, reduced to non-secret identifier fields.
+      properties:
+        slug: { type: string }
+        id: { type: string }
+        displayName: { type: string }
+        description: { type: string }
+        family: { type: string }
+        isDefault: { type: boolean }
+        defaultReasoningEffort: { type: string, description: The effort the model uses when none is chosen. }
+        reasoningEfforts:
+          type: array
+          items:
+            type: object
+            required: [effort, description]
+            properties:
+              effort: { type: string }
+              description: { type: string }
