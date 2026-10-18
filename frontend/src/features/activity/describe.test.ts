@@ -30,6 +30,12 @@ describe('describeActivity', () => {
     expect(line.quote).toBe('npm test');
     expect(line.approvals).toBe(true);
   });
+  it('says why a budget held a turn', () => {
+    const line = (reason: string) => describeActivity(item('budget.paused', {}, { botId: 'fe', resourceId: reason }), nameOf, t).text;
+    expect(line('exceeded')).toContain('activity.line.budgetPaused{');
+    expect(line('usage_unknown')).toContain('activity.line.budgetPausedUnknown');
+    expect(line('reserve')).toContain('activity.line.budgetPausedReserve');
+  });
   it('keeps a removed member by the name it had', () => {
     expect(describeActivity(item('bot.deleted', { name: '后端开发' }), nameOf, t).text).toContain('后端开发');
   });

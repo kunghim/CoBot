@@ -69,8 +69,11 @@ export function describeActivity(item: ActivityItem, nameOf: (id: unknown) => st
       return { text: t('activity.line.message', { from: nameOf(d.fromBotId), to: nameOf(d.toBotId) }), quote: str(d.text), conversationBotId: str(d.toBotId) || undefined };
     case 'memory.changed':
       return { text: t(d.deleted ? 'activity.line.memoryDeleted' : 'activity.line.memory', { actor: actor || t('activity.someone') }), quote: str(d.text) };
-    case 'budget.paused':
-      return { text: t('activity.line.budgetPaused', { actor: actor || t('activity.someone') }) };
+    case 'budget.paused': {
+      // The event names why: spent, spend unknown, or too little left for a turn.
+      const reason = item.resourceId === 'usage_unknown' ? 'Unknown' : item.resourceId === 'reserve' ? 'Reserve' : '';
+      return { text: t(`activity.line.budgetPaused${reason}`, { actor: actor || t('activity.someone') }) };
+    }
     case 'team.created':
     case 'team.archived':
     case 'team.restored':

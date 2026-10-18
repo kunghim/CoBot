@@ -371,7 +371,9 @@
       "message": "{{from}} → {{to}}",
       "memory": "{{actor}} saved a working method",
       "memoryDeleted": "Deleted a memory of {{actor}}",
-      "budgetPaused": "Budget spent; {{actor}}'s next turn is paused"
+      "budgetPaused": "Budget spent; {{actor}}'s next turn is paused",
+      "budgetPausedUnknown": "A turn's usage is unknown, so the budget cannot be judged; {{actor}}'s next turn is paused",
+      "budgetPausedReserve": "Too little budget left for another of {{actor}}'s turns (estimated from recent ones); the next turn is paused"
     },
     "empty": "No activity yet",
     "loadFailed": "Failed to load activity",
