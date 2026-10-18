@@ -17,7 +17,7 @@ export function RoleChip({ name, roleId, isLeader = false }: { name: ReactNode; 
  * said in its conversation — one line, cut with an ellipsis, never wider
  * than the row.
  */
-export function MemberRow({ avatar, name, status, statusLabel, preview, time, current = false, attention = false, leaderLabel, onSelect }: { avatar: ReactNode; name: ReactNode; status?: ReactNode; statusLabel: string; preview?: ReactNode; time?: ReactNode; current?: boolean; attention?: boolean; /** Set on the leader's row: a quiet word after the name. */ leaderLabel?: string; onSelect: () => void }) {
+export function MemberRow({ avatar, name, status, statusLabel, preview, time, current = false, attention = false, onSelect }: { avatar: ReactNode; name: ReactNode; status?: ReactNode; statusLabel: string; preview?: ReactNode; time?: ReactNode; current?: boolean; attention?: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
@@ -35,42 +35,12 @@ export function MemberRow({ avatar, name, status, statusLabel, preview, time, cu
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className={cx('min-w-0 truncate', current || leaderLabel ? 'font-semibold' : 'font-medium text-neutral-800 dark:text-neutral-100')}>{name}</span>
-            {leaderLabel && <span className="shrink-0 text-[10px] font-medium tracking-wide text-neutral-500 dark:text-neutral-400">{leaderLabel}</span>}
-          </span>
+          <span className={cx('min-w-0 flex-1 truncate', current ? 'font-semibold' : 'font-medium text-neutral-800 dark:text-neutral-100')}>{name}</span>
           {(status || time) && <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{status ?? time}</span>}
         </span>
         {preview && <span className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">{preview}</span>}
       </span>
     </button>
-  );
-}
-
-/**
- * A team as a tree: the leader's row on top with a larger avatar, and its
- * members indented under it, joined to the leader by guide lines — the
- * layout itself says who leads. Pass MemberRows; the leader's uses a 32px
- * avatar and leaderLabel, the members 24–28px.
- */
-export function TeamTree({ leader, members }: { leader: ReactNode; members: ReactNode[] }) {
-  const line = 'bg-neutral-300 dark:bg-neutral-700';
-  return (
-    <div>
-      {leader}
-      <ul className="mt-px space-y-px">
-        {members.map((member, index) => {
-          const last = index === members.length - 1;
-          return (
-            <li key={index} className="relative pl-[34px]">
-              <span aria-hidden className={cx('absolute left-[23px] top-0 w-px', line, last ? 'h-1/2' : 'h-full')} />
-              <span aria-hidden className={cx('absolute left-[23px] top-1/2 h-px w-[9px]', line)} />
-              {member}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 

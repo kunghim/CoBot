@@ -5,7 +5,7 @@ import dangoSeries from '../../../assets/avatars/dango/dist/dango.json';
 import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
-import { AppTitleBar, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote, TeamTree } from '../components/ui';
+import { AppTitleBar, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const dango: AvatarSeries = { id: 'dango', name: dangoSeries.name, kind: 'composed', version: dangoSeries.version, data: dangoSeries as unknown as AvatarSeries['data'] };
@@ -79,46 +79,28 @@ export default function TeamConversation() {
         </Demo>
       </Doc>
 
-      <Doc
-        id="member-row"
-        name="MemberRow 成员行 · TeamTree 团队树"
-        file="components/ui/Team.tsx"
-        use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息（只显示一行，超出用省略号截断，不会撑出侧栏）。当前成员白底加描边；等你处理时头像右下角加琥珀色点。用 TeamTree 排成一棵树：队长在最上面，头像大一号，名字后面有一个很淡的“队长”；成员缩进在下面，用细线连到队长——布局本身说明谁带队。"
-        avoid="不要给队长再加皇冠、底色等额外标记；层级和更大的头像已经足够。"
-      >
+      <Doc id="member-row" name="MemberRow 成员行" file="components/ui/Team.tsx" use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息（只显示一行，超出用省略号截断，不会撑出侧栏）。当前成员白底加描边；等你处理时头像右下角加琥珀色点。队长和成员暂时用同一种样式（怎么区分队长以后再定）。">
         <Demo surface="sunken">
-          <div className="w-72">
-            <TeamTree
-              leader={
-                <MemberRow
-                  avatar={<RoleAvatar roleId="leader" size={32} />}
-                  name="队长"
-                  leaderLabel="队长"
-                  time="09:41"
-                  statusLabel="空闲"
-                  preview="方案已经发你了，确认后我就分派给成员。"
-                  current={selected === 'leader'}
-                  onSelect={() => setSelected('leader')}
-                />
-              }
-              members={[
-                ['frontend-dev', '前端开发', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存'],
-                ['backend-dev', '后端开发', 'idle', '', '空闲', ''],
-                ['qa-engineer', '测试工程师', 'waiting', '等你审批', '等你审批', '想在沙箱外运行 npx playwright test --headed 来验证页面'],
-              ].map(([roleId, name, state, status, statusLabel, preview]) => (
-                <MemberRow
-                  key={roleId}
-                  avatar={<RoleAvatar roleId={roleId} size={28} state={state as AvatarState} />}
-                  name={name}
-                  status={status || undefined}
-                  statusLabel={statusLabel}
-                  preview={preview || undefined}
-                  attention={state === 'waiting'}
-                  current={selected === roleId}
-                  onSelect={() => setSelected(roleId)}
-                />
-              ))}
-            />
+          <div className="w-64 space-y-px">
+            {[
+              ['leader', '队长', 'idle', '', '空闲', '方案已经发你了，确认后我就分派给成员。', '09:41'],
+              ['frontend-dev', '前端开发', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存', ''],
+              ['backend-dev', '后端开发', 'idle', '', '空闲', '', ''],
+              ['qa-engineer', '测试工程师', 'waiting', '等你审批', '等你审批', '想在沙箱外运行 npx playwright test --headed 来验证页面', ''],
+            ].map(([roleId, name, state, status, statusLabel, preview, time]) => (
+              <MemberRow
+                key={roleId}
+                avatar={<RoleAvatar roleId={roleId} size={28} state={state as AvatarState} />}
+                name={name}
+                status={status || undefined}
+                time={time || undefined}
+                statusLabel={statusLabel}
+                preview={preview || undefined}
+                attention={state === 'waiting'}
+                current={selected === roleId}
+                onSelect={() => setSelected(roleId)}
+              />
+            ))}
           </div>
         </Demo>
       </Doc>
