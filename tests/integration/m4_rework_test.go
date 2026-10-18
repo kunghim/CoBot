@@ -18,7 +18,7 @@ import (
 func TestRerunFromAcceptedDelivery(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	lost := bots[1]
 
 	runID, deliveryID := seedUnresolvedRun(t, h, team, lost, "崩溃时已接受的派发", "turn-x", "epoch-dead")
@@ -63,7 +63,7 @@ func TestRerunFromAcceptedDelivery(t *testing.T) {
 func TestReplayStuckChainDecisionOnStartup(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 
 	// Seed exactly the crash window: chain awaiting, card decided, bound

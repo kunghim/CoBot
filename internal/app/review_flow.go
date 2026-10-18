@@ -249,7 +249,7 @@ func (a *App) createAcceptanceLocked(ctx context.Context, tx *sql.Tx, run domain
 	rows.Close()
 	summary := strings.TrimSpace(reply)
 	if summary == "" {
-		summary = "这次需求的任务都已结束，队长没有给出交付说明，可以查看各任务的交付与评审记录。"
+		summary = "这次需求的任务都已结束，项目经理没有给出交付说明，可以查看各任务的交付与评审记录。"
 	}
 	var created []string
 	for _, requirement := range requirements {
@@ -321,7 +321,10 @@ func (a *App) AnswerAcceptance(ctx context.Context, principal auth.Principal, qu
 	defer tx.Rollback()
 	messageID := ""
 	if decision == domain.AcceptanceRevise {
-		text := fmt.Sprintf("用户验收未通过，要求修改：%s\n请按意见安排后续任务；这批任务结束后，系统会再请用户验收。", comment)
+		// This is the user's own message in the conversation, so it carries
+		// the user's words only; what to do with them is in the leader's
+		// instructions.
+		text := "验收未通过，需要修改：" + comment
 		blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 		if err != nil {
 			return domain.Question{}, err

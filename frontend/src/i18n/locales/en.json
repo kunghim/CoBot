@@ -9,12 +9,12 @@
     "toggleWorkPanel": "Collapse/expand work panel"
   },
   "home": {
-    "noTeams": "No teams yet. Create one and the leader and members will collaborate here.",
+    "noTeams": "No teams yet. Create one and the project manager and members will collaborate here.",
     "emptyTitle": "Hand one job to a whole team",
-    "emptyBody": "Pick a working folder and CoBot sets up a leader and members for it. Tell the leader your goal; it splits the work into tasks for the members, and asks you before anyone runs a command or edits a file.",
+    "emptyBody": "Pick a working folder and CoBot sets up a project manager and members for it. Tell the project manager your goal; it splits the work into tasks for the members, and asks you before anyone runs a command or edits a file.",
     "pickTitle": "Who do you want to talk to?",
-    "selectBot": "Pick a member on the left, or go straight to a leader.",
-    "openLeader": "Open leader"
+    "selectBot": "Pick a member on the left, or go straight to a project manager.",
+    "openLeader": "Open project manager"
   },
   "archived": {
     "search": "Search team name or folder",
@@ -73,7 +73,7 @@
     "creating": "Creating…",
     "expand": "Expand team",
     "collapse": "Collapse team",
-    "leader": "Leader",
+    "leader": "Project manager",
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {
@@ -94,10 +94,9 @@
     "software": { "name": "Software development" }
   },
   "role": {
-    "leader": { "name": "Leader", "summary": "Understands your goal, splits the work, coordinates members and reports back to you." },
+    "leader": { "name": "Project manager", "summary": "Understands your goal, splits the work, coordinates members and reports back to you." },
     "productManager": { "name": "Product manager", "summary": "Shapes requirements, scope and acceptance criteria." },
-    "frontendDev": { "name": "Frontend developer", "summary": "Builds the interface and interactions." },
-    "backendDev": { "name": "Backend developer", "summary": "Builds server logic, APIs and data." },
+    "fullstackEngineer": { "name": "Full-stack engineer", "summary": "Builds the interface, interactions, server logic and data." },
     "qaEngineer": { "name": "QA engineer", "summary": "Writes and runs tests and reports problems." },
     "codeReviewer": { "name": "Reviewer", "summary": "Reviews requirements, designs, test cases and code against the criteria; the verdict decides the task." }
   },
@@ -149,8 +148,8 @@
   },
   "conversation": {
     "emptyTitle": "No conversation with {{name}} yet",
-    "emptyLeader": "Tell the leader what you want done. It agrees a plan with you first and assigns members once you confirm.",
-    "emptyMember": "Members usually get work from the leader. You can also ask this member a question or add details here.",
+    "emptyLeader": "Tell the project manager what you want done. It agrees a plan with you first and assigns members once you confirm.",
+    "emptyMember": "Members usually get work from the project manager. You can also ask this member a question or add details here.",
     "exchange": {
       "to": "To",
       "from": "From",
@@ -561,7 +560,7 @@
     "engineProtocol": "Protocol",
     "defaultModel": "Default model",
     "modelUnset": "Not set (engine default)",
-    "memberLimit": "Member limit (incl. leader)",
+    "memberLimit": "Member limit (incl. project manager)",
     "chainLimit": "Collaboration chain wake limit",
     "reviewRejectLimit": "Review send-back limit",
     "budget": "Budget",
@@ -669,17 +668,17 @@
     "error.forbidden.bot_only": "Only members can perform this action",
     "error.message.other_team": "Messages can only go to members of the same team",
     "error.message.to_self": "A member cannot message itself",
-    "error.approval.captain_only": "Only the captain can raise this approval",
+    "error.approval.captain_only": "Only the project manager can raise this approval",
     "error.task.team_required": "Missing teamId parameter",
     "error.task.title_required": "Task title cannot be empty",
-    "error.task.captain_only": "Only the captain can create tasks for members",
-    "error.task.reviewer_or_captain": "Only this task's reviewer or the captain can decide \"{{title}}\"",
-    "error.task.review_escalated": "\"{{title}}\" was sent back more often than allowed; the captain decides it now",
+    "error.task.captain_only": "Only the project manager can create tasks for members",
+    "error.task.reviewer_or_captain": "Only this task's reviewer or the project manager can decide \"{{title}}\"",
+    "error.task.review_escalated": "\"{{title}}\" was sent back more often than allowed; the project manager decides it now",
     "error.task.review_type_unknown": "Unknown review type: {{reviewType}} (one of {{allowed}})",
-    "error.task.cancel_captain_only": "Only the captain or the user can cancel a task",
+    "error.task.cancel_captain_only": "Only the project manager or the user can cancel a task",
     "error.bot.revision_conflict": "The member changed elsewhere; refresh and retry",
     "error.task.owner_only": "Only the task owner can do this",
-    "error.task.owner_or_captain": "Only the owner or the captain can do this",
+    "error.task.owner_or_captain": "Only the owner or the project manager can do this",
     "error.task.parent_unknown": "Parent task not found",
     "error.task.parent_other_team": "Parent task belongs to another team",
     "error.task.owner_other_team": "Owner is not a member of this team",
@@ -716,7 +715,7 @@
     "error.chain.binding_missing": "This chain confirmation is missing its chain binding; refresh and retry",
     "error.team.not_archived": "Team status is {{status}}; only archived teams or teams whose folder is gone can be deleted",
     "error.team.open_work": "The team still has unfinished work and cannot be archived yet: running members {{activeRuns}}, queued messages {{queuedDeliveries}}, pending approvals {{pendingApprovals}}, open questions {{openQuestions}}, offered hand-overs {{offeredTransfers}}, open tasks {{openTasks}}",
-    "error.bot.leader_delete": "The captain cannot be deleted; remove the team instead",
+    "error.bot.leader_delete": "The project manager cannot be deleted; remove the team instead",
     "error.lease.missing": "No execution lease: the host may be gone, so side effects are refused",
     "error.lease.corrupt": "The execution lease is corrupt; side effects are refused",
     "error.lease.expired": "The execution lease expired: the host may be gone, so side effects are refused",

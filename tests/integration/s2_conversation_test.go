@@ -16,7 +16,7 @@ import (
 func TestConversationsShowCollaborationAndActivityIsReadable(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, member := bots[0], bots[1]
 	token := h.botToken(t, captain)
 

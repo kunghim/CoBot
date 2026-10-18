@@ -15,8 +15,7 @@ import { findBotContext } from '../teams/teamUtils';
 const LINEUP = [
   { roleId: 'leader', key: 'role.leader.name', isLeader: true },
   { roleId: 'product-manager', key: 'role.productManager.name', isLeader: false },
-  { roleId: 'frontend-dev', key: 'role.frontendDev.name', isLeader: false },
-  { roleId: 'backend-dev', key: 'role.backendDev.name', isLeader: false },
+  { roleId: 'fullstack-engineer', key: 'role.fullstackEngineer.name', isLeader: false },
   { roleId: 'qa-engineer', key: 'role.qaEngineer.name', isLeader: false },
   { roleId: 'code-reviewer', key: 'role.codeReviewer.name', isLeader: false },
 ];

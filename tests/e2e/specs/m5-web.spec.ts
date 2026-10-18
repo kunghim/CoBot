@@ -26,7 +26,7 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   await expect(page.getByText('m5团队').first()).toBeVisible({ timeout: 15000 });
 
-  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  const leaders = page.getByRole('button', { name: /项目经理/ }).filter({ visible: true });
   await expect(leaders).toHaveCount(1, { timeout: 15000 });
   await leaders.first().click();
 

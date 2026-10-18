@@ -49,7 +49,7 @@ func (h *m2Harness) userPost(t *testing.T, path string, body map[string]any) (in
 func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, member := bots[0], bots[1]
 
 	// Activity: a real action produces real events for the team feed.
@@ -134,7 +134,7 @@ func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 // same way creation refuses them, and a clean move rewrites the marker.
 func TestWebSurfaceDirectories(t *testing.T) {
 	h := newM2Harness(t)
-	h.createTeam(t, []string{"backend-dev"})
+	h.createTeam(t, []string{"fullstack-engineer"})
 
 	// Listing children returns names only.
 	child := filepath.Join(h.teamDir, "child-sub")

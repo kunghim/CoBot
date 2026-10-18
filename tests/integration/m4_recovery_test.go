@@ -65,7 +65,7 @@ func seedUnresolvedRun(t *testing.T, h *m2Harness, team domain.Team, bot domain.
 func TestRestartReconciliationClassifiesUnresolvedWork(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, lost := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -192,7 +192,7 @@ func TestRestartReconciliationClassifiesUnresolvedWork(t *testing.T) {
 func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -304,7 +304,7 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 func TestStopInterruptsInFlightRuns(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	fake := h.ensureFake(t, team.ID)
 

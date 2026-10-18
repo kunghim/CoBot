@@ -128,7 +128,7 @@ func TestReviewerDecidesAndTheUserAcceptsTheRequirement(t *testing.T) {
 	if _, err := h.app.UpdateSettings(ctx, h.user, domain.SettingsPatch{ReviewRejectLimit: &limit}, settings.Revision); err != nil {
 		t.Fatal(err)
 	}
-	team, bots := h.createTeam(t, []string{"backend-dev", "code-reviewer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "code-reviewer"})
 	captain, dev, reviewer := bots[0], bots[1], bots[2]
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "方案确认，开始吧"}); err != nil {
 		t.Fatal(err)
@@ -230,7 +230,7 @@ func TestReviewerDecidesAndTheUserAcceptsTheRequirement(t *testing.T) {
 	if _, err := h.app.AnswerAcceptance(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "登录失败时要提示原因", acceptance.Revision); err != nil {
 		t.Fatal(err)
 	}
-	f.waitTurn(captain, "用户验收未通过", "登录失败时要提示原因")
+	f.waitTurn(captain, "验收未通过，需要修改：登录失败时要提示原因")
 }
 
 // Without a reviewer the leader accepts the delivery as before, and the
@@ -238,7 +238,7 @@ func TestReviewerDecidesAndTheUserAcceptsTheRequirement(t *testing.T) {
 func TestUserAcceptanceClosesARequirement(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, dev := bots[0], bots[1]
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "做吧"}); err != nil {
 		t.Fatal(err)

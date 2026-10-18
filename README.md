@@ -35,7 +35,7 @@ what matters.
 
 ```mermaid
 flowchart LR
-    U([You]) -->|goal| L[Leader bot]
+    U([You]) -->|goal| L[Project manager]
     L -->|create_task / send_message| M1[Member bot]
     L -->|create_task / send_message| M2[Member bot]
     M1 & M2 -->|deliver_task / send_message / ask_user| C[(CoBot core<br/>tasks · messages · approvals)]
@@ -45,10 +45,10 @@ flowchart LR
     M1 & M2 -. execute in team directory .-> E[[Codex]]
 ```
 
-1. **Create a team** on a working directory. A leader and members with built-in roles
-   (product manager, backend, frontend, QA, code reviewer) get their own agent sessions.
+1. **Create a team** on a working directory. A project manager and members with built-in roles
+   (product manager, full-stack engineer, QA engineer, reviewer) get their own agent sessions.
    You can add or remove members later from the team's settings.
-2. **Give the leader a goal.** It agrees the plan with you, then breaks it into tasks with
+2. **Give the project manager a goal.** It agrees the plan with you, then breaks it into tasks with
    owners, dependencies and acceptance criteria.
 3. **Members collaborate through structured tools** (MCP), not by parsing chat. Every
    action they take becomes a fact in CoBot's database, and that fact wakes up whoever needs
@@ -58,18 +58,18 @@ flowchart LR
 
 ## Features
 
-- **Role-based collaboration.** Each bot sees only the tools its role needs. The leader has
+- **Role-based collaboration.** Each bot sees only the tools its role needs. The project manager has
   `send_message`, `ask_user`, `create_task`, `review_task` and `view_tasks`; members have
   `send_message`, `ask_user`, `deliver_task` and `view_tasks`; a reviewer also has
   `review_task`. The host binds each call to the member's identity, so a model can't act as
   someone else.
 - **Delivery and review.** A member delivers a task with what it did, how to check it and
-  what it verified. A task the leader marks for review (requirements, design, test cases,
+  what it verified. A task the project manager marks for review (requirements, design, test cases,
   code…) goes to a reviewer member with the matching checklist, and the reviewer's verdict
-  decides it; after too many send-backs (3 by default, adjustable in settings) the leader
-  decides instead. Other tasks the leader (or you) accepts. Accepting completes the task and
+  decides it; after too many send-backs (3 by default, adjustable in settings) the project manager
+  decides instead. Other tasks the project manager (or you) accepts. Accepting completes the task and
   releases the tasks waiting on it; sending back needs a reason. When every task of a confirmed
-  plan has ended, the leader reports the result and you accept it or ask for changes. CoBot
+  plan has ended, the project manager reports the result and you accept it or ask for changes. CoBot
   moves the task status itself; the model never drives the state machine.
 - **Human in the loop.** Native Codex approvals show the full command or diff, with Codex's
   own choices: allow, allow for this session, decline, or decline and stop (requests for extra
@@ -116,7 +116,7 @@ With real Codex on Windows we verified: sign-in, multi-member parallel work, tas
 questions, native file approvals and rejections, collaboration limits, reconnecting after a
 dropped connection, graceful shutdown, crash recovery and upgrades.
 The headline test was two consecutive rounds of **CoBot developing CoBot**. In each round
-the leader planned the work, a member implemented it, a separate member reviewed it, and a
+the project manager planned the work, a member implemented it, a separate member reviewed it, and a
 human approved the exact candidate commit. The second round ran on the upgraded build that
 included the first round's change.
 
@@ -184,7 +184,7 @@ This preference is saved for subsequent visits; agent replies are not translated
    CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
    both, with a button to authorize again if that failed.
 2. **New team:** choose a working directory and the members you want.
-3. **Message the leader** with a small, checkable goal. For example: "Inspect this
+3. **Message the project manager** with a small, checkable goal. For example: "Inspect this
    project and propose three improvements. Do not edit files yet." Agent replies
    follow the conversation and role instructions, not the interface language.
 

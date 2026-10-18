@@ -57,7 +57,7 @@ func (a *App) rosterText(ctx context.Context, teamID string) string {
 	for _, m := range members {
 		role := "成员"
 		if m.IsLeader {
-			role = "队长"
+			role = "项目经理"
 		}
 		fmt.Fprintf(&b, "- %s（%s，id=%s）\n", m.Name, role, m.ID)
 	}

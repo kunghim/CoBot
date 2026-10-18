@@ -33,7 +33,7 @@ func finishTurn(t *testing.T, h *m2Harness, fake *fakeengine.Server, turn fakeen
 func TestDeliverAndReviewMoveTheTaskForTheModel(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	leader, dev, qa := bots[0], bots[1], bots[2]
 	fake := h.ensureFake(t, team.ID)
 
@@ -106,7 +106,7 @@ func TestDeliverAndReviewMoveTheTaskForTheModel(t *testing.T) {
 func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	dev := bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -329,7 +329,7 @@ func TestTurnUsageSumsEveryModelCall(t *testing.T) {
 func TestNotesAndWaitingTasksReachTheRightSide(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	dev, qa := bots[1], bots[2]
 	fake := h.ensureFake(t, team.ID)
 

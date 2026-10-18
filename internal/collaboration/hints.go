@@ -10,7 +10,7 @@ var hints = map[string]string{
 	"error.task.review_not_pending":        "这个任务现在不是待验收状态，还不能验收；等负责人交付后系统会通知你。",
 	"error.task.reject_reason_required":    "打回时必须在 comment 里写明缺什么。",
 	"error.task.review_decision":           "decision 只能是 accept（通过）或 reject（打回）。",
-	"error.task.captain_only":              "只有队长能做这个操作。",
+	"error.task.captain_only":              "只有项目经理能做这个操作。",
 	"error.message.target_required":        "请在 targetBotIds 或 targetBotId 里写明发给谁。",
 	"error.idempotency.required":           "这次调用缺少调用标识，请重试一次。",
 }

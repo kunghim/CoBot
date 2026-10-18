@@ -24,7 +24,7 @@ test('native tool approval appears, decides, engine resumes', async ({ page, con
 
   // Symmetric with the flow spec: pick the one visible leader so the specs do
   // not depend on execution order once more teams exist on the page.
-  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  const leaders = page.getByRole('button', { name: /项目经理/ }).filter({ visible: true });
   await expect(leaders).toHaveCount(1, { timeout: 15000 });
   await leaders.first().click();
 

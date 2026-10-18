@@ -23,7 +23,7 @@ import (
 func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	leader, owner, target := bots[0], bots[1], bots[2]
 	fake := h.ensureFake(t, team.ID)
 
@@ -161,7 +161,7 @@ func taskIDOf(t *testing.T, h *m2Harness, ownerID string) string {
 func TestArchiveOnlyIdleTeam(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, owner := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 	refused := func(why string) {
@@ -272,7 +272,7 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 func TestDeleteRemovesTeamCompletely(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	userFile := filepath.Join(h.teamDir, "README.md")
 	if err := os.WriteFile(userFile, []byte("project"), 0o644); err != nil {
 		t.Fatal(err)
@@ -376,7 +376,7 @@ func TestClaimedFolderIsRefused(t *testing.T) {
 func TestTeamFollowsItsFolder(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	status := func() string {
 		t.Helper()
 		current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
@@ -430,7 +430,7 @@ func TestCreateTeamIsAtomic(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("a user file, not a folder"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	input := app.CreateTeamInput{Name: "原子创建", Directory: dir, InitialRoleIDs: []string{"backend-dev"}, RequestID: "atomic-create"}
+	input := app.CreateTeamInput{Name: "原子创建", Directory: dir, InitialRoleIDs: []string{"fullstack-engineer"}, RequestID: "atomic-create"}
 	_, _, err := h.app.CreateTeam(ctx, h.user, input)
 	var de *domain.Error
 	if !errors.As(err, &de) || de.MessageKey != "error.team.prepare_failed" {

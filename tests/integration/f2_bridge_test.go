@@ -20,7 +20,7 @@ import (
 func TestRetainedMCPBridgeBindsEveryCallToNativeTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	fake := h.ensureFake(t, team.ID)
 	activate := func(text string, n int) (string, fakeengine.StartedTurn) {
 		t.Helper()

@@ -18,7 +18,7 @@ import (
 func TestDependencyChainIsRecorded(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	owner := bots[1].ID
 
 	a, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
@@ -39,7 +39,7 @@ func TestDependencyChainIsRecorded(t *testing.T) {
 	}
 
 	// A dependency from another team is refused rather than silently dropped.
-	other, otherBots := h.createTeamWithDir(t, "其他团队", "other-dir", []string{"backend-dev"})
+	other, otherBots := h.createTeamWithDir(t, "其他团队", "other-dir", []string{"fullstack-engineer"})
 	_, err = h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
 		TeamID: team.ID, OwnerID: owner, Title: "跨团队", AcceptanceCriteria: "非法",
 		DependencyIDs: []string{otherBots[1].ID},
@@ -57,7 +57,7 @@ func TestDependencyChainIsRecorded(t *testing.T) {
 func TestDependenciesSatisfiedBlocksAssignment(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, member := bots[0].ID, bots[1].ID
 
 	first, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
@@ -113,7 +113,7 @@ func TestDependenciesSatisfiedBlocksAssignment(t *testing.T) {
 func TestConfirmRequiresEvidence(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
 		TeamID: team.ID, OwnerID: bots[1].ID, Title: "无证据", AcceptanceCriteria: "必须有证据",
 	})
@@ -157,7 +157,7 @@ func TestConfirmRequiresEvidence(t *testing.T) {
 func TestTwoPhaseTransferKeepsSingleOwner(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain := bots[0]
 	owner, target := bots[1].ID, bots[2].ID
 
@@ -291,7 +291,7 @@ func TestTwoPhaseTransferKeepsSingleOwner(t *testing.T) {
 func TestAskUserDeliversAnswerToAsker(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	asker := bots[1]
 
 	question, err := h.app.AskUser(ctx, auth.NewPrincipalBot(asker.ID, team.ID), app.AskUserInput{
@@ -335,7 +335,7 @@ func TestAskUserDeliversAnswerToAsker(t *testing.T) {
 func TestUserReadsWholeCollaborationRecord(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	a, b := bots[1], bots[2]
 
 	if _, err := h.app.SendMessageFromBot(ctx, auth.NewPrincipalBot(a.ID, team.ID), b.ID, "帮我准备测试环境", "", "req-collab-1"); err != nil {
@@ -376,7 +376,7 @@ func TestUserReadsWholeCollaborationRecord(t *testing.T) {
 func TestTaskPermissionEdges(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	owner, outsider := bots[1], bots[2]
 
 	_, err := h.app.CreateTask(ctx, auth.NewPrincipalBot(outsider.ID, team.ID), true, app.CreateTaskInput{
@@ -417,7 +417,7 @@ var de *domain.Error
 // arguments is rejected instead of silently creating a second task.
 func TestWriteIdempotencyReplaysAndRejectsKeyReuse(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain := bots[0]
 	token := h.botToken(t, captain)
 	// All retries belong to one model turn. Ending a simulated turn between

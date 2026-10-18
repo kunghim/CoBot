@@ -23,7 +23,7 @@ func TestConcurrentTeamReservationRetryReturnsSameTeam(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	input := app.CreateTeamInput{Name: "one team", Directory: dir, InitialRoleIDs: []string{"backend-dev"}, RequestID: "team-reservation"}
+	input := app.CreateTeamInput{Name: "one team", Directory: dir, InitialRoleIDs: []string{"fullstack-engineer"}, RequestID: "team-reservation"}
 	var wg sync.WaitGroup
 	ids := make(chan string, 8)
 	failures := make(chan error, 8)
@@ -66,7 +66,7 @@ func TestConcurrentTeamReservationRetryReturnsSameTeam(t *testing.T) {
 
 func TestHTTPRequiresRevisionAndDeleteHeaders(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	for _, test := range []struct {
 		method, path string
 		body         map[string]any
@@ -111,7 +111,7 @@ func TestConcurrentHTTPTaskAndMemberRetriesCreateOneResource(t *testing.T) {
 	for _, action := range []string{"tasks", "bots"} {
 		t.Run(action, func(t *testing.T) {
 			h := newM2Harness(t)
-			team, bots := h.createTeam(t, []string{"backend-dev"})
+			team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 			body := map[string]any{"requestId": "same-operation", "roleId": "qa-engineer"}
 			if action == "tasks" {
 				body = map[string]any{"requestId": "same-operation", "ownerId": bots[1].ID, "title": "one task", "acceptanceCriteria": "exactly once"}
@@ -180,7 +180,7 @@ func TestConcurrentHTTPTaskAndMemberRetriesCreateOneResource(t *testing.T) {
 func TestReplayRecordFailureRollsBackBusinessAndDelivery(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	_, err := h.app.DB.Exec(`CREATE TRIGGER fail_replay BEFORE INSERT ON idempotency BEGIN SELECT RAISE(ABORT,'simulated replay persistence failure'); END`)
 	if err != nil {
 		t.Fatal(err)

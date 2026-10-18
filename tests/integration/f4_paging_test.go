@@ -14,7 +14,7 @@ import (
 
 func TestAssignmentCarriesFullTaskRequirementsAndIdentity(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	task, err := h.app.CreateTask(context.Background(), h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "scoped file", Description: "Use only the selected directory. Write EXACT_CONTENT. Do not run Git.", AcceptanceCriteria: "Read the exact file back"})
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestAssignmentCarriesFullTaskRequirementsAndIdentity(t *testing.T) {
 func TestScopedPagesKeepAllTiedRecordsAndDecidedHistory(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	stamp := time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC)
 	tx, err := h.app.DB.BeginTx(ctx, nil)
 	if err != nil {

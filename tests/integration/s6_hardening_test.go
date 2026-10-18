@@ -22,7 +22,7 @@ import (
 func TestFileLinksNeverLaunchProgramsOrScripts(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, _ := h.createTeam(t, []string{"backend-dev"})
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
 	for _, name := range []string{"page.html", "run.cmd", "setup.EXE", "go.ps1", "link.lnk"} {
 		if err := os.WriteFile(filepath.Join(team.Directory, name), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
@@ -222,7 +222,7 @@ func TestRefusedTurnFailsWithoutARecoveryCard(t *testing.T) {
 func TestCancelledDependencyReleasesDependentsAndTellsTheLeader(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, dev, qa := bots[0], bots[1], bots[2]
 	token := h.botToken(t, captain)
 	taskID := func(title string) string {

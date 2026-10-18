@@ -18,8 +18,8 @@ var Scenarios = []Scenario{
 		ID:             "software",
 		NameKey:        "scenario.software.name",
 		Name:           "Software development",
-		RoleIDs:        []string{"product-manager", "frontend-dev", "backend-dev", "qa-engineer", "code-reviewer"},
-		DefaultRoleIDs: []string{"frontend-dev", "backend-dev", "qa-engineer"},
+		RoleIDs:        []string{"product-manager", FullstackRoleID, "qa-engineer", "code-reviewer"},
+		DefaultRoleIDs: []string{FullstackRoleID, "qa-engineer", "code-reviewer"},
 	},
 }
 

@@ -19,7 +19,7 @@ import (
 func TestQueuedMemberMessagesMergeIntoOneTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -48,7 +48,7 @@ func TestQueuedMemberMessagesMergeIntoOneTurn(t *testing.T) {
 	if merged.ThreadID != memberTurn.ThreadID {
 		t.Fatalf("third turn is not the member's: %+v", merged)
 	}
-	for _, want := range []string{"收到了 3 条消息", "【来自 队长】", "接口定了", "记得写测试", "完成后告诉我"} {
+	for _, want := range []string{"收到了 3 条消息", "【来自 项目经理】", "接口定了", "记得写测试", "完成后告诉我"} {
 		if !strings.Contains(merged.Text, want) {
 			t.Fatalf("merged input lacks %q:\n%s", want, merged.Text)
 		}
@@ -149,7 +149,7 @@ func TestRefusedSteerQueuesAndUserMessagesMerge(t *testing.T) {
 // for the recipient's next turn and wakes nobody.
 func TestBroadcastAndNotifyOnly(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, backend, qa := bots[0], bots[1], bots[2]
 	token := h.botToken(t, captain)
 	fake := h.ensureFake(t, team.ID)
@@ -218,7 +218,7 @@ func TestWarmTeamStartsEngineAhead(t *testing.T) {
 func TestReviewWakesTheLeader(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	leader, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 

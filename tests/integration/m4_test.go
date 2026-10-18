@@ -22,7 +22,7 @@ import (
 func TestChainBudgetGatesBotWakes(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -129,7 +129,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 func TestUserMessageOpensNewChainWithoutClearingOld(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -168,7 +168,7 @@ func TestUserMessageOpensNewChainWithoutClearingOld(t *testing.T) {
 func TestChainWakeDeduplicatesDispatchKey(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[0].ID, Text: "hi"}); err != nil {
 		t.Fatalf("message: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestChainWakeDeduplicatesDispatchKey(t *testing.T) {
 func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	bot := bots[1]
 
 	base := domain.UsageEntry{
@@ -295,7 +295,7 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 func TestBudgetPausesNewTurnsAndResumes(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain := bots[0]
 	fake := h.ensureFake(t, team.ID)
 
@@ -411,7 +411,7 @@ func seedMemory(t *testing.T, h *m2Harness, teamID, botID, body string) domain.M
 func TestMemoriesStayWithTheirOwner(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	alice, bob := bots[1], bots[2]
 	mem := seedMemory(t, h, team.ID, alice.ID, "部署前先跑 go test ./...")
 
@@ -435,7 +435,7 @@ func TestMemoriesStayWithTheirOwner(t *testing.T) {
 func TestThreadInstructionsCarryOwnMemories(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	member, teammate := bots[1], bots[2]
 	body := strings.Repeat("记忆内容片段 ", 120) // ~1440 chars each
 	for i := 0; i < 10; i++ {

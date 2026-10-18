@@ -34,7 +34,7 @@ func seedTeam(t *testing.T, db *sql.DB) (teamID, botID string) {
 	ctx := context.Background()
 	teamID, botID = domain.NewID(), domain.NewID()
 	team := domain.Team{ID: teamID, Name: "store-test", ProfileInstance: "test", LeaderID: botID, Status: domain.TeamStatusActive}
-	bot := domain.Bot{ID: botID, TeamID: teamID, Name: "owner", RoleID: "backend-dev", IsLeader: true}
+	bot := domain.Bot{ID: botID, TeamID: teamID, Name: "owner", RoleID: "fullstack-engineer", IsLeader: true}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatal(err)

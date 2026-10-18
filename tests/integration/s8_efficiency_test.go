@@ -16,7 +16,7 @@ import (
 func TestAssignmentsShareATurnAndDeliveredOnesAreDropped(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, dev := bots[0], bots[1]
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: dev.ID, Text: "先看看项目"}); err != nil {
 		t.Fatal(err)
@@ -60,7 +60,7 @@ func TestAssignmentsShareATurnAndDeliveredOnesAreDropped(t *testing.T) {
 func TestDeliveryNoticesShareTheLeadersTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "frontend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, back, front := bots[0], bots[1], bots[2]
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "开工"}); err != nil {
 		t.Fatal(err)

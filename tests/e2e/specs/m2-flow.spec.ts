@@ -31,7 +31,7 @@ test('create team, message leader, receive engine reply', async ({ page }) => {
   // behind, so scope the leader lookup to this team's rows. Collapsed teams
   // keep their bot buttons in the DOM but hidden, and strict mode plus
   // visibility filtering picks the one expanded team's leader.
-  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  const leaders = page.getByRole('button', { name: /项目经理/ }).filter({ visible: true });
   await expect(leaders).toHaveCount(1, { timeout: 15000 });
   await leaders.first().click();
 

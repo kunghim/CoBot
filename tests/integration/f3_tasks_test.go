@@ -16,7 +16,7 @@ import (
 func TestCancelledTaskCannotDispatchItsQueuedAssignment(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	owner := bots[1]
 	fake := h.ensureFake(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: owner.ID, Text: "hold"}); err != nil {
@@ -48,7 +48,7 @@ func TestCancelledTaskCannotDispatchItsQueuedAssignment(t *testing.T) {
 func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	owner := bots[1]
 	fake := h.ensureFake(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: owner.ID, Text: "hold"}); err != nil {
@@ -93,7 +93,7 @@ func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) 
 func TestQuestionCountsBlockMemberDeleteAndArchive(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	question, err := h.app.AskUser(ctx, auth.NewPrincipalBot(member.ID, team.ID), app.AskUserInput{Question: "Still waiting"})
 	if err != nil {
@@ -120,7 +120,7 @@ func TestQuestionCountsBlockMemberDeleteAndArchive(t *testing.T) {
 func TestTerminalTaskCannotReopenOrAcceptUnknownStatus(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "cancel", AcceptanceCriteria: "no reopening"})
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +141,7 @@ func TestTerminalTaskCannotReopenOrAcceptUnknownStatus(t *testing.T) {
 func TestMessageRetryCannotChangeRecipientOrSender(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: "same", RequestID: "user-key"}); err != nil {
 		t.Fatal(err)
 	}

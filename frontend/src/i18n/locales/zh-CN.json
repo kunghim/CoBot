@@ -9,12 +9,12 @@
     "toggleWorkPanel": "收起/展开工作面板"
   },
   "home": {
-    "noTeams": "还没有团队。创建团队后，队长与成员会在这里协作。",
+    "noTeams": "还没有团队。创建团队后，项目经理与成员会在这里协作。",
     "emptyTitle": "把一件事交给一支团队",
-    "emptyBody": "选一个工作目录，CoBot 会为它配好队长和成员。你把目标告诉队长，队长拆成任务分给成员；运行命令、改文件这类操作会先请你批准。",
+    "emptyBody": "选一个工作目录，CoBot 会为它配好项目经理和成员。你把目标告诉项目经理，项目经理拆成任务分给成员；运行命令、改文件这类操作会先请你批准。",
     "pickTitle": "和谁聊？",
-    "selectBot": "从左侧选一位成员，或者直接找队长。",
-    "openLeader": "找队长"
+    "selectBot": "从左侧选一位成员，或者直接找项目经理。",
+    "openLeader": "找项目经理"
   },
   "archived": {
     "search": "搜索团队名称或目录",
@@ -73,7 +73,7 @@
     "creating": "创建中…",
     "expand": "展开团队",
     "collapse": "收起团队",
-    "leader": "队长",
+    "leader": "项目经理",
     "loading": "加载团队中…",
     "loadFailed": "团队列表加载失败",
     "badge": {
@@ -94,10 +94,9 @@
     "software": { "name": "软件开发" }
   },
   "role": {
-    "leader": { "name": "队长", "summary": "负责理解你的目标、拆分任务、协调成员并向你汇报。" },
+    "leader": { "name": "项目经理", "summary": "负责理解你的目标、拆分任务、协调成员并向你汇报。" },
     "productManager": { "name": "产品经理", "summary": "整理需求，写清范围和验收标准。" },
-    "frontendDev": { "name": "前端开发", "summary": "实现界面与交互。" },
-    "backendDev": { "name": "后端开发", "summary": "实现服务端逻辑、接口与数据。" },
+    "fullstackEngineer": { "name": "全栈工程师", "summary": "实现界面、交互、服务端逻辑与数据。" },
     "qaEngineer": { "name": "测试工程师", "summary": "编写和执行测试，报告问题。" },
     "codeReviewer": { "name": "评审员", "summary": "对照完成标准评审需求、设计、测试用例和代码，结论直接决定任务通过或打回。" }
   },
@@ -149,8 +148,8 @@
   },
   "conversation": {
     "emptyTitle": "还没有和 {{name}} 的对话",
-    "emptyLeader": "告诉队长你想做什么。队长会先和你对齐方案，你确认后再分派给成员。",
-    "emptyMember": "成员通常由队长派活。你也可以直接在这里问它问题或补充要求。",
+    "emptyLeader": "告诉项目经理你想做什么。项目经理会先和你对齐方案，你确认后再分派给成员。",
+    "emptyMember": "成员通常由项目经理派活。你也可以直接在这里问它问题或补充要求。",
     "exchange": {
       "to": "发给",
       "from": "来自",
@@ -556,7 +555,7 @@
     "engineProtocol": "协议",
     "defaultModel": "默认模型",
     "modelUnset": "未设置（跟随引擎默认）",
-    "memberLimit": "成员上限（含队长）",
+    "memberLimit": "成员上限（含项目经理）",
     "chainLimit": "协作链唤醒上限",
     "reviewRejectLimit": "评审打回次数上限",
     "budget": "预算",
@@ -664,17 +663,17 @@
     "error.forbidden.bot_only": "该操作仅限成员执行",
     "error.message.other_team": "只能给同团队成员发消息",
     "error.message.to_self": "不能给自己发消息",
-    "error.approval.captain_only": "只有队长可以发起该审批",
+    "error.approval.captain_only": "只有项目经理可以发起该审批",
     "error.task.team_required": "缺少 teamId 参数",
     "error.task.title_required": "任务标题不能为空",
-    "error.task.captain_only": "只有队长可以为成员创建任务",
-    "error.task.reviewer_or_captain": "只有这个任务的评审员或队长可以给出结论：「{{title}}」",
-    "error.task.review_escalated": "「{{title}}」打回次数已超过上限，现在由队长决定",
+    "error.task.captain_only": "只有项目经理可以为成员创建任务",
+    "error.task.reviewer_or_captain": "只有这个任务的评审员或项目经理可以给出结论：「{{title}}」",
+    "error.task.review_escalated": "「{{title}}」打回次数已超过上限，现在由项目经理决定",
     "error.task.review_type_unknown": "未知的评审类型：{{reviewType}}（可选：{{allowed}}）",
-    "error.task.cancel_captain_only": "只有队长或用户可以取消任务",
+    "error.task.cancel_captain_only": "只有项目经理或用户可以取消任务",
     "error.bot.revision_conflict": "成员已被其他入口修改，请刷新后重试",
     "error.task.owner_only": "只有任务负责人可以执行该操作",
-    "error.task.owner_or_captain": "只有负责人或队长可以执行该操作",
+    "error.task.owner_or_captain": "只有负责人或项目经理可以执行该操作",
     "error.task.parent_unknown": "父任务不存在",
     "error.task.parent_other_team": "父任务不属于本团队",
     "error.task.owner_other_team": "负责人不是本团队成员",
@@ -711,7 +710,7 @@
     "error.chain.binding_missing": "协作链确认缺少链信息，请刷新后重试",
     "error.team.not_archived": "团队当前状态为 {{status}}，只能删除已归档或目录不在的团队",
     "error.team.open_work": "团队还有未完成的工作，暂不能归档：进行中的成员 {{activeRuns}}、排队的消息 {{queuedDeliveries}}、待处理审批 {{pendingApprovals}}、待回答问题 {{openQuestions}}、待接收的交接 {{offeredTransfers}}、未完成任务 {{openTasks}}",
-    "error.bot.leader_delete": "队长不能删除；请先处理团队本身",
+    "error.bot.leader_delete": "项目经理不能删除；请先处理团队本身",
     "error.lease.missing": "执行租约缺失：宿主可能已退出，副作用操作被拒绝",
     "error.lease.corrupt": "执行租约损坏，副作用操作被拒绝",
     "error.lease.expired": "执行租约已过期：宿主可能已退出，副作用操作被拒绝",

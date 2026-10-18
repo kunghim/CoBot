@@ -22,7 +22,7 @@ var memberTools = []string{"send_message", "ask_user", "deliver_task", "view_tas
 // back through the core.
 func TestMCPBridgeProtocol(t *testing.T) {
 	h := newM2Harness(t)
-	_, bots := h.createTeam(t, []string{"backend-dev"})
+	_, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	memberID, captainID := bots[1].ID, bots[0].ID
 	readToken := h.botToken(t, bots[1])
 	binding, _ := h.tokens.Resolve(readToken)
