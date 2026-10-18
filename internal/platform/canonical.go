@@ -238,6 +238,7 @@ func splitKey(key string) []string {
 // ignore rules; repoDir must already be a canonical, existing directory.
 func GitExcludePath(repoDir string) (string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "rev-parse", "--git-path", "info/exclude")
+	HideChildWindow(cmd)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

@@ -37,6 +37,7 @@
 /cobot-desktop.exe
 node_modules/
 /frontend/wailsjs/
+/frontend/package.json.md5
 /frontend/coverage/
 /frontend/playwright-report/
 /frontend/test-results/
