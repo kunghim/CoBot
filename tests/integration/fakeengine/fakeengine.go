@@ -27,6 +27,7 @@ type Server struct {
 	BeforeStartTurn   func() error
 	StartTurnErr      error
 	SteerErr          error
+	InterruptErr      error // set by tests: the engine refuses turn/interrupt
 	ReplyErr          error
 	BeforeReplyReturn func()
 	ResumeErr         error
@@ -210,6 +211,9 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.InterruptErr != nil {
+		return s.InterruptErr
+	}
 	s.interrupted = append(s.interrupted, threadID)
 	return nil
 }

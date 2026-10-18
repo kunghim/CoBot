@@ -869,6 +869,17 @@ export interface components {
             status: "todo" | "doing" | "review" | "done" | "cancelled";
             blockedReason?: string;
             dependencyIds: string[];
+            /**
+             * @description The checklist a reviewer member applies; absent when the leader accepts the delivery.
+             * @enum {string}
+             */
+            reviewType?: "requirements" | "design" | "test_plan" | "code" | "general";
+            /** @description The reviewer member whose verdict decides the task. */
+            reviewerId?: string;
+            /** @description The reviewer's send-backs since the leader last decided. */
+            rejectCount: number;
+            /** @description Groups the tasks one confirmed plan created. */
+            requirementId?: string;
             /** Format: int64 */
             revision: number;
             createdBy: string;
@@ -906,6 +917,12 @@ export interface components {
         };
         Question: {
             id: string;
+            /**
+             * @description acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @enum {string}
+             */
+            kind: "" | "acceptance";
+            requirementId?: string;
             teamId: string;
             requesterBotId: string;
             taskId?: string;
@@ -1029,7 +1046,13 @@ export interface components {
         AnswerQuestionRequest: {
             /** Format: uuid */
             requestId: string;
+            /** @description The answer; for an acceptance question */
             answerText: string;
+            /**
+             * @description Required for an acceptance question, refused for any other.
+             * @enum {string}
+             */
+            decision?: "accept" | "revise";
             /** Format: int64 */
             expectedRevision: number;
         };
@@ -1129,9 +1152,14 @@ export interface components {
             revision: number;
             /** @enum {string} */
             language: "zh-CN" | "en";
+            /** @enum {string} */
+            colorMode: "system" | "light" | "dark";
+            /** @enum {string} */
+            theme: "graphite" | "harbor" | "dusk";
             defaultModel: string;
             memberLimit: number;
             chainLimit: number;
+            reviewRejectLimit: number;
             /** @enum {string} */
             budgetScope: "" | "bot" | "team";
             /** Format: int64 */
@@ -1141,9 +1169,14 @@ export interface components {
         SettingsPatch: {
             /** @enum {string} */
             language?: "zh-CN" | "en";
+            /** @enum {string} */
+            colorMode?: "system" | "light" | "dark";
+            /** @enum {string} */
+            theme?: "graphite" | "harbor" | "dusk";
             defaultModel?: string;
             memberLimit?: number;
             chainLimit?: number;
+            reviewRejectLimit?: number;
             /** @enum {string} */
             budgetScope?: "" | "bot" | "team";
             /** Format: int64 */

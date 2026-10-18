@@ -1867,7 +1867,7 @@ components:
   schemas:
     Task:
       type: object
-      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt, dependencyIds, createdBy]
+      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt, dependencyIds, createdBy, rejectCount]
       properties:
         id: { type: string }
         teamId: { type: string }
@@ -1881,6 +1881,13 @@ components:
         dependencyIds:
           type: array
           items: { type: string }
+        reviewType:
+          type: string
+          enum: [requirements, design, test_plan, code, general]
+          description: The checklist a reviewer member applies; absent when the leader accepts the delivery.
+        reviewerId: { type: string, description: The reviewer member whose verdict decides the task. }
+        rejectCount: { type: integer, description: The reviewer's send-backs since the leader last decided. }
+        requirementId: { type: string, description: Groups the tasks one confirmed plan created. }
         revision: { type: integer, format: int64 }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
@@ -1915,9 +1922,14 @@ components:
         updatedAt: { type: string, format: date-time }
     Question:
       type: object
-      required: [id, teamId, requesterBotId, question, options, status, revision, createdAt]
+      required: [id, kind, teamId, requesterBotId, question, options, status, revision, createdAt]
       properties:
         id: { type: string }
+        kind:
+          type: string
+          enum: ['', acceptance]
+          description: acceptance hands a finished requirement to the user; '' is an ask_user question.
+        requirementId: { type: string }
         teamId: { type: string }
         requesterBotId: { type: string }
         taskId: { type: string }
@@ -2031,7 +2043,11 @@ components:
       required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        answerText: { type: string }
+        answerText: { type: string, description: The answer; for an acceptance question, the requested changes (required with revise). }
+        decision:
+          type: string
+          enum: [accept, revise]
+          description: Required for an acceptance question, refused for any other.
         expectedRevision: { type: integer, format: int64 }
     CollaborationRequest:
       type: object
@@ -2146,13 +2162,16 @@ components:
     Settings:
       type: object
       required:
-        [revision, language, defaultModel, memberLimit, chainLimit, budgetScope, budgetTokens, enginePath]
+        [revision, language, colorMode, theme, defaultModel, memberLimit, chainLimit, reviewRejectLimit, budgetScope, budgetTokens, enginePath]
       properties:
         revision: { type: integer, format: int64 }
         language: { type: string, enum: [zh-CN, en] }
+        colorMode: { type: string, enum: [system, light, dark] }
+        theme: { type: string, enum: [graphite, harbor, dusk] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }
+        reviewRejectLimit: { type: integer, minimum: 1, maximum: 20 }
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
@@ -2160,9 +2179,12 @@ components:
       type: object
       properties:
         language: { type: string, enum: [zh-CN, en] }
+        colorMode: { type: string, enum: [system, light, dark] }
+        theme: { type: string, enum: [graphite, harbor, dusk] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }
+        reviewRejectLimit: { type: integer, minimum: 1, maximum: 20 }
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }

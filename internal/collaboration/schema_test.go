@@ -39,6 +39,10 @@ func TestEachRoleIsOfferedOnlyItsTools(t *testing.T) {
 	if got := ToolsForRole(RoleMember); !slices.Equal(got, []string{"send_message", "ask_user", "deliver_task", "view_tasks"}) {
 		t.Fatalf("member tools = %v", got)
 	}
+	// A reviewer is a member who also gives verdicts.
+	if got := ToolsForRole(RoleReviewer); !slices.Equal(got, []string{"send_message", "ask_user", "deliver_task", "review_task", "view_tasks"}) {
+		t.Fatalf("reviewer tools = %v", got)
+	}
 }
 
 func TestWritesDeriveTheirKeyFromTheCallID(t *testing.T) {

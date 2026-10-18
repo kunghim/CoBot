@@ -53,8 +53,12 @@ func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
 	if err := InsertTeam(ctx, tx, team, dir, dir, []domain.Bot{bot}); err != nil {
 		t.Fatal(err)
 	}
-	task := domain.Task{ID: "task", TeamID: team.ID, OwnerID: bot.ID, Title: "kept task", Status: domain.TaskTodo, Revision: 1}
-	if err := InsertTask(ctx, tx, task); err != nil {
+	// The schema is the v7 one, so rows are written with the columns that
+	// existed then, not with today's insert helpers.
+	task := domain.Task{ID: "task"}
+	seeded := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO tasks (id, team_id, owner_id, title, status, revision, created_by, created_at, updated_at) VALUES (?, ?, ?, 'kept task', ?, 1, '', ?, ?)`,
+		task.ID, team.ID, bot.ID, domain.TaskTodo, seeded, seeded); err != nil {
 		t.Fatal(err)
 	}
 	for _, m := range []domain.Message{
@@ -70,7 +74,8 @@ func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := InsertQuestion(ctx, tx, domain.Question{ID: "question", TeamID: team.ID, RequesterBotID: bot.ID, TaskID: task.ID, Question: "kept question", Status: domain.QuestionAnswered, Revision: 2}); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO questions (id, team_id, requester_bot_id, task_id, question, status, revision, created_at) VALUES ('question', ?, ?, ?, 'kept question', ?, 2, ?)`,
+		team.ID, bot.ID, task.ID, domain.QuestionAnswered, seeded); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE questions SET answer_message_id='answer' WHERE id='question'`); err != nil {
@@ -241,7 +246,9 @@ func TestMigrateFailureLeavesSchemaServedAndDoesNotAutoDown(t *testing.T) {
 	if v != 1 {
 		t.Fatalf("version after failure = %d, want 1", v)
 	}
-	if _, err := GetSettings(ctx, db); err != nil {
+	// Read with the v1 columns: today's GetSettings expects later ones.
+	var language string
+	if err := db.QueryRowContext(ctx, `SELECT language FROM settings WHERE id = 1`).Scan(&language); err != nil {
 		t.Fatalf("settings unreadable after failed migration: %v", err)
 	}
 }
@@ -307,6 +314,27 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 	limit := 999
 	if _, err := UpdateSettings(ctx, db, domain.SettingsPatch{MemberLimit: &limit}, 2); err == nil {
 		t.Fatal("out-of-range member limit must be rejected")
+	}
+
+	// Appearance starts at the system mode with the default palette and
+	// takes only the listed values.
+	if saved.ColorMode != "system" || saved.Theme != "graphite" {
+		t.Fatalf("appearance defaults = %q/%q, want system/graphite", saved.ColorMode, saved.Theme)
+	}
+	dark, harbor := "dark", "harbor"
+	saved, err = UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &dark, Theme: &harbor}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Revision != 3 || saved.ColorMode != "dark" || saved.Theme != "harbor" {
+		t.Fatalf("unexpected appearance: %+v", saved)
+	}
+	badMode, badTheme := "sepia", "neon"
+	if _, err := UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &badMode}, 3); err == nil {
+		t.Fatal("unsupported color mode must be rejected")
+	}
+	if _, err := UpdateSettings(ctx, db, domain.SettingsPatch{Theme: &badTheme}, 3); err == nil {
+		t.Fatal("unsupported theme must be rejected")
 	}
 
 	// Events recorded inside the same transaction replay in order.
@@ -375,15 +403,17 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		if err := InsertTeam(ctx, tx, team, folder, folder, []domain.Bot{bot}); err != nil {
 			t.Fatal(err)
 		}
-		task := domain.Task{ID: id + "-task", TeamID: id, OwnerID: bot.ID, Title: id, Status: domain.TaskTodo, Revision: 1}
-		if err := InsertTask(ctx, tx, task); err != nil {
+		// The schema is the pre-00011 one, so the row is written with the
+		// columns that existed then, not with today's InsertTask.
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO tasks (id, team_id, owner_id, title, status, revision, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, '', ?, ?)`,
+			id+"-task", id, bot.ID, id, domain.TaskTodo, now, now); err != nil {
 			t.Fatal(err)
 		}
 		message := domain.Message{ID: id + "-msg", TeamID: id, BotID: bot.ID, Kind: domain.MessageKindUser, Blocks: []byte(`[]`)}
 		if err := InsertMessage(ctx, tx, message); err != nil {
 			t.Fatal(err)
 		}
-		now := time.Now().UTC().Format(time.RFC3339Nano)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO deliveries(id,message_id,team_id,target_bot_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, id+"-d", message.ID, id, bot.ID, domain.DeliveryCancelled, now, now); err != nil {
 			t.Fatal(err)
 		}

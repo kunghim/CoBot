@@ -122,8 +122,7 @@ test('home shows only real actions and tabs support arrow keys', async ({ page }
   await firstTab.press('ArrowRight');
   const secondTab = page.getByRole('tab', { name: /^审批$/ });
   await expect(secondTab).toHaveAttribute('aria-selected', 'true');
-  const focusedId = await page.evaluate(() => document.activeElement?.id ?? '');
-  expect(focusedId).toBe('workpanel-tab-approvals');
+  await expect(secondTab).toBeFocused();
   await secondTab.press('End');
   await expect(page.getByRole('tab', { name: /记忆/ })).toHaveAttribute('aria-selected', 'true');
   await secondTab.press('Home');

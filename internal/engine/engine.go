@@ -7,7 +7,13 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
+
+// ErrRejected marks a request the engine answered with an error: it was
+// received and refused, so nothing it asked for started. Any other failure
+// (a timeout, a lost connection) leaves the outcome unknown.
+var ErrRejected = errors.New("engine rejected the request")
 
 // ThreadSpec describes one bot conversation thread.
 type ThreadSpec struct {

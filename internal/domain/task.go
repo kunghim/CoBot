@@ -21,20 +21,30 @@ const TaskAuthorUser = "user"
 
 // Task is the unit of work with exactly one owner.
 type Task struct {
-	ID                 string    `json:"id"`
-	TeamID             string    `json:"teamId"`
-	OwnerID            string    `json:"ownerId"`
-	ParentID           string    `json:"parentId,omitempty"`
-	Title              string    `json:"title"`
-	Description        string    `json:"description,omitempty"`
-	AcceptanceCriteria string    `json:"acceptanceCriteria,omitempty"`
-	Status             string    `json:"status"`
-	BlockedReason      string    `json:"blockedReason,omitempty"`
-	DependencyIDs      []string  `json:"dependencyIds"`
-	Revision           int64     `json:"revision"`
-	CreatedBy          string    `json:"createdBy"`
-	CreatedAt          time.Time `json:"createdAt"`
-	UpdatedAt          time.Time `json:"updatedAt"`
+	ID                 string   `json:"id"`
+	TeamID             string   `json:"teamId"`
+	OwnerID            string   `json:"ownerId"`
+	ParentID           string   `json:"parentId,omitempty"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description,omitempty"`
+	AcceptanceCriteria string   `json:"acceptanceCriteria,omitempty"`
+	Status             string   `json:"status"`
+	BlockedReason      string   `json:"blockedReason,omitempty"`
+	DependencyIDs      []string `json:"dependencyIds"`
+	// ReviewType names the checklist a reviewer member applies; empty means
+	// the leader accepts the delivery itself.
+	ReviewType string `json:"reviewType,omitempty"`
+	// ReviewerID is the reviewer member whose verdict decides the task.
+	ReviewerID string `json:"reviewerId,omitempty"`
+	// RejectCount counts the reviewer's automatic send-backs since the
+	// leader last decided.
+	RejectCount int `json:"rejectCount"`
+	// RequirementID groups the tasks one confirmed plan created.
+	RequirementID string    `json:"requirementId,omitempty"`
+	Revision      int64     `json:"revision"`
+	CreatedBy     string    `json:"createdBy"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // IsTerminal reports whether a task still participates in dependency
@@ -85,9 +95,25 @@ const (
 	QuestionCancelled = "cancelled"
 )
 
-// Question is an ask_user request awaiting the user.
+// Question kinds. An acceptance question hands a finished requirement to
+// the user, who accepts it or asks for changes.
+const (
+	QuestionKindAsk        = ""
+	QuestionKindAcceptance = "acceptance"
+)
+
+// Acceptance decisions on an acceptance question.
+const (
+	AcceptanceAccept = "accept"
+	AcceptanceRevise = "revise"
+)
+
+// Question is an ask_user request, or a requirement's acceptance, awaiting
+// the user.
 type Question struct {
 	ID              string    `json:"id"`
+	Kind            string    `json:"kind"`
+	RequirementID   string    `json:"requirementId,omitempty"`
 	TeamID          string    `json:"teamId"`
 	RequesterBotID  string    `json:"requesterBotId"`
 	TaskID          string    `json:"taskId,omitempty"`

@@ -9,9 +9,12 @@
     "toggleWorkPanel": "Collapse/expand work panel"
   },
   "home": {
-    "welcome": "Welcome to CoBot",
     "noTeams": "No teams yet. Create one and the leader and members will collaborate here.",
-    "selectBot": "Pick a member on the left to start a conversation"
+    "emptyTitle": "Hand one job to a whole team",
+    "emptyBody": "Pick a working folder and CoBot sets up a leader and members for it. Tell the leader your goal; it splits the work into tasks for the members, and asks you before anyone runs a command or edits a file.",
+    "pickTitle": "Who do you want to talk to?",
+    "selectBot": "Pick a member on the left, or go straight to a leader.",
+    "openLeader": "Open leader"
   },
   "archived": {
     "search": "Search team name or folder",
@@ -96,7 +99,7 @@
     "frontendDev": { "name": "Frontend developer", "summary": "Builds the interface and interactions." },
     "backendDev": { "name": "Backend developer", "summary": "Builds server logic, APIs and data." },
     "qaEngineer": { "name": "QA engineer", "summary": "Writes and runs tests and reports problems." },
-    "codeReviewer": { "name": "Code reviewer", "summary": "Reviews changes for correctness and quality." }
+    "codeReviewer": { "name": "Reviewer", "summary": "Reviews requirements, designs, test cases and code against the criteria; the verdict decides the task." }
   },
   "stats": {
     "turns": "{{turns}} turns {{steps}} steps",
@@ -145,6 +148,9 @@
     }
   },
   "conversation": {
+    "emptyTitle": "No conversation with {{name}} yet",
+    "emptyLeader": "Tell the leader what you want done. It agrees a plan with you first and assigns members once you confirm.",
+    "emptyMember": "Members usually get work from the leader. You can also ask this member a question or add details here.",
     "exchange": {
       "to": "To",
       "from": "From",
@@ -437,6 +443,8 @@
     "dependencies_other": "{{count}} dependencies",
     "dependenciesTitle": "Depends on:",
     "acceptance": "Acceptance",
+    "reviewer_one": "Reviewer: {{name}} · sent back {{count}} time",
+    "reviewer_other": "Reviewer: {{name}} · sent back {{count}} times",
     "blocked": "Blocked",
     "reviewNeedsEvidence": "Add evidence before requesting review",
     "action": {
@@ -472,6 +480,12 @@
     "loadFailed": "Failed to load questions",
     "answerPlaceholder": "Type your answer…",
     "answerSend": "Answer",
+    "acceptance": {
+      "title": "Delivery acceptance",
+      "accept": "Accept",
+      "revise": "Request changes",
+      "changesPlaceholder": "What needs to change (required to request changes)"
+    },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
     "cancel": "No longer needed"
   },
@@ -508,6 +522,7 @@
     "defaultModelHint": "The model members use for their work.",
     "sections": {
       "general": "General",
+      "appearance": "Appearance",
       "engine": "Codex engine",
       "models": "Models",
       "collaboration": "Collaboration & budget",
@@ -517,6 +532,7 @@
     },
     "sectionHints": {
       "general": "Basic preferences such as the interface language.",
+      "appearance": "Light, dark or following the system, and the interface colors. Members keep their role colors in every theme.",
       "engine": "CoBot detects Codex and authorizes its safety hook at startup; this page shows the result.",
       "models": "Changes apply right away to work that starts afterwards.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
@@ -525,6 +541,14 @@
       "about": "Version and where data is stored on this machine."
     },
     "language": "Language",
+    "colorMode": "Mode",
+    "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
+    "theme": "Theme",
+    "themes": {
+      "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
+      "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
+      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a coral accent" }
+    },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
     "engineError": "Engine unavailable",
@@ -537,6 +561,7 @@
     "modelUnset": "Not set (engine default)",
     "memberLimit": "Member limit (incl. leader)",
     "chainLimit": "Collaboration chain wake limit",
+    "reviewRejectLimit": "Review send-back limit",
     "budget": "Budget",
     "budgetScope": "Budget scope",
     "budgetNone": "Unlimited",
@@ -564,6 +589,7 @@
     "error.approval.file_preview_unavailable": "The exact file changes are unavailable. Approval is disabled; reject or stop this execution.",
     "error.internal": "Internal error; check the service log",
     "error.path.outside_team": "Only existing files inside the team folder can be opened",
+    "error.path.open_executable": "This is a program or script and would run if opened, so it is not opened; use the folder icon beside it to see it in the file manager",
     "error.team.permission_mode_invalid": "Unsupported permission mode",
     "error.team.patch_one_field": "Change one thing at a time",
     "error.path.open_failed": "Could not open this file with the system program",
@@ -579,8 +605,11 @@
     "error.forbidden.origin": "Origin not allowed",
     "error.settings.revision_conflict": "Settings changed elsewhere; refresh and retry",
     "error.settings.unsupported_language": "Unsupported language",
+    "error.settings.unsupported_color_mode": "Unsupported color mode",
+    "error.settings.unsupported_theme": "Unsupported theme",
     "error.settings.member_limit_range": "Member limit must be between {{min}} and {{max}}",
     "error.settings.chain_limit_range": "Chain limit must be between {{min}} and {{max}}",
+    "error.settings.review_reject_limit_range": "Review send-back limit must be between {{min}} and {{max}}",
     "error.settings.budget_scope_required": "Pick a budget scope before setting a token limit",
     "error.settings.budget_scope_invalid": "Invalid budget scope",
     "error.settings.budget_tokens_positive": "Token limit must be positive",
@@ -633,6 +662,7 @@
     "error.engine.interrupt_failed": "Failed to request a stop",
     "error.engine.thread_failed": "Engine thread operation failed",
     "error.engine.turn_unknown": "Run state unknown",
+    "error.engine.turn_rejected": "The engine refused this turn; nothing ran",
     "error.unauthorized.principal_required": "A valid caller identity is required",
     "error.forbidden.bot_only": "Only members can perform this action",
     "error.message.other_team": "Messages can only go to members of the same team",
@@ -641,6 +671,9 @@
     "error.task.team_required": "Missing teamId parameter",
     "error.task.title_required": "Task title cannot be empty",
     "error.task.captain_only": "Only the captain can create tasks for members",
+    "error.task.reviewer_or_captain": "Only this task's reviewer or the captain can decide \"{{title}}\"",
+    "error.task.review_escalated": "\"{{title}}\" was sent back more often than allowed; the captain decides it now",
+    "error.task.review_type_unknown": "Unknown review type: {{reviewType}} (one of {{allowed}})",
     "error.task.cancel_captain_only": "Only the captain or the user can cancel a task",
     "error.bot.revision_conflict": "The member changed elsewhere; refresh and retry",
     "error.task.owner_only": "Only the task owner can do this",
@@ -664,6 +697,9 @@
     "error.question.team_required": "Missing teamId parameter",
     "error.question.text_required": "Question text cannot be empty",
     "error.question.answer_required": "Answer text cannot be empty",
+    "error.question.acceptance_decision": "Delivery acceptance needs Accept or Request changes",
+    "error.question.revise_reason_required": "Say what needs to change",
+    "error.question.not_acceptance": "This is not a delivery acceptance",
     "error.question.requester_only": "Only the asking member can withdraw the question",
     "error.question.already_answered": "This question is already decided",
     "error.question.revision_conflict": "The question changed elsewhere; refresh and retry",

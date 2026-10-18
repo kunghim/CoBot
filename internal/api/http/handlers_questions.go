@@ -1,7 +1,11 @@
 package http
 
 import (
+	"context"
 	"net/http"
+
+	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/domain"
 )
 
 // handleListQuestions pages a team's questions. An open question is user input
@@ -11,8 +15,11 @@ func (s *Server) handleListQuestions(w http.ResponseWriter, r *http.Request) {
 }
 
 type answerQuestionRequest struct {
-	RequestID        string `json:"requestId"`
-	AnswerText       string `json:"answerText"`
+	RequestID  string `json:"requestId"`
+	AnswerText string `json:"answerText"`
+	// Decision answers an acceptance question: accept, or revise with the
+	// changes in answerText.
+	Decision         string `json:"decision,omitempty"`
 	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
 }
 
@@ -32,7 +39,13 @@ func (s *Server) handleAnswerQuestion(w http.ResponseWriter, r *http.Request) {
 	if req.ExpectedRevision != nil {
 		expected = *req.ExpectedRevision
 	}
-	question, err := s.App.AnswerQuestion(r.Context(), principal, r.PathValue("id"), req.AnswerText, expected)
+	answer := s.App.AnswerQuestion
+	if req.Decision != "" {
+		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
+			return s.App.AnswerAcceptance(ctx, principal, id, req.Decision, text, expected)
+		}
+	}
+	question, err := answer(r.Context(), principal, r.PathValue("id"), req.AnswerText, expected)
 	if err != nil {
 		writeError(w, r, err)
 		return
