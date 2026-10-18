@@ -193,6 +193,56 @@ paths:
                         $ref: "#/components/schemas/EngineStatus"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/avatars/catalog:
+    get:
+      operationId: getAvatarCatalog
+      security:
+        - SessionCookie: []
+      summary: The avatar catalog cached in this profile, and its last sync
+      responses:
+        "200":
+          description: Cached catalog; empty until a sync succeeds
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AvatarCatalog"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/catalog/sync:
+    post:
+      operationId: syncAvatarCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Catalog after the check
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AvatarCatalog"
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/engine/check:
     post:
       operationId: checkEngine
@@ -2159,6 +2209,35 @@ components:
           type: string
           description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
         bearerExpiresAt: { type: string, format: date-time }
+    AvatarCatalog:
+      type: object
+      required: [series, status]
+      properties:
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvatarSeries"
+        status:
+          type: object
+          required: [syncing]
+          properties:
+            syncing: { type: boolean }
+            lastSyncAt: { type: string, format: date-time }
+            lastError: { type: string }
+    AvatarSeries:
+      type: object
+      required: [id, name, kind, version, data]
+      properties:
+        id: { type: string }
+        name:
+          type: object
+          additionalProperties: { type: string }
+        kind: { type: string }
+        version: { type: integer }
+        data:
+          type: object
+          description: The series file as published (format in assets/avatars)
+          additionalProperties: true
     Settings:
       type: object
       required:

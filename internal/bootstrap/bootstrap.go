@@ -20,6 +20,7 @@ import (
 	apihttp "github.com/kunghim/CoBot/internal/api/http"
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/avatars"
 	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/config"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -51,6 +52,9 @@ type Options struct {
 	// hook trust, so users never configure either by hand. Product entry
 	// points enable it; tests leave it off and drive the engine themselves.
 	EngineSelfCheck bool
+	// AvatarSync checks for a newer avatar catalog right after startup.
+	// Product entry points enable it; tests stay offline.
+	AvatarSync bool
 }
 
 // Core is a running product instance.
@@ -213,6 +217,14 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		Version:      opts.Version,
 		Logger:       logger,
 	}
+	// The avatar catalog is downloaded, not bundled. A bad address in
+	// config.json falls back to the published one instead of failing startup.
+	catalog, catalogErr := avatars.New(paths.AvatarsDir(), cfg.AssetsBaseURL)
+	if catalogErr != nil {
+		logger.Warn("assetsBaseUrl ignored", "error", catalogErr)
+		catalog, _ = avatars.New(paths.AvatarsDir(), "")
+	}
+	application.Avatars = catalog
 
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
@@ -365,6 +377,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// no dispatch worker may outlive a failed Start call.
 	startupComplete = true
 	scheduler.Start()
+	if opts.AvatarSync {
+		application.StartAvatarSync()
+	}
 	if opts.EngineSelfCheck {
 		go func() {
 			info := application.EngineStatus(ctx)

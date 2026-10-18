@@ -79,6 +79,7 @@ func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 		ExtraOrigins:    b.extraOrigins,
 		HelperBinary:    filepath.Join(filepath.Dir(executable), name),
 		EngineSelfCheck: true,
+		AvatarSync:      true,
 	})
 	if err == nil {
 		b.core = core

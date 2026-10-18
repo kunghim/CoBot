@@ -8,17 +8,17 @@ import { useTeams } from '../../api/queries';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import ConversationView from '../conversations/ConversationView';
 import CreateTeamDialog from '../teams/CreateTeamDialog';
-import { MemberMark } from '../teams/roleTone';
+import Avatar from '../avatars/Avatar';
 import { findBotContext } from '../teams/teamUtils';
 
 // The built-in lineup a new team starts from, in the order a request flows.
 const LINEUP = [
-  { roleId: 'leader', key: 'role.leader.name', isLeader: true },
-  { roleId: 'product-manager', key: 'role.productManager.name', isLeader: false },
-  { roleId: 'frontend-dev', key: 'role.frontendDev.name', isLeader: false },
-  { roleId: 'backend-dev', key: 'role.backendDev.name', isLeader: false },
-  { roleId: 'qa-engineer', key: 'role.qaEngineer.name', isLeader: false },
-  { roleId: 'code-reviewer', key: 'role.codeReviewer.name', isLeader: false },
+  { roleId: 'leader', isLeader: true },
+  { roleId: 'product-manager', isLeader: false },
+  { roleId: 'frontend-dev', isLeader: false },
+  { roleId: 'backend-dev', isLeader: false },
+  { roleId: 'qa-engineer', isLeader: false },
+  { roleId: 'code-reviewer', isLeader: false },
 ];
 
 export default function HomePage() {
@@ -44,11 +44,9 @@ export default function HomePage() {
       <div className="w-full max-w-lg">
         {teams.isSuccess && leaders.length === 0 ? (
           <>
-            <div className="flex -space-x-1.5" aria-hidden="true">
+            <div className="flex gap-1" aria-hidden="true">
               {LINEUP.map((entry) => (
-                <span key={entry.roleId} className="rounded-lg ring-4 ring-neutral-50 dark:ring-neutral-950">
-                  <MemberMark size="lg" bot={{ name: t(entry.key), roleId: entry.roleId, isLeader: entry.isLeader }} />
-                </span>
+                <Avatar key={entry.roleId} size="xl" bot={{ roleId: entry.roleId, isLeader: entry.isLeader }} />
               ))}
             </div>
             <h1 className="mt-6 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('home.emptyTitle')}</h1>
@@ -75,7 +73,7 @@ export default function HomePage() {
                       onClick={() => setBotId(leader.id)}
                       className="flex w-full items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm ring-1 ring-neutral-200 transition-colors hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700"
                     >
-                      <MemberMark bot={leader} size="lg" />
+                      <Avatar bot={leader} size="lg" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{team.name}</span>
                         <span className="block truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{team.directory}</span>

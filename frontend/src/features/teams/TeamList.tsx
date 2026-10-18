@@ -4,7 +4,7 @@ import LoadMore from '../../components/LoadMore';
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Crown, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
@@ -12,16 +12,14 @@ import { useSelectedBot } from '../../app/SelectedBotContext';
 import CreateTeamDialog from './CreateTeamDialog';
 import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
-import { MemberMark } from './roleTone';
+import Avatar from '../avatars/Avatar';
 
+// States the avatar does not draw itself (queued work), and waiting for you,
+// which stays loud on purpose.
 const DOT_CLASS: Record<string, string> = {
-  idle: 'bg-neutral-300 dark:bg-neutral-600',
   queued: 'bg-sky-500',
-  working: 'bg-emerald-500',
   waiting_approval: 'bg-amber-500',
   waiting_input: 'bg-orange-500',
-  interrupted: 'bg-red-400',
-  unknown: 'bg-neutral-400',
 };
 
 export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
@@ -220,27 +218,17 @@ function BotRow({
           : 'text-neutral-600 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60'
       }`}
     >
-      <span className="relative">
-        <MemberMark bot={bot} />
-        <span
-          role="img"
-          aria-label={statusLabel}
-          title={statusLabel}
-          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-neutral-100 dark:ring-neutral-900 ${DOT_CLASS[bot.status] ?? DOT_CLASS.unknown} ${bot.status === 'working' ? 'animate-pulse' : ''}`}
-        />
+      {/* The avatar shows the state (moving while working, wide eyes while
+          waiting); a dot remains only for states it cannot draw. */}
+      <span className="relative" role="img" aria-label={statusLabel} title={statusLabel}>
+        <Avatar bot={bot} showState />
+        {DOT_CLASS[bot.status] && (
+          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-neutral-100 dark:ring-neutral-900 ${DOT_CLASS[bot.status]}`} />
+        )}
       </span>
       <span className={`min-w-0 flex-1 truncate ${selected ? 'font-medium' : ''}`}>{bot.name}</span>
-      {/* The leader is marked by a badge, not a second "leader" label next
-          to a name that usually already says so. */}
-      {bot.isLeader && (
-        <span
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300"
-          title={t('team.leader')}
-        >
-          <Crown size={10} aria-hidden="true" />
-          <span className="sr-only">{t('team.leader')}</span>
-        </span>
-      )}
+      {/* The leader's avatar (the star) marks it; screen readers hear it. */}
+      {bot.isLeader && <span className="sr-only">{t('team.leader')}</span>}
     </button>
   );
 }

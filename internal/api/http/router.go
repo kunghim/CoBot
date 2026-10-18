@@ -88,6 +88,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/open-path", s.handleOpenTeamPath)
 	mux.HandleFunc("POST /api/v1/teams/{id}/warm", s.handleWarmTeam)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
+	mux.HandleFunc("GET /api/v1/avatars/catalog", s.handleGetAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/catalog/sync", s.handleSyncAvatarCatalog)
 
 	// Conversations and runs.
 	mux.HandleFunc("GET /api/v1/bots/{id}/messages", s.handleListMessages)

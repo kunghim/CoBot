@@ -94,8 +94,10 @@ flowchart LR
   guesses and silently reruns.
 - **Local-first.** CoBot is a single executable that binds to loopback only. Your data stays
   in `~/.cobot`. Agents run in a private Codex environment with its own login, separate from
-  your everyday Codex setup. No cloud service. A browser sign-in lasts 30 days, is renewed while
-  in use and survives restarts.
+  your everyday Codex setup. No cloud service: CoBot never sends your data anywhere. The only
+  thing it downloads itself is the public avatar catalog from this repository (`assets/avatars`),
+  at startup and when you check for updates in Settings. A browser sign-in lasts 30 days, is
+  renewed while in use and survives restarts.
 - **Web UI and desktop shell.** Both run on one shared core. The UI is available in English
   and Chinese.
 

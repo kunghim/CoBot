@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useAuthorizations,
+  useAvatarCatalog,
   useEngine,
   useEngineCheck,
   useEngineLogin,
@@ -10,6 +11,7 @@ import {
   useEngineModels,
   useRevokeAuthorization,
   useStatus,
+  useSyncAvatarCatalog,
 } from '../../api/queries';
 import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
@@ -167,6 +169,7 @@ export function AppearanceSection({ settings, save, states }: SectionProps) {
         : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-50'
     }`;
   return (
+    <>
     <Card>
       <div className="space-y-6">
         <div>
@@ -233,6 +236,43 @@ export function AppearanceSection({ settings, save, states }: SectionProps) {
             })}
           </div>
         </div>
+      </div>
+    </Card>
+    <AvatarCatalogCard />
+    </>
+  );
+}
+
+/** Which avatar catalog this profile has, and a way to check for a newer one. */
+function AvatarCatalogCard() {
+  const { t, i18n } = useTranslation();
+  const catalog = useAvatarCatalog();
+  const sync = useSyncAvatarCatalog();
+  const status = catalog.data?.status;
+  const syncing = sync.isPending || status?.syncing === true;
+  const name = (names: Record<string, string>) => names[i18n.language] ?? names.en ?? Object.values(names)[0] ?? '';
+  return (
+    <Card title={t('settings.avatarCatalog')}>
+      <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
+        <div className="min-w-0 space-y-1">
+          {catalog.data && catalog.data.series.length === 0 && <p className="text-neutral-600 dark:text-neutral-300">{t('settings.avatarCatalogNone')}</p>}
+          {catalog.data?.series.map((series) => (
+            <p key={series.id} className="text-neutral-700 dark:text-neutral-200">
+              {t('settings.avatarCatalogSeries', { name: name(series.name), version: series.version })}
+            </p>
+          ))}
+          {syncing ? (
+            <p className="text-xs text-neutral-500" role="status">{t('settings.avatarCatalogSyncing')}</p>
+          ) : status?.lastError ? (
+            <p className="break-all text-xs text-amber-700 dark:text-amber-400" role="status">{t('settings.avatarCatalogFailed', { error: status.lastError })}</p>
+          ) : status?.lastSyncAt ? (
+            <p className="text-xs text-neutral-500" role="status">{t('settings.avatarCatalogChecked', { time: new Date(status.lastSyncAt).toLocaleString(i18n.language) })}</p>
+          ) : null}
+          {sync.isError && <p className="text-xs text-red-600" role="alert">{apiErrorMessage(t, sync.error)}</p>}
+        </div>
+        <button type="button" onClick={() => sync.mutate()} disabled={syncing} className={secondaryButton}>
+          {t('settings.avatarCatalogCheck')}
+        </button>
       </div>
     </Card>
   );

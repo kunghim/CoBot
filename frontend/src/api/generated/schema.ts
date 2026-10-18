@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avatars/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The avatar catalog cached in this profile, and its last sync */
+        get: operations["getAvatarCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status */
+        post: operations["syncAvatarCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/engine/check": {
         parameters: {
             query?: never;
@@ -1147,6 +1181,27 @@ export interface components {
             /** Format: date-time */
             bearerExpiresAt?: string;
         };
+        AvatarCatalog: {
+            series: components["schemas"]["AvatarSeries"][];
+            status: {
+                syncing: boolean;
+                /** Format: date-time */
+                lastSyncAt?: string;
+                lastError?: string;
+            };
+        };
+        AvatarSeries: {
+            id: string;
+            name: {
+                [key: string]: string;
+            };
+            kind: string;
+            version: number;
+            /** @description The series file as published (format in assets/avatars) */
+            data: {
+                [key: string]: unknown;
+            };
+        };
         Settings: {
             /** Format: int64 */
             revision: number;
@@ -1558,6 +1613,59 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: components["schemas"]["EngineStatus"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached catalog; empty until a sync succeeds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    syncAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Catalog after the check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
                     };
                 };
             };

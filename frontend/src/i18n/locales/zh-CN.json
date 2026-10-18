@@ -539,6 +539,13 @@
     "colorMode": "明暗",
     "colorModes": { "system": "跟随系统", "light": "浅色", "dark": "深色" },
     "theme": "主题",
+    "avatarCatalog": "头像库",
+    "avatarCatalogNone": "还没有下载头像库，成员暂时显示默认头像。",
+    "avatarCatalogSeries": "{{name}}：第 {{version}} 版",
+    "avatarCatalogSyncing": "正在检查更新……",
+    "avatarCatalogChecked": "上次检查：{{time}}",
+    "avatarCatalogFailed": "上次检查没有完成：{{error}}",
+    "avatarCatalogCheck": "检查更新",
     "themes": {
       "graphite": { "name": "石墨", "summary": "带一点绿意的石墨灰，钴蓝强调" },
       "harbor": { "name": "港湾", "summary": "偏冷的蓝灰，青绿强调" },

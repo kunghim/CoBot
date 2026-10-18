@@ -374,6 +374,26 @@ type ApprovalOption struct {
 	Text              *string `json:"text,omitempty"`
 }
 
+// AvatarCatalog defines model for AvatarCatalog.
+type AvatarCatalog struct {
+	Series []AvatarSeries `json:"series"`
+	Status struct {
+		LastError  *string    `json:"lastError,omitempty"`
+		LastSyncAt *time.Time `json:"lastSyncAt,omitempty"`
+		Syncing    bool       `json:"syncing"`
+	} `json:"status"`
+}
+
+// AvatarSeries defines model for AvatarSeries.
+type AvatarSeries struct {
+	// Data The series file as published (format in assets/avatars)
+	Data    map[string]interface{} `json:"data"`
+	Id      string                 `json:"id"`
+	Kind    string                 `json:"kind"`
+	Name    map[string]string      `json:"name"`
+	Version int                    `json:"version"`
+}
+
 // BootstrapResult defines model for BootstrapResult.
 type BootstrapResult struct {
 	BearerExpiresAt *time.Time `json:"bearerExpiresAt,omitempty"`
@@ -955,6 +975,11 @@ type RevokeAuthorizationJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// SyncAvatarCatalogJSONBody defines parameters for SyncAvatarCatalog.
+type SyncAvatarCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteBotParams defines parameters for DeleteBot.
 type DeleteBotParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -1210,6 +1235,9 @@ type EngineLogoutJSONRequestBody EngineLogoutJSONBody
 
 // RevokeAuthorizationJSONRequestBody defines body for RevokeAuthorization for application/json ContentType.
 type RevokeAuthorizationJSONRequestBody RevokeAuthorizationJSONBody
+
+// SyncAvatarCatalogJSONRequestBody defines body for SyncAvatarCatalog for application/json ContentType.
+type SyncAvatarCatalogJSONRequestBody SyncAvatarCatalogJSONBody
 
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody

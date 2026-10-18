@@ -20,7 +20,7 @@ import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
 import { ExchangeLine, RoleBadge, TeamMembersContext, isExchange } from './ExchangeLine';
-import { MemberMark } from '../teams/roleTone';
+import Avatar from '../avatars/Avatar';
 import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -140,7 +140,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     <TeamMembersContext.Provider value={membersByName}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-5 py-2 lg:pr-14 dark:border-neutral-800">
-        <MemberMark bot={bot} size="lg" />
+        <Avatar bot={bot} size="lg" showState />
         <div className="min-w-0">
           <p className="truncate text-[15px] font-semibold leading-5">{headerTitle}</p>
           <p className="flex min-w-0 items-baseline gap-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
@@ -184,7 +184,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
         {conv.isSuccess && timeline.length === 0 && !preparing && (
           <div className="mx-auto mt-[12vh] flex max-w-sm flex-col items-center text-center">
-            <MemberMark bot={bot} size="lg" />
+            <Avatar bot={bot} size="xl" />
             <p className="mt-4 text-sm font-medium">{t('conversation.emptyTitle', { name: bot.name })}</p>
             <p className="mt-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
               {t(bot.isLeader ? 'conversation.emptyLeader' : 'conversation.emptyMember')}

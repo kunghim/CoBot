@@ -16,7 +16,7 @@ import type { DirectoryCheckResult } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useDialogFocus } from '../../components/useDialogFocus';
 import { pickDirectory } from '../../platform/pickDirectory';
-import { MemberMark } from './roleTone';
+import Avatar from '../avatars/Avatar';
 
 /** folderName is the last path segment, used as the suggested team name. */
 function folderName(path: string): string {
@@ -171,7 +171,7 @@ export default function CreateTeamDialog({
       >
         {locked ? <Lock size={10} /> : selected ? <Check size={12} /> : null}
       </span>
-      <MemberMark bot={{ name: label, roleId: id, isLeader: locked }} />
+      <Avatar bot={{ roleId: id, isLeader: locked }} />
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-sm font-medium">
           {label}

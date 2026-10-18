@@ -4,6 +4,8 @@ import type { components } from './generated/schema';
 
 export type Status = components['schemas']['Status'];
 export type Settings = components['schemas']['Settings'];
+export type AvatarCatalog = components['schemas']['AvatarCatalog'];
+export type AvatarSeries = components['schemas']['AvatarSeries'];
 export type SettingsPatch = components['schemas']['SettingsPatch'];
 export type Event = components['schemas']['Event'];
 export type ErrorEnvelope = components['schemas']['ErrorEnvelope'];

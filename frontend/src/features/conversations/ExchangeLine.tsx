@@ -5,14 +5,14 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Bot, Message } from '../../api/types';
-import { roleTone } from '../teams/roleTone';
+import { roleChip } from '../teams/roleChip';
 
 /** The team's members by name, so a badge can wear its member's role color. */
 export const TeamMembersContext = createContext<ReadonlyMap<string, Bot>>(new Map());
 
 export function RoleBadge({ name }: { name: string }) {
   const member = useContext(TeamMembersContext).get(name);
-  const tone = member ? roleTone(member.roleId, member.isLeader).chip : 'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700/80 dark:text-neutral-200';
+  const tone = member ? roleChip(member.roleId, member.isLeader) : 'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700/80 dark:text-neutral-200';
   return (
     <span className={`inline-flex max-w-[12rem] shrink-0 items-center truncate rounded-md px-1.5 py-px text-[11px] font-medium leading-4 ${tone}`}>
       {name}

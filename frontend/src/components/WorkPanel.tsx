@@ -13,7 +13,7 @@ import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
-import { MemberMark } from '../features/teams/roleTone';
+import Avatar from '../features/avatars/Avatar';
 import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
 
 type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
@@ -40,7 +40,7 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex min-h-14 items-center gap-2.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        {context && <MemberMark bot={context.bot} />}
+        {context && <Avatar bot={context.bot} />}
         <div className="min-w-0 flex-1">
           {context ? (
             <>

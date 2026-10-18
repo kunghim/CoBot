@@ -105,7 +105,8 @@ test('dangerous markup renders as inert text', async ({ page }) => {
   await sendCurrent(page, '<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>请原样显示');
 
   await expect(page.getByText('请原样显示').first()).toBeVisible({ timeout: 15000 });
-  expect(await page.locator('img').count()).toBe(0);
+  // Member avatars are the only images; the injected one never renders.
+  expect(await page.locator('img:not([data-avatar])').count()).toBe(0);
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 

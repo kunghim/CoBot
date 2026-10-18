@@ -544,6 +544,13 @@
     "colorMode": "Mode",
     "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
     "theme": "Theme",
+    "avatarCatalog": "Avatar catalog",
+    "avatarCatalogNone": "The avatar catalog has not been downloaded yet; members show the default avatar for now.",
+    "avatarCatalogSeries": "{{name}}: version {{version}}",
+    "avatarCatalogSyncing": "Checking for updates…",
+    "avatarCatalogChecked": "Last checked: {{time}}",
+    "avatarCatalogFailed": "The last check did not finish: {{error}}",
+    "avatarCatalogCheck": "Check for updates",
     "themes": {
       "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
       "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
