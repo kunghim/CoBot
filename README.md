@@ -108,7 +108,7 @@ the agent you already trust.
 | --- | --- |
 | Windows 10/11 x64, local Web | **Ready to try.** Verified with real Codex end to end |
 | Windows standalone server build | Builds and runs |
-| Windows desktop shell (Wails/WebView2) | Compiles; not yet verified at runtime |
+| Windows desktop shell (Wails/WebView2) | **Beta downloads available.** Desktop startup and installer lifecycle checked in Windows Sandbox; see the release notes for limitations |
 | macOS (Web / desktop) | Cross-compiles; `.app` packaging reviewed statically only; native runtime, installation, signing and notarization not yet verified |
 | Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
 
@@ -131,8 +131,34 @@ not yet.
 
 ## Quick start
 
-This preview is built from source. Start with the **Windows local Web** version;
-macOS instructions are for unverified source trials, not a verified native release.
+### Windows desktop downloads
+
+[**v0.1.0-beta.1 — downloads and release notes**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+
+| Download | How to use |
+| --- | --- |
+| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | Install for your current user, then open **CoBot** from the Start menu |
+| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
+
+Both downloads contain the same application files. You need **Windows 10/11 x64**, an existing
+**WebView2 Runtime**, and the official **Codex CLI 0.161.0 or newer on `PATH`**, with an eligible
+account and network access to Codex services. Codex is not bundled. This beta supports official
+Codex account sign-in; third-party relay configurations are outside its supported scope.
+You do not need Go or Node to use these downloads.
+
+The packages are unsigned. Optional `.sha256` checksum files are on the release page.
+GitHub's **Source code** archives are for building, not ready-to-run applications.
+After opening CoBot, sign in under **Settings → Codex engine**, choose a model and create a team.
+CoBot uses a private Codex environment with its own login.
+
+Updates are manual: close CoBot before installing a newer MSI, or extract a complete newer ZIP
+into a new folder. Both editions store settings and team data in `%USERPROFILE%\.cobot`, separate
+from program files. Uninstalling the MSI or deleting an extracted ZIP folder retains that data.
+
+### Build from source
+
+The commands below build the **local Web** version. macOS instructions are for unverified
+source trials; no macOS application download is included in this release.
 
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
@@ -142,7 +168,7 @@ network access to its service. Go and Node are build tools; the resulting CoBot
 executable still needs Codex for agent work. Local-first does not mean offline
 model execution.
 
-### Windows (PowerShell)
+#### Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/kunghim/CoBot.git
@@ -152,7 +178,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-### macOS (Bash; native runtime unverified)
+#### macOS (Bash; native runtime unverified)
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
