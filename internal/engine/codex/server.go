@@ -119,6 +119,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
+	hideChildWindow(cmd)
 	if opts.Env != nil {
 		cmd.Env = opts.Env
 	}

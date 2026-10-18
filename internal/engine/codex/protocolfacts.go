@@ -44,7 +44,9 @@ func ExportProtocol(ctx context.Context, binary, version string) (ProtocolFacts,
 		return ProtocolFacts{}, err
 	}
 	defer os.RemoveAll(dir)
-	out, err := exec.CommandContext(ctx, binary, "app-server", "generate-json-schema", "--out", dir).CombinedOutput()
+	cmd := exec.CommandContext(ctx, binary, "app-server", "generate-json-schema", "--out", dir)
+	hideChildWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return ProtocolFacts{}, fmt.Errorf("codex app-server generate-json-schema: %w: %s", err, strings.TrimSpace(string(out)))
 	}
