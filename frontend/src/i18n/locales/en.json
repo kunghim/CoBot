@@ -96,7 +96,7 @@
     "frontendDev": { "name": "Frontend developer", "summary": "Builds the interface and interactions." },
     "backendDev": { "name": "Backend developer", "summary": "Builds server logic, APIs and data." },
     "qaEngineer": { "name": "QA engineer", "summary": "Writes and runs tests and reports problems." },
-    "codeReviewer": { "name": "Code reviewer", "summary": "Reviews changes for correctness and quality." }
+    "codeReviewer": { "name": "Reviewer", "summary": "Reviews requirements, designs, test cases and code against the criteria; the verdict decides the task." }
   },
   "stats": {
     "turns": "{{turns}} turns {{steps}} steps",
@@ -437,6 +437,8 @@
     "dependencies_other": "{{count}} dependencies",
     "dependenciesTitle": "Depends on:",
     "acceptance": "Acceptance",
+    "reviewer_one": "Reviewer: {{name}} · sent back {{count}} time",
+    "reviewer_other": "Reviewer: {{name}} · sent back {{count}} times",
     "blocked": "Blocked",
     "reviewNeedsEvidence": "Add evidence before requesting review",
     "action": {
@@ -472,6 +474,12 @@
     "loadFailed": "Failed to load questions",
     "answerPlaceholder": "Type your answer…",
     "answerSend": "Answer",
+    "acceptance": {
+      "title": "Delivery acceptance",
+      "accept": "Accept",
+      "revise": "Request changes",
+      "changesPlaceholder": "What needs to change (required to request changes)"
+    },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
     "cancel": "No longer needed"
   },
@@ -537,6 +545,7 @@
     "modelUnset": "Not set (engine default)",
     "memberLimit": "Member limit (incl. leader)",
     "chainLimit": "Collaboration chain wake limit",
+    "reviewRejectLimit": "Review send-back limit",
     "budget": "Budget",
     "budgetScope": "Budget scope",
     "budgetNone": "Unlimited",
@@ -582,6 +591,7 @@
     "error.settings.unsupported_language": "Unsupported language",
     "error.settings.member_limit_range": "Member limit must be between {{min}} and {{max}}",
     "error.settings.chain_limit_range": "Chain limit must be between {{min}} and {{max}}",
+    "error.settings.review_reject_limit_range": "Review send-back limit must be between {{min}} and {{max}}",
     "error.settings.budget_scope_required": "Pick a budget scope before setting a token limit",
     "error.settings.budget_scope_invalid": "Invalid budget scope",
     "error.settings.budget_tokens_positive": "Token limit must be positive",
@@ -643,6 +653,9 @@
     "error.task.team_required": "Missing teamId parameter",
     "error.task.title_required": "Task title cannot be empty",
     "error.task.captain_only": "Only the captain can create tasks for members",
+    "error.task.reviewer_or_captain": "Only this task's reviewer or the captain can decide \"{{title}}\"",
+    "error.task.review_escalated": "\"{{title}}\" was sent back more often than allowed; the captain decides it now",
+    "error.task.review_type_unknown": "Unknown review type: {{reviewType}} (one of {{allowed}})",
     "error.task.cancel_captain_only": "Only the captain or the user can cancel a task",
     "error.bot.revision_conflict": "The member changed elsewhere; refresh and retry",
     "error.task.owner_only": "Only the task owner can do this",
@@ -666,6 +679,9 @@
     "error.question.team_required": "Missing teamId parameter",
     "error.question.text_required": "Question text cannot be empty",
     "error.question.answer_required": "Answer text cannot be empty",
+    "error.question.acceptance_decision": "Delivery acceptance needs Accept or Request changes",
+    "error.question.revise_reason_required": "Say what needs to change",
+    "error.question.not_acceptance": "This is not a delivery acceptance",
     "error.question.requester_only": "Only the asking member can withdraw the question",
     "error.question.already_answered": "This question is already decided",
     "error.question.revision_conflict": "The question changed elsewhere; refresh and retry",

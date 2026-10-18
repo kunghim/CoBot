@@ -303,7 +303,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil || len(queue) == 0 {
 		if err == nil {
 			var questions int
-			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'`, botID).Scan(&questions); e != nil {
+			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&questions); e != nil {
 				return e
 			}
 			queued, e := sqlite.CountQueuedDeliveries(ctx, s.app.DB, botID)
@@ -931,10 +931,14 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 }
 
 // bridgeRole is the tool set a member's bridge offers: "leader" for the
-// team's leader, "member" for everyone else.
+// team's leader, "reviewer" for a reviewer member, "member" for everyone
+// else.
 func bridgeRole(team domain.Team, bot domain.Bot) string {
 	if bot.IsLeader || team.LeaderID == bot.ID {
 		return "leader"
+	}
+	if bot.RoleID == roles.ReviewerRoleID {
+		return "reviewer"
 	}
 	return "member"
 }

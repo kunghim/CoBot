@@ -424,6 +424,14 @@ export function CollaborationSection({ settings, save, states }: SectionProps) {
             state={states.chainLimit}
             onCommit={(value, revert) => save('chainLimit', { chainLimit: value }, revert)}
           />
+          <NumberField
+            label={t('settings.reviewRejectLimit')}
+            value={settings.reviewRejectLimit}
+            min={1}
+            max={20}
+            state={states.reviewRejectLimit}
+            onCommit={(value, revert) => save('reviewRejectLimit', { reviewRejectLimit: value }, revert)}
+          />
         </div>
       </Card>
       <Card title={t('settings.budget')}>

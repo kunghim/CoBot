@@ -96,7 +96,7 @@
     "frontendDev": { "name": "前端开发", "summary": "实现界面与交互。" },
     "backendDev": { "name": "后端开发", "summary": "实现服务端逻辑、接口与数据。" },
     "qaEngineer": { "name": "测试工程师", "summary": "编写和执行测试，报告问题。" },
-    "codeReviewer": { "name": "代码审查", "summary": "审查改动的正确性与质量。" }
+    "codeReviewer": { "name": "评审员", "summary": "对照完成标准评审需求、设计、测试用例和代码，结论直接决定任务通过或打回。" }
   },
   "stats": {
     "turns": "{{turns}} 轮 {{steps}} 步",
@@ -433,6 +433,7 @@
     "dependencies": "{{count}} 项依赖",
     "dependenciesTitle": "依赖：",
     "acceptance": "验收标准",
+    "reviewer": "评审员：{{name}} · 已打回 {{count}} 次",
     "blocked": "阻塞原因",
     "reviewNeedsEvidence": "先提交证据才能进入待确认",
     "action": {
@@ -468,6 +469,12 @@
     "loadFailed": "问题加载失败",
     "answerPlaceholder": "输入回答…",
     "answerSend": "回答",
+    "acceptance": {
+      "title": "交付验收",
+      "accept": "验收通过",
+      "revise": "继续修改",
+      "changesPlaceholder": "需要修改什么（选「继续修改」时必填）"
+    },
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
     "cancel": "不再需要"
   },
@@ -533,6 +540,7 @@
     "modelUnset": "未设置（跟随引擎默认）",
     "memberLimit": "成员上限（含队长）",
     "chainLimit": "协作链唤醒上限",
+    "reviewRejectLimit": "评审打回次数上限",
     "budget": "预算",
     "budgetScope": "预算范围",
     "budgetNone": "不限制",
@@ -578,6 +586,7 @@
     "error.settings.unsupported_language": "不支持的语言",
     "error.settings.member_limit_range": "成员上限需在 {{min}}～{{max}} 之间",
     "error.settings.chain_limit_range": "协作链上限需在 {{min}}～{{max}} 之间",
+    "error.settings.review_reject_limit_range": "评审打回次数上限需在 {{min}}～{{max}} 之间",
     "error.settings.budget_scope_required": "设置 Token 上限前需要先选择预算范围",
     "error.settings.budget_scope_invalid": "预算范围无效",
     "error.settings.budget_tokens_positive": "Token 上限必须为正数",
@@ -639,6 +648,9 @@
     "error.task.team_required": "缺少 teamId 参数",
     "error.task.title_required": "任务标题不能为空",
     "error.task.captain_only": "只有队长可以为成员创建任务",
+    "error.task.reviewer_or_captain": "只有这个任务的评审员或队长可以给出结论：「{{title}}」",
+    "error.task.review_escalated": "「{{title}}」打回次数已超过上限，现在由队长决定",
+    "error.task.review_type_unknown": "未知的评审类型：{{reviewType}}（可选：{{allowed}}）",
     "error.task.cancel_captain_only": "只有队长或用户可以取消任务",
     "error.bot.revision_conflict": "成员已被其他入口修改，请刷新后重试",
     "error.task.owner_only": "只有任务负责人可以执行该操作",
@@ -662,6 +674,9 @@
     "error.question.team_required": "缺少 teamId 参数",
     "error.question.text_required": "问题内容不能为空",
     "error.question.answer_required": "回答内容不能为空",
+    "error.question.acceptance_decision": "交付验收需要选择「验收通过」或「继续修改」",
+    "error.question.revise_reason_required": "继续修改时请写明需要修改什么",
+    "error.question.not_acceptance": "这不是交付验收",
     "error.question.requester_only": "只有提问者可以撤回问题",
     "error.question.already_answered": "该问题已处理",
     "error.question.revision_conflict": "问题已被其他入口处理，请刷新后重试",

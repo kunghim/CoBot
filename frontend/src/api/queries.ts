@@ -429,8 +429,17 @@ export function useQuestions(teamId: string | null, status = 'open', enabled = t
 export function useAnswerQuestion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ questionId, answerText, expectedRevision }: { questionId: string; answerText: string; expectedRevision: number }) =>
-      api.answerQuestion(questionId, { answerText, expectedRevision }),
+    mutationFn: ({
+      questionId,
+      answerText,
+      decision,
+      expectedRevision,
+    }: {
+      questionId: string;
+      answerText: string;
+      decision?: 'accept' | 'revise';
+      expectedRevision: number;
+    }) => api.answerQuestion(questionId, { answerText, decision, expectedRevision }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['questions'] });
       void qc.invalidateQueries({ queryKey: queryKeys.teams });

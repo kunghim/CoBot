@@ -318,15 +318,24 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 		}
 	} else {
 		var questions int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'`, botID).Scan(&questions); err == nil && questions > 0 {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&questions); err == nil && questions > 0 {
 			nextStatus = domain.BotStatusWaitingInput
 		}
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
 		return err
 	}
+	// A leader's turn that reported a finished requirement hands its reply
+	// to the user for acceptance.
+	acceptances, err := s.app.createAcceptanceLocked(ctx, tx, run, st.text)
+	if err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
+	}
+	for _, id := range acceptances {
+		s.app.recordEvent(ctx, domain.Event{Type: domain.EventQuestionCreated, TeamID: teamID, BotID: botID, ResourceID: id})
 	}
 	if s.app.CollaborationTokens != nil {
 		s.app.CollaborationTokens.RevokeRun(run.ID)

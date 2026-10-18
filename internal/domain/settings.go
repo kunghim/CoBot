@@ -16,28 +16,32 @@ const (
 )
 
 // Settings is the single business-settings row of the profile database.
-// Defaults match the product decisions (member limit 6, chain limit 10, no
-// budget, zh-CN).
+// Defaults match the product decisions (member limit 6, chain limit 10,
+// review reject limit 3, no budget, zh-CN).
 type Settings struct {
 	Revision     int64  `json:"revision"`
 	Language     string `json:"language"`
 	DefaultModel string `json:"defaultModel"`
 	MemberLimit  int    `json:"memberLimit"`
 	ChainLimit   int    `json:"chainLimit"`
-	BudgetScope  string `json:"budgetScope"`
-	BudgetTokens int64  `json:"budgetTokens"`
-	EnginePath   string `json:"enginePath"`
+	// ReviewRejectLimit is how often a reviewer may send one task back
+	// before the leader decides.
+	ReviewRejectLimit int    `json:"reviewRejectLimit"`
+	BudgetScope       string `json:"budgetScope"`
+	BudgetTokens      int64  `json:"budgetTokens"`
+	EnginePath        string `json:"enginePath"`
 }
 
 // DefaultSettings returns first-run values; model/engine fields stay empty
 // until the engine is configured — the product never fabricates them.
 func DefaultSettings() Settings {
 	return Settings{
-		Revision:    1,
-		Language:    "zh-CN",
-		MemberLimit: 6,
-		ChainLimit:  10,
-		BudgetScope: BudgetScopeNone,
+		Revision:          1,
+		Language:          "zh-CN",
+		MemberLimit:       6,
+		ChainLimit:        10,
+		ReviewRejectLimit: 3,
+		BudgetScope:       BudgetScopeNone,
 	}
 }
 
@@ -51,6 +55,9 @@ func (s Settings) Validate() error {
 	}
 	if s.ChainLimit < 1 || s.ChainLimit > 100 {
 		return InvalidRequest("error.settings.chain_limit_range", map[string]any{"min": 1, "max": 100})
+	}
+	if s.ReviewRejectLimit < 1 || s.ReviewRejectLimit > 20 {
+		return InvalidRequest("error.settings.review_reject_limit_range", map[string]any{"min": 1, "max": 20})
 	}
 	switch s.BudgetScope {
 	case BudgetScopeNone:
@@ -80,13 +87,14 @@ func isSupportedLanguage(lang string) bool {
 // "leave unchanged"; empty strings are rejected instead of silently clearing
 // a value the caller forgot to send.
 type SettingsPatch struct {
-	Language     *string `json:"language"`
-	DefaultModel *string `json:"defaultModel"`
-	MemberLimit  *int    `json:"memberLimit"`
-	ChainLimit   *int    `json:"chainLimit"`
-	BudgetScope  *string `json:"budgetScope"`
-	BudgetTokens *int64  `json:"budgetTokens"`
-	EnginePath   *string `json:"enginePath"`
+	Language          *string `json:"language"`
+	DefaultModel      *string `json:"defaultModel"`
+	MemberLimit       *int    `json:"memberLimit"`
+	ChainLimit        *int    `json:"chainLimit"`
+	ReviewRejectLimit *int    `json:"reviewRejectLimit"`
+	BudgetScope       *string `json:"budgetScope"`
+	BudgetTokens      *int64  `json:"budgetTokens"`
+	EnginePath        *string `json:"enginePath"`
 }
 
 // Apply returns the settings value after the patch, without persisting.
@@ -103,6 +111,9 @@ func (s Settings) Apply(p SettingsPatch) Settings {
 	}
 	if p.ChainLimit != nil {
 		out.ChainLimit = *p.ChainLimit
+	}
+	if p.ReviewRejectLimit != nil {
+		out.ReviewRejectLimit = *p.ReviewRejectLimit
 	}
 	if p.BudgetScope != nil {
 		out.BudgetScope = strings.TrimSpace(*p.BudgetScope)

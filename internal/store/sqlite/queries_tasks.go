@@ -12,13 +12,14 @@ import (
 )
 
 const taskColumns = `id, team_id, owner_id, parent_id, title, description, acceptance_criteria,
-	status, blocked_reason, revision, created_by, created_at, updated_at`
+	status, blocked_reason, review_type, reviewer_id, reject_count, requirement_id, revision, created_by, created_at, updated_at`
 
 func scanTask(row interface{ Scan(...any) error }) (domain.Task, error) {
 	var t domain.Task
 	var created, updated string
 	err := row.Scan(&t.ID, &t.TeamID, &t.OwnerID, &t.ParentID, &t.Title, &t.Description,
-		&t.AcceptanceCriteria, &t.Status, &t.BlockedReason, &t.Revision, &t.CreatedBy, &created, &updated)
+		&t.AcceptanceCriteria, &t.Status, &t.BlockedReason, &t.ReviewType, &t.ReviewerID, &t.RejectCount, &t.RequirementID,
+		&t.Revision, &t.CreatedBy, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Task{}, ErrNotFound
 	}
@@ -88,9 +89,10 @@ func ListTasks(ctx context.Context, q Queryer, teamID, ownerID string, limit int
 func InsertTask(ctx context.Context, tx *sql.Tx, task domain.Task) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := tx.ExecContext(ctx, `INSERT INTO tasks (`+taskColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		task.ID, task.TeamID, task.OwnerID, task.ParentID, task.Title, task.Description,
-		task.AcceptanceCriteria, task.Status, task.BlockedReason, task.Revision,
+		task.AcceptanceCriteria, task.Status, task.BlockedReason,
+		task.ReviewType, task.ReviewerID, task.RejectCount, task.RequirementID, task.Revision,
 		task.CreatedBy, now, now)
 	if err != nil {
 		return fmt.Errorf("insert task: %w", err)
@@ -128,6 +130,33 @@ func UpdateTaskStatusTx(ctx context.Context, tx *sql.Tx, taskID, status, blocked
 		return domain.Task{}, err
 	}
 	return GetTask(ctx, tx, taskID)
+}
+
+// SetTaskRejectCount records how often a reviewer has sent the task back.
+func SetTaskRejectCount(ctx context.Context, tx *sql.Tx, taskID string, count int) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET reject_count = ?, updated_at = ? WHERE id = ?`,
+		count, time.Now().UTC().Format(time.RFC3339Nano), taskID); err != nil {
+		return fmt.Errorf("set reject count: %w", err)
+	}
+	return nil
+}
+
+// ListRequirementTasks returns every task one requirement created.
+func ListRequirementTasks(ctx context.Context, q Queryer, requirementID string) ([]domain.Task, error) {
+	rows, err := q.QueryContext(ctx, `SELECT `+taskColumns+` FROM tasks WHERE requirement_id = ? ORDER BY created_at, id`, requirementID)
+	if err != nil {
+		return nil, fmt.Errorf("list requirement tasks: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Task
+	for rows.Next() {
+		t, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 // ChangeTaskOwner swaps the owner inside a transaction; callers must have
@@ -355,9 +384,9 @@ func InsertQuestion(ctx context.Context, tx *sql.Tx, q domain.Question) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO questions (id, team_id, requester_bot_id, task_id, run_id, question, options, status, revision, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		q.ID, q.TeamID, q.RequesterBotID, q.TaskID, q.RunID, q.Question, string(options), q.Status, q.Revision,
+	_, err = tx.ExecContext(ctx, `INSERT INTO questions (id, kind, requirement_id, team_id, requester_bot_id, task_id, run_id, question, options, status, revision, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		q.ID, q.Kind, q.RequirementID, q.TeamID, q.RequesterBotID, q.TaskID, q.RunID, q.Question, string(options), q.Status, q.Revision,
 		time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("insert question: %w", err)
@@ -369,9 +398,9 @@ func InsertQuestion(ctx context.Context, tx *sql.Tx, q domain.Question) error {
 func GetQuestion(ctx context.Context, q Queryer, id string) (domain.Question, error) {
 	var out domain.Question
 	var options, created, answered string
-	err := q.QueryRowContext(ctx, `SELECT id, team_id, requester_bot_id, task_id, run_id, question, options, status,
+	err := q.QueryRowContext(ctx, `SELECT id, kind, requirement_id, team_id, requester_bot_id, task_id, run_id, question, options, status,
 		answer_text, answer_message_id, revision, created_at, answered_at FROM questions WHERE id = ?`, id).
-		Scan(&out.ID, &out.TeamID, &out.RequesterBotID, &out.TaskID, &out.RunID, &out.Question, &options,
+		Scan(&out.ID, &out.Kind, &out.RequirementID, &out.TeamID, &out.RequesterBotID, &out.TaskID, &out.RunID, &out.Question, &options,
 			&out.Status, &out.AnswerText, &out.AnswerMessageID, &out.Revision, &created, &answered)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Question{}, ErrNotFound

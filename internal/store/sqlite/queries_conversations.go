@@ -223,13 +223,14 @@ func ListQueuedDeliveries(ctx context.Context, q Queryer, botID string, limit in
 // SetDeliveryStatus transitions one delivery with optimistic state check.
 // ListDispatchableDeliveries preserves FIFO among eligible input. A waiting
 // question parks only related automatic work, so an unrelated user message
-// behind it is still allowed without implicitly answering that question.
+// behind it is still allowed without implicitly answering that question. An
+// acceptance question parks nothing.
 func ListDispatchableDeliveries(ctx context.Context, q Queryer, botID string, limit int) ([]DeliveryRecord, error) {
 	rows, err := q.QueryContext(ctx, `SELECT `+deliveryColumns+` FROM deliveries
 		WHERE target_bot_id = ? AND status = ?
 		AND NOT EXISTS (SELECT 1 FROM chains c WHERE c.id = deliveries.chain_id AND c.status IN ('awaiting_approval','evaluating')) AND (
 		EXISTS (SELECT 1 FROM messages m WHERE m.id = deliveries.message_id AND m.kind = ?) OR
-		NOT EXISTS (SELECT 1 FROM questions q WHERE q.status = 'open' AND (
+		NOT EXISTS (SELECT 1 FROM questions q WHERE q.status = 'open' AND q.kind = '' AND (
 		(q.task_id = '' AND q.requester_bot_id = deliveries.target_bot_id) OR
 		(deliveries.task_id != '' AND q.task_id = deliveries.task_id))))
 		ORDER BY created_at ASC,id ASC LIMIT ?`, botID, domain.DeliveryQueued, domain.MessageKindUser, limit)
@@ -250,7 +251,9 @@ func ListDispatchableDeliveries(ctx context.Context, q Queryer, botID string, li
 
 func HasBlockingQuestion(ctx context.Context, q Queryer, botID, taskID string) (bool, error) {
 	var n int
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE status = 'open' AND
+	// An acceptance question waits on the user's verdict on finished work; it
+	// never holds the member back.
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE status = 'open' AND kind = '' AND
 		((task_id = '' AND requester_bot_id = ?) OR (? != '' AND task_id = ?))`, botID, taskID, taskID).Scan(&n)
 	return n > 0, err
 }

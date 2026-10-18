@@ -60,12 +60,17 @@ flowchart LR
 
 - **Role-based collaboration.** Each bot sees only the tools its role needs. The leader has
   `send_message`, `ask_user`, `create_task`, `review_task` and `view_tasks`; members have
-  `send_message`, `ask_user`, `deliver_task` and `view_tasks`. The host binds each call to
-  the member's identity, so a model can't act as someone else.
+  `send_message`, `ask_user`, `deliver_task` and `view_tasks`; a reviewer also has
+  `review_task`. The host binds each call to the member's identity, so a model can't act as
+  someone else.
 - **Delivery and review.** A member delivers a task with what it did, how to check it and
-  what it verified. The leader (or you) accepts it, which completes the task and releases the
-  tasks waiting on it, or sends it back with a reason. CoBot moves the task status itself; the
-  model never drives the state machine.
+  what it verified. A task the leader marks for review (requirements, design, test cases,
+  code…) goes to a reviewer member with the matching checklist, and the reviewer's verdict
+  decides it; after too many send-backs (3 by default, adjustable in settings) the leader
+  decides instead. Other tasks the leader (or you) accepts. Accepting completes the task and
+  releases the tasks waiting on it; sending back needs a reason. When every task of a confirmed
+  plan has ended, the leader reports the result and you accept it or ask for changes. CoBot
+  moves the task status itself; the model never drives the state machine.
 - **Human in the loop.** Native Codex approvals show the full command or diff, with Codex's
   own choices: allow, allow for this session, decline, or decline and stop (requests for extra
   access: allow for this turn or this session, or deny). Each team has a permission mode

@@ -1,7 +1,8 @@
 import LoadMore from '../../components/LoadMore';
 // QuestionList surfaces the ask_user questions the user still owes an answer
-// to. An answer is ordinary input delivered to the asking bot; it is never a
-// security authorization, and the panel says so.
+// to, and the finished requirements waiting for the user's acceptance. An
+// answer is ordinary input delivered to the asking bot; it is never a security
+// authorization, and the panel says so.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAnswerQuestion, useCancelQuestion, useQuestions } from '../../api/queries';
@@ -31,9 +32,13 @@ export default function QuestionList({ teamId, viewBotId }: { teamId: string; vi
         {t('questions.title')} · {items.length}
       </p>
       <ul className="space-y-2 px-3 pb-2">
-        {items.map((question) => (
-          <QuestionCard key={question.id} question={question} />
-        ))}
+        {items.map((question) =>
+          question.kind === 'acceptance' ? (
+            <AcceptanceCard key={question.id} question={question} />
+          ) : (
+            <QuestionCard key={question.id} question={question} />
+          ),
+        )}
       </ul>
       <LoadMore page={questions} />
     </section>
@@ -111,6 +116,68 @@ function QuestionCard({ question }: { question: Question }) {
       >
         {t('questions.cancel')}
       </button>
+      {errorText && (
+        <p className="mt-1 text-xs text-red-600" role="alert">
+          {errorText}
+        </p>
+      )}
+    </li>
+  );
+}
+
+// AcceptanceCard hands a finished requirement to the user: the leader's
+// delivery report, then accept, or ask for changes, which must say what.
+function AcceptanceCard({ question }: { question: Question }) {
+  const { t } = useTranslation();
+  const answer = useAnswerQuestion();
+  const [changes, setChanges] = useState('');
+  const [errorText, setErrorText] = useState('');
+
+  const decide = (decision: 'accept' | 'revise') => {
+    if (decision === 'revise' && !changes.trim()) return;
+    setErrorText('');
+    answer.mutate(
+      { questionId: question.id, answerText: decision === 'revise' ? changes.trim() : '', decision, expectedRevision: question.revision },
+      { onSuccess: () => setChanges(''), onError: (error) => setErrorText(apiErrorMessage(t, error)) },
+    );
+  };
+
+  return (
+    <li className="rounded-lg border border-emerald-300 p-2 text-sm dark:border-emerald-700">
+      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t('questions.acceptance.title')}</p>
+      <p className="mt-1 whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        <button
+          type="button"
+          onClick={() => decide('accept')}
+          disabled={answer.isPending}
+          className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+        >
+          {t('questions.acceptance.accept')}
+        </button>
+      </div>
+      <form
+        className="mt-1.5 flex gap-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          decide('revise');
+        }}
+      >
+        <input
+          value={changes}
+          onChange={(event) => setChanges(event.target.value)}
+          placeholder={t('questions.acceptance.changesPlaceholder')}
+          aria-label={t('questions.acceptance.changesPlaceholder')}
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+        />
+        <button
+          type="submit"
+          disabled={!changes.trim() || answer.isPending}
+          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+        >
+          {t('questions.acceptance.revise')}
+        </button>
+      </form>
       {errorText && (
         <p className="mt-1 text-xs text-red-600" role="alert">
           {errorText}

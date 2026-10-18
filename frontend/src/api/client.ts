@@ -281,7 +281,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
   },
-  answerQuestion: (questionId: string, body: { answerText: string; expectedRevision: number }) =>
+  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise'; expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),

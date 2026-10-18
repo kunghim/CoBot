@@ -1,6 +1,10 @@
 package collaboration
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/kunghim/CoBot/internal/roles"
+)
 
 // These are wire schemas, not domain permissions. The application still
 // validates identity, ownership, current revision and execution state.
@@ -43,6 +47,7 @@ func toolSchema(name string) json.RawMessage {
 		add("ownerId", text("Exactly one team member ID from the team roster in your instructions."), true)
 		add("parentId", text("Optional organizational parent task."), false)
 		add("dependencyIds", strings("Task IDs that must be done first; this task reaches its owner only after they are."), false)
+		add("reviewType", map[string]any{"type": "string", "enum": roles.ReviewTypes, "description": "Optional: the kind of review the delivery needs (requirements, design, test_plan, code, general). A reviewer member then decides it; omit to accept it yourself."}, false)
 	case "ask_user":
 		add("question", text("Specific input needed from the user. End this work after receiving waiting."), true)
 		add("options", strings("Optional suggested answers, not security permissions."), false)

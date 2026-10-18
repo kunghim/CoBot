@@ -16,6 +16,12 @@ const (
 	SessionCookieScopes  = "SessionCookie.Scopes"
 )
 
+// Defines values for AnswerQuestionRequestDecision.
+const (
+	Accept AnswerQuestionRequestDecision = "accept"
+	Revise AnswerQuestionRequestDecision = "revise"
+)
+
 // Defines values for ApprovalRequestState.
 const (
 	ApprovalRequestStateDecided     ApprovalRequestState = "decided"
@@ -112,6 +118,12 @@ const (
 	PatchTaskRequestStatusTodo      PatchTaskRequestStatus = "todo"
 )
 
+// Defines values for QuestionKind.
+const (
+	QuestionKindAcceptance QuestionKind = "acceptance"
+	QuestionKindEmpty      QuestionKind = ""
+)
+
 // Defines values for QuestionStatus.
 const (
 	QuestionStatusAnswered  QuestionStatus = "answered"
@@ -205,6 +217,15 @@ const (
 	StatusProfileProduction  StatusProfile = "production"
 )
 
+// Defines values for TaskReviewType.
+const (
+	Code         TaskReviewType = "code"
+	Design       TaskReviewType = "design"
+	General      TaskReviewType = "general"
+	Requirements TaskReviewType = "requirements"
+	TestPlan     TaskReviewType = "test_plan"
+)
+
 // Defines values for TaskStatus.
 const (
 	TaskStatusCancelled TaskStatus = "cancelled"
@@ -269,10 +290,17 @@ const (
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
-	AnswerText       string             `json:"answerText"`
-	ExpectedRevision int64              `json:"expectedRevision"`
-	RequestId        openapi_types.UUID `json:"requestId"`
+	// AnswerText The answer; for an acceptance question
+	AnswerText string `json:"answerText"`
+
+	// Decision Required for an acceptance question, refused for any other.
+	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
+	ExpectedRevision int64                          `json:"expectedRevision"`
+	RequestId        openapi_types.UUID             `json:"requestId"`
 }
+
+// AnswerQuestionRequestDecision Required for an acceptance question, refused for any other.
+type AnswerQuestionRequestDecision string
 
 // Approval defines model for Approval.
 type Approval struct {
@@ -529,20 +557,27 @@ type PatchTaskRequestStatus string
 
 // Question defines model for Question.
 type Question struct {
-	AnswerMessageId *string        `json:"answerMessageId,omitempty"`
-	AnswerText      *string        `json:"answerText,omitempty"`
-	AnsweredAt      *time.Time     `json:"answeredAt,omitempty"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	Id              string         `json:"id"`
-	Options         []string       `json:"options"`
-	Question        string         `json:"question"`
-	RequesterBotId  string         `json:"requesterBotId"`
-	Revision        int64          `json:"revision"`
-	RunId           *string        `json:"runId,omitempty"`
-	Status          QuestionStatus `json:"status"`
-	TaskId          *string        `json:"taskId,omitempty"`
-	TeamId          string         `json:"teamId"`
+	AnswerMessageId *string    `json:"answerMessageId,omitempty"`
+	AnswerText      *string    `json:"answerText,omitempty"`
+	AnsweredAt      *time.Time `json:"answeredAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	Id              string     `json:"id"`
+
+	// Kind acceptance hands a finished requirement to the user; '' is an ask_user question.
+	Kind           QuestionKind   `json:"kind"`
+	Options        []string       `json:"options"`
+	Question       string         `json:"question"`
+	RequesterBotId string         `json:"requesterBotId"`
+	RequirementId  *string        `json:"requirementId,omitempty"`
+	Revision       int64          `json:"revision"`
+	RunId          *string        `json:"runId,omitempty"`
+	Status         QuestionStatus `json:"status"`
+	TaskId         *string        `json:"taskId,omitempty"`
+	TeamId         string         `json:"teamId"`
 }
+
+// QuestionKind acceptance hands a finished requirement to the user; ” is an ask_user question.
+type QuestionKind string
 
 // QuestionStatus defines model for Question.Status.
 type QuestionStatus string
@@ -639,14 +674,15 @@ type SessionStats struct {
 
 // Settings defines model for Settings.
 type Settings struct {
-	BudgetScope  SettingsBudgetScope `json:"budgetScope"`
-	BudgetTokens int64               `json:"budgetTokens"`
-	ChainLimit   int                 `json:"chainLimit"`
-	DefaultModel string              `json:"defaultModel"`
-	EnginePath   string              `json:"enginePath"`
-	Language     SettingsLanguage    `json:"language"`
-	MemberLimit  int                 `json:"memberLimit"`
-	Revision     int64               `json:"revision"`
+	BudgetScope       SettingsBudgetScope `json:"budgetScope"`
+	BudgetTokens      int64               `json:"budgetTokens"`
+	ChainLimit        int                 `json:"chainLimit"`
+	DefaultModel      string              `json:"defaultModel"`
+	EnginePath        string              `json:"enginePath"`
+	Language          SettingsLanguage    `json:"language"`
+	MemberLimit       int                 `json:"memberLimit"`
+	ReviewRejectLimit int                 `json:"reviewRejectLimit"`
+	Revision          int64               `json:"revision"`
 }
 
 // SettingsBudgetScope defines model for Settings.BudgetScope.
@@ -657,13 +693,14 @@ type SettingsLanguage string
 
 // SettingsPatch defines model for SettingsPatch.
 type SettingsPatch struct {
-	BudgetScope  *SettingsPatchBudgetScope `json:"budgetScope,omitempty"`
-	BudgetTokens *int64                    `json:"budgetTokens,omitempty"`
-	ChainLimit   *int                      `json:"chainLimit,omitempty"`
-	DefaultModel *string                   `json:"defaultModel,omitempty"`
-	EnginePath   *string                   `json:"enginePath,omitempty"`
-	Language     *SettingsPatchLanguage    `json:"language,omitempty"`
-	MemberLimit  *int                      `json:"memberLimit,omitempty"`
+	BudgetScope       *SettingsPatchBudgetScope `json:"budgetScope,omitempty"`
+	BudgetTokens      *int64                    `json:"budgetTokens,omitempty"`
+	ChainLimit        *int                      `json:"chainLimit,omitempty"`
+	DefaultModel      *string                   `json:"defaultModel,omitempty"`
+	EnginePath        *string                   `json:"enginePath,omitempty"`
+	Language          *SettingsPatchLanguage    `json:"language,omitempty"`
+	MemberLimit       *int                      `json:"memberLimit,omitempty"`
+	ReviewRejectLimit *int                      `json:"reviewRejectLimit,omitempty"`
 }
 
 // SettingsPatchBudgetScope defines model for SettingsPatch.BudgetScope.
@@ -716,21 +753,36 @@ type SubmitEvidenceRequest struct {
 
 // Task defines model for Task.
 type Task struct {
-	AcceptanceCriteria *string    `json:"acceptanceCriteria,omitempty"`
-	BlockedReason      *string    `json:"blockedReason,omitempty"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	CreatedBy          string     `json:"createdBy"`
-	DependencyIds      []string   `json:"dependencyIds"`
-	Description        *string    `json:"description,omitempty"`
-	Id                 string     `json:"id"`
-	OwnerId            string     `json:"ownerId"`
-	ParentId           *string    `json:"parentId,omitempty"`
-	Revision           int64      `json:"revision"`
-	Status             TaskStatus `json:"status"`
-	TeamId             string     `json:"teamId"`
-	Title              string     `json:"title"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
+	AcceptanceCriteria *string   `json:"acceptanceCriteria,omitempty"`
+	BlockedReason      *string   `json:"blockedReason,omitempty"`
+	CreatedAt          time.Time `json:"createdAt"`
+	CreatedBy          string    `json:"createdBy"`
+	DependencyIds      []string  `json:"dependencyIds"`
+	Description        *string   `json:"description,omitempty"`
+	Id                 string    `json:"id"`
+	OwnerId            string    `json:"ownerId"`
+	ParentId           *string   `json:"parentId,omitempty"`
+
+	// RejectCount The reviewer's send-backs since the leader last decided.
+	RejectCount int `json:"rejectCount"`
+
+	// RequirementId Groups the tasks one confirmed plan created.
+	RequirementId *string `json:"requirementId,omitempty"`
+
+	// ReviewType The checklist a reviewer member applies; absent when the leader accepts the delivery.
+	ReviewType *TaskReviewType `json:"reviewType,omitempty"`
+
+	// ReviewerId The reviewer member whose verdict decides the task.
+	ReviewerId *string    `json:"reviewerId,omitempty"`
+	Revision   int64      `json:"revision"`
+	Status     TaskStatus `json:"status"`
+	TeamId     string     `json:"teamId"`
+	Title      string     `json:"title"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
+
+// TaskReviewType The checklist a reviewer member applies; absent when the leader accepts the delivery.
+type TaskReviewType string
 
 // TaskStatus defines model for Task.Status.
 type TaskStatus string

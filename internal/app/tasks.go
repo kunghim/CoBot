@@ -11,6 +11,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -24,7 +25,10 @@ type CreateTaskInput struct {
 	AcceptanceCriteria string
 	ParentID           string
 	DependencyIDs      []string
-	RequestID          string
+	// ReviewType asks for a reviewer member's verdict on the delivery; empty
+	// leaves acceptance to the leader.
+	ReviewType string
+	RequestID  string
 }
 
 // isLeaderOf reports whether the bot leads the team.
@@ -122,6 +126,10 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if title == "" {
 		return domain.Task{}, domain.InvalidRequest("error.task.title_required", nil)
 	}
+	reviewType := strings.TrimSpace(in.ReviewType)
+	if reviewType != "" && !roles.ValidReviewType(reviewType) {
+		return domain.Task{}, domain.InvalidRequest("error.task.review_type_unknown", map[string]any{"reviewType": reviewType, "allowed": strings.Join(roles.ReviewTypes, ", ")})
+	}
 	if err := a.assertSameTeamOwner(ctx, a.DB, in.TeamID, in.OwnerID); err != nil {
 		return domain.Task{}, err
 	}
@@ -149,7 +157,7 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 		ID: domain.NewID(), TeamID: in.TeamID, OwnerID: in.OwnerID,
 		ParentID: in.ParentID, Title: title, Description: in.Description,
 		AcceptanceCriteria: in.AcceptanceCriteria, Status: domain.TaskTodo,
-		DependencyIDs: deps, Revision: 1, CreatedBy: createdBy,
+		DependencyIDs: deps, ReviewType: reviewType, Revision: 1, CreatedBy: createdBy,
 	}
 
 	tx, err := a.DB.BeginTx(ctx, nil)
@@ -170,6 +178,20 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	if err := a.validateDependencies(ctx, tx, task.ID, in.TeamID, in.DependencyIDs); err != nil {
 		return domain.Task{}, err
 	}
+	chainID := ""
+	if principal.Kind == auth.KindBot {
+		chainID = chainOfRunLocked(ctx, tx, principal.BotID)
+		// The tasks the leader creates in one turn answer one confirmed
+		// plan: the user's message's chain groups them as a requirement.
+		if principal.BotID == freshTeam.LeaderID {
+			task.RequirementID = chainID
+		}
+	}
+	if reviewType != "" {
+		if task.ReviewerID, err = reviewerFor(ctx, tx, in.TeamID, in.OwnerID); err != nil {
+			return domain.Task{}, err
+		}
+	}
 	if err := sqlite.InsertTask(ctx, tx, task); err != nil {
 		if isUniqueViolation(err) {
 			return domain.Task{}, domain.IdempotencyConflict("error.task.request_reused", map[string]any{"requestId": in.RequestID})
@@ -187,10 +209,6 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 	ready, err := a.dependenciesSatisfied(ctx, tx, task.ID)
 	if err != nil {
 		return domain.Task{}, err
-	}
-	chainID := ""
-	if principal.Kind == auth.KindBot {
-		chainID = chainOfRunLocked(ctx, tx, principal.BotID)
 	}
 	if err := a.enqueueAssignmentLocked(ctx, tx, task, ready, chainID, principal.BotID); err != nil {
 		return domain.Task{}, err
@@ -213,6 +231,21 @@ func (a *App) CreateTask(ctx context.Context, principal auth.Principal, captainO
 		}
 	}
 	return sqlite.GetTask(ctx, a.DB, task.ID)
+}
+
+// reviewerFor picks the reviewer member of a task: the team's first
+// reviewer who is not its owner. With none, the leader accepts the delivery.
+func reviewerFor(ctx context.Context, q sqlite.Queryer, teamID, ownerID string) (string, error) {
+	bots, err := sqlite.ListBots(ctx, q, teamID)
+	if err != nil {
+		return "", err
+	}
+	for _, bot := range bots {
+		if bot.RoleID == roles.ReviewerRoleID && !bot.IsLeader && bot.ID != ownerID {
+			return bot.ID, nil
+		}
+	}
+	return "", nil
 }
 
 // dependenciesSatisfied reports whether no dependency of the task still
@@ -504,6 +537,11 @@ func (a *App) updateTaskStatus(ctx context.Context, principal auth.Principal, ta
 		if leaderToWake, err = a.enqueueDependencyCancelledNoticeLocked(ctx, tx, principal, updated, released); err != nil {
 			return domain.Task{}, err
 		}
+		if leaderToWake == "" {
+			if leaderToWake, err = a.reportRequirementIfFinishedLocked(ctx, tx, updated); err != nil {
+				return domain.Task{}, err
+			}
+		}
 	}
 	if status == domain.TaskReview && task.Status != domain.TaskReview {
 		leaderToWake, err = a.enqueueReviewNoticeLocked(ctx, tx, principal, updated)
@@ -786,6 +824,10 @@ func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID 
 	if err != nil {
 		return domain.Task{}, err
 	}
+	leaderToWake, err := a.reportRequirementIfFinishedLocked(ctx, tx, updated)
+	if err != nil {
+		return domain.Task{}, err
+	}
 	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
 		return domain.Task{}, err
 	}
@@ -795,10 +837,8 @@ func (a *App) ConfirmTask(ctx context.Context, principal auth.Principal, taskID 
 	a.recordTaskUpdated(ctx, updated)
 	for _, dependent := range activated {
 		a.recordTaskUpdated(ctx, dependent)
-		if a.Scheduler != nil {
-			a.Scheduler.Wake(dependent.OwnerID)
-		}
 	}
+	a.wakeAll([]string{leaderToWake}, activated)
 	return updated, nil
 }
 
