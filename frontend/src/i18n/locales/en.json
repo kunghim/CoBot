@@ -16,6 +16,20 @@
     "selectBot": "Pick a member on the left, or go straight to a leader.",
     "openLeader": "Open leader"
   },
+  "avatar": {
+    "change": "Change avatar",
+    "memberTitle": "{{name}}'s avatar",
+    "roleTitle": "Default avatar of the {{name}} role",
+    "series": "Series: {{name}}",
+    "shape": "Shape",
+    "eyes": "Eyes",
+    "color": "Color",
+    "save": "Use this avatar",
+    "useDefault": "Use default",
+    "custom": "Customized",
+    "default": "Default avatar",
+    "noCatalog": "The avatar catalog has not been downloaded yet, so avatars cannot be changed. Check for updates in Settings > Appearance."
+  },
   "archived": {
     "search": "Search team name or folder",
     "sort": "Sort by",
@@ -523,6 +537,7 @@
     "sections": {
       "general": "General",
       "appearance": "Appearance",
+      "roles": "Roles",
       "engine": "Codex engine",
       "models": "Models",
       "collaboration": "Collaboration & budget",
@@ -533,6 +548,7 @@
     "sectionHints": {
       "general": "Basic preferences such as the interface language.",
       "appearance": "Light, dark or following the system, and the interface colors. Members keep their role colors in every theme.",
+      "roles": "Each role's default avatar. Members without an avatar of their own follow it; click a member's avatar in its conversation to change just that member.",
       "engine": "CoBot detects Codex and authorizes its safety hook at startup; this page shows the result.",
       "models": "Changes apply right away to work that starts afterwards.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
@@ -614,6 +630,8 @@
     "error.settings.unsupported_language": "Unsupported language",
     "error.settings.unsupported_color_mode": "Unsupported color mode",
     "error.settings.unsupported_theme": "Unsupported theme",
+    "error.avatar.invalid": "Invalid avatar",
+    "error.role.not_found": "Role not found",
     "error.settings.member_limit_range": "Member limit must be between {{min}} and {{max}}",
     "error.settings.chain_limit_range": "Chain limit must be between {{min}} and {{max}}",
     "error.settings.review_reject_limit_range": "Review send-back limit must be between {{min}} and {{max}}",

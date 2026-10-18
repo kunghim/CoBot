@@ -36,3 +36,30 @@ test('members show their role avatar from the downloaded catalog', async ({ page
   expect(memberSrc).toMatch(/^data:image\/svg\+xml/);
   expect(memberSrc).not.toBe(leaderSrc);
 });
+
+// A member's own avatar, chosen in the picker, replaces its role's.
+test('a member can be given its own avatar', async ({ page }) => {
+  const teamDir = join(process.env.COBOT_E2E_ROOT!, 'avatar-pick-' + Date.now());
+  mkdirSync(teamDir, { recursive: true });
+  await page.goto('/');
+  await page.getByRole('button', { name: /新建团队|create team/i }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/团队名称|team name/i).fill('换头像团队');
+  await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
+  await dialog.getByRole('button', { name: /创建|create/i }).click();
+
+  const list = page.getByRole('complementary', { name: /团队列表|team list/i });
+  const leader = list.locator('li').filter({ hasText: '换头像团队' }).getByRole('button', { name: /队长/ }).first();
+  await expect(leader).toBeVisible({ timeout: 15000 });
+  await leader.click();
+  const before = await leader.locator('img').first().getAttribute('src');
+
+  await page.getByRole('main').getByRole('button', { name: /更换头像|Change avatar/ }).click();
+  const picker = page.getByRole('dialog');
+  await picker.getByRole('radio', { name: 'flower' }).click();
+  await picker.getByRole('radio', { name: '#f98b8b' }).click();
+  await picker.getByRole('button', { name: /使用这个头像|Use this avatar/ }).click();
+  await expect(picker).toBeHidden();
+
+  await expect.poll(async () => leader.locator('img').first().getAttribute('src')).not.toBe(before);
+});

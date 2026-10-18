@@ -107,6 +107,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/roles/{id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a role's avatar (null returns it to the catalog default); members without their own follow it */
+        put: operations["setRoleAvatar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/avatars/catalog": {
         parameters: {
             query?: never;
@@ -348,7 +365,8 @@ export interface paths {
         delete: operations["deleteBot"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Set or clear a member's own avatar */
+        patch: operations["patchBot"];
         trace?: never;
     };
     "/api/v1/teams/{id}/bots": {
@@ -1190,6 +1208,15 @@ export interface components {
                 lastError?: string;
             };
         };
+        /** @description An avatar the user chose, by catalog parts; never an image */
+        AvatarRef: {
+            /** @enum {string} */
+            kind: "catalog";
+            series: string;
+            shape: string;
+            eyes: string;
+            color: string;
+        };
         AvatarSeries: {
             id: string;
             name: {
@@ -1281,6 +1308,7 @@ export interface components {
             /** @enum {string} */
             status: "idle" | "queued" | "working" | "waiting_approval" | "waiting_input" | "interrupted" | "unknown";
             currentRunId?: string;
+            avatar?: components["schemas"]["AvatarRef"];
             /** Format: int64 */
             revision: number;
             /** Format: date-time */
@@ -1619,6 +1647,44 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
+    setRoleAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Role avatar set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            roleId: string;
+                            avatar?: components["schemas"]["AvatarRef"];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
     getAvatarCatalog: {
         parameters: {
             query?: never;
@@ -1854,6 +1920,7 @@ export interface operations {
                                 name?: string;
                                 contentVersion?: string;
                                 scenarios?: string[];
+                                avatar?: components["schemas"]["AvatarRef"];
                             }[];
                             scenarios?: {
                                 id: string;
@@ -2123,6 +2190,43 @@ export interface operations {
             };
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    patchBot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     addBot: {

@@ -16,6 +16,20 @@
     "selectBot": "从左侧选一位成员，或者直接找队长。",
     "openLeader": "找队长"
   },
+  "avatar": {
+    "change": "更换头像",
+    "memberTitle": "{{name}}的头像",
+    "roleTitle": "“{{name}}”角色的默认头像",
+    "series": "系列：{{name}}",
+    "shape": "形状",
+    "eyes": "眼睛",
+    "color": "颜色",
+    "save": "使用这个头像",
+    "useDefault": "恢复默认",
+    "custom": "已自定义",
+    "default": "默认头像",
+    "noCatalog": "头像库还没有下载，暂时不能更换头像。可以到“设置 → 外观”检查更新。"
+  },
   "archived": {
     "search": "搜索团队名称或目录",
     "sort": "排序方式",
@@ -518,6 +532,7 @@
     "sections": {
       "general": "通用",
       "appearance": "外观",
+      "roles": "角色",
       "engine": "Codex 引擎",
       "models": "模型",
       "collaboration": "协作与预算",
@@ -528,6 +543,7 @@
     "sectionHints": {
       "general": "界面语言等基础偏好。",
       "appearance": "浅色、深色或跟随系统，以及界面配色。成员的角色颜色在所有主题里不变。",
+      "roles": "每个角色的默认头像。没有单独设置头像的成员会跟着角色变；在成员的会话里点头像，可以只改这一个成员。",
       "engine": "CoBot 启动时自动检测 Codex 并授权安全钩子，这里只展示结果。",
       "models": "修改后立即生效，对之后开始的任务起作用。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
@@ -609,6 +625,8 @@
     "error.settings.unsupported_language": "不支持的语言",
     "error.settings.unsupported_color_mode": "不支持的明暗模式",
     "error.settings.unsupported_theme": "不支持的主题",
+    "error.avatar.invalid": "头像设置无效",
+    "error.role.not_found": "找不到这个角色",
     "error.settings.member_limit_range": "成员上限需在 {{min}}～{{max}} 之间",
     "error.settings.chain_limit_range": "协作链上限需在 {{min}}～{{max}} 之间",
     "error.settings.review_reject_limit_range": "评审打回次数上限需在 {{min}}～{{max}} 之间",

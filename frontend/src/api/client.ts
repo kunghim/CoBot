@@ -240,6 +240,10 @@ export const api = {
   checkEngine: () => request<import('./types').EngineStatus>('POST', '/api/v1/engine/check', {}),
   getAvatarCatalog: () => request<import('./types').AvatarCatalog>('GET', '/api/v1/avatars/catalog'),
   syncAvatarCatalog: () => request<import('./types').AvatarCatalog>('POST', '/api/v1/avatars/catalog/sync', {}),
+  setBotAvatar: (botId: string, avatar: import('./types').AvatarRef | null, expectedRevision: number) =>
+    request<import('./types').Bot>('PATCH', `/api/v1/bots/${botId}`, { avatar, expectedRevision }),
+  setRoleAvatar: (roleId: string, avatar: import('./types').AvatarRef | null) =>
+    request<{ roleId: string }>('PUT', `/api/v1/roles/${encodeURIComponent(roleId)}/avatar`, { avatar }),
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),

@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { applyLiveSignal } from './live';
-import type { Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
+import type { AvatarRef, Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
 import { api, apiUrl, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
@@ -288,6 +288,25 @@ export function useAvatarCatalog(enabled = true) {
     enabled,
     staleTime: 60_000,
     refetchInterval: (query) => (query.state.data?.status.syncing ? 2_000 : false),
+  });
+}
+
+/** Sets or clears a member's own avatar. */
+export function useSetBotAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, avatar, expectedRevision }: { botId: string; avatar: AvatarRef | null; expectedRevision: number }) =>
+      api.setBotAvatar(botId, avatar, expectedRevision),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.teams }),
+  });
+}
+
+/** Sets or clears a role's avatar. */
+export function useSetRoleAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, avatar }: { roleId: string; avatar: AvatarRef | null }) => api.setRoleAvatar(roleId, avatar),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.roles }),
   });
 }
 

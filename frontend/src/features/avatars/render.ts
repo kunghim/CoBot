@@ -4,7 +4,7 @@
 // <img> data URIs, never inserted as markup, so a catalog file can only ever
 // draw a picture.
 import { Avatar, Style } from '@dicebear/core';
-import type { AvatarCatalog, AvatarSeries, Bot } from '../../api/types';
+import type { AvatarCatalog, AvatarRef, AvatarSeries, Bot } from '../../api/types';
 import fallbackUrl from './fallback.svg';
 
 export interface ComposedAvatar {
@@ -78,6 +78,47 @@ export function roleAvatar(series: AvatarSeries, roleId: string): ComposedAvatar
   if (!shapes.length || !eyes.length || !palette.length) return null;
   const h = hash(roleId || 'member');
   return { shape: shapes[h % shapes.length], eyes: eyes[(h >>> 8) % eyes.length], color: palette[(h >>> 16) % palette.length] };
+}
+
+/** Whether a cached composed series can draw these parts. */
+function draws(series: AvatarSeries, avatar: ComposedAvatar): boolean {
+  const data = composedData(series);
+  return !!data && data.parts.shapes.includes(avatar.shape) && data.parts.eyes.includes(avatar.eyes) && /^#[0-9a-f]{6}$/.test(avatar.color);
+}
+
+/** A chosen avatar's series and parts, when the cached catalog can draw it. */
+function chosen(catalog: AvatarCatalog | undefined, ref: AvatarRef | undefined | null): { series: AvatarSeries; avatar: ComposedAvatar } | null {
+  if (!ref || ref.kind !== 'catalog') return null;
+  const series = catalog?.series.find((entry) => entry.id === ref.series);
+  const avatar = { shape: ref.shape, eyes: ref.eyes, color: ref.color };
+  return series && draws(series, avatar) ? { series, avatar } : null;
+}
+
+/**
+ * The avatar a member shows: its own, else the one chosen for its role, else
+ * the catalog's default for the role. Null until a catalog is cached.
+ */
+export function resolveAvatar(
+  catalog: AvatarCatalog | undefined,
+  roleId: string,
+  own?: AvatarRef | null,
+  role?: AvatarRef | null,
+): { series: AvatarSeries; avatar: ComposedAvatar } | null {
+  const picked = chosen(catalog, own) ?? chosen(catalog, role);
+  if (picked) return picked;
+  const series = defaultSeries(catalog);
+  const avatar = series ? roleAvatar(series, roleId) : null;
+  return series && avatar ? { series, avatar } : null;
+}
+
+/** The reference that stores a choice. */
+export function avatarRef(series: AvatarSeries, avatar: ComposedAvatar): AvatarRef {
+  return { kind: 'catalog', series: series.id, ...avatar };
+}
+
+/** The parts a composed series offers to the picker. */
+export function seriesParts(series: AvatarSeries): { shapes: string[]; eyes: string[]; palette: string[] } | null {
+  return composedData(series)?.parts ?? null;
 }
 
 const styles = new Map<string, Style>();

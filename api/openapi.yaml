@@ -193,6 +193,52 @@ paths:
                         $ref: "#/components/schemas/EngineStatus"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/roles/{id}/avatar:
+    put:
+      operationId: setRoleAvatar
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set a role's avatar (null returns it to the catalog default); members without their own follow it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, avatar]
+              properties:
+                requestId: { type: string, format: uuid }
+                avatar:
+                  description: The avatar to use; null follows the default again
+                  nullable: true
+                  allOf:
+                    - $ref: "#/components/schemas/AvatarRef"
+      responses:
+        "200":
+          description: Role avatar set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [roleId]
+                        properties:
+                          roleId: { type: string }
+                          avatar: { $ref: "#/components/schemas/AvatarRef" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/avatars/catalog:
     get:
       operationId: getAvatarCatalog
@@ -427,6 +473,7 @@ paths:
                                 scenarios:
                                   type: array
                                   items: { type: string }
+                                avatar: { $ref: "#/components/schemas/AvatarRef" }
                           scenarios:
                             type: array
                             items:
@@ -687,6 +734,47 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
   /api/v1/bots/{id}:
+    patch:
+      operationId: patchBot
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set or clear a member's own avatar
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision, avatar]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
+                avatar:
+                  description: The avatar to use; null follows the default again
+                  nullable: true
+                  allOf:
+                    - $ref: "#/components/schemas/AvatarRef"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       operationId: deleteBot
       security:
@@ -2224,6 +2312,16 @@ components:
             syncing: { type: boolean }
             lastSyncAt: { type: string, format: date-time }
             lastError: { type: string }
+    AvatarRef:
+      type: object
+      description: An avatar the user chose, by catalog parts; never an image
+      required: [kind, series, shape, eyes, color]
+      properties:
+        kind: { type: string, enum: [catalog] }
+        series: { type: string }
+        shape: { type: string }
+        eyes: { type: string }
+        color: { type: string, pattern: "^#[0-9a-f]{6}$" }
     AvatarSeries:
       type: object
       required: [id, name, kind, version, data]
@@ -2318,6 +2416,7 @@ components:
           type: string
           enum: [idle, queued, working, waiting_approval, waiting_input, interrupted, unknown]
         currentRunId: { type: string }
+        avatar: { $ref: "#/components/schemas/AvatarRef" }
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
     TeamWithBots:

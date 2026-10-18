@@ -76,6 +76,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/archive", s.handleArchiveTeam)
 	mux.HandleFunc("POST /api/v1/teams/{id}/restore", s.handleRestoreTeam)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}", s.handleDeleteBot)
+	mux.HandleFunc("PATCH /api/v1/bots/{id}", s.handlePatchBot)
+	mux.HandleFunc("PUT /api/v1/roles/{id}/avatar", s.handlePutRoleAvatar)
 	mux.HandleFunc("GET /api/v1/teams/{id}/activity", s.handleListActivity)
 	mux.HandleFunc("GET /api/v1/bots/{id}/memories", s.handleListMemories)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)

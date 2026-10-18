@@ -21,6 +21,7 @@ import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
 import { ExchangeLine, RoleBadge, TeamMembersContext, isExchange } from './ExchangeLine';
 import Avatar from '../avatars/Avatar';
+import { MemberAvatarButton } from '../avatars/AvatarEditors';
 import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -140,7 +141,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     <TeamMembersContext.Provider value={membersByName}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-5 py-2 lg:pr-14 dark:border-neutral-800">
-        <Avatar bot={bot} size="lg" showState />
+        <MemberAvatarButton bot={bot} disabled={readOnly} />
         <div className="min-w-0">
           <p className="truncate text-[15px] font-semibold leading-5">{headerTitle}</p>
           <p className="flex min-w-0 items-baseline gap-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">

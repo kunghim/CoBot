@@ -44,6 +44,11 @@ const (
 	Recovery   ApprovalType = "recovery"
 )
 
+// Defines values for AvatarRefKind.
+const (
+	Catalog AvatarRefKind = "catalog"
+)
+
 // Defines values for BotStatus.
 const (
 	BotStatusIdle            BotStatus = "idle"
@@ -384,6 +389,18 @@ type AvatarCatalog struct {
 	} `json:"status"`
 }
 
+// AvatarRef An avatar the user chose, by catalog parts; never an image
+type AvatarRef struct {
+	Color  string        `json:"color"`
+	Eyes   string        `json:"eyes"`
+	Kind   AvatarRefKind `json:"kind"`
+	Series string        `json:"series"`
+	Shape  string        `json:"shape"`
+}
+
+// AvatarRefKind defines model for AvatarRef.Kind.
+type AvatarRefKind string
+
 // AvatarSeries defines model for AvatarSeries.
 type AvatarSeries struct {
 	// Data The series file as published (format in assets/avatars)
@@ -408,16 +425,18 @@ type BootstrapResult struct {
 
 // Bot defines model for Bot.
 type Bot struct {
-	CreatedAt    time.Time `json:"createdAt"`
-	CurrentRunId *string   `json:"currentRunId,omitempty"`
-	Id           string    `json:"id"`
-	IsLeader     bool      `json:"isLeader"`
-	Name         string    `json:"name"`
-	Revision     int64     `json:"revision"`
-	RoleId       string    `json:"roleId"`
-	RoleVersion  *string   `json:"roleVersion,omitempty"`
-	Status       BotStatus `json:"status"`
-	TeamId       string    `json:"teamId"`
+	// Avatar An avatar the user chose, by catalog parts; never an image
+	Avatar       *AvatarRef `json:"avatar,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	CurrentRunId *string    `json:"currentRunId,omitempty"`
+	Id           string     `json:"id"`
+	IsLeader     bool       `json:"isLeader"`
+	Name         string     `json:"name"`
+	Revision     int64      `json:"revision"`
+	RoleId       string     `json:"roleId"`
+	RoleVersion  *string    `json:"roleVersion,omitempty"`
+	Status       BotStatus  `json:"status"`
+	TeamId       string     `json:"teamId"`
 }
 
 // BotStatus defines model for Bot.Status.
@@ -986,6 +1005,14 @@ type DeleteBotParams struct {
 	IfMatch        int64  `json:"If-Match"`
 }
 
+// PatchBotJSONBody defines parameters for PatchBot.
+type PatchBotJSONBody struct {
+	// Avatar The avatar to use; null follows the default again
+	Avatar           *AvatarRef         `json:"avatar"`
+	ExpectedRevision int64              `json:"expectedRevision"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1082,6 +1109,13 @@ type ListQuestionsParamsStatus string
 type CancelQuestionJSONBody struct {
 	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// SetRoleAvatarJSONBody defines parameters for SetRoleAvatar.
+type SetRoleAvatarJSONBody struct {
+	// Avatar The avatar to use; null follows the default again
+	Avatar    *AvatarRef         `json:"avatar"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // InterruptRunJSONBody defines parameters for InterruptRun.
@@ -1239,6 +1273,9 @@ type RevokeAuthorizationJSONRequestBody RevokeAuthorizationJSONBody
 // SyncAvatarCatalogJSONRequestBody defines body for SyncAvatarCatalog for application/json ContentType.
 type SyncAvatarCatalogJSONRequestBody SyncAvatarCatalogJSONBody
 
+// PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
+type PatchBotJSONRequestBody PatchBotJSONBody
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
 
@@ -1259,6 +1296,9 @@ type AnswerQuestionJSONRequestBody = AnswerQuestionRequest
 
 // CancelQuestionJSONRequestBody defines body for CancelQuestion for application/json ContentType.
 type CancelQuestionJSONRequestBody CancelQuestionJSONBody
+
+// SetRoleAvatarJSONRequestBody defines body for SetRoleAvatar for application/json ContentType.
+type SetRoleAvatarJSONRequestBody SetRoleAvatarJSONBody
 
 // InterruptRunJSONRequestBody defines body for InterruptRun for application/json ContentType.
 type InterruptRunJSONRequestBody InterruptRunJSONBody

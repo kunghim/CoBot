@@ -108,3 +108,79 @@ func TestAvatarCatalogReportsAFailedSync(t *testing.T) {
 		t.Fatalf("status = %v", status)
 	}
 }
+
+// A member's own avatar and a role's avatar are stored as part choices and
+// come back with the member and the role library.
+func TestMemberAndRoleAvatarsAreStored(t *testing.T) {
+	missing := httptest.NewServer(http.NotFoundHandler())
+	defer missing.Close()
+	c := startCoreWithAssets(t, missing.URL+"/assets/")
+	csrf := map[string]string{"X-CSRF-Token": c.csrf}
+	request := func() string { return fmt.Sprintf("req-%d", time.Now().UnixNano()) }
+
+	resp, body := c.do("POST", "/api/v1/teams", map[string]any{
+		"requestId": request(), "name": "头像", "directory": t.TempDir(), "initialRoleIds": []string{"frontend-dev"},
+	}, csrf)
+	if resp.StatusCode != 201 {
+		t.Fatalf("create team: %d %v", resp.StatusCode, body)
+	}
+	var member map[string]any
+	for _, b := range body["data"].(map[string]any)["bots"].([]any) {
+		if bot := b.(map[string]any); bot["isLeader"] != true {
+			member = bot
+		}
+	}
+	if _, has := member["avatar"]; has {
+		t.Fatalf("a new member has an avatar of its own: %v", member["avatar"])
+	}
+	botPath := "/api/v1/bots/" + member["id"].(string)
+	avatar := map[string]any{"kind": "catalog", "series": "dango", "shape": "flower", "eyes": "grin", "color": "#f98b8b"}
+
+	resp, body = c.do("PATCH", botPath, map[string]any{"requestId": request(), "expectedRevision": member["revision"], "avatar": avatar}, csrf)
+	if resp.StatusCode != 200 {
+		t.Fatalf("set member avatar: %d %v", resp.StatusCode, body)
+	}
+	member = body["data"].(map[string]any)
+	if got := member["avatar"].(map[string]any); got["shape"] != "flower" {
+		t.Fatalf("member avatar = %v", got)
+	}
+	resp, body = c.do("PATCH", botPath, map[string]any{"requestId": request(), "expectedRevision": member["revision"], "avatar": map[string]any{"kind": "catalog", "series": "dango", "shape": "flower", "eyes": "grin", "color": "red"}}, csrf)
+	if resp.StatusCode != 400 {
+		t.Fatalf("invalid color accepted: %d %v", resp.StatusCode, body)
+	}
+	resp, body = c.do("PATCH", botPath, map[string]any{"requestId": request(), "expectedRevision": member["revision"], "avatar": nil}, csrf)
+	if resp.StatusCode != 200 {
+		t.Fatalf("clear member avatar: %d %v", resp.StatusCode, body)
+	}
+	if _, has := body["data"].(map[string]any)["avatar"]; has {
+		t.Fatal("cleared member still has an avatar")
+	}
+
+	resp, body = c.do("PUT", "/api/v1/roles/frontend-dev/avatar", map[string]any{"requestId": request(), "avatar": avatar}, csrf)
+	if resp.StatusCode != 200 {
+		t.Fatalf("set role avatar: %d %v", resp.StatusCode, body)
+	}
+	if resp, _ := c.do("PUT", "/api/v1/roles/no-such-role/avatar", map[string]any{"requestId": request(), "avatar": avatar}, csrf); resp.StatusCode != 404 {
+		t.Fatalf("unknown role: %d", resp.StatusCode)
+	}
+	roleAvatar := func() any {
+		_, body := c.do("GET", "/api/v1/roles", nil, nil)
+		for _, r := range body["data"].(map[string]any)["items"].([]any) {
+			if role := r.(map[string]any); role["id"] == "frontend-dev" {
+				return role["avatar"]
+			}
+		}
+		t.Fatal("frontend-dev missing from the role library")
+		return nil
+	}
+	if got, ok := roleAvatar().(map[string]any); !ok || got["eyes"] != "grin" {
+		t.Fatalf("role avatar = %v", roleAvatar())
+	}
+	resp, body = c.do("PUT", "/api/v1/roles/frontend-dev/avatar", map[string]any{"requestId": request(), "avatar": nil}, csrf)
+	if resp.StatusCode != 200 {
+		t.Fatalf("clear role avatar: %d %v", resp.StatusCode, body)
+	}
+	if got := roleAvatar(); got != nil {
+		t.Fatalf("cleared role avatar = %v", got)
+	}
+}

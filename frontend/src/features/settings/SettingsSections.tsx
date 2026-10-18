@@ -11,8 +11,10 @@ import {
   useEngineModels,
   useRevokeAuthorization,
   useStatus,
+  useRoles,
   useSyncAvatarCatalog,
 } from '../../api/queries';
+import { RoleAvatarRow } from '../avatars/AvatarEditors';
 import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import type { SaveState } from './useSettingSaver';
@@ -673,6 +675,25 @@ export function AboutSection() {
         <dt className="text-neutral-500">{t('settings.dataRoot')}</dt>
         <dd className="break-all font-mono text-xs leading-5">{s?.dataRoot}</dd>
       </dl>
+    </Card>
+  );
+}
+
+/** The role library with each role's avatar; members without their own follow it. */
+export function RolesSection() {
+  const { t } = useTranslation();
+  const roles = useRoles();
+  return (
+    <Card>
+      {roles.isPending && <p className="text-sm text-neutral-500">{t('status.loading')}</p>}
+      {roles.isError && <p className="text-sm text-red-600" role="alert">{t('status.error')}</p>}
+      {roles.data && (
+        <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
+          {roles.data.items.map((role) => (
+            <RoleAvatarRow key={role.id} role={role} />
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

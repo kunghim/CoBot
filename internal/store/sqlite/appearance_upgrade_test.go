@@ -62,8 +62,8 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 				t.Fatal(err)
 			}
 			actual, err := current.CurrentVersion(ctx)
-			if err != nil || actual != 21 {
-				t.Fatalf("version = %d, error = %v; want 21", actual, err)
+			if err != nil || actual != MaxSupportedVersion {
+				t.Fatalf("version = %d, error = %v; want %d", actual, err, MaxSupportedVersion)
 			}
 			saved, err := GetSettings(ctx, db)
 			if err != nil {
