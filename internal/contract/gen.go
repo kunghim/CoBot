@@ -104,10 +104,10 @@ const (
 
 // Defines values for MessageKind.
 const (
-	Assistant     MessageKind = "assistant"
-	Collaboration MessageKind = "collaboration"
-	System        MessageKind = "system"
-	User          MessageKind = "user"
+	MessageKindAssistant     MessageKind = "assistant"
+	MessageKindCollaboration MessageKind = "collaboration"
+	MessageKindSystem        MessageKind = "system"
+	MessageKindUser          MessageKind = "user"
 )
 
 // Defines values for PatchTaskRequestStatus.
@@ -186,10 +186,24 @@ const (
 	SettingsBudgetScopeTeam  SettingsBudgetScope = "team"
 )
 
+// Defines values for SettingsColorMode.
+const (
+	SettingsColorModeDark   SettingsColorMode = "dark"
+	SettingsColorModeLight  SettingsColorMode = "light"
+	SettingsColorModeSystem SettingsColorMode = "system"
+)
+
 // Defines values for SettingsLanguage.
 const (
 	SettingsLanguageEn   SettingsLanguage = "en"
 	SettingsLanguageZhCN SettingsLanguage = "zh-CN"
+)
+
+// Defines values for SettingsTheme.
+const (
+	SettingsThemeDusk     SettingsTheme = "dusk"
+	SettingsThemeGraphite SettingsTheme = "graphite"
+	SettingsThemeHarbor   SettingsTheme = "harbor"
 )
 
 // Defines values for SettingsPatchBudgetScope.
@@ -199,10 +213,24 @@ const (
 	SettingsPatchBudgetScopeTeam  SettingsPatchBudgetScope = "team"
 )
 
+// Defines values for SettingsPatchColorMode.
+const (
+	Dark   SettingsPatchColorMode = "dark"
+	Light  SettingsPatchColorMode = "light"
+	System SettingsPatchColorMode = "system"
+)
+
 // Defines values for SettingsPatchLanguage.
 const (
 	SettingsPatchLanguageEn   SettingsPatchLanguage = "en"
 	SettingsPatchLanguageZhCN SettingsPatchLanguage = "zh-CN"
+)
+
+// Defines values for SettingsPatchTheme.
+const (
+	SettingsPatchThemeDusk     SettingsPatchTheme = "dusk"
+	SettingsPatchThemeGraphite SettingsPatchTheme = "graphite"
+	SettingsPatchThemeHarbor   SettingsPatchTheme = "harbor"
 )
 
 // Defines values for StatusEnvironment.
@@ -677,37 +705,53 @@ type Settings struct {
 	BudgetScope       SettingsBudgetScope `json:"budgetScope"`
 	BudgetTokens      int64               `json:"budgetTokens"`
 	ChainLimit        int                 `json:"chainLimit"`
+	ColorMode         SettingsColorMode   `json:"colorMode"`
 	DefaultModel      string              `json:"defaultModel"`
 	EnginePath        string              `json:"enginePath"`
 	Language          SettingsLanguage    `json:"language"`
 	MemberLimit       int                 `json:"memberLimit"`
 	ReviewRejectLimit int                 `json:"reviewRejectLimit"`
 	Revision          int64               `json:"revision"`
+	Theme             SettingsTheme       `json:"theme"`
 }
 
 // SettingsBudgetScope defines model for Settings.BudgetScope.
 type SettingsBudgetScope string
 
+// SettingsColorMode defines model for Settings.ColorMode.
+type SettingsColorMode string
+
 // SettingsLanguage defines model for Settings.Language.
 type SettingsLanguage string
+
+// SettingsTheme defines model for Settings.Theme.
+type SettingsTheme string
 
 // SettingsPatch defines model for SettingsPatch.
 type SettingsPatch struct {
 	BudgetScope       *SettingsPatchBudgetScope `json:"budgetScope,omitempty"`
 	BudgetTokens      *int64                    `json:"budgetTokens,omitempty"`
 	ChainLimit        *int                      `json:"chainLimit,omitempty"`
+	ColorMode         *SettingsPatchColorMode   `json:"colorMode,omitempty"`
 	DefaultModel      *string                   `json:"defaultModel,omitempty"`
 	EnginePath        *string                   `json:"enginePath,omitempty"`
 	Language          *SettingsPatchLanguage    `json:"language,omitempty"`
 	MemberLimit       *int                      `json:"memberLimit,omitempty"`
 	ReviewRejectLimit *int                      `json:"reviewRejectLimit,omitempty"`
+	Theme             *SettingsPatchTheme       `json:"theme,omitempty"`
 }
 
 // SettingsPatchBudgetScope defines model for SettingsPatch.BudgetScope.
 type SettingsPatchBudgetScope string
 
+// SettingsPatchColorMode defines model for SettingsPatch.ColorMode.
+type SettingsPatchColorMode string
+
 // SettingsPatchLanguage defines model for SettingsPatch.Language.
 type SettingsPatchLanguage string
+
+// SettingsPatchTheme defines model for SettingsPatch.Theme.
+type SettingsPatchTheme string
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {

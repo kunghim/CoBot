@@ -2162,10 +2162,12 @@ components:
     Settings:
       type: object
       required:
-        [revision, language, defaultModel, memberLimit, chainLimit, reviewRejectLimit, budgetScope, budgetTokens, enginePath]
+        [revision, language, colorMode, theme, defaultModel, memberLimit, chainLimit, reviewRejectLimit, budgetScope, budgetTokens, enginePath]
       properties:
         revision: { type: integer, format: int64 }
         language: { type: string, enum: [zh-CN, en] }
+        colorMode: { type: string, enum: [system, light, dark] }
+        theme: { type: string, enum: [graphite, harbor, dusk] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }
@@ -2177,6 +2179,8 @@ components:
       type: object
       properties:
         language: { type: string, enum: [zh-CN, en] }
+        colorMode: { type: string, enum: [system, light, dark] }
+        theme: { type: string, enum: [graphite, harbor, dusk] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }

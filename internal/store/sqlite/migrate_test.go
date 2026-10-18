@@ -316,6 +316,27 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 		t.Fatal("out-of-range member limit must be rejected")
 	}
 
+	// Appearance starts at the system mode with the default palette and
+	// takes only the listed values.
+	if saved.ColorMode != "system" || saved.Theme != "graphite" {
+		t.Fatalf("appearance defaults = %q/%q, want system/graphite", saved.ColorMode, saved.Theme)
+	}
+	dark, harbor := "dark", "harbor"
+	saved, err = UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &dark, Theme: &harbor}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Revision != 3 || saved.ColorMode != "dark" || saved.Theme != "harbor" {
+		t.Fatalf("unexpected appearance: %+v", saved)
+	}
+	badMode, badTheme := "sepia", "neon"
+	if _, err := UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &badMode}, 3); err == nil {
+		t.Fatal("unsupported color mode must be rejected")
+	}
+	if _, err := UpdateSettings(ctx, db, domain.SettingsPatch{Theme: &badTheme}, 3); err == nil {
+		t.Fatal("unsupported theme must be rejected")
+	}
+
 	// Events recorded inside the same transaction replay in order.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

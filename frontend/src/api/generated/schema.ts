@@ -1152,6 +1152,10 @@ export interface components {
             revision: number;
             /** @enum {string} */
             language: "zh-CN" | "en";
+            /** @enum {string} */
+            colorMode: "system" | "light" | "dark";
+            /** @enum {string} */
+            theme: "graphite" | "harbor" | "dusk";
             defaultModel: string;
             memberLimit: number;
             chainLimit: number;
@@ -1165,6 +1169,10 @@ export interface components {
         SettingsPatch: {
             /** @enum {string} */
             language?: "zh-CN" | "en";
+            /** @enum {string} */
+            colorMode?: "system" | "light" | "dark";
+            /** @enum {string} */
+            theme?: "graphite" | "harbor" | "dusk";
             defaultModel?: string;
             memberLimit?: number;
             chainLimit?: number;

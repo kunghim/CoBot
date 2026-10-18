@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, ArrowLeft, Bot, Cpu, Info, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { Archive, ArrowLeft, Bot, Cpu, Info, Palette, Settings2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
 import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { useSettings } from '../../api/queries';
 import { workspacePath } from '../../app/workspacePath';
 import {
   AboutSection,
+  AppearanceSection,
   CollaborationSection,
   EngineSection,
   GeneralSection,
@@ -15,10 +16,11 @@ import {
 import ArchivedTeamsSection from './ArchivedTeamsSection';
 import { useSettingSaver } from './useSettingSaver';
 
-type SectionId = 'general' | 'engine' | 'models' | 'collaboration' | 'archived' | 'security' | 'about';
+type SectionId = 'general' | 'appearance' | 'engine' | 'models' | 'collaboration' | 'archived' | 'security' | 'about';
 
 const sections: { id: SectionId; icon: LucideIcon }[] = [
   { id: 'general', icon: Settings2 },
+  { id: 'appearance', icon: Palette },
   { id: 'engine', icon: Cpu },
   { id: 'models', icon: Bot },
   { id: 'collaboration', icon: Users },
@@ -63,6 +65,7 @@ export default function SettingsPage() {
     const props = { settings: settings.data, save, states };
     body = {
       general: <GeneralSection {...props} />,
+      appearance: <AppearanceSection {...props} />,
       engine: <EngineSection />,
       models: <ModelsSection {...props} />,
       collaboration: <CollaborationSection {...props} />,

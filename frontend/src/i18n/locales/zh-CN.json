@@ -517,6 +517,7 @@
     "defaultModelHint": "成员执行任务时使用的模型。",
     "sections": {
       "general": "通用",
+      "appearance": "外观",
       "engine": "Codex 引擎",
       "models": "模型",
       "collaboration": "协作与预算",
@@ -526,6 +527,7 @@
     },
     "sectionHints": {
       "general": "界面语言等基础偏好。",
+      "appearance": "浅色、深色或跟随系统，以及界面配色。成员的角色颜色在所有主题里不变。",
       "engine": "CoBot 启动时自动检测 Codex 并授权安全钩子，这里只展示结果。",
       "models": "修改后立即生效，对之后开始的任务起作用。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
@@ -534,6 +536,14 @@
       "about": "版本与本机数据位置。"
     },
     "language": "语言",
+    "colorMode": "明暗",
+    "colorModes": { "system": "跟随系统", "light": "浅色", "dark": "深色" },
+    "theme": "主题",
+    "themes": {
+      "graphite": { "name": "石墨", "summary": "带一点绿意的石墨灰，钴蓝强调" },
+      "harbor": { "name": "港湾", "summary": "偏冷的蓝灰，青绿强调" },
+      "dusk": { "name": "暮梅", "summary": "带紫调的暖灰，珊瑚红强调" }
+    },
     "engineNotConfigured": "未检测到已配置的引擎",
     "engineReady": "引擎可用",
     "engineError": "引擎不可用",
@@ -590,6 +600,8 @@
     "error.forbidden.origin": "来源不被允许",
     "error.settings.revision_conflict": "设置已被其他入口修改，请刷新后重试",
     "error.settings.unsupported_language": "不支持的语言",
+    "error.settings.unsupported_color_mode": "不支持的明暗模式",
+    "error.settings.unsupported_theme": "不支持的主题",
     "error.settings.member_limit_range": "成员上限需在 {{min}}～{{max}} 之间",
     "error.settings.chain_limit_range": "协作链上限需在 {{min}}～{{max}} 之间",
     "error.settings.review_reject_limit_range": "评审打回次数上限需在 {{min}}～{{max}} 之间",

@@ -6,6 +6,7 @@ import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client
 import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
+import { useAppearance } from './appearance';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
@@ -86,6 +87,7 @@ export default function App() {
     const lang = snapshot.data?.settings.language;
     if (lang) void i18n.changeLanguage(lang);
   }, [snapshot.data?.settings.language, i18n]);
+  useAppearance(snapshot.data?.settings);
 
   const invalidateAll = useCallback(() => {
     void queryClient.invalidateQueries();

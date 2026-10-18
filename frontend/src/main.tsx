@@ -3,8 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import App from './app/App';
+import { applyStoredAppearance } from './app/appearance';
 import './i18n';
 import './styles/index.css';
+
+applyStoredAppearance();
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -522,6 +522,7 @@
     "defaultModelHint": "The model members use for their work.",
     "sections": {
       "general": "General",
+      "appearance": "Appearance",
       "engine": "Codex engine",
       "models": "Models",
       "collaboration": "Collaboration & budget",
@@ -531,6 +532,7 @@
     },
     "sectionHints": {
       "general": "Basic preferences such as the interface language.",
+      "appearance": "Light, dark or following the system, and the interface colors. Members keep their role colors in every theme.",
       "engine": "CoBot detects Codex and authorizes its safety hook at startup; this page shows the result.",
       "models": "Changes apply right away to work that starts afterwards.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
@@ -539,6 +541,14 @@
       "about": "Version and where data is stored on this machine."
     },
     "language": "Language",
+    "colorMode": "Mode",
+    "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
+    "theme": "Theme",
+    "themes": {
+      "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
+      "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
+      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a coral accent" }
+    },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
     "engineError": "Engine unavailable",
@@ -595,6 +605,8 @@
     "error.forbidden.origin": "Origin not allowed",
     "error.settings.revision_conflict": "Settings changed elsewhere; refresh and retry",
     "error.settings.unsupported_language": "Unsupported language",
+    "error.settings.unsupported_color_mode": "Unsupported color mode",
+    "error.settings.unsupported_theme": "Unsupported theme",
     "error.settings.member_limit_range": "Member limit must be between {{min}} and {{max}}",
     "error.settings.chain_limit_range": "Chain limit must be between {{min}} and {{max}}",
     "error.settings.review_reject_limit_range": "Review send-back limit must be between {{min}} and {{max}}",
