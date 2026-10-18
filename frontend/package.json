@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
+    "gallery": "node scripts/build-gallery.mjs",
     "generate:api": "openapi-typescript ../api/openapi.yaml -o src/api/generated/schema.ts"
   },
   "dependencies": {

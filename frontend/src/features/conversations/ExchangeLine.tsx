@@ -5,7 +5,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Bot, Message } from '../../api/types';
-import { roleChip } from '../teams/roleChip';
+import { roleChip } from '../../components/ui/roleChip';
 
 /** The team's members by name, so a badge can wear its member's role color. */
 export const TeamMembersContext = createContext<ReadonlyMap<string, Bot>>(new Map());
