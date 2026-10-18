@@ -19,5 +19,6 @@ export * from './Feedback';
 export * from './Display';
 export * from './Layout';
 export * from './Team';
+export * from './ModelPicker';
 export { roleChip } from './roleChip';
 export { Icons, iconMeaning, type IconName } from './icons';

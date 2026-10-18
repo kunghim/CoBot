@@ -1,11 +1,11 @@
 // Gallery: members and conversations — CoBot's own components.
 import { useState } from 'react';
-import { Brain, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import dangoSeries from '../../../assets/avatars/dango/dist/dango.json';
 import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
-import { AppTitleBar, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
+import { AppTitleBar, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote, TeamTree } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const dango: AvatarSeries = { id: 'dango', name: dangoSeries.name, kind: 'composed', version: dangoSeries.version, data: dangoSeries as unknown as AvatarSeries['data'] };
@@ -17,6 +17,19 @@ function RoleAvatar({ roleId, size = 24, state = 'idle' }: { roleId: string; siz
 
 const person = (roleId: string, name: string, size = 16) => ({ avatar: <RoleAvatar roleId={roleId} size={size} />, name });
 
+const LEVELS = [
+  { value: 'minimal', label: '最低' },
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'xhigh', label: '极高' },
+];
+const MODELS = [
+  { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', description: '默认，综合能力最好' },
+  { id: 'gpt-6.1-mini', label: 'GPT-6.1 mini', description: '更快、更省' },
+  { id: 'gpt-6.1-codex', label: 'GPT-6.1 Codex', description: '为编程调优' },
+];
+
 export default function TeamConversation() {
   const [selected, setSelected] = useState('leader');
   const [draft, setDraft] = useState('');
@@ -26,6 +39,8 @@ export default function TeamConversation() {
   const [left, setLeft] = useState(true);
   const [right, setRight] = useState(true);
   const [maximized, setMaximized] = useState(false);
+  const [model, setModel] = useState('gpt-6.1-sol');
+  const [effort, setEffort] = useState('high');
 
   return (
     <Chapter id="team" title="成员与会话" intro="CoBot 自己的组件。成员 = 头像 + 名字，在哪里提到成员都一起出现；状态由头像表达（工作中会动、等你处理时睁大眼睛），同时用文字告诉读屏器。">
@@ -64,32 +79,49 @@ export default function TeamConversation() {
         </Demo>
       </Doc>
 
-      <Doc id="member-row" name="MemberRow 成员行" file="components/ui/Team.tsx" use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息。消息只显示一行，超出用省略号截断，不会撑出侧栏。当前成员白底加描边；等你处理时头像右下角加琥珀色点。">
+      <Doc
+        id="member-row"
+        name="MemberRow 成员行 · TeamTree 团队树"
+        file="components/ui/Team.tsx"
+        use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息（只显示一行，超出用省略号截断，不会撑出侧栏）。当前成员白底加描边；等你处理时头像右下角加琥珀色点。用 TeamTree 排成一棵树：队长在最上面，头像大一号，名字后面有一个很淡的“队长”；成员缩进在下面，用细线连到队长——布局本身说明谁带队。"
+        avoid="不要给队长再加皇冠、底色等额外标记；层级和更大的头像已经足够。"
+      >
         <Demo surface="sunken">
-          <div className="w-64 space-y-px">
-            {[
-              ['leader', '队长', 'idle', '', '空闲', '方案已经发你了，确认后我就分派给成员。', '09:41'],
-              ['frontend-dev', '前端开发', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存', ''],
-              ['backend-dev', '后端开发', 'idle', '', '空闲', '', ''],
-              ['qa-engineer', '测试工程师', 'waiting', '等你审批', '等你审批', '想在沙箱外运行 npx playwright test --headed 来验证页面', ''],
-            ].map(([roleId, name, state, status, statusLabel, preview, time]) => (
-              <MemberRow
-                key={roleId}
-                avatar={<RoleAvatar roleId={roleId} size={32} state={state as AvatarState} />}
-                name={name}
-                status={status || undefined}
-                time={time || undefined}
-                statusLabel={statusLabel}
-                preview={preview || undefined}
-                attention={state === 'waiting'}
-                current={selected === roleId}
-                onSelect={() => setSelected(roleId)}
-              />
-            ))}
+          <div className="w-72">
+            <TeamTree
+              leader={
+                <MemberRow
+                  avatar={<RoleAvatar roleId="leader" size={32} />}
+                  name="队长"
+                  leaderLabel="队长"
+                  time="09:41"
+                  statusLabel="空闲"
+                  preview="方案已经发你了，确认后我就分派给成员。"
+                  current={selected === 'leader'}
+                  onSelect={() => setSelected('leader')}
+                />
+              }
+              members={[
+                ['frontend-dev', '前端开发', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存'],
+                ['backend-dev', '后端开发', 'idle', '', '空闲', ''],
+                ['qa-engineer', '测试工程师', 'waiting', '等你审批', '等你审批', '想在沙箱外运行 npx playwright test --headed 来验证页面'],
+              ].map(([roleId, name, state, status, statusLabel, preview]) => (
+                <MemberRow
+                  key={roleId}
+                  avatar={<RoleAvatar roleId={roleId} size={28} state={state as AvatarState} />}
+                  name={name}
+                  status={status || undefined}
+                  statusLabel={statusLabel}
+                  preview={preview || undefined}
+                  attention={state === 'waiting'}
+                  current={selected === roleId}
+                  onSelect={() => setSelected(roleId)}
+                />
+              ))}
+            />
           </div>
         </Demo>
       </Doc>
-
       <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧深色气泡；成员的回复在左侧，带头像和名字（纯文字，不加底色）；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字。">
         <Demo>
           <div className="mx-auto max-w-2xl space-y-4">
@@ -185,7 +217,18 @@ export default function TeamConversation() {
               options={
                 <>
                   <ComposerOption icon={ShieldCheck}>默认权限</ComposerOption>
-                  <ComposerOption icon={Brain}>跟随模型</ComposerOption>
+                  <ModelEffortPicker
+                    triggerLabel="模型与思考强度"
+                    models={MODELS}
+                    model={model}
+                    onModel={setModel}
+                    levels={LEVELS}
+                    effort={effort}
+                    onEffort={setEffort}
+                    isDefault={effort === 'medium'}
+                    onReset={() => setEffort('medium')}
+                    labels={{ effort: '思考强度', reset: '恢复默认', chooseModel: '选择模型', back: '返回' }}
+                  />
                 </>
               }
             />
@@ -194,6 +237,46 @@ export default function TeamConversation() {
         </Demo>
       </Doc>
 
+      <Doc
+        id="model-picker"
+        name="ModelEffortPicker 模型与思考强度"
+        file="components/ui/ModelPicker.tsx"
+        use="输入框左下角选择模型和思考强度，和 Codex 一样：按钮上显示当前强度（强调色）和模型；点开后顶部居中是强度和模型名，点模型名换模型；下面是分档滑块，可以拖、点刻度或用方向键；右上角恢复默认（已是默认时不可点）。"
+        a11y="滑块以 slider 读出档位名称；面板打开后 Esc 或点外面关闭。"
+      >
+        <Demo>
+          <div className="flex flex-wrap items-start gap-8">
+            <div className="w-72 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-neutral-900/10 dark:bg-neutral-800 dark:ring-white/10">
+              <ModelEffortPanel
+                models={MODELS}
+                model={model}
+                onModel={setModel}
+                levels={LEVELS}
+                effort={effort}
+                onEffort={setEffort}
+                isDefault={effort === 'medium'}
+                onReset={() => setEffort('medium')}
+                labels={{ effort: '思考强度', reset: '恢复默认', chooseModel: '选择模型', back: '返回' }}
+              />
+            </div>
+            <div className="pt-40">
+              <ModelEffortPicker
+                triggerLabel="模型与思考强度"
+                models={MODELS}
+                model={model}
+                onModel={setModel}
+                levels={LEVELS}
+                effort={effort}
+                onEffort={setEffort}
+                isDefault={effort === 'medium'}
+                onReset={() => setEffort('medium')}
+                labels={{ effort: '思考强度', reset: '恢复默认', chooseModel: '选择模型', back: '返回' }}
+              />
+              <p className="mt-2 text-xs text-neutral-500">输入框里的样子，点开向上弹出</p>
+            </div>
+          </div>
+        </Demo>
+      </Doc>
       <Doc
         id="title-bar"
         name="AppTitleBar 桌面标题栏"

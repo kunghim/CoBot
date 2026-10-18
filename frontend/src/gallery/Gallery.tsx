@@ -20,7 +20,7 @@ const TOC: Array<[string, string, Array<[string, string]>]> = [
   ['actions', '操作与表单', [['button', 'Button'], ['icon-button', 'IconButton'], ['button-group', 'ButtonGroup'], ['field', 'Field'], ['text-input', '输入框'], ['select', 'Select · Combobox'], ['checkbox', 'Checkbox · Switch'], ['radio', 'Radio · RadioCards'], ['segmented', 'Segmented · Toggle'], ['slider', 'Slider'], ['file-drop', 'FileDrop'], ['fieldset', 'Fieldset']]],
   ['navigation', '导航与浮层', [['rail', 'RailItem'], ['nav-item', 'NavItem'], ['tabs', 'Tabs'], ['tree', 'Tree'], ['breadcrumbs', '面包屑 · 步骤 · 分页'], ['menu', 'Menu'], ['popover', 'Popover · Tooltip'], ['dialog', 'Dialog · AlertDialog'], ['sheet', 'Sheet']]],
   ['feedback', '反馈、数据与结构', [['toast', 'Toast'], ['alert', 'Alert'], ['progress', '加载'], ['progress-ring', 'ProgressRing'], ['empty', 'EmptyState'], ['badge', 'Badge 等'], ['card', 'Card'], ['list', 'List'], ['table', 'Table'], ['description-list', '键值 · 指标 · 代码'], ['accordion', 'Accordion · 复制'], ['structure', '页面结构']]],
-  ['team', '成员与会话', [['avatar', 'Avatar'], ['role-chip', 'RoleChip'], ['member-row', 'MemberRow'], ['messages', '消息'], ['process', 'ProcessStep'], ['approval', '审批卡 · 提问卡'], ['composer', 'Composer'], ['title-bar', '桌面标题栏']]],
+  ['team', '成员与会话', [['avatar', 'Avatar'], ['role-chip', 'RoleChip'], ['member-row', 'MemberRow · TeamTree'], ['messages', '消息'], ['process', 'ProcessStep'], ['approval', '审批卡 · 提问卡'], ['composer', 'Composer'], ['model-picker', '模型与思考强度'], ['title-bar', '桌面标题栏']]],
   ['patterns', '模式、文案、禁止', [['saving', '保存反馈'], ['panels', '侧栏开合'], ['states', '加载 · 空 · 出错'], ['writing', '文案'], ['donts', '禁止事项']]],
 ];
 
