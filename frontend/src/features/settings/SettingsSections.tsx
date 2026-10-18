@@ -14,6 +14,8 @@ import {
 import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import type { SaveState } from './useSettingSaver';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
 
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
 type SectionProps = { settings: Settings; save: Save; states: Record<string, SaveState> };
@@ -129,6 +131,108 @@ export function GeneralSection({ settings, save, states }: SectionProps) {
             <option value="en">English</option>
           </select>
         </Field>
+      </div>
+    </Card>
+  );
+}
+
+const COLOR_MODES: ColorMode[] = ['system', 'light', 'dark'];
+const MODE_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
+
+// What each theme swatch draws: its rail, paper, a card and its signal color.
+const THEMES: Array<{ id: Theme; rail: string; paper: string; card: string; line: string; signal: string }> = [
+  { id: 'graphite', rail: '#171e1b', paper: '#f4f6f3', card: '#ffffff', line: '#dbe0da', signal: '#5568f0' },
+  { id: 'harbor', rail: '#141c24', paper: '#f2f5f8', card: '#ffffff', line: '#d5dee6', signal: '#1c9f92' },
+  { id: 'dusk', rail: '#1f171c', paper: '#f7f4f5', card: '#ffffff', line: '#e1d7dc', signal: '#e5654b' },
+];
+
+/** Light, dark or following the system, and the palette; applied at once. */
+export function AppearanceSection({ settings, save, states }: SectionProps) {
+  const { t } = useTranslation();
+  const [appearance, setAppearance] = useState<Appearance>({ colorMode: settings.colorMode, theme: settings.theme });
+  useEffect(() => setAppearance({ colorMode: settings.colorMode, theme: settings.theme }), [settings.colorMode, settings.theme]);
+  const change = (field: 'colorMode' | 'theme', next: Appearance) => {
+    setAppearance(next);
+    applyAppearance(next);
+    save(field, { [field]: next[field] }, (persisted) => {
+      const restored = { colorMode: persisted.colorMode, theme: persisted.theme };
+      setAppearance(restored);
+      applyAppearance(restored);
+    });
+  };
+  const optionClass = (active: boolean) =>
+    `rounded-lg text-sm transition-colors ${
+      active
+        ? 'bg-white font-medium text-neutral-900 shadow-sm ring-1 ring-neutral-300 dark:bg-neutral-800 dark:text-neutral-50 dark:ring-neutral-600'
+        : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-50'
+    }`;
+  return (
+    <Card>
+      <div className="space-y-6">
+        <div>
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span id="color-mode-label" className="text-neutral-500">{t('settings.colorMode')}</span>
+            <SaveIndicator state={states.colorMode} />
+          </div>
+          <div role="radiogroup" aria-labelledby="color-mode-label" className="mt-2 inline-flex gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-950">
+            {COLOR_MODES.map((mode) => {
+              const Icon = MODE_ICONS[mode];
+              const active = appearance.colorMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => !active && change('colorMode', { ...appearance, colorMode: mode })}
+                  className={`${optionClass(active)} flex items-center gap-1.5 px-3 py-1.5`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {t(`settings.colorModes.${mode}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span id="theme-label" className="text-neutral-500">{t('settings.theme')}</span>
+            <SaveIndicator state={states.theme} />
+          </div>
+          <div role="radiogroup" aria-labelledby="theme-label" className="mt-2 grid gap-3 sm:grid-cols-3">
+            {THEMES.map((theme) => {
+              const active = appearance.theme === theme.id;
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={t(`settings.themes.${theme.id}.name`)}
+                  onClick={() => !active && change('theme', { ...appearance, theme: theme.id })}
+                  className={`overflow-hidden rounded-xl border-2 text-left transition-colors ${
+                    active ? 'border-signal-500' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-700 dark:hover:border-neutral-600'
+                  }`}
+                >
+                  <span aria-hidden="true" className="flex h-16" style={{ background: theme.paper }}>
+                    <span className="w-4" style={{ background: theme.rail }} />
+                    <span className="flex flex-1 flex-col justify-center gap-1.5 px-3">
+                      <span className="h-2 w-3/5 rounded-full" style={{ background: theme.line }} />
+                      <span className="flex items-center gap-1.5 rounded-md px-1.5 py-1" style={{ background: theme.card, boxShadow: `inset 0 0 0 1px ${theme.line}` }}>
+                        <span className="h-2 w-2 rounded-full" style={{ background: theme.signal }} />
+                        <span className="h-1.5 flex-1 rounded-full" style={{ background: theme.line }} />
+                      </span>
+                    </span>
+                  </span>
+                  <span className="block px-3 py-2">
+                    <span className="block text-sm font-medium">{t(`settings.themes.${theme.id}.name`)}</span>
+                    <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">{t(`settings.themes.${theme.id}.summary`)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Card>
   );

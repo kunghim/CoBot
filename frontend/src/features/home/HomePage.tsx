@@ -1,16 +1,31 @@
 // HomePage hosts the conversation shell: with a selected member it renders
-// the real session; without one it stays the honest empty state (no fake
-// data, no placeholder buttons).
+// the real session; without one it is a starting point — create the first
+// team, or open a team's leader — built only from real data.
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Plus } from 'lucide-react';
 import { useTeams } from '../../api/queries';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import ConversationView from '../conversations/ConversationView';
+import CreateTeamDialog from '../teams/CreateTeamDialog';
+import { MemberMark } from '../teams/roleTone';
 import { findBotContext } from '../teams/teamUtils';
+
+// The built-in lineup a new team starts from, in the order a request flows.
+const LINEUP = [
+  { roleId: 'leader', key: 'role.leader.name', isLeader: true },
+  { roleId: 'product-manager', key: 'role.productManager.name', isLeader: false },
+  { roleId: 'frontend-dev', key: 'role.frontendDev.name', isLeader: false },
+  { roleId: 'backend-dev', key: 'role.backendDev.name', isLeader: false },
+  { roleId: 'qa-engineer', key: 'role.qaEngineer.name', isLeader: false },
+  { roleId: 'code-reviewer', key: 'role.codeReviewer.name', isLeader: false },
+];
 
 export default function HomePage() {
   const { t } = useTranslation();
-  const { botId } = useSelectedBot();
+  const { botId, setBotId } = useSelectedBot();
   const teams = useTeams(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
 
@@ -18,10 +33,70 @@ export default function HomePage() {
     return <ConversationView key={context.bot.id} item={context.item} bot={context.bot} />;
   }
 
+  const active = (teams.data?.items ?? []).filter((item) => item.team.status !== 'archived');
+  const leaders = active.flatMap((item) => {
+    const leader = item.bots.find((bot) => bot.isLeader);
+    return leader ? [{ team: item.team, leader }] : [];
+  });
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-      <h1 className="text-base font-semibold">{t('home.welcome')}</h1>
-      <p className="max-w-sm text-sm leading-6 text-neutral-500 dark:text-neutral-400">{t('home.selectBot')}</p>
+    <div className="flex h-full items-center justify-center overflow-y-auto p-8">
+      <div className="w-full max-w-lg">
+        {teams.isSuccess && leaders.length === 0 ? (
+          <>
+            <div className="flex -space-x-1.5" aria-hidden="true">
+              {LINEUP.map((entry) => (
+                <span key={entry.roleId} className="rounded-lg ring-4 ring-neutral-50 dark:ring-neutral-950">
+                  <MemberMark size="lg" bot={{ name: t(entry.key), roleId: entry.roleId, isLeader: entry.isLeader }} />
+                </span>
+              ))}
+            </div>
+            <h1 className="mt-6 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('home.emptyTitle')}</h1>
+            <p className="mt-3 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('home.emptyBody')}</p>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            >
+              <Plus size={16} aria-hidden="true" />
+              {t('team.new')}
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('home.pickTitle')}</h1>
+            <p className="mt-3 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('home.selectBot')}</p>
+            {leaders.length > 0 && (
+              <ul className="mt-6 space-y-2">
+                {leaders.map(({ team, leader }) => (
+                  <li key={team.id}>
+                    <button
+                      type="button"
+                      onClick={() => setBotId(leader.id)}
+                      className="flex w-full items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm ring-1 ring-neutral-200 transition-colors hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700"
+                    >
+                      <MemberMark bot={leader} size="lg" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{team.name}</span>
+                        <span className="block truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{team.directory}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">{t('home.openLeader')}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+      <CreateTeamDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(leaderBotId) => {
+          setCreateOpen(false);
+          setBotId(leaderBotId);
+        }}
+      />
     </div>
   );
 }

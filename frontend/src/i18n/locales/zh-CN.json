@@ -9,9 +9,12 @@
     "toggleWorkPanel": "收起/展开工作面板"
   },
   "home": {
-    "welcome": "欢迎使用 CoBot",
     "noTeams": "还没有团队。创建团队后，队长与成员会在这里协作。",
-    "selectBot": "从左侧选择一个成员开始对话"
+    "emptyTitle": "把一件事交给一支团队",
+    "emptyBody": "选一个工作目录，CoBot 会为它配好队长和成员。你把目标告诉队长，队长拆成任务分给成员；运行命令、改文件这类操作会先请你批准。",
+    "pickTitle": "和谁聊？",
+    "selectBot": "从左侧选一位成员，或者直接找队长。",
+    "openLeader": "找队长"
   },
   "archived": {
     "search": "搜索团队名称或目录",
@@ -145,6 +148,9 @@
     }
   },
   "conversation": {
+    "emptyTitle": "还没有和 {{name}} 的对话",
+    "emptyLeader": "告诉队长你想做什么。队长会先和你对齐方案，你确认后再分派给成员。",
+    "emptyMember": "成员通常由队长派活。你也可以直接在这里问它问题或补充要求。",
     "exchange": {
       "to": "发给",
       "from": "来自",
@@ -511,6 +517,7 @@
     "defaultModelHint": "成员执行任务时使用的模型。",
     "sections": {
       "general": "通用",
+      "appearance": "外观",
       "engine": "Codex 引擎",
       "models": "模型",
       "collaboration": "协作与预算",
@@ -520,6 +527,7 @@
     },
     "sectionHints": {
       "general": "界面语言等基础偏好。",
+      "appearance": "浅色、深色或跟随系统，以及界面配色。成员的角色颜色在所有主题里不变。",
       "engine": "CoBot 启动时自动检测 Codex 并授权安全钩子，这里只展示结果。",
       "models": "修改后立即生效，对之后开始的任务起作用。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
@@ -528,6 +536,14 @@
       "about": "版本与本机数据位置。"
     },
     "language": "语言",
+    "colorMode": "明暗",
+    "colorModes": { "system": "跟随系统", "light": "浅色", "dark": "深色" },
+    "theme": "主题",
+    "themes": {
+      "graphite": { "name": "石墨", "summary": "带一点绿意的石墨灰，钴蓝强调" },
+      "harbor": { "name": "港湾", "summary": "偏冷的蓝灰，青绿强调" },
+      "dusk": { "name": "暮梅", "summary": "带紫调的暖灰，珊瑚红强调" }
+    },
     "engineNotConfigured": "未检测到已配置的引擎",
     "engineReady": "引擎可用",
     "engineError": "引擎不可用",
@@ -584,6 +600,8 @@
     "error.forbidden.origin": "来源不被允许",
     "error.settings.revision_conflict": "设置已被其他入口修改，请刷新后重试",
     "error.settings.unsupported_language": "不支持的语言",
+    "error.settings.unsupported_color_mode": "不支持的明暗模式",
+    "error.settings.unsupported_theme": "不支持的主题",
     "error.settings.member_limit_range": "成员上限需在 {{min}}～{{max}} 之间",
     "error.settings.chain_limit_range": "协作链上限需在 {{min}}～{{max}} 之间",
     "error.settings.review_reject_limit_range": "评审打回次数上限需在 {{min}}～{{max}} 之间",

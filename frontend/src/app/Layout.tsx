@@ -58,7 +58,9 @@ export default function Layout() {
   const location = useLocation();
   useEffect(() => rememberWorkspacePath(location.pathname + location.search), [location.pathname, location.search]);
   const teams = useTeams(true);
-  const knownSelections = useRef(new Set<string>());
+  // Ids known to have existed: a selection restored from the last visit
+  // counts, so a member deleted since then is cleared too.
+  const knownSelections = useRef(new Set<string>(botId ? [botId] : []));
 
   // A selection whose bot no longer exists (team deleted elsewhere) clears
   // itself instead of pointing at nothing.
@@ -73,23 +75,24 @@ export default function Layout() {
   return (
     <div className="relative flex h-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       {/* Primary icon rail: logo + home on top, settings at the bottom. */}
+      {/* The rail is the dark spine of the desk in both themes. */}
       <nav
         aria-label={t('app.title')}
-        className="flex w-14 shrink-0 flex-col items-center border-r border-neutral-200 py-3 dark:border-neutral-800"
+        className="flex w-14 shrink-0 flex-col items-center bg-neutral-900 py-3 dark:bg-black/40"
       >
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-white dark:bg-neutral-100 dark:text-neutral-900"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight text-white ring-1 ring-white/15"
           title="CoBot"
           aria-hidden="true"
         >
-          C
+          Co
         </div>
         <div className="mt-4 flex flex-col items-center gap-1">
-          <NavLink to="/" end aria-label={t('nav.home')} title={t('nav.home')} className="rounded-md">
+          <NavLink to="/" end aria-label={t('nav.home')} title={t('nav.home')} className="rounded-md focus-visible:outline-signal-400">
             {({ isActive }) => (
               <span
                 className={`flex h-9 w-9 items-center justify-center rounded-md ${
-                  isActive ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-500 dark:text-neutral-400'
+                  isActive ? 'bg-white/12 text-white' : 'text-neutral-400 hover:bg-white/8 hover:text-white'
                 }`}
               >
                 <Home size={18} aria-hidden="true" />
@@ -98,11 +101,11 @@ export default function Layout() {
           </NavLink>
         </div>
         <div className="mt-auto">
-          <NavLink to="/settings" aria-label={t('nav.settings')} title={t('nav.settings')} className="rounded-md">
+          <NavLink to="/settings" aria-label={t('nav.settings')} title={t('nav.settings')} className="rounded-md focus-visible:outline-signal-400">
             {({ isActive }) => (
               <span
                 className={`flex h-9 w-9 items-center justify-center rounded-md ${
-                  isActive ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-500 dark:text-neutral-400'
+                  isActive ? 'bg-white/12 text-white' : 'text-neutral-400 hover:bg-white/8 hover:text-white'
                 }`}
               >
                 <Settings size={18} aria-hidden="true" />
@@ -116,7 +119,7 @@ export default function Layout() {
       {listOpen && (
         <aside
           aria-label={t('nav.teamList')}
-          className="absolute left-14 z-10 h-full w-64 border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 lg:static lg:z-auto"
+          className="absolute left-14 z-10 h-full w-64 border-r border-neutral-200 bg-neutral-100 shadow-lg dark:border-neutral-800 dark:bg-neutral-900 lg:static lg:z-auto lg:shadow-none"
         >
           <TeamList onCollapse={() => setListOpen(false)} />
         </aside>
@@ -132,7 +135,7 @@ export default function Layout() {
       {/* Conversation area: the routed conversation page. */}
       <main className="relative flex min-w-0 flex-1 flex-col">
         {!panelOpen && (
-          <div className="absolute right-2 top-2 z-10">
+          <div className="absolute right-2 top-2.5 z-10 hidden lg:block">
             <IconButton label={t('nav.toggleWorkPanel')} expanded={panelOpen} onClick={() => setPanelOpen(true)}>
               <PanelRightOpen size={18} aria-hidden="true" />
             </IconButton>
