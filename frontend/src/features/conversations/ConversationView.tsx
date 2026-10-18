@@ -19,7 +19,8 @@ import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
-import { ExchangeLine, RoleBadge, isExchange } from './ExchangeLine';
+import { ExchangeLine, RoleBadge, TeamMembersContext, isExchange } from './ExchangeLine';
+import { MemberMark } from '../teams/roleTone';
 import ExchangeOverlay from './ExchangeOverlay';
 import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -116,6 +117,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     [...messages].reverse().find((message) => message.kind === 'user' && message.deliveryStatus === 'queued') ?? null;
 
   const botNameById = new Map(item.bots.map((entry) => [entry.id, entry.name]));
+  const membersByName = new Map(item.bots.map((entry) => [entry.name, entry]));
   const nameOf = (botId: string) => botNameById.get(botId) ?? botId;
   // Between sending and the member's turn starting (engine start, thread
   // creation) the flow still says something is happening.
@@ -133,16 +135,22 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   };
 
   const headerTitle = bot.name;
-  const headerSubtitle =
-    bot.isLeader && team.directory ? `${team.name} · ${team.directory}` : team.name;
 
   return (
+    <TeamMembersContext.Provider value={membersByName}>
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-12 items-center gap-3 border-b border-neutral-200 px-4 py-1.5 dark:border-neutral-800">
+      <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-5 py-2 lg:pr-14 dark:border-neutral-800">
+        <MemberMark bot={bot} size="lg" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{headerTitle}</p>
-          <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" title={bot.isLeader ? team.directory : undefined}>
-            {headerSubtitle}
+          <p className="truncate text-[15px] font-semibold leading-5">{headerTitle}</p>
+          <p className="flex min-w-0 items-baseline gap-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+            <span className="shrink-0">{team.name}</span>
+            {bot.isLeader && team.directory && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="truncate font-mono text-[11px]" title={team.directory}>{team.directory}</span>
+              </>
+            )}
           </p>
         </div>
       </header>
@@ -165,7 +173,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        className="min-h-0 flex-1 overflow-y-auto px-5 py-5"
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
@@ -174,7 +182,16 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </p>
         )}
         <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
-        <ul className="space-y-2">
+        {conv.isSuccess && timeline.length === 0 && !preparing && (
+          <div className="mx-auto mt-[12vh] flex max-w-sm flex-col items-center text-center">
+            <MemberMark bot={bot} size="lg" />
+            <p className="mt-4 text-sm font-medium">{t('conversation.emptyTitle', { name: bot.name })}</p>
+            <p className="mt-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+              {t(bot.isLeader ? 'conversation.emptyLeader' : 'conversation.emptyMember')}
+            </p>
+          </div>
+        )}
+        <ul className="mx-auto max-w-3xl space-y-4">
           {timeline.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
@@ -218,7 +235,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
       {/* The exchange between two members is read-only: while it is open the
           composer and approval cards step aside (kept mounted, so nothing
           typed or pending is lost). */}
-      <div className={`space-y-2 px-4 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
+      <div className={`mx-auto w-full max-w-3xl space-y-2 px-5 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
         {queuedCount > 0 && (
           <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t('conversation.queuedBanner', { count: queuedCount })}
@@ -228,7 +245,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
           <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
 
-          <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:focus-within:border-neutral-500">
+          <div className="rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgb(23_30_27/0.06),0_8px_24px_-12px_rgb(23_30_27/0.18)] transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
             <textarea
               ref={composerRef}
               aria-label={t('conversation.placeholder', { name: headerTitle })}
@@ -303,6 +320,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         )}
       </div>
     </div>
+    </TeamMembersContext.Provider>
   );
 }
 
@@ -394,7 +412,7 @@ function MessageRow({
   if (message.kind === 'system') {
     return (
       <div className="flex justify-center">
-        <span className="max-w-[85%] whitespace-pre-wrap text-center text-xs text-neutral-400">{text}</span>
+        <span className="max-w-[85%] whitespace-pre-wrap text-center text-xs text-neutral-500 dark:text-neutral-400">{text}</span>
       </div>
     );
   }
@@ -405,10 +423,10 @@ function MessageRow({
       <div className="max-w-[85%] space-y-1">
         {!isUser && <RoleBadge name={nameOf(message.botId)} />}
         <div
-          className={`break-words rounded-xl px-3 py-2 text-sm ${
+          className={`break-words text-sm leading-6 ${
             isUser
-              ? 'whitespace-pre-wrap bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
-              : 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+              ? 'whitespace-pre-wrap rounded-2xl rounded-br-md bg-neutral-900 px-3.5 py-2 text-white dark:bg-neutral-100 dark:text-neutral-900'
+              : 'rounded-2xl rounded-tl-md bg-white px-4 py-2.5 text-neutral-900 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-800'
           }`}
         >
           {isUser ? text : <Markdown text={text} teamId={teamId} />}

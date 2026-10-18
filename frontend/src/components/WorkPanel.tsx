@@ -13,6 +13,7 @@ import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
+import { MemberMark } from '../features/teams/roleTone';
 import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
 
 type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
@@ -35,13 +36,20 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
   );
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
-  const scope = context ? `${context.bot.name} · ${context.team.name}` : '';
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+      <div className="flex min-h-14 items-center gap-2.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+        {context && <MemberMark bot={context.bot} />}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold">{context ? scope : t('panel.noSelection')}</p>
+          {context ? (
+            <>
+              <p className="truncate text-sm font-semibold leading-5">{context.bot.name}</p>
+              <p className="truncate text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{context.team.name}</p>
+            </>
+          ) : (
+            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">{t('nav.workPanel')}</p>
+          )}
         </div>
         <button
           type="button"
@@ -55,10 +63,11 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         </button>
       </div>
 
+      {context && (
       <div
         role="tablist"
         aria-label={t('panel.tablist')}
-        className="flex gap-1 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800"
+        className="flex gap-4 border-b border-neutral-200 px-3 dark:border-neutral-800"
         onKeyDown={(event) => {
           const index = TABS.indexOf(tab);
           let next: number;
@@ -85,16 +94,17 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
             aria-controls="workpanel-tabpanel"
             tabIndex={tab === id ? 0 : -1}
             onClick={() => setTab(id)}
-            className={`rounded-md px-2 py-1 text-xs transition-colors ${
+            className={`-mb-px border-b-2 py-2 text-xs transition-colors ${
               tab === id
-                ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
-                : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                ? 'border-neutral-900 font-semibold text-neutral-900 dark:border-neutral-100 dark:text-neutral-50'
+                : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
             }`}
           >
             {t(`panel.tabs.${id}`)}
           </button>
         ))}
       </div>
+      )}
 
       <div
         id="workpanel-tabpanel"
@@ -102,7 +112,7 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
         aria-labelledby={`workpanel-tab-${tab}`}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {!context && <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
+        {!context && <p className="px-3 py-4 text-sm leading-6 text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
         {/* A team whose folder is gone is read-only: lists stay, actions are off. */}
         <fieldset disabled={context?.team.status === 'directory_missing'} className="m-0 min-w-0 border-0 p-0">
         {context && tab === 'tasks' && (

@@ -16,6 +16,7 @@ import type { DirectoryCheckResult } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useDialogFocus } from '../../components/useDialogFocus';
 import { pickDirectory } from '../../platform/pickDirectory';
+import { MemberMark } from './roleTone';
 
 /** folderName is the last path segment, used as the suggested team name. */
 function folderName(path: string): string {
@@ -154,7 +155,7 @@ export default function CreateTeamDialog({
       onClick={() => {
         if (!locked) toggleRole(id);
       }}
-      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+      className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
         selected
           ? 'border-neutral-900 bg-neutral-50 dark:border-neutral-200 dark:bg-neutral-800'
           : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-700 dark:hover:border-neutral-500'
@@ -170,6 +171,7 @@ export default function CreateTeamDialog({
       >
         {locked ? <Lock size={10} /> : selected ? <Check size={12} /> : null}
       </span>
+      <MemberMark bot={{ name: label, roleId: id, isLeader: locked }} />
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-sm font-medium">
           {label}
@@ -185,7 +187,7 @@ export default function CreateTeamDialog({
   );
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-neutral-950/45 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         ref={dialogRef as React.RefObject<HTMLDivElement>}
         tabIndex={-1}
@@ -193,9 +195,9 @@ export default function CreateTeamDialog({
         aria-modal="true"
         aria-labelledby="create-team-title"
         onMouseDown={(event) => event.stopPropagation()}
-        className="max-h-full w-full max-w-xl overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        className="w-full max-w-xl rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900"
       >
-        <h2 id="create-team-title" className="text-base font-semibold">
+        <h2 id="create-team-title" className="text-lg font-semibold tracking-tight">
           {t('team.createTitle')}
         </h2>
 
@@ -225,18 +227,21 @@ export default function CreateTeamDialog({
                 if (event.key === 'Enter' && directory.trim()) applyDirectory(directory.trim());
               }}
               placeholder={t('team.directoryPlaceholder')}
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 font-mono text-xs dark:border-neutral-700"
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 font-mono text-xs focus:border-signal-500 focus:outline-none dark:border-neutral-700"
             />
           </div>
+          {/* One line is kept for the check result, so the dialog does not
+              shift under the pointer when leaving the field starts a check. */}
+          <div className="mt-1.5 min-h-[1.125rem]">
           {checking && (
-            <p role="status" className="mt-1.5 text-xs text-neutral-500">
+            <p role="status" className="text-xs text-neutral-500">
               {t('status.loading')}
             </p>
           )}
           {verdict && (
             <p
               role="status"
-              className={`mt-1.5 text-xs ${verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}
+              className={`break-all text-xs ${verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}
             >
               {verdictText(verdict)}
               {verdict.duplicate && verdict.archived && verdict.teamId && (
@@ -253,9 +258,10 @@ export default function CreateTeamDialog({
               )}
             </p>
           )}
+          </div>
         </div>
 
-        <label className="mt-4 block text-sm">
+        <label className="mt-3 block text-sm">
           <span className="text-neutral-500 dark:text-neutral-400">{t('team.name')}</span>
           <input
             value={name}
@@ -267,7 +273,7 @@ export default function CreateTeamDialog({
               if (event.key === 'Enter') submit();
             }}
             placeholder={t('team.namePlaceholder')}
-            className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm dark:border-neutral-700"
+            className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm focus:border-signal-500 focus:outline-none dark:border-neutral-700"
           />
         </label>
 

@@ -76,7 +76,7 @@ export default function SettingsPage() {
     <div className="flex h-full flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 md:flex-row">
       <nav
         aria-label={t('settings.title')}
-        className="shrink-0 border-b border-neutral-200 bg-white px-3 py-3 dark:border-neutral-800 dark:bg-neutral-900 md:w-56 md:border-b-0 md:border-r"
+        className="shrink-0 border-b border-neutral-200 bg-neutral-100 px-3 py-3 dark:border-neutral-800 dark:bg-neutral-900 md:w-56 md:border-b-0 md:border-r"
       >
         <button
           type="button"

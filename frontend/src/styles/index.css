@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/*
+ * CoBot's look: a quiet graphite-sage desk where the members are the color.
+ * The neutral scale is redefined here, so every neutral-* utility in the app
+ * takes the tinted graphite instead of Tailwind's pure gray; the only strong
+ * colors left are the members' role colors (see features/teams/roleTone.ts),
+ * the cobalt signal for focus and links, and the status colors.
+ */
+@theme {
+  --color-neutral-50: #f4f6f3;
+  --color-neutral-100: #eaeee9;
+  --color-neutral-200: #dbe0da;
+  --color-neutral-300: #c2c9c2;
+  --color-neutral-400: #96a19a;
+  --color-neutral-500: #6a766f;
+  --color-neutral-600: #515c56;
+  --color-neutral-700: #3a443f;
+  --color-neutral-800: #252c29;
+  --color-neutral-900: #171e1b;
+  --color-neutral-950: #0f1312;
+
+  --color-signal-400: #8c98ff;
+  --color-signal-500: #5568f0;
+  --color-signal-600: #3346d3;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
+}
+
 :root {
   color-scheme: light dark;
 }
@@ -12,6 +40,51 @@ body,
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
   -webkit-font-smoothing: antialiased;
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: var(--color-neutral-950);
+    color: var(--color-neutral-100);
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-signal-500) 28%, transparent);
+}
+
+/* One focus treatment wherever keyboard focus lands; it sits in the base
+   layer so a component's own focus utilities still win. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-signal-500);
+    outline-offset: 2px;
+  }
+}
+
+/* Thin, tinted scrollbars instead of the platform's heavy gray ones. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-300) transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  * {
+    scrollbar-color: var(--color-neutral-700) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

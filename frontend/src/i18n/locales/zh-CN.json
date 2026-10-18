@@ -9,9 +9,12 @@
     "toggleWorkPanel": "收起/展开工作面板"
   },
   "home": {
-    "welcome": "欢迎使用 CoBot",
     "noTeams": "还没有团队。创建团队后，队长与成员会在这里协作。",
-    "selectBot": "从左侧选择一个成员开始对话"
+    "emptyTitle": "把一件事交给一支团队",
+    "emptyBody": "选一个工作目录，CoBot 会为它配好队长和成员。你把目标告诉队长，队长拆成任务分给成员；运行命令、改文件这类操作会先请你批准。",
+    "pickTitle": "和谁聊？",
+    "selectBot": "从左侧选一位成员，或者直接找队长。",
+    "openLeader": "找队长"
   },
   "archived": {
     "search": "搜索团队名称或目录",
@@ -145,6 +148,9 @@
     }
   },
   "conversation": {
+    "emptyTitle": "还没有和 {{name}} 的对话",
+    "emptyLeader": "告诉队长你想做什么。队长会先和你对齐方案，你确认后再分派给成员。",
+    "emptyMember": "成员通常由队长派活。你也可以直接在这里问它问题或补充要求。",
     "exchange": {
       "to": "发给",
       "from": "来自",

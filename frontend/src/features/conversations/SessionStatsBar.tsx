@@ -64,7 +64,7 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
   const tps = stats.outputTokensPerSecond ? Math.round(stats.outputTokensPerSecond) : 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-1 px-1 text-[11px] text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
+    <div className="flex flex-wrap items-center gap-1 px-1 font-mono text-[11px] tracking-tight text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
       <Item testId="stats-turns" label={<><Timer size={12} aria-hidden="true" />{t('stats.turns', { turns: stats.turns, steps: stats.steps })}{tps > 0 && ` · ${tps} tok/s`}</>}>
         <span className="mb-1 block font-semibold">{t('stats.timeTitle')}</span>
         <Row name={t('stats.modelTime')} value={seconds(stats.modelMs)} />
@@ -85,7 +85,7 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
       {window > 0 && (
         <Item testId="stats-context" label={<><span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-neutral-400" style={{ borderTopColor: 'transparent' }} aria-hidden="true" />{used}%</>}>
           <span className="mb-1 flex justify-between font-semibold"><span>{t('stats.contextTitle', { percent: used })}</span><span className="tabular-nums">{compactTokens(stats.context.used)} / {compactTokens(window)}</span></span>
-          <span className="block h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span className="block h-full bg-blue-500" style={{ width: `${Math.min(used, 100)}%` }} /></span>
+          <span className="block h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span className="block h-full bg-signal-500" style={{ width: `${Math.min(used, 100)}%` }} /></span>
           <span className="mt-1.5 block text-[10px] text-neutral-400">{t('stats.contextNote')}</span>
         </Item>
       )}

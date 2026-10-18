@@ -2,7 +2,7 @@
 // the routes so the team list, the conversation shell and the work panel all
 // agree on one selection. It intentionally stores only the bot id: the team
 // is always derived from the freshest teams query, never cached here.
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 interface SelectedBotContextValue {
   botId: string | null;
@@ -14,8 +14,28 @@ interface SelectedBotContextValue {
 
 const SelectedBotContext = createContext<SelectedBotContextValue | null>(null);
 
+// The selection survives a reload in this browser; a stored id whose member
+// is gone is cleared by the layout once the teams load.
+const storageKey = 'cobot.selectedBot';
+
+function storedBotId(): string | null {
+  try {
+    return window.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
 export function SelectedBotProvider({ children }: { children: ReactNode }) {
-  const [botId, setBotId] = useState<string | null>(null);
+  const [botId, setBotId] = useState<string | null>(storedBotId);
+  useEffect(() => {
+    try {
+      if (botId) window.localStorage.setItem(storageKey, botId);
+      else window.localStorage.removeItem(storageKey);
+    } catch {
+      /* storage unavailable: the selection just does not persist */
+    }
+  }, [botId]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const value = useMemo(() => ({ botId, setBotId, drafts,
     setDraft: (id: string, text: string) => setDrafts((current) => ({ ...current, [id]: text })),
