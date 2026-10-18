@@ -1,0 +1,91 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- Keep UpgradeCode stable across public versions. Runtime user data is
+       deliberately absent: this package only owns installed program files. -->
+  <Package Name="CoBot" Manufacturer="CoBot" Version="$(var.MsiVersion)"
+           UpgradeCode="D159E043-D132-4929-BD91-423E8B2769E9"
+           Scope="perUser" Language="1033" InstallerVersion="500">
+    <SummaryInformation Description="CoBot local multi-agent collaboration" />
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer CoBot version is already installed." />
+    <!-- MSI ignores prerelease suffixes; each distributed MSI needs a new
+         numeric version. Block different packages with equal versions. -->
+    <Upgrade Id="D159E043-D132-4929-BD91-423E8B2769E9">
+      <UpgradeVersion Minimum="$(var.MsiVersion)" Maximum="$(var.MsiVersion)"
+                      IncludeMinimum="yes" IncludeMaximum="yes"
+                      OnlyDetect="yes" Property="COBOT_SAME_VERSION" />
+    </Upgrade>
+    <Launch Condition="Installed OR NOT COBOT_SAME_VERSION"
+            Message="This CoBot installer version is already installed. Use the original installer to repair it, or install a newer version." />
+    <!-- VersionNT can report a compatibility version on Windows 10/11. -->
+    <Property Id="COBOT_WINDOWS_BUILD">
+      <RegistrySearch Id="ReadWindowsBuild" Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR (VersionNT64 AND COBOT_WINDOWS_BUILD &gt;= 10240)"
+            Message="CoBot requires 64-bit Windows 10 or later." />
+    <Launch Condition="NOT ALLUSERS" Message="This package installs for the current user only." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/kunghim/CoBot" />
+    <!-- Files-in-use must be resolved by the user, never by killing a run. -->
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <Property Id="REBOOT" Value="ReallySuppress" />
+    <Icon Id="CoBotIcon" SourceFile="$(var.AppIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="CoBotIcon" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <ui:WixUI Id="WixUI_Minimal" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="CoBot">
+          <Component Id="DesktopProgram" Guid="F3762CF7-B4CB-5101-9D0C-BB3FC774339B">
+            <File Id="DesktopExe" Source="$(var.Payload)\cobot-desktop.exe" />
+            <RemoveFolder Id="RemoveEmptyProgramFolder" Directory="INSTALLFOLDER" On="uninstall" />
+            <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                           Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="BackgroundHelper" Guid="89EC0F76-D3A8-59BD-BE70-C9278DB35854">
+            <File Id="HelperExe" Source="$(var.Payload)\cobot-helper.exe" />
+            <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                           Name="Helper" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="ConsoleProgram" Guid="2088B75A-046D-5CC0-8A1B-0B18D77F42D4">
+            <File Id="ConsoleExe" Source="$(var.Payload)\cobot.exe" />
+            <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                           Name="Console" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="ProjectLicense" Guid="820F6F70-8D43-5A0C-96A1-B6764692822C">
+            <File Id="LicenseFile" Source="$(var.Payload)\LICENSE" />
+            <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                           Name="License" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="ThirdPartyLicenses" Guid="00680593-DBBF-58A9-A80A-B23867AC2ECA">
+            <File Id="NoticesFile" Source="$(var.Payload)\THIRD-PARTY-NOTICES.txt" />
+            <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                           Name="Notices" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="CoBotMenuFolder" Name="CoBot">
+        <Component Id="StartMenuEntry" Guid="190946B8-BCE6-5F35-B55B-3963272EC9CC">
+          <Shortcut Id="CoBotShortcut" Name="CoBot" Target="[#DesktopExe]"
+                    Description="Local multi-agent collaboration"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveCoBotMenu" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\CoBot\Installer"
+                         Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="CoBotApplication" Title="CoBot" Level="1">
+      <ComponentRef Id="DesktopProgram" />
+      <ComponentRef Id="BackgroundHelper" />
+      <ComponentRef Id="ConsoleProgram" />
+      <ComponentRef Id="ProjectLicense" />
+      <ComponentRef Id="ThirdPartyLicenses" />
+      <ComponentRef Id="StartMenuEntry" />
+    </Feature>
+  </Package>
+</Wix>
