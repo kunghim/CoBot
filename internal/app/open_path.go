@@ -34,6 +34,12 @@ func (a *App) OpenTeamPath(ctx context.Context, principal auth.Principal, teamID
 	if !ok {
 		return nil, domain.InvalidRequest("error.path.outside_team", nil)
 	}
+	// Members write files into the team folder without asking, so a link to
+	// a program or script would run it outside the engine's sandbox and every
+	// approval on one click. Such files are only shown in the file manager.
+	if !reveal && launchesProgram(path) {
+		return nil, domain.InvalidRequest("error.path.open_executable", nil)
+	}
 	launch := a.OpenLocal
 	if launch == nil {
 		launch = func(path string, reveal bool) error {
@@ -91,6 +97,33 @@ func resolveTeamPath(dir, raw string) (string, bool) {
 		return "", false
 	}
 	return "", false
+}
+
+// programExtensions are the file types the system opener runs instead of
+// showing: programs, scripts, installers, shortcuts and launchers on Windows,
+// macOS and Linux desktops. The check covers every platform, since a team
+// folder may be shared between them.
+var programExtensions = map[string]bool{
+	// Windows programs, installers and control-panel items
+	".exe": true, ".com": true, ".scr": true, ".pif": true, ".cpl": true, ".msi": true, ".msp": true, ".msc": true,
+	".appx": true, ".msix": true, ".appref-ms": true, ".application": true, ".gadget": true,
+	// Windows scripts and script hosts
+	".bat": true, ".cmd": true, ".ps1": true, ".psm1": true, ".psd1": true, ".vbs": true, ".vbe": true,
+	".js": true, ".jse": true, ".wsf": true, ".wsh": true, ".hta": true, ".reg": true, ".inf": true,
+	// Windows shortcuts and shell links that point elsewhere
+	".lnk": true, ".url": true, ".scf": true, ".settingcontent-ms": true, ".library-ms": true, ".search-ms": true,
+	// Cross-platform runtimes
+	".jar": true, ".py": true, ".pyw": true,
+	// macOS and Linux launchers
+	".app": true, ".command": true, ".tool": true, ".workflow": true, ".pkg": true, ".dmg": true,
+	".sh": true, ".desktop": true, ".run": true, ".appimage": true,
+}
+
+// launchesProgram reports whether opening path with the system's default
+// program would run code rather than show content. Directories are shown by
+// the file manager, except macOS bundles, which open as applications.
+func launchesProgram(path string) bool {
+	return programExtensions[strings.ToLower(filepath.Ext(path))]
 }
 
 func within(root, path string) bool {

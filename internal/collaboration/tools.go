@@ -9,14 +9,18 @@ import "github.com/kunghim/CoBot/internal/auth"
 const (
 	RoleLeader = "leader"
 	RoleMember = "member"
+	// RoleReviewer is a member who also gives the verdict on the deliveries
+	// sent to it for review.
+	RoleReviewer = "reviewer"
 
 	// BridgeEnvRole names the role a spawned bridge serves.
 	BridgeEnvRole = auth.BridgeEnvRole
 )
 
 var (
-	leaderTools = []string{"send_message", "ask_user", "create_task", "review_task", "view_tasks"}
-	memberTools = []string{"send_message", "ask_user", "deliver_task", "view_tasks"}
+	leaderTools   = []string{"send_message", "ask_user", "create_task", "review_task", "view_tasks"}
+	memberTools   = []string{"send_message", "ask_user", "deliver_task", "view_tasks"}
+	reviewerTools = []string{"send_message", "ask_user", "deliver_task", "review_task", "view_tasks"}
 )
 
 // ToolsForRole lists the tools offered to a role. An unknown role (a bridge
@@ -27,6 +31,8 @@ func ToolsForRole(role string) []string {
 		return leaderTools
 	case RoleMember:
 		return memberTools
+	case RoleReviewer:
+		return reviewerTools
 	default:
 		return []string{"send_message", "ask_user", "create_task", "review_task", "deliver_task", "view_tasks"}
 	}
@@ -38,8 +44,9 @@ var toolDescriptions = map[string]string{
 		"只是顺带告知、对方不需要做任何事时设 notifyOnly=true：对方下一轮会看到，不会被唤醒。交付任务请用交付工具，不要用消息代替。",
 	"ask_user": "向用户提问。调用后请结束这一轮，用户回答后你会被唤醒。",
 	"create_task": "创建任务并指派给一名成员（用户确认方案后再用）。创建后系统会把任务送到负责人手上，不必另发消息。" +
-		"有先后顺序时用 dependencyIds：后续任务会等前置任务完成后才送到负责人手上。",
-	"review_task": "验收成员交付的任务。decision=accept：通过，任务完成，并放行依赖它的任务；" +
+		"有先后顺序时用 dependencyIds：后续任务会等前置任务完成后才送到负责人手上。" +
+		"需要专业评审时填 reviewType：交付后由评审员按对应检查清单评审并直接决定通过或打回；团队没有评审员或不填时由你验收。",
+	"review_task": "给交付的任务下结论（队长验收，或评审员评审送到你手上的任务）。decision=accept：通过，任务完成，并放行依赖它的任务；" +
 		"decision=reject：打回，必须在 comment 写明缺什么，任务会退回负责人。",
 	"deliver_task": "交付你负责的任务：在 summary 里写清做了什么、怎么运行或查看成果、实际做了哪些验证以及结果。" +
 		"交付后队长会收到通知并验收，你结束这一轮即可；被打回时你会收到原因。",

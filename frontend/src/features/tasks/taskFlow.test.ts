@@ -10,6 +10,7 @@ function task(overrides: Partial<Task>): Task {
     title: '示例任务',
     status: 'todo',
     dependencyIds: [],
+    rejectCount: 0,
     revision: 1,
     createdBy: 'user',
     createdAt: '2026-10-15T01:00:00Z',

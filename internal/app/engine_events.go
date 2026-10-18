@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -193,58 +194,119 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 		return
 	}
 
-	var text string
-	assistantID := ""
-	if rt := source; rt != nil {
-		rt.mu.Lock()
-		if buf := rt.buffer[run.ID]; buf != nil {
-			text = joinTexts(buf.texts)
-			if text == "" {
-				text = buf.commentary
-			}
-			delete(rt.buffer, run.ID)
-		}
-		rt.mu.Unlock()
+	settlement := runSettlement{
+		teamID: teamID, botID: botID, run: run, status: status,
+		threadID: n.ThreadID, turnID: n.TurnID, epoch: source.server.Epoch(),
+		text: takeReply(source, run.ID),
 	}
+	if err := s.settleRun(ctx, settlement); err != nil {
+		// turn/completed arrives once: a lost settlement would leave the
+		// member working forever, so it is retried until it lands.
+		s.logger.Error("settle finished turn; retrying", "runId", run.ID, "botId", botID, "error", err)
+		go s.retrySettle(settlement)
+	}
+}
 
+// runSettlement is everything needed to record a turn's end; it is kept
+// whole so a failed write can be retried after the notification is gone.
+type runSettlement struct {
+	teamID, botID string
+	run           domain.Run
+	status        string
+	threadID      string
+	turnID        string
+	epoch         string // the engine connection the turn ran on
+	text          string // the turn's reply, empty when it said nothing
+}
+
+// takeReply removes and returns the reply buffered for a run.
+func takeReply(rt *teamRuntime, runID string) string {
+	if rt == nil {
+		return ""
+	}
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	buf := rt.buffer[runID]
+	if buf == nil {
+		return ""
+	}
+	delete(rt.buffer, runID)
+	if text := joinTexts(buf.texts); text != "" {
+		return text
+	}
+	return buf.commentary
+}
+
+// settleRetryDelays space the retries of a settlement whose write failed.
+var settleRetryDelays = []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second}
+
+func (s *Scheduler) retrySettle(settlement runSettlement) {
+	for _, delay := range settleRetryDelays {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+		err := s.settleRun(ctx, settlement)
+		cancel()
+		if err == nil {
+			return
+		}
+		s.logger.Warn("settle finished turn", "runId", settlement.run.ID, "error", err)
+	}
+	// Still recorded as running: interrupting it from the conversation asks
+	// the engine for the turn's real end and settles it then.
+	s.logger.Error("finished turn could not be recorded", "runId", settlement.run.ID, "botId", settlement.botID)
+}
+
+// settleRun records a turn's end: the run's final status, its reply, the
+// member's next state. It is idempotent: a run that is no longer the
+// member's active one has been settled already.
+func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
+	run, teamID, botID := st.run, st.teamID, st.botID
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return
+		return err
 	}
 	defer tx.Rollback()
 	fresh, err := sqlite.FindActiveRun(ctx, tx, botID)
-	if err != nil || fresh.ID != run.ID {
-		return
+	if errors.Is(err, sqlite.ErrNotFound) || (err == nil && fresh.ID != run.ID) {
+		return nil
 	}
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, status, n.TurnID, source.server.Epoch(), "", true); err != nil {
-		return
+	if err != nil {
+		return err
+	}
+	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, st.status, st.turnID, st.epoch, "", true); err != nil {
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE run_id = ? AND type = ? AND request_state = ?`, domain.ApprovalStateInvalidated, run.ID, domain.ApprovalNativeTool, domain.ApprovalStatePending); err != nil {
-		return
+		return err
 	}
 	// A finished turn that never reported tokens is an unknown spend, not a
 	// zero one: a budget must pause rather than trust it (G08). A usage row
 	// that already arrived keeps its real numbers.
 	epoch := run.EngineEpoch
 	if epoch == "" {
-		epoch = source.server.Epoch()
+		epoch = st.epoch
 	}
-	turnID := n.TurnID
+	turnID := st.turnID
 	if turnID == "" {
 		turnID = run.ProviderTurnID
 	}
-	if uerr := s.app.MarkUsageUnknownIfMissing(ctx, tx, teamID, botID, epoch, n.ThreadID, turnID); uerr != nil {
-		return
+	if err := s.app.MarkUsageUnknownIfMissing(ctx, tx, teamID, botID, epoch, st.threadID, turnID); err != nil {
+		return err
 	}
-	if text != "" {
-		blocks, _ := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	assistantID := ""
+	if st.text != "" {
+		blocks, _ := json.Marshal([]domain.TextBlock{{Type: "text", Text: st.text}})
 		assistant := domain.Message{
 			ID: domain.NewID(), TeamID: teamID, BotID: botID,
 			Kind: domain.MessageKindAssistant, Blocks: blocks, RunID: run.ID,
 			CreatedAt: time.Now().UTC(),
 		}
 		if err := sqlite.InsertMessage(ctx, tx, assistant); err != nil {
-			return
+			return err
 		}
 		assistantID = assistant.ID
 	}
@@ -256,21 +318,30 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 		}
 	} else {
 		var questions int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'`, botID).Scan(&questions); err == nil && questions > 0 {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&questions); err == nil && questions > 0 {
 			nextStatus = domain.BotStatusWaitingInput
 		}
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
-		return
+		return err
+	}
+	// A leader's turn that reported a finished requirement hands its reply
+	// to the user for acceptance.
+	acceptances, err := s.app.createAcceptanceLocked(ctx, tx, run, st.text)
+	if err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
-		return
+		return err
+	}
+	for _, id := range acceptances {
+		s.app.recordEvent(ctx, domain.Event{Type: domain.EventQuestionCreated, TeamID: teamID, BotID: botID, ResourceID: id})
 	}
 	if s.app.CollaborationTokens != nil {
 		s.app.CollaborationTokens.RevokeRun(run.ID)
 	}
 	if s.app.Paths.Root != "" {
-		hookrun.RemoveNativeBinding(s.app.Paths.Root, n.ThreadID, n.TurnID)
+		hookrun.RemoveNativeBinding(s.app.Paths.Root, st.threadID, turnID)
 	}
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: botID, ResourceID: run.ID})
 	messageResource := assistantID
@@ -280,6 +351,7 @@ func (s *Scheduler) finishRun(ctx context.Context, teamID string, source *teamRu
 	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: teamID, BotID: botID, ResourceID: messageResource})
 	s.app.Hub.Publish()
 	s.Wake(botID) // pick up the next queued delivery without model help
+	return nil
 }
 
 // joinTexts keeps each reply segment of a turn (a note before the work, the
@@ -319,36 +391,59 @@ func (s *Scheduler) onApproval(teamID string, source *teamRuntime, req engine.Ap
 	if rt := source; rt != nil {
 		approval.EngineEpoch = rt.server.Epoch()
 	}
+	stored, err := s.storeApproval(ctx, botID, run, approval, req)
+	if err != nil {
+		// The engine waits for an answer to every request: one that cannot
+		// become a card is declined, never left hanging with the turn.
+		s.logger.Error("approval could not be recorded; declined", "botId", botID, "method", req.Method, "error", err)
+		_ = source.server.ReplyApproval(ctx, req.RequestID, map[string]any{"decision": domain.DecisionDeclineEngine})
+		return
+	}
+	if !stored {
+		return // the card exists already
+	}
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: teamID, BotID: botID, ResourceID: approval.ID, Revision: approval.Revision})
+	s.app.Hub.Publish()
+}
+
+// errRunEnded reports an approval that arrived after its run stopped being
+// the member's live one.
+var errRunEnded = errors.New("run is no longer active")
+
+// storeApproval writes a native approval card and pauses its run. It reports
+// false when the same request already has a card.
+func (s *Scheduler) storeApproval(ctx context.Context, botID string, run domain.Run, approval domain.Approval, req engine.ApprovalRequest) (bool, error) {
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return
+		return false, err
 	}
 	defer tx.Rollback()
 	var duplicate int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM approvals WHERE engine_epoch = ? AND engine_request_id = ?`, approval.EngineEpoch, string(req.RequestID)).Scan(&duplicate); err != nil || duplicate != 0 {
-		return
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM approvals WHERE engine_epoch = ? AND engine_request_id = ?`, approval.EngineEpoch, string(req.RequestID)).Scan(&duplicate); err != nil {
+		return false, err
 	}
-	if fresh, err := sqlite.FindActiveRun(ctx, tx, botID); err != nil || fresh.ID != run.ID {
-		return
+	if duplicate != 0 {
+		return false, nil
+	}
+	if fresh, err := sqlite.FindActiveRun(ctx, tx, botID); err != nil {
+		return false, err
+	} else if fresh.ID != run.ID {
+		return false, errRunEnded
 	}
 	if err := sqlite.InsertApproval(ctx, tx, approval); err != nil {
-		return
+		return false, err
 	}
 	if run.ID != "" {
 		// Pausing for approval keeps the engine's own turn id: only the status
 		// changes, so the eventual turn/completed still matches this run.
 		if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunWaitingApproval, run.ProviderTurnID, run.EngineEpoch, "", false); err != nil {
-			return
+			return false, err
 		}
 	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusWaitingApproval, runIDOrEmpty(run)); err != nil {
-		return
+		return false, err
 	}
-	if err := tx.Commit(); err != nil {
-		return
-	}
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: teamID, BotID: botID, ResourceID: approval.ID, Revision: approval.Revision})
-	s.app.Hub.Publish()
+	return true, tx.Commit()
 }
 
 func runIDOrEmpty(run domain.Run) string {
@@ -529,10 +624,58 @@ func (a *App) InterruptRun(ctx context.Context, runID string) (string, error) {
 		return "", domain.Conflict("error.run.not_active", map[string]any{"status": "starting"})
 	}
 	if err := rt.server.InterruptTurn(ctx, session.ProviderThreadID, run.ProviderTurnID); err != nil {
+		// The engine may refuse because the turn already ended and its end was
+		// never recorded here. Its own record of the turn settles the run.
+		if a.Scheduler.settleEndedTurn(ctx, rt, run, session.ProviderThreadID) {
+			return run.ID, nil
+		}
 		return "", domain.EngineUnavailable("error.engine.interrupt_failed", nil, err)
 	}
 	// The authoritative terminal state arrives with turn/completed.
 	return run.ID, nil
+}
+
+// settleEndedTurn records the end of a run whose turn the engine reports as
+// finished. It reports whether the run was settled.
+func (s *Scheduler) settleEndedTurn(ctx context.Context, rt *teamRuntime, run domain.Run, threadID string) bool {
+	inspector, ok := rt.server.(engine.TurnInspector)
+	if !ok || run.EngineEpoch != rt.server.Epoch() {
+		return false
+	}
+	state, err := inspector.InspectTurn(ctx, threadID, run.ProviderTurnID)
+	if err != nil {
+		return false
+	}
+	status := ""
+	switch state {
+	case "completed":
+		status = domain.RunCompleted
+	case "failed":
+		status = domain.RunFailed
+	case "interrupted":
+		status = domain.RunInterrupted
+	default:
+		return false // still running: the interrupt failed for another reason
+	}
+	rt.forgetLiveRun(threadID, run.ProviderTurnID)
+	stepStatus := engine.StepInterrupted
+	if status == domain.RunCompleted {
+		stepStatus = engine.StepCompleted
+	}
+	if err := sqlite.CloseOpenRunSteps(ctx, s.app.DB, run.ID, stepStatus); err != nil {
+		s.logger.Warn("settle run steps", "runId", run.ID, "error", err)
+	}
+	err = s.settleRun(ctx, runSettlement{
+		teamID: run.TeamID, botID: run.BotID, run: run, status: status,
+		threadID: threadID, turnID: run.ProviderTurnID, epoch: rt.server.Epoch(),
+		text: takeReply(rt, run.ID),
+	})
+	if err != nil {
+		s.logger.Warn("settle ended turn", "runId", run.ID, "error", err)
+		return false
+	}
+	s.logger.Info("settled a turn the engine had already ended", "runId", run.ID, "status", status)
+	return true
 }
 
 func (a *App) botByThread(ctx context.Context, epoch, threadID string) (string, error) {

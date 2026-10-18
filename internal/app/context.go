@@ -105,13 +105,17 @@ func (a *App) memoriesText(ctx context.Context, teamID, botID string) string {
 // toolGuide names the collaboration tools of a role with their arguments,
 // so the model calls them directly instead of first searching the tool list
 // (in Codex's code mode the tool schemas are not part of the prompt).
-func toolGuide(leader bool) string {
+func toolGuide(role string) string {
 	var b strings.Builder
 	b.WriteString("\n# 协作工具\n你通过 CoBot 的工具和团队协作。工具名是 mcp__cobot__<名字>，在代码里调用时写作 tools.mcp__cobot__<名字>(参数)，不需要先搜索工具列表。\n")
-	if leader {
-		b.WriteString("- create_task({title, description, acceptanceCriteria, ownerId, dependencyIds?})：派活。用户确认方案后再用。\n")
+	switch role {
+	case "leader":
+		b.WriteString("- create_task({title, description, acceptanceCriteria, ownerId, dependencyIds?, reviewType?})：派活。用户确认方案后再用。需要专业评审时 reviewType 填 requirements（需求）、design（PRD/原型/方案）、test_plan（测试用例）、code（代码）或 general（其他）。\n")
 		b.WriteString("- review_task({taskId, decision: \"accept\" 或 \"reject\", comment?})：验收交付；打回时 comment 写明缺什么。\n")
-	} else {
+	case "reviewer":
+		b.WriteString("- review_task({taskId, decision: \"accept\" 或 \"reject\", comment?})：评审送到你手上的任务；打回时 comment 写明缺什么、怎样算改好。\n")
+		b.WriteString("- deliver_task({taskId, summary, artifactRefs?})：交付你自己负责的任务。\n")
+	default:
 		b.WriteString("- deliver_task({taskId, summary, artifactRefs?})：交付你负责的任务；summary 写清做了什么、怎么运行或查看、实际验证和结果。\n")
 	}
 	b.WriteString("- send_message({targetBotIds, text, notifyOnly?})：给同事发消息。\n")
@@ -138,7 +142,7 @@ func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot doma
 		b.WriteString("\n# 你的记忆（工作方法与偏好）\n")
 		b.WriteString(memories)
 	}
-	b.WriteString(toolGuide(bridgeRole(team, bot) == "leader"))
+	b.WriteString(toolGuide(bridgeRole(team, bot)))
 	b.WriteString(collaborationEtiquette)
 	return b.String(), contextDigest{Roster: digestOf(roster), Memories: digestOf(memories)}
 }

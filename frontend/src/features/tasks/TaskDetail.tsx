@@ -109,6 +109,11 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
           {t('tasks.acceptance')}: {current.acceptanceCriteria}
         </p>
       )}
+      {current.reviewerId && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          {t('tasks.reviewer', { name: ownerLabel(current.reviewerId, bots, userLabel), count: current.rejectCount })}
+        </p>
+      )}
       {current.blockedReason && (
         <p className="text-xs text-amber-700 dark:text-amber-400">
           {t('tasks.blocked')}: {current.blockedReason}

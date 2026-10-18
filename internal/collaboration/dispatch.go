@@ -293,6 +293,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 			OwnerID            string   `json:"ownerId"`
 			ParentID           string   `json:"parentId"`
 			DependencyIDs      []string `json:"dependencyIds"`
+			ReviewType         string   `json:"reviewType"`
 			RequestID          string   `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
@@ -308,7 +309,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		task, err := d.app.CreateTask(ctx, principal, true, app.CreateTaskInput{
 			TeamID: bot.TeamID, OwnerID: args.OwnerID, Title: args.Title,
 			Description: args.Description, AcceptanceCriteria: args.AcceptanceCriteria,
-			ParentID: args.ParentID, DependencyIDs: args.DependencyIDs, RequestID: args.RequestID,
+			ParentID: args.ParentID, DependencyIDs: args.DependencyIDs, ReviewType: args.ReviewType, RequestID: args.RequestID,
 		})
 		if err != nil {
 			return errorResult(err)

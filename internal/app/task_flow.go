@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -14,15 +13,17 @@ import (
 )
 
 // The task flow a member's model sees has three steps: it is handed a task,
-// it delivers, the leader accepts or sends it back. CoBot moves the task
+// it delivers, the delivery is accepted or sent back. CoBot moves the task
 // through todo → doing → review → done behind these steps; the model never
 // has to know the lifecycle, the revision or which transition comes next.
+// A task marked for review is decided by its reviewer member; any other is
+// accepted by the leader.
 
-// DeliverTask records what the owner produced and puts the task up for the
-// leader's review in one step. A task still in todo passes through doing;
-// a task already in review takes the new delivery and goes back to the
-// leader. When the leader owns the task itself, nobody else would review it,
-// so the delivery completes it.
+// DeliverTask records what the owner produced and puts the task up for
+// review in one step. A task still in todo passes through doing; a task
+// already in review takes the new delivery and goes back for review. When the
+// leader owns the task itself, nobody else would review it, so the delivery
+// completes it.
 func (a *App) DeliverTask(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string) (domain.Task, error) {
 	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
 	defer unlock()
@@ -77,7 +78,7 @@ func (a *App) DeliverTask(ctx context.Context, principal auth.Principal, taskID,
 	}
 	var updated domain.Task
 	var activated []domain.Task
-	leaderToWake := ""
+	var toWake []string
 	if team.LeaderID == principal.BotID {
 		if updated, err = sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, domain.TaskDone, "", 0); err != nil {
 			return domain.Task{}, err
@@ -85,12 +86,30 @@ func (a *App) DeliverTask(ctx context.Context, principal auth.Principal, taskID,
 		if activated, err = a.activateDependentDeliveriesLocked(ctx, tx, task.ID); err != nil {
 			return domain.Task{}, err
 		}
+		leader, err := a.reportRequirementIfFinishedLocked(ctx, tx, updated)
+		if err != nil {
+			return domain.Task{}, err
+		}
+		toWake = append(toWake, leader)
 	} else {
 		if updated, err = sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, domain.TaskReview, "", 0); err != nil {
 			return domain.Task{}, err
 		}
-		if leaderToWake, err = a.enqueueDeliveryNoticeLocked(ctx, tx, principal, updated, summary); err != nil {
+		reviewer, err := a.liveReviewerLocked(ctx, tx, updated)
+		if err != nil {
 			return domain.Task{}, err
+		}
+		if reviewer != "" && !rejectsExhausted(ctx, tx, updated) {
+			if err := a.enqueueReviewRequestLocked(ctx, tx, principal, updated, reviewer, summary, artifactRefs); err != nil {
+				return domain.Task{}, err
+			}
+			toWake = append(toWake, reviewer)
+		} else {
+			leader, err := a.enqueueDeliveryNoticeLocked(ctx, tx, principal, updated, summary)
+			if err != nil {
+				return domain.Task{}, err
+			}
+			toWake = append(toWake, leader)
 		}
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
@@ -102,23 +121,18 @@ func (a *App) DeliverTask(ctx context.Context, principal auth.Principal, taskID,
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventTaskUpdated, TeamID: task.TeamID, BotID: principal.BotID, ResourceID: task.ID, Revision: updated.Revision,
 		Payload: mustJSON(map[string]any{"change": "status", "status": updated.Status, "evidence": true})})
 	a.Hub.Publish()
-	if a.Scheduler != nil {
-		if leaderToWake != "" {
-			a.Scheduler.Wake(leaderToWake)
-		}
-		for _, dependent := range activated {
-			a.Scheduler.Wake(dependent.OwnerID)
-		}
-	}
+	a.wakeAll(toWake, activated)
 	for _, dependent := range activated {
 		a.recordTaskUpdated(ctx, dependent)
 	}
 	return updated, nil
 }
 
-// ReviewTask is the leader's answer to a delivery: accept completes the task
-// and releases the tasks waiting on it; reject sends it back to the owner
-// with the reason, as a message that wakes the owner.
+// ReviewTask is the verdict on a delivery, given by the task's reviewer, the
+// leader or the user. Accept completes the task and releases the tasks
+// waiting on it; reject sends it back to the owner with the reason, as a
+// message that wakes the owner. A reviewer's send-backs are counted: past the
+// configured limit the task stays in review and the leader decides.
 func (a *App) ReviewTask(ctx context.Context, principal auth.Principal, taskID string, accept bool, comment string) (domain.Task, error) {
 	cached, unlock, writeErr := beginWrite[domain.Task](ctx, a, principal)
 	defer unlock()
@@ -145,11 +159,19 @@ func (a *App) ReviewTask(ctx context.Context, principal auth.Principal, taskID s
 	if err != nil {
 		return domain.Task{}, err
 	}
+	asReviewer := false
 	switch principal.Kind {
 	case auth.KindUser:
 	case auth.KindBot:
-		if principal.BotID != team.LeaderID || principal.TeamID != task.TeamID {
+		if principal.TeamID != task.TeamID {
 			return domain.Task{}, domain.Forbidden("error.task.captain_only", nil)
+		}
+		switch {
+		case principal.BotID == team.LeaderID:
+		case task.ReviewerID != "" && principal.BotID == task.ReviewerID:
+			asReviewer = true
+		default:
+			return domain.Task{}, domain.Forbidden("error.task.reviewer_or_captain", map[string]any{"title": task.Title})
 		}
 	default:
 		return domain.Task{}, domain.Unauthorized("error.unauthorized.principal_required")
@@ -157,23 +179,81 @@ func (a *App) ReviewTask(ctx context.Context, principal auth.Principal, taskID s
 	if task.Status != domain.TaskReview {
 		return domain.Task{}, domain.InvalidRequest("error.task.review_not_pending", map[string]any{"title": task.Title, "status": task.Status})
 	}
+	settings, err := sqlite.GetSettings(ctx, tx)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	if asReviewer && task.RejectCount > settings.ReviewRejectLimit {
+		// Past the limit the leader has the task; the reviewer is done with it.
+		return domain.Task{}, domain.Conflict("error.task.review_escalated", map[string]any{"title": task.Title})
+	}
+	if asReviewer {
+		result := "reject"
+		if accept {
+			result = "accept"
+		}
+		if err := sqlite.InsertEvidence(ctx, tx, domain.Evidence{
+			ID: domain.NewID(), TaskID: task.ID, AuthorID: principal.BotID, Summary: reviewSummary(accept, comment),
+			ArtifactRefs: []string{}, ReviewResult: result, CreatedAt: time.Now().UTC(),
+		}); err != nil {
+			return domain.Task{}, err
+		}
+	}
 	var updated domain.Task
 	var activated []domain.Task
-	ownerToWake := ""
-	if accept {
+	var toWake []string
+	switch {
+	case accept:
 		if updated, err = sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, domain.TaskDone, "", 0); err != nil {
 			return domain.Task{}, err
 		}
 		if activated, err = a.activateDependentDeliveriesLocked(ctx, tx, task.ID); err != nil {
 			return domain.Task{}, err
 		}
-	} else {
+		if asReviewer {
+			if err := a.noteReviewPassedLocked(ctx, tx, principal, team, updated, comment); err != nil {
+				return domain.Task{}, err
+			}
+		}
+		leader, err := a.reportRequirementIfFinishedLocked(ctx, tx, updated)
+		if err != nil {
+			return domain.Task{}, err
+		}
+		toWake = append(toWake, leader)
+	case asReviewer && task.RejectCount+1 > settings.ReviewRejectLimit:
+		// One send-back too many: the task stays in review and the leader is
+		// woken with every reason so far.
+		if err := sqlite.SetTaskRejectCount(ctx, tx, task.ID, task.RejectCount+1); err != nil {
+			return domain.Task{}, err
+		}
+		if updated, err = sqlite.GetTask(ctx, tx, task.ID); err != nil {
+			return domain.Task{}, err
+		}
+		leader, err := a.enqueueReviewEscalationLocked(ctx, tx, principal, team, updated, settings.ReviewRejectLimit)
+		if err != nil {
+			return domain.Task{}, err
+		}
+		toWake = append(toWake, leader)
+	default:
+		count := 0 // the leader's or the user's decision starts a fresh count
+		if asReviewer {
+			count = task.RejectCount + 1
+		}
+		if err := sqlite.SetTaskRejectCount(ctx, tx, task.ID, count); err != nil {
+			return domain.Task{}, err
+		}
 		if updated, err = sqlite.UpdateTaskStatusTx(ctx, tx, task.ID, domain.TaskDoing, "", 0); err != nil {
 			return domain.Task{}, err
 		}
-		if ownerToWake, err = a.enqueueRejectionLocked(ctx, tx, principal, team, updated, comment); err != nil {
+		text := fmt.Sprintf("任务「%s」验收未通过（任务 ID：%s）：%s\n改好后再用 deliver_task 交付。", task.Title, task.ID, comment)
+		if asReviewer {
+			text = fmt.Sprintf("任务「%s」评审未通过（任务 ID：%s，第 %d 次打回）：%s\n改好后再用 deliver_task 交付，会再送评审。", task.Title, task.ID, count, comment)
+		}
+		owner, err := a.enqueueRejectionLocked(ctx, tx, principal, team, updated, text)
+		if err != nil {
 			return domain.Task{}, err
 		}
+		toWake = append(toWake, owner)
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, updated); err != nil {
 		return domain.Task{}, err
@@ -185,48 +265,42 @@ func (a *App) ReviewTask(ctx context.Context, principal auth.Principal, taskID s
 	for _, dependent := range activated {
 		a.recordTaskUpdated(ctx, dependent)
 	}
-	if a.Scheduler != nil {
-		if ownerToWake != "" {
-			a.Scheduler.Wake(ownerToWake)
-		}
-		for _, dependent := range activated {
-			a.Scheduler.Wake(dependent.OwnerID)
-		}
-	}
+	a.wakeAll(toWake, activated)
 	return updated, nil
 }
 
+// wakeAll wakes the members a change reached and the owners of the tasks it
+// released.
+func (a *App) wakeAll(botIDs []string, released []domain.Task) {
+	if a.Scheduler == nil {
+		return
+	}
+	for _, id := range botIDs {
+		if id != "" {
+			a.Scheduler.Wake(id)
+		}
+	}
+	for _, task := range released {
+		a.Scheduler.Wake(task.OwnerID)
+	}
+}
+
 // enqueueRejectionLocked tells the owner its delivery was sent back and why,
-// as a message from the leader that wakes it. It reports the owner to wake.
-func (a *App) enqueueRejectionLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, team domain.Team, task domain.Task, comment string) (string, error) {
+// as a message from the reviewer or the leader that wakes it. It reports the
+// owner to wake.
+func (a *App) enqueueRejectionLocked(ctx context.Context, tx *sql.Tx, principal auth.Principal, team domain.Team, task domain.Task, text string) (string, error) {
 	if task.OwnerID == "" || task.OwnerID == team.LeaderID {
 		return "", nil
 	}
-	text := fmt.Sprintf("任务「%s」验收未通过（任务 ID：%s）：%s\n改好后再用 deliver_task 交付。", task.Title, task.ID, comment)
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
-	if err != nil {
-		return "", err
-	}
 	source := ""
-	if principal.Kind == auth.KindBot {
-		source = principal.BotID
-	}
-	message := domain.Message{
-		ID: domain.NewID(), TeamID: task.TeamID, BotID: task.OwnerID,
-		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: task.ID,
-		SourceBotID: source,
-	}
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
-		return "", err
-	}
 	chain := ""
 	if principal.Kind == auth.KindBot {
+		source = principal.BotID
 		chain = chainOfRunLocked(ctx, tx, principal.BotID)
 	}
-	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
-		ID: domain.NewID(), MessageID: message.ID, TeamID: task.TeamID, TargetBotID: task.OwnerID,
-		Status: domain.DeliveryQueued, ChainID: chain, TaskID: task.ID,
-		SourceRunID: principal.RunID, Kind: "review_result",
+	if err := enqueueSystemMessageLocked(ctx, tx, systemMessage{
+		teamID: task.TeamID, target: task.OwnerID, source: source, text: text, about: task.ID,
+		taskID: task.ID, chainID: chain, sourceRun: principal.RunID, kind: "review_result",
 	}); err != nil {
 		return "", err
 	}
@@ -324,7 +398,7 @@ func (a *App) taskLines(ctx context.Context, teamID, ownerID string) ([]TaskLine
 					continue
 				}
 			}
-			if depTask.Status != domain.TaskDone {
+			if blocksDependents(depTask) {
 				line.WaitingOn = append(line.WaitingOn, depTask.Title)
 			}
 		}

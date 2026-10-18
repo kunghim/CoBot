@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -185,5 +186,42 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	<-requests
 	if p := (<-requests)["params"].(map[string]any); p["cursor"] != "page-2" {
 		t.Fatal("model cursor lost", p)
+	}
+}
+
+// A turn/start Codex answers with an error never started, unlike one whose
+// answer never came; the refusal also drops the thread's loaded mark.
+func TestTurnStartRefusalIsTellableFromAnUnknownOutcome(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	server := &Server{pending: map[string]pendingApproval{}, intents: map[string]string{}}
+	client := NewClient(nopCloser{inW}, outR, ClientHooks{})
+	server.client = client
+	t.Cleanup(func() { inW.Close(); outW.Close(); client.Wait() })
+	go func() {
+		scanner := bufio.NewScanner(inR)
+		for scanner.Scan() {
+			var req map[string]any
+			if json.Unmarshal(scanner.Bytes(), &req) != nil {
+				return
+			}
+			// The refused thread gets an error; the other is never answered.
+			if params, _ := req["params"].(map[string]any); params["threadId"] == "refused" {
+				writeJSONLine(outW, map[string]any{"id": req["id"], "error": map[string]any{"code": -32600, "message": "thread not found"}})
+			}
+		}
+	}()
+	server.setLoaded("refused", true)
+	_, err := server.StartTurn(context.Background(), "refused", "hi", engine.TurnOptions{})
+	if !errors.Is(err, engine.ErrRejected) {
+		t.Fatalf("refusal = %v, want ErrRejected", err)
+	}
+	if server.ThreadLoaded("refused") {
+		t.Fatal("a refused thread must be resumed before its next turn")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := server.StartTurn(ctx, "silent", "hi", engine.TurnOptions{}); err == nil || errors.Is(err, engine.ErrRejected) {
+		t.Fatalf("no answer = %v, want an unknown outcome", err)
 	}
 }

@@ -107,6 +107,9 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if question.Status != domain.QuestionOpen {
 		return domain.Question{}, domain.Conflict("error.question.already_answered", map[string]any{"status": question.Status})
 	}
+	if question.Kind == domain.QuestionKindAcceptance {
+		return domain.Question{}, domain.InvalidRequest("error.question.acceptance_decision", nil)
+	}
 	if strings.TrimSpace(answerText) == "" {
 		return domain.Question{}, domain.InvalidRequest("error.question.answer_required", nil)
 	}
