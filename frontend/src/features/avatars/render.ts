@@ -87,28 +87,57 @@ function draws(series: AvatarSeries, avatar: ComposedAvatar): boolean {
 }
 
 /** A chosen avatar's series and parts, when the cached catalog can draw it. */
-function chosen(catalog: AvatarCatalog | undefined, ref: AvatarRef | undefined | null): { series: AvatarSeries; avatar: ComposedAvatar } | null {
-  if (!ref || ref.kind !== 'catalog') return null;
+/** A composed avatar of a cached series. */
+export interface Composed {
+  kind: 'composed';
+  series: AvatarSeries;
+  avatar: ComposedAvatar;
+}
+
+/** What a member shows: a composed avatar or a local picture. */
+export type Resolved = Composed | { kind: 'upload'; file: string };
+
+function chosen(catalog: AvatarCatalog | undefined, ref: AvatarRef | undefined | null): Resolved | null {
+  if (ref?.kind === 'upload' && ref.file) return { kind: 'upload', file: ref.file };
+  if (ref?.kind !== 'catalog' || !ref.shape || !ref.eyes || !ref.color) return null;
   const series = catalog?.series.find((entry) => entry.id === ref.series);
   const avatar = { shape: ref.shape, eyes: ref.eyes, color: ref.color };
-  return series && draws(series, avatar) ? { series, avatar } : null;
+  return series && draws(series, avatar) ? { kind: 'composed', series, avatar } : null;
+}
+
+/** The catalog default for a role. */
+function roleDefault(catalog: AvatarCatalog | undefined, roleId: string): Composed | null {
+  const series = defaultSeries(catalog);
+  const avatar = series ? roleAvatar(series, roleId) : null;
+  return series && avatar ? { kind: 'composed', series, avatar } : null;
 }
 
 /**
  * The avatar a member shows: its own, else the one chosen for its role, else
- * the catalog's default for the role. Null until a catalog is cached.
+ * the catalog's default for the role. Null until a catalog is cached (a
+ * local picture shows without one).
  */
 export function resolveAvatar(
   catalog: AvatarCatalog | undefined,
   roleId: string,
   own?: AvatarRef | null,
   role?: AvatarRef | null,
-): { series: AvatarSeries; avatar: ComposedAvatar } | null {
-  const picked = chosen(catalog, own) ?? chosen(catalog, role);
-  if (picked) return picked;
-  const series = defaultSeries(catalog);
-  const avatar = series ? roleAvatar(series, roleId) : null;
-  return series && avatar ? { series, avatar } : null;
+): Resolved | null {
+  return chosen(catalog, own) ?? chosen(catalog, role) ?? roleDefault(catalog, roleId);
+}
+
+/** Where the picker starts composing: the shown avatar if it is composed,
+ * else the role's composed choice or default. */
+export function composedStart(
+  catalog: AvatarCatalog | undefined,
+  roleId: string,
+  own?: AvatarRef | null,
+  role?: AvatarRef | null,
+): Composed | null {
+  for (const candidate of [chosen(catalog, own), chosen(catalog, role)]) {
+    if (candidate?.kind === 'composed') return candidate;
+  }
+  return roleDefault(catalog, roleId);
 }
 
 /** The reference that stores a choice. */

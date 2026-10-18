@@ -2,7 +2,12 @@ package integration
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -182,5 +187,119 @@ func TestMemberAndRoleAvatarsAreStored(t *testing.T) {
 	}
 	if got := roleAvatar(); got != nil {
 		t.Fatalf("cleared role avatar = %v", got)
+	}
+}
+
+func pngOf(t *testing.T, side int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, side, side))
+	for x := 0; x < side; x++ {
+		img.Set(x, x, color.RGBA{R: 200, A: 255})
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// A local picture is kept in the data root, served back only to the user,
+// and can become a member's avatar; anything but a 256×256 PNG is refused.
+func TestLocalPicturesBecomeAvatars(t *testing.T) {
+	missing := httptest.NewServer(http.NotFoundHandler())
+	defer missing.Close()
+	c := startCoreWithAssets(t, missing.URL+"/assets/")
+	csrf := map[string]string{"X-CSRF-Token": c.csrf}
+	request := func() string { return fmt.Sprintf("req-%d", time.Now().UnixNano()) }
+	upload := func(data []byte) (*http.Response, map[string]any) {
+		return c.do("POST", "/api/v1/avatars/uploads", map[string]any{"requestId": request(), "data": base64.StdEncoding.EncodeToString(data)}, csrf)
+	}
+
+	if resp, body := upload(pngOf(t, 100)); resp.StatusCode != 400 {
+		t.Fatalf("a 100px picture was accepted: %d %v", resp.StatusCode, body)
+	}
+	if resp, body := upload([]byte("GIF89a not a png")); resp.StatusCode != 400 {
+		t.Fatalf("a non-PNG was accepted: %d %v", resp.StatusCode, body)
+	}
+	picture := pngOf(t, 256)
+	resp, body := upload(picture)
+	if resp.StatusCode != 201 {
+		t.Fatalf("upload: %d %v", resp.StatusCode, body)
+	}
+	file := body["data"].(map[string]any)["file"].(string)
+
+	req, _ := http.NewRequest("GET", c.base+"/api/v1/avatars/uploads/"+file, nil)
+	req.Header.Set("Cookie", c.cookieHeader())
+	got, err := c.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	served, _ := io.ReadAll(got.Body)
+	got.Body.Close()
+	if got.StatusCode != 200 || !bytes.Equal(served, picture) || got.Header.Get("Content-Type") != "image/png" || got.Header.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("served %d %q %q, %d bytes", got.StatusCode, got.Header.Get("Content-Type"), got.Header.Get("X-Content-Type-Options"), len(served))
+	}
+	anonymous, _ := http.Get(c.base + "/api/v1/avatars/uploads/" + file)
+	if anonymous.StatusCode != 401 {
+		t.Fatalf("picture served without a session: %d", anonymous.StatusCode)
+	}
+	anonymous.Body.Close()
+
+	resp, body = c.do("POST", "/api/v1/teams", map[string]any{
+		"requestId": request(), "name": "图片", "directory": t.TempDir(), "initialRoleIds": []string{"frontend-dev"},
+	}, csrf)
+	if resp.StatusCode != 201 {
+		t.Fatalf("create team: %d %v", resp.StatusCode, body)
+	}
+	leader := body["data"].(map[string]any)["bots"].([]any)[0].(map[string]any)
+	path := "/api/v1/bots/" + leader["id"].(string)
+	gone := map[string]any{"kind": "upload", "file": strings.Repeat("a", 64) + ".png"}
+	if resp, body := c.do("PATCH", path, map[string]any{"requestId": request(), "expectedRevision": leader["revision"], "avatar": gone}, csrf); resp.StatusCode != 400 {
+		t.Fatalf("a picture that is not stored was accepted: %d %v", resp.StatusCode, body)
+	}
+	resp, body = c.do("PATCH", path, map[string]any{"requestId": request(), "expectedRevision": leader["revision"], "avatar": map[string]any{"kind": "upload", "file": file}}, csrf)
+	if resp.StatusCode != 200 {
+		t.Fatalf("set picture avatar: %d %v", resp.StatusCode, body)
+	}
+	if avatar := body["data"].(map[string]any)["avatar"].(map[string]any); avatar["file"] != file {
+		t.Fatalf("avatar = %v", avatar)
+	}
+}
+
+// Pictures nothing uses are removed as the core starts; recent ones stay,
+// since a choice is saved right after its upload.
+func TestUnusedPicturesAreCleanedAtStart(t *testing.T) {
+	root := t.TempDir()
+	uploads := filepath.Join(root, "avatars", "uploads")
+	if err := os.MkdirAll(uploads, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	unused := filepath.Join(uploads, strings.Repeat("b", 64)+".png")
+	leftover := filepath.Join(uploads, ".upload-123")
+	recent := filepath.Join(uploads, strings.Repeat("c", 64)+".png")
+	for _, path := range []string{unused, leftover, recent} {
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.Chtimes(unused, old, old)
+	_ = os.Chtimes(leftover, old, old)
+
+	startCore(t, platform.EnvDevelopment, root)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		_, errUnused := os.Stat(unused)
+		_, errLeftover := os.Stat(leftover)
+		if os.IsNotExist(errUnused) && os.IsNotExist(errLeftover) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("unused pictures were not cleaned")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err := os.Stat(recent); err != nil {
+		t.Fatalf("a recent picture was removed: %v", err)
 	}
 }

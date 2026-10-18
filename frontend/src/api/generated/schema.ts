@@ -124,6 +124,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avatars/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep a local picture (already cropped to a 256×256 PNG) for use as an avatar; it stays in the data root */
+        post: operations["saveAvatarUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/uploads/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A stored avatar picture */
+        get: operations["getAvatarUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/avatars/catalog": {
         parameters: {
             query?: never;
@@ -1208,14 +1242,15 @@ export interface components {
                 lastError?: string;
             };
         };
-        /** @description An avatar the user chose, by catalog parts; never an image */
+        /** @description An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image. */
         AvatarRef: {
             /** @enum {string} */
-            kind: "catalog";
-            series: string;
-            shape: string;
-            eyes: string;
-            color: string;
+            kind: "catalog" | "upload";
+            series?: string;
+            shape?: string;
+            eyes?: string;
+            color?: string;
+            file?: string;
         };
         AvatarSeries: {
             id: string;
@@ -1682,6 +1717,66 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    saveAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /**
+                     * Format: byte
+                     * @description Base64 PNG
+                     */
+                    data: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored picture */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            file: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
             404: components["responses"]["Error"];
         };
     };

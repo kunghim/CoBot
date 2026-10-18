@@ -47,6 +47,7 @@ const (
 // Defines values for AvatarRefKind.
 const (
 	Catalog AvatarRefKind = "catalog"
+	Upload  AvatarRefKind = "upload"
 )
 
 // Defines values for BotStatus.
@@ -389,13 +390,14 @@ type AvatarCatalog struct {
 	} `json:"status"`
 }
 
-// AvatarRef An avatar the user chose, by catalog parts; never an image
+// AvatarRef An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image.
 type AvatarRef struct {
-	Color  string        `json:"color"`
-	Eyes   string        `json:"eyes"`
+	Color  *string       `json:"color,omitempty"`
+	Eyes   *string       `json:"eyes,omitempty"`
+	File   *string       `json:"file,omitempty"`
 	Kind   AvatarRefKind `json:"kind"`
-	Series string        `json:"series"`
-	Shape  string        `json:"shape"`
+	Series *string       `json:"series,omitempty"`
+	Shape  *string       `json:"shape,omitempty"`
 }
 
 // AvatarRefKind defines model for AvatarRef.Kind.
@@ -425,7 +427,7 @@ type BootstrapResult struct {
 
 // Bot defines model for Bot.
 type Bot struct {
-	// Avatar An avatar the user chose, by catalog parts; never an image
+	// Avatar An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image.
 	Avatar       *AvatarRef `json:"avatar,omitempty"`
 	CreatedAt    time.Time  `json:"createdAt"`
 	CurrentRunId *string    `json:"currentRunId,omitempty"`
@@ -999,6 +1001,13 @@ type SyncAvatarCatalogJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// SaveAvatarUploadJSONBody defines parameters for SaveAvatarUpload.
+type SaveAvatarUploadJSONBody struct {
+	// Data Base64 PNG
+	Data      []byte             `json:"data"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteBotParams defines parameters for DeleteBot.
 type DeleteBotParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -1272,6 +1281,9 @@ type RevokeAuthorizationJSONRequestBody RevokeAuthorizationJSONBody
 
 // SyncAvatarCatalogJSONRequestBody defines body for SyncAvatarCatalog for application/json ContentType.
 type SyncAvatarCatalogJSONRequestBody SyncAvatarCatalogJSONBody
+
+// SaveAvatarUploadJSONRequestBody defines body for SaveAvatarUpload for application/json ContentType.
+type SaveAvatarUploadJSONRequestBody SaveAvatarUploadJSONBody
 
 // PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
 type PatchBotJSONRequestBody PatchBotJSONBody

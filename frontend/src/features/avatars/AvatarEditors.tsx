@@ -7,7 +7,7 @@ import type { AvatarRef, Bot, Role } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import Avatar from './Avatar';
 import AvatarPicker from './AvatarPicker';
-import { resolveAvatar } from './render';
+import { composedStart } from './render';
 
 /** A member's avatar that opens the picker for the member's own avatar. */
 export function MemberAvatarButton({ bot, disabled = false }: { bot: Bot; disabled?: boolean }) {
@@ -37,7 +37,8 @@ export function MemberAvatarButton({ bot, disabled = false }: { bot: Bot; disabl
       <AvatarPicker
         open={open}
         title={t('avatar.memberTitle', { name: bot.name })}
-        current={resolveAvatar(catalog.data, roleId, bot.avatar, roleChoice)}
+        start={composedStart(catalog.data, roleId, bot.avatar, roleChoice)}
+        currentPicture={pictureOf(bot.avatar) ?? pictureOf(roleChoice)}
         hasOwn={!!bot.avatar}
         pending={setAvatar.isPending}
         errorText={setAvatar.isError ? apiErrorMessage(t, setAvatar.error) : ''}
@@ -77,7 +78,8 @@ export function RoleAvatarRow({ role }: { role: Role }) {
       <AvatarPicker
         open={open}
         title={t('avatar.roleTitle', { name })}
-        current={resolveAvatar(catalog.data, role.id, null, role.avatar)}
+        start={composedStart(catalog.data, role.id, null, role.avatar)}
+        currentPicture={pictureOf(role.avatar)}
         hasOwn={!!role.avatar}
         pending={setAvatar.isPending}
         errorText={setAvatar.isError ? apiErrorMessage(t, setAvatar.error) : ''}
@@ -86,4 +88,8 @@ export function RoleAvatarRow({ role }: { role: Role }) {
       />
     </li>
   );
+}
+
+function pictureOf(ref: AvatarRef | null | undefined): string | undefined {
+  return ref?.kind === 'upload' ? ref.file : undefined;
 }

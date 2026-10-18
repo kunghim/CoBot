@@ -63,3 +63,34 @@ test('a member can be given its own avatar', async ({ page }) => {
 
   await expect.poll(async () => leader.locator('img').first().getAttribute('src')).not.toBe(before);
 });
+
+// A 2×2 red PNG; the browser crops and scales it to the 256px the core keeps.
+const PICTURE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGO4Y2Nzx8aGAUIBACe+BVHJBGtCAAAAAElFTkSuQmCC', 'base64');
+
+// A picture from this computer becomes a member's avatar.
+test('a member can use a local picture as its avatar', async ({ page }) => {
+  const teamDir = join(process.env.COBOT_E2E_ROOT!, 'avatar-picture-' + Date.now());
+  mkdirSync(teamDir, { recursive: true });
+  await page.goto('/');
+  await page.getByRole('button', { name: /新建团队|create team/i }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/团队名称|team name/i).fill('图片头像团队');
+  await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
+  await dialog.getByRole('button', { name: /创建|create/i }).click();
+
+  const list = page.getByRole('complementary', { name: /团队列表|team list/i });
+  const leader = list.locator('li').filter({ hasText: '图片头像团队' }).getByRole('button', { name: /队长/ }).first();
+  await expect(leader).toBeVisible({ timeout: 15000 });
+  await leader.click();
+
+  await page.getByRole('main').getByRole('button', { name: /更换头像|Change avatar/ }).click();
+  const picker = page.getByRole('dialog');
+  const chooser = page.waitForEvent('filechooser');
+  await picker.getByRole('button', { name: /使用本地图片|Use a picture/ }).click();
+  await (await chooser).setFiles({ name: 'me.png', mimeType: 'image/png', buffer: PICTURE });
+  await expect(picker.getByText(/只保存在这台电脑上|kept on this computer only/)).toBeVisible();
+  await picker.getByRole('button', { name: /使用这个头像|Use this avatar/ }).click();
+  await expect(picker).toBeHidden();
+
+  await expect(leader.locator('img').first()).toHaveAttribute('src', /^blob:/, { timeout: 10000 });
+});

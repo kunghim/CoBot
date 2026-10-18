@@ -291,6 +291,17 @@ export function useAvatarCatalog(enabled = true) {
   });
 }
 
+/** A stored avatar picture as a blob URL; pictures never change. */
+export function useAvatarUpload(file: string | undefined) {
+  return useQuery({
+    queryKey: ['avatarUpload', file ?? ''],
+    queryFn: () => api.getAvatarUpload(file!),
+    enabled: !!file,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
 /** Sets or clears a member's own avatar. */
 export function useSetBotAvatar() {
   const qc = useQueryClient();

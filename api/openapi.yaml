@@ -239,6 +239,59 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/avatars/uploads:
+    post:
+      operationId: saveAvatarUpload
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Keep a local picture (already cropped to a 256×256 PNG) for use as an avatar; it stays in the data root
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, data]
+              properties:
+                requestId: { type: string, format: uuid }
+                data: { type: string, format: byte, description: Base64 PNG, at most 512 KB }
+      responses:
+        "201":
+          description: Stored picture
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [file]
+                        properties:
+                          file: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/uploads/{file}:
+    get:
+      operationId: getAvatarUpload
+      security:
+        - SessionCookie: []
+      summary: A stored avatar picture
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The picture
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/avatars/catalog:
     get:
       operationId: getAvatarCatalog
@@ -2314,14 +2367,17 @@ components:
             lastError: { type: string }
     AvatarRef:
       type: object
-      description: An avatar the user chose, by catalog parts; never an image
-      required: [kind, series, shape, eyes, color]
+      description: >-
+        An avatar the user chose: catalog parts (kind catalog: series, shape,
+        eyes, color) or a local picture (kind upload: file). Never an image.
+      required: [kind]
       properties:
-        kind: { type: string, enum: [catalog] }
+        kind: { type: string, enum: [catalog, upload] }
         series: { type: string }
         shape: { type: string }
         eyes: { type: string }
         color: { type: string, pattern: "^#[0-9a-f]{6}$" }
+        file: { type: string, pattern: "^[0-9a-f]{64}\\.png$" }
     AvatarSeries:
       type: object
       required: [id, name, kind, version, data]

@@ -380,6 +380,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	if opts.AvatarSync {
 		application.StartAvatarSync()
 	}
+	go application.CleanAvatarUploads(context.Background())
 	if opts.EngineSelfCheck {
 		go func() {
 			info := application.EngineStatus(ctx)

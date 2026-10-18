@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 
@@ -107,4 +108,49 @@ func (s *Server) handlePutRoleAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"roleId": r.PathValue("id"), "avatar": ref})
+}
+
+// handleSaveAvatarUpload stores a picture the interface already cropped to
+// 256×256 PNG; it is kept in the data root and never leaves the computer.
+func (s *Server) handleSaveAvatarUpload(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		RequestID string `json:"requestId"`
+		Data      string `json:"data"`
+	}
+	if err := decodeBody(w, r, &body); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(body.Data)
+	if err != nil {
+		writeError(w, r, domain.InvalidRequest("error.avatar.upload_format", nil))
+		return
+	}
+	name, err := s.App.SaveAvatarUpload(r.Context(), principal, data)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusCreated, map[string]any{"file": name})
+}
+
+func (s *Server) handleGetAvatarUpload(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	path, err := s.App.AvatarUploadPath(principal, r.PathValue("file"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// The name is the content's hash: the file never changes.
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	http.ServeFile(w, r, path)
 }

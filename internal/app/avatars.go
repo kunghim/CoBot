@@ -109,6 +109,9 @@ func (a *App) SetBotAvatar(ctx context.Context, principal auth.Principal, botID 
 			return domain.Bot{}, err
 		}
 	}
+	if err := a.requireUploadExists(ref); err != nil {
+		return domain.Bot{}, err
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Bot{}, err
@@ -157,6 +160,9 @@ func (a *App) SetRoleAvatar(ctx context.Context, principal auth.Principal, roleI
 		if err := ref.Validate(); err != nil {
 			return err
 		}
+	}
+	if err := a.requireUploadExists(ref); err != nil {
+		return err
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {

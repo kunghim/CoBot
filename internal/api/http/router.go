@@ -92,6 +92,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
 	mux.HandleFunc("GET /api/v1/avatars/catalog", s.handleGetAvatarCatalog)
 	mux.HandleFunc("POST /api/v1/avatars/catalog/sync", s.handleSyncAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/uploads", s.handleSaveAvatarUpload)
+	mux.HandleFunc("GET /api/v1/avatars/uploads/{file}", s.handleGetAvatarUpload)
 
 	// Conversations and runs.
 	mux.HandleFunc("GET /api/v1/bots/{id}/messages", s.handleListMessages)
