@@ -242,9 +242,21 @@ export function AlertDialog({ open, onCancel, onConfirm, title, description, con
   );
 }
 
-/** A side panel over the page (team list or work panel on narrow screens). */
-export function Sheet({ open, onClose, side = 'right', title, children, closeLabel }: { open: boolean; onClose: () => void; side?: 'left' | 'right'; title: ReactNode; children: ReactNode; closeLabel: string }) {
+/**
+ * A side panel over the page (team list or work panel on narrow screens).
+ * Without a title the content brings its own header and close control;
+ * label then names the panel.
+ */
+export function Sheet({ open, onClose, side = 'right', title, label, children, closeLabel }: { open: boolean; onClose: () => void; side?: 'left' | 'right'; title?: ReactNode; label?: string; children: ReactNode; closeLabel?: string }) {
   const id = useId();
+  if (title === undefined) {
+    return (
+      <Modal open={open} onClose={onClose} position={side} labelledBy={`${id}-label`}>
+        <span id={`${id}-label`} className="sr-only">{label}</span>
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      </Modal>
+    );
+  }
   return (
     <Modal open={open} onClose={onClose} position={side} labelledBy={`${id}-title`}>
       <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">

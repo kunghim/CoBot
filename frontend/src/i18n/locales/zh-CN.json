@@ -1,12 +1,15 @@
 {
   "app": { "title": "CoBot" },
+  "common": { "close": "关闭" },
   "nav": {
     "home": "首页",
     "settings": "设置",
     "teamList": "团队列表",
     "workPanel": "工作面板",
-    "toggleTeamList": "收起/展开团队列表",
-    "toggleWorkPanel": "收起/展开工作面板"
+    "openTeamList": "展开团队列表",
+    "closeTeamList": "收起团队列表",
+    "openWorkPanel": "展开工作面板",
+    "closeWorkPanel": "收起工作面板"
   },
   "home": {
     "noTeams": "还没有团队。创建团队后，队长与成员会在这里协作。",

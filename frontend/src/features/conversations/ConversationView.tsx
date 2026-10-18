@@ -4,6 +4,7 @@
 // above the composer, and the interrupt control while a run is active.
 // User text is shown verbatim; member replies render as Markdown without
 // raw HTML.
+import { ShellToggle } from '../../app/shell';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, Loader2, Square, X } from 'lucide-react';
@@ -140,9 +141,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   return (
     <TeamMembersContext.Provider value={membersByName}>
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-5 py-2 lg:pr-14 dark:border-neutral-800">
+      <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+        <ShellToggle side="left" />
         <MemberAvatarButton bot={bot} disabled={readOnly} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold leading-5">{headerTitle}</p>
           <p className="flex min-w-0 items-baseline gap-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
             <span className="shrink-0">{team.name}</span>
@@ -154,6 +156,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             )}
           </p>
         </div>
+        <ShellToggle side="right" />
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col">

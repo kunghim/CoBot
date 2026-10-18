@@ -1,12 +1,15 @@
 {
   "app": { "title": "CoBot" },
+  "common": { "close": "Close" },
   "nav": {
     "home": "Home",
     "settings": "Settings",
     "teamList": "Team list",
     "workPanel": "Work panel",
-    "toggleTeamList": "Collapse/expand team list",
-    "toggleWorkPanel": "Collapse/expand work panel"
+    "openTeamList": "Expand team list",
+    "closeTeamList": "Collapse team list",
+    "openWorkPanel": "Expand work panel",
+    "closeWorkPanel": "Collapse work panel"
   },
   "home": {
     "noTeams": "No teams yet. Create one and the leader and members will collaborate here.",

@@ -4,7 +4,7 @@
 // entries can ask it to show a tab or open a task.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { PanelToggle } from './ui';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
@@ -20,7 +20,8 @@ type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
 
 const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'memory'];
 
-export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
+/** onClose, when given, puts a close toggle in the header (narrow windows). */
+export default function WorkPanel({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
   const { botId } = useSelectedBot();
   const teams = useTeams(true);
@@ -51,16 +52,7 @@ export default function WorkPanel({ onCollapse }: { onCollapse: () => void }) {
             <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">{t('nav.workPanel')}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onCollapse}
-          title={t('nav.toggleWorkPanel')}
-          aria-label={t('nav.toggleWorkPanel')}
-          aria-expanded={true}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+        {onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
       </div>
 
       {context && (

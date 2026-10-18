@@ -4,7 +4,8 @@ import LoadMore from '../../components/LoadMore';
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { PanelToggle } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
@@ -22,7 +23,9 @@ const DOT_CLASS: Record<string, string> = {
   waiting_input: 'bg-orange-500',
 };
 
-export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
+/** onClose, when given, puts a close toggle in the header (narrow windows,
+ * where the list covers the conversation and its header toggle). */
+export default function TeamList({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
   const { botId, setBotId } = useSelectedBot();
   const navigate = useNavigate();
@@ -60,20 +63,11 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-3 py-3">
+      <div className="flex min-h-14 items-center justify-between px-3 py-2">
         <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
           {t('nav.teamList')}
         </span>
-        <button
-          type="button"
-          onClick={onCollapse}
-          title={t('nav.toggleTeamList')}
-          aria-label={t('nav.toggleTeamList')}
-          aria-expanded={true}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        {onClose && <PanelToggle side="left" open onToggle={onClose} openLabel={t('nav.openTeamList')} closeLabel={t('nav.closeTeamList')} />}
       </div>
 
       <div className="px-3 pb-2">

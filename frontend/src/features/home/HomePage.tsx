@@ -10,6 +10,7 @@ import ConversationView from '../conversations/ConversationView';
 import CreateTeamDialog from '../teams/CreateTeamDialog';
 import Avatar from '../avatars/Avatar';
 import { findBotContext } from '../teams/teamUtils';
+import { ShellToggle } from '../../app/shell';
 
 // The built-in lineup a new team starts from, in the order a request flows.
 const LINEUP = [
@@ -40,7 +41,12 @@ export default function HomePage() {
   });
 
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto p-8">
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-14 items-center justify-between px-3 py-2">
+        <ShellToggle side="left" />
+        <ShellToggle side="right" />
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-8 pb-14">
       <div className="w-full max-w-lg">
         {teams.isSuccess && leaders.length === 0 ? (
           <>
@@ -86,6 +92,7 @@ export default function HomePage() {
             )}
           </>
         )}
+      </div>
       </div>
       <CreateTeamDialog
         open={createOpen}

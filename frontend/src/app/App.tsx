@@ -7,6 +7,7 @@ import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/querie
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
+import { ToastProvider } from '../components/ui';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
@@ -126,6 +127,7 @@ export default function App() {
   }
 
   return (
+    <ToastProvider closeLabel={t('common.close')}>
     <SelectedBotProvider>
       <Routes>
         <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
@@ -136,5 +138,6 @@ export default function App() {
         </Route>
       </Routes>
     </SelectedBotProvider>
+    </ToastProvider>
   );
 }
