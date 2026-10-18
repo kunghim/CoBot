@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "series": [
+    {
+      "id": "dango",
+      "name": {
+        "zh-CN": "团子",
+        "en": "Dango"
+      },
+      "kind": "composed",
+      "version": 1,
+      "file": "dango/dist/dango.json",
+      "sha256": "80e20b2141a9fe77419f532b5676741b2455ebfe01eed5c1823203cc29a6bc57",
+      "size": 40756
+    }
+  ]
+}

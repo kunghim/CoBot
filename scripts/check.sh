@@ -10,6 +10,9 @@ echo "==> public file policy"
 node scripts/check-public-files.mjs
 node --test scripts/repository-policy.test.mjs
 
+echo "==> avatar catalog"
+node assets/avatars/build.mjs --check
+
 echo "==> gofmt"
 bad=$(gofmt -l cmd internal tests || true)
 if [ -n "$bad" ]; then

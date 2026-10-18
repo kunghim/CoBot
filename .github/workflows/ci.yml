@@ -27,6 +27,8 @@ jobs:
         run: node scripts/check-pr-route.mjs
       - name: Test repository policy enforcement
         run: node --test scripts/repository-policy.test.mjs
+      - name: Check the avatar catalog is built from its sources
+        run: node assets/avatars/build.mjs --check
 
   web-core:
     name: web/shared core (ubuntu)

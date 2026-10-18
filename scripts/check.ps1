@@ -15,6 +15,10 @@ if ($LASTEXITCODE -ne 0) { throw "public file policy failed" }
 node --test scripts/repository-policy.test.mjs
 if ($LASTEXITCODE -ne 0) { throw "repository policy tests failed" }
 
+Write-Host "==> avatar catalog"
+node assets/avatars/build.mjs --check
+if ($LASTEXITCODE -ne 0) { throw "avatar catalog is out of date; run node assets/avatars/build.mjs" }
+
 Write-Host "==> gofmt"
 $bad = gofmt -l cmd internal tests
 if ($bad) { throw "gofmt needed on:`n$bad" }
