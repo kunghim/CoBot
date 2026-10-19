@@ -110,6 +110,7 @@ the agent you already trust.
 | Windows standalone server build | Builds and runs |
 | Windows desktop shell (Wails/WebView2) | **Beta downloads available.** Desktop startup and installer lifecycle checked in Windows Sandbox; see the release notes for limitations |
 | macOS ARM64 desktop | Local ZIP smoke test passed on macOS 26.6.2 with Codex 0.146.0: sign-in, messages, task handoff/delivery/acceptance, file tools, command approval/rejection and restart. Intel Macs and notarized distribution remain unverified |
+| macOS Intel (x86_64) desktop | Cross-built shell/helper, UI startup, native directory dialog, team creation/restart and shared-core tests passed under Rosetta on Apple Silicon. Physical Intel Mac and Intel Codex end-to-end use remain unverified |
 | Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
 
 With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
@@ -191,6 +192,10 @@ npm ci --prefix frontend
 For the macOS desktop package, also provide Wails CLI v2.15.0 and the Apple
 command-line build tools, then run `./scripts/build.sh --target desktop --version 0.1.0-beta.1`.
 On Apple Silicon this writes `.tmp/dist/CoBot-0.1.0-beta.1-macos-arm64.zip`.
+Use `--arch arm64` for Apple Silicon or `--arch amd64` for Intel; the ZIP name
+includes the selected architecture, and both shell and helper target it.
+Intel builds can be smoke-tested through an existing Rosetta installation on
+Apple Silicon, which does not replace testing on a physical Intel Mac.
 Extract it and keep the entire `CoBot.app` bundle together. It uses the production
 profile by default. For an isolated trial, launch its executable with an explicit
 `--data-root <empty-directory>`; the temporary root still uses production semantics.

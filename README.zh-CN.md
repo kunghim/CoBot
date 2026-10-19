@@ -87,6 +87,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | Windows 独立服务构建 | 可构建、可运行 |
 | Windows 桌面壳（Wails/WebView2） | **已提供测试版下载**；已在 Windows 沙盒检查桌面启动与安装生命周期，验证限制见发布说明 |
 | macOS ARM64 桌面 | 本机 ZIP 已在 macOS 26.6.2、Codex 0.146.0 上通过冒烟测试：登录、消息、任务交接/交付/验收、文件工具、命令审批允许/拒绝及重启。Intel Mac 与公证发行尚未验证 |
+| macOS Intel（x86_64）桌面 | 已交叉构建主程序和助手；在 Apple Silicon 的 Rosetta 下通过界面启动、原生目录对话框、创建团队/重启及共享核心测试。Intel 真机及 Intel Codex 端到端使用尚未验证 |
 | Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
 
 在 Windows 上用真实 Codex 验证过的内容：登录、多成员并行、任务交接与提问、原生文件审批与拒绝、
@@ -157,6 +158,9 @@ npm ci --prefix frontend
 构建 macOS 桌面包还需 Wails CLI v2.15.0 和 Apple 命令行构建工具，然后运行
 `./scripts/build.sh --target desktop --version 0.1.0-beta.1`。
 Apple Silicon 产物为 `.tmp/dist/CoBot-0.1.0-beta.1-macos-arm64.zip`。
+可用 `--arch arm64` 指定 Apple Silicon，或用 `--arch amd64` 指定 Intel；
+ZIP 文件名包含目标架构，主程序与助手保持一致。
+Apple Silicon 可通过已安装的 Rosetta 做 Intel 包冒烟测试，但不能代替 Intel 真机验收。
 解压后保持整个 `CoBot.app` 完整。桌面包默认使用 production profile；隔离试用时，
 为包内可执行文件传入 `--data-root <空目录>`，该临时目录仍按 production 规则运行。
 包使用本地 ad-hoc 签名，没有 Developer ID 签名或公证；Gatekeeper 评估会拒绝该本地包，下载后的安装尚未验收。
