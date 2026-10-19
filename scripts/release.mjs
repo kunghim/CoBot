@@ -97,7 +97,7 @@ export function releaseNotes({ version, msiVersion, sourceCommit, repository, ru
     '- Windows x64：任选 MSI 安装包或完整 ZIP；ZIP 解压后保留主程序旁的两个助手。系统需已有 WebView2 Runtime。',
     '- macOS Apple Silicon：打开 ARM64 DMG，将 CoBot.app 复制到「应用程序」，弹出映像后启动。暂不提供 Intel 包。',
     '- 另行安装官方 Codex CLI（Windows 最低 0.161.0，macOS 最低 0.146.0），在 CoBot 的私有环境中独立登录。',
-    '- 程序未进行发行签名；macOS 也未公证。信任软件来源后，可参照 Apple 的单个应用首次打开步骤：https://support.apple.com/zh-cn/102445；不要全局关闭 Gatekeeper。',
+    '- 程序未进行发行签名；macOS 也未公证。信任软件来源后，可参照 [Apple 的单个应用首次打开步骤](https://support.apple.com/zh-cn/102445)；不要全局关闭 Gatekeeper。',
     '- 本流水线不执行真实账号、Agent 审批或交互安装验收。公开发布前，请补充下载包安装、首次打开、必要的真实 Agent 测试结果及未测范围。',
     '- 更新前关闭程序并保留完整数据目录；目前没有自动更新。', '',
   ].join('\n');

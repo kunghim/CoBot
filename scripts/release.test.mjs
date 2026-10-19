@@ -93,4 +93,5 @@ test('notes distinguish automation from real-account and installation acceptance
   assert.match(notes, /Before publishing this draft/);
   assert.match(notes, /does not perform them/);
   assert.match(notes, /macOS 最低 0.146.0/);
+  assert.match(notes, /\]\(https:\/\/support\.apple\.com\/zh-cn\/102445\)；/);
 });
