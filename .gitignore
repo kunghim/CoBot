@@ -1,6 +1,9 @@
 .tmp/
 .idea/
 
+# Contributor-private documentation and optional local context.
+/.local/
+
 # Private by default; publish selected documents through scripts/public-files-policy.json.
 /docs/**
 
@@ -80,4 +83,11 @@ Desktop.ini
 /.*
 !/.github/
 !/.gitignore
+!/AGENTS.md
+!/CLAUDE.md
+!/docs/
+!/docs/development.md
+!/docs/ai-coding.md
+!/docs/dependencies.md
+!/docs/upgrading.md
 # END managed public file exceptions
