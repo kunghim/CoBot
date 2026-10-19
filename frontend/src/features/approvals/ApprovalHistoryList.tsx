@@ -3,7 +3,7 @@
 // the full request.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, Skeleton } from '../../components/ui';
 import { useApprovals, useTeams } from '../../api/queries';
 import type { Approval, Bot } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
@@ -17,14 +17,14 @@ export default function ApprovalHistoryList({ teamId, viewBotId }: { teamId: str
   const { t } = useTranslation();
   const history = useApprovals(teamId, 'history', true, viewBotId);
   const teams = useTeams();
-  if (history.isPending) return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
-  if (history.isError && !history.data) return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('approvals.historyLoadFailed')}</p>;
+  if (history.isPending) return <div className="space-y-2 px-3 py-3" role="status" aria-label={t('status.loading')}><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>;
+  if (history.isError && !history.data) return <div className="px-3 py-3"><Alert tone="danger">{t('approvals.historyLoadFailed')}</Alert></div>;
   const items = history.data?.items ?? [];
-  if (!items.length) return <p className="px-3 py-2 text-sm text-neutral-500">{t('approvals.historyEmpty')}</p>;
+  if (!items.length) return <EmptyState icon={<Icons.approvals size={20} aria-hidden />} title={t('approvals.historyEmpty')} />;
   const bots = teams.data?.items.find((item) => item.team.id === teamId)?.bots ?? [];
   return (
     <div>
-      <ul className="divide-y divide-neutral-100 px-3 py-1 dark:divide-neutral-800">
+      <ul className="divide-y divide-neutral-200 px-3 py-1 dark:divide-neutral-800">
         {items.map((approval) => approval.decision && <HistoryRow key={approval.id} approval={approval} bots={bots} />)}
       </ul>
       <LoadMore page={history} />
@@ -58,23 +58,21 @@ function HistoryRow({ approval, bots }: { approval: Approval; bots: Bot[] }) {
 
   return (
     <li className="py-2 text-xs">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-start gap-1.5 rounded text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/60">
-        <span className="mt-0.5 shrink-0 text-neutral-400">{open ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}</span>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={cx('-mx-1.5 flex w-[calc(100%+0.75rem)] items-start gap-1.5 rounded-lg px-1.5 py-1 text-left transition-colors', interactive.hover)}>
+        <span className="mt-0.5 shrink-0 text-neutral-400">{open ? <Icons.expand size={12} aria-hidden /> : <Icons.next size={12} aria-hidden />}</span>
         <span className="min-w-0 flex-1 space-y-0.5">
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 flex-1 truncate font-medium text-neutral-800 dark:text-neutral-200">
               {t(`approvals.type.${approval.type}`, { defaultValue: t('approvals.title') })} · {requester?.name ?? t('activity.someone')}
             </span>
-            <span className="shrink-0 text-[11px] text-neutral-400">{time}</span>
+            <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{time}</span>
           </span>
           <span className="block truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{headline(approval, t)}</span>
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${declined ? 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300' : 'bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300'}`}>
-              {t('approvals.decisionBy', { actor, choice })}
-            </span>
-            {approval.requestState === 'invalidated' && <span className="text-[10px] text-neutral-400">{t('approvals.laterInvalidatedShort')}</span>}
+            <Badge tone={declined ? 'danger' : 'success'}>{t('approvals.decisionBy', { actor, choice })}</Badge>
+            {approval.requestState === 'invalidated' && <span className="text-[10px] text-neutral-500 dark:text-neutral-400">{t('approvals.laterInvalidatedShort')}</span>}
             {(approval.responseState === 'unknown' || approval.responseState === 'expired') && (
-              <span className="text-[10px] text-amber-600">{t(`approvals.response.${approval.responseState}`)}</span>
+              <span className="text-[10px] text-amber-700 dark:text-amber-400">{t(`approvals.response.${approval.responseState}`)}</span>
             )}
           </span>
         </span>
@@ -89,9 +87,9 @@ function HistoryRow({ approval, bots }: { approval: Approval; bots: Bot[] }) {
           {reason && <p className="text-neutral-600 dark:text-neutral-400">{t('approvals.reason')}：{reason}</p>}
           {decision.comment && <p className="whitespace-pre-wrap">{t('approvals.comment')}：{decision.comment}</p>}
           {requester && (
-            <button type="button" className="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400" onClick={() => setBotId(requester.id)}>
+            <Button variant="ghost" size="sm" icon={Icons.sendMessage} onClick={() => setBotId(requester.id)}>
               {t('approvals.openConversation')}
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -15,7 +15,8 @@ import {
 } from '../../api/queries';
 import type { Bot, Task } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
-import { canConfirm, canOfferTransfer, canRequestReview, canSubmitEvidence, dependencyLabels, nextStatuses, ownerLabel, statusTone } from './taskFlow';
+import { canConfirm, canOfferTransfer, canRequestReview, canSubmitEvidence, dependencyLabels, nextStatuses, ownerLabel } from './taskFlow';
+import { Alert, Button, Icons, Select, Tag, TextInput } from '../../components/ui';
 
 export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: Task[]; bots: Bot[] }) {
   const { t } = useTranslation();
@@ -102,7 +103,7 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
   );
 
   return (
-    <div className="space-y-2 border-t border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700">
+    <div className="space-y-3 border-t border-neutral-200 px-3 py-3 text-sm dark:border-neutral-800">
       {current.description && <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{current.description}</p>}
       {current.acceptanceCriteria && (
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -115,110 +116,87 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
         </p>
       )}
       {current.blockedReason && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <Alert tone="warning">
           {t('tasks.blocked')}: {current.blockedReason}
-        </p>
+        </Alert>
       )}
       {(current.dependencyIds ?? []).length > 0 && (
-        <p className="flex flex-wrap gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
           {t('tasks.dependenciesTitle')}
           {dependencyLabels(current, tasks).map((label) => (
-            <span key={label} className="rounded-full bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-800">
-              {label}
-            </span>
+            <Tag key={label}>{label}</Tag>
           ))}
         </p>
       )}
 
       {/* Evidence: the record that gates review and confirm. */}
-      <section aria-label={t('tasks.evidenceTitle')}>
-        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('tasks.evidenceTitle')}</p>
-        {evidence.length === 0 && <p className="text-xs text-neutral-400">{t('tasks.evidenceEmpty')}</p>}
-        <ul className="mt-1 space-y-1">
+      <section aria-label={t('tasks.evidenceTitle')} className="space-y-1.5">
+        <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('tasks.evidenceTitle')}</p>
+        {evidence.length === 0 && <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('tasks.evidenceEmpty')}</p>}
+        <ul className="space-y-1">
           {evidence.map((item) => (
-            <li key={item.id} className="rounded bg-neutral-50 px-2 py-1 text-xs dark:bg-neutral-800/60">
+            <li key={item.id} className="rounded-lg bg-neutral-900/[0.03] px-2.5 py-1.5 text-xs dark:bg-white/[0.04]">
               <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{item.summary}</p>
               {item.testResult && <p className="text-neutral-500 dark:text-neutral-400">{t('tasks.testResult')}: {item.testResult}</p>}
               {(item.artifactRefs ?? []).length > 0 && (
-                <p className="break-all text-neutral-400">{(item.artifactRefs ?? []).join(', ')}</p>
+                <p className="break-all font-mono text-neutral-500 dark:text-neutral-400">{(item.artifactRefs ?? []).join(', ')}</p>
               )}
             </li>
           ))}
         </ul>
         {canSubmitEvidence(current.status) && (
           <form
-            className="mt-1 space-y-1"
+            className="space-y-1.5"
             onSubmit={(event) => {
               event.preventDefault();
               submitNewEvidence();
             }}
           >
-            <input
-              value={evidenceSummary}
-              onChange={(event) => setEvidenceSummary(event.target.value)}
-              placeholder={t('tasks.evidenceSummaryPlaceholder')}
-              aria-label={t('tasks.evidenceSummaryPlaceholder')}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-            <input
-              value={testResult}
-              onChange={(event) => setTestResult(event.target.value)}
-              placeholder={t('tasks.testResultPlaceholder')}
-              aria-label={t('tasks.testResultPlaceholder')}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-            <input
-              value={artifactRefs}
-              onChange={(event) => setArtifactRefs(event.target.value)}
-              placeholder={t('tasks.artifactRefsPlaceholder')}
-              aria-label={t('tasks.artifactRefsPlaceholder')}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-            <button
-              type="submit"
-              disabled={!evidenceSummary.trim() || submitEvidence.isPending}
-              className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
-            >
+            <TextInput size="sm" value={evidenceSummary} onChange={(event) => setEvidenceSummary(event.target.value)} placeholder={t('tasks.evidenceSummaryPlaceholder')} aria-label={t('tasks.evidenceSummaryPlaceholder')} />
+            <TextInput size="sm" value={testResult} onChange={(event) => setTestResult(event.target.value)} placeholder={t('tasks.testResultPlaceholder')} aria-label={t('tasks.testResultPlaceholder')} />
+            <TextInput size="sm" mono value={artifactRefs} onChange={(event) => setArtifactRefs(event.target.value)} placeholder={t('tasks.artifactRefsPlaceholder')} aria-label={t('tasks.artifactRefsPlaceholder')} />
+            <Button type="submit" size="sm" block disabled={!evidenceSummary.trim()} loading={submitEvidence.isPending}>
               {t('tasks.evidenceSubmit')}
-            </button>
+            </Button>
           </form>
         )}
       </section>
 
       {/* Transfers: offered, then accepted; the owner only changes on accept. */}
-      <section aria-label={t('tasks.transfersTitle')}>
-        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('tasks.transfersTitle')}</p>
-        {transfers.length === 0 && <p className="text-xs text-neutral-400">{t('tasks.transfersEmpty')}</p>}
-        <ul className="mt-1 space-y-1">
+      <section aria-label={t('tasks.transfersTitle')} className="space-y-1.5">
+        <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('tasks.transfersTitle')}</p>
+        {transfers.length === 0 && <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('tasks.transfersEmpty')}</p>}
+        <ul className="space-y-1">
           {transfers.map((item) => (
-            <li key={item.id} className="rounded bg-neutral-50 px-2 py-1 text-xs dark:bg-neutral-800/60">
+            <li key={item.id} className="rounded-lg bg-neutral-900/[0.03] px-2.5 py-1.5 text-xs dark:bg-white/[0.04]">
               <span className="text-neutral-500 dark:text-neutral-400">
                 {t(`tasks.transfer.${item.status}`, { defaultValue: item.status })} ·{' '}
               </span>
               {ownerLabel(item.fromBotId, bots, userLabel)} → {ownerLabel(item.toBotId, bots, userLabel)}
               {item.note && <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{item.note}</p>}
               {item.status === 'offered' && (
-                <span className="mt-1 flex gap-1">
-                  <button
-                    type="button"
+                <span className="mt-1.5 flex gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={accept.isPending}
                     onClick={() => {
                       setErrorText('');
                       accept.mutate({ transferId: item.id, expectedRevision: current.revision }, { onError: fail });
                     }}
-                    className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
                   >
                     {t('tasks.transferAccept')}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    loading={cancelTransfer.isPending}
                     onClick={() => {
                       setErrorText('');
                       cancelTransfer.mutate(item.id, { onError: fail });
                     }}
-                    className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
                   >
                     {t('tasks.transferCancel')}
-                  </button>
+                  </Button>
                 </span>
               )}
             </li>
@@ -226,79 +204,47 @@ export default function TaskDetail({ task, tasks, bots }: { task: Task; tasks: T
         </ul>
         {canOfferTransfer(current) && !liveOffer && (
           <form
-            className="mt-1 space-y-1"
+            className="space-y-1.5"
             onSubmit={(event) => {
               event.preventDefault();
               offerTransfer();
             }}
           >
-            <select
+            <Select
+              size="sm"
+              label={t('tasks.transferTargetLabel')}
               value={transferTarget}
-              onChange={(event) => setTransferTarget(event.target.value)}
-              aria-label={t('tasks.transferTargetLabel')}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">{t('tasks.transferTargetPlaceholder')}</option>
-              {bots
-                .filter((bot) => bot.id !== current.ownerId)
-                .map((bot) => (
-                  <option key={bot.id} value={bot.id}>
-                    {bot.name}
-                  </option>
-                ))}
-            </select>
-            <input
-              value={transferNote}
-              onChange={(event) => setTransferNote(event.target.value)}
-              placeholder={t('tasks.transferNotePlaceholder')}
-              aria-label={t('tasks.transferNotePlaceholder')}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+              placeholder={t('tasks.transferTargetPlaceholder')}
+              onChange={setTransferTarget}
+              options={bots.filter((bot) => bot.id !== current.ownerId).map((bot) => ({ value: bot.id, label: bot.name }))}
             />
-            <button
-              type="submit"
-              disabled={!transferTarget || offer.isPending}
-              className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
-            >
+            <TextInput size="sm" value={transferNote} onChange={(event) => setTransferNote(event.target.value)} placeholder={t('tasks.transferNotePlaceholder')} aria-label={t('tasks.transferNotePlaceholder')} />
+            <Button type="submit" size="sm" block disabled={!transferTarget} loading={offer.isPending}>
               {t('tasks.transferOffer')}
-            </button>
+            </Button>
           </form>
         )}
       </section>
 
-      {errorText && (
-        <p className="text-xs text-red-600" role="alert">
-          {errorText}
-        </p>
-      )}
+      {errorText && <Alert tone="danger">{errorText}</Alert>}
 
       {/* Status actions: the server rejects anything the rules do not allow;
           these buttons only reflect the same rules to keep the UI honest. */}
       {(transitionStatuses.length > 0 || canConfirm(current, hasEvidence)) && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap justify-end gap-1.5">
           {transitionStatuses.map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => patchStatus(status)}
-              className={`rounded-md px-2 py-1 text-xs font-medium ${statusTone(status)} hover:opacity-80`}
-            >
+            <Button key={status} size="sm" variant={status === 'cancelled' ? 'ghost' : 'secondary'} onClick={() => patchStatus(status)} disabled={patch.isPending}>
               {t(`tasks.action.${status}`)}
-            </button>
+            </Button>
           ))}
           {canConfirm(current, hasEvidence) && (
-            <button
-              type="button"
-              onClick={confirmTask}
-              className={`rounded-md px-2 py-1 text-xs font-medium ${statusTone('done')} hover:opacity-80`}
-            >
+            <Button size="sm" variant="primary" icon={Icons.done} onClick={confirmTask} loading={confirm.isPending}>
               {t('tasks.action.done')}
-            </button>
+            </Button>
           )}
         </div>
       )}
-      {current.status === 'review' && !hasEvidence && (
-        <p className="text-xs text-neutral-400">{t('tasks.reviewNeedsEvidence')}</p>
-      )}
+      {current.status === 'review' && !hasEvidence && <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('tasks.reviewNeedsEvidence')}</p>}
     </div>
   );
 }

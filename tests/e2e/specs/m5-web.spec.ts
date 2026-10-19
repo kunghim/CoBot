@@ -38,7 +38,8 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await panel.getByRole('tab', { name: /^任务$|^Tasks$/ }).click();
   await panel.getByRole('button', { name: /新建任务|new task/i }).click();
   await panel.getByLabel(/任务标题|title/i).fill('e2e任务');
-  await panel.getByLabel(/负责人|owner/i).selectOption({ index: 1 });
+  await panel.getByRole('combobox', { name: /负责人|owner/i }).click();
+  await page.getByRole('option').first().click();
   await panel.getByRole('button', { name: /^创建$|^Create$/ }).click();
   await expect(panel.getByText('e2e任务')).toBeVisible({ timeout: 15000 });
 

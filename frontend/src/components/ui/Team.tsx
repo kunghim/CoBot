@@ -173,11 +173,12 @@ export function ProcessStep({ kind, status, title, detail, duration, badge }: { 
  * content, and the answers as pill buttons on the right, the main one last.
  */
 export function WaitingCard({ icon, title, position, onPrevious, onNext, previousLabel, nextLabel, onClose, closeLabel, children, actions }: { icon: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; children: ReactNode; actions: ReactNode }) {
+  const id = useId();
   return (
-    <section className="animate-pop-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(23_30_27/0.06),0_12px_32px_-16px_rgb(23_30_27/0.25)] dark:border-neutral-700 dark:bg-neutral-800 dark:shadow-none">
+    <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(23_30_27/0.06),0_12px_32px_-16px_rgb(23_30_27/0.25)] dark:border-neutral-700 dark:bg-neutral-800 dark:shadow-none">
       <header className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span className="flex shrink-0 items-center" aria-hidden>{icon}</span>
-        <h3 className="min-w-0 flex-1 truncate">{title}</h3>
+        <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate">{title}</h3>
         {position && position.total > 1 && (
           <span className="flex items-center gap-0.5 text-xs tabular-nums">
             <IconButton icon={ChevronLeft} label={previousLabel} size="sm" shape="circle" disabled={position.index <= 1} onClick={onPrevious} />

@@ -1,6 +1,7 @@
 // taskFlow mirrors the server's task lifecycle rules for the board UI. The
 // server stays authoritative; these helpers only decide which buttons exist,
 // never whether an action succeeds.
+import type { Tone } from '../../components/ui';
 import type { Bot, Task, TaskStatus } from '../../api/types';
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
@@ -42,18 +43,18 @@ export function canOfferTransfer(task: Task): boolean {
   return task.status !== 'done' && task.status !== 'cancelled';
 }
 
-const TONE: Record<TaskStatus, string> = {
-  todo: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
-  doing: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  review: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-  done: 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+// Each status's tone in the component library (Badge, StatusDot).
+const TONE: Record<TaskStatus, Tone> = {
+  todo: 'neutral',
+  doing: 'success',
+  review: 'info',
+  done: 'neutral',
+  cancelled: 'danger',
 };
 
-export function statusTone(status: TaskStatus): string {
+export function statusTone(status: TaskStatus): Tone {
   return TONE[status] ?? TONE.todo;
 }
-
 /** Display name for an owner id: member name when it is a bot of the team,
  * the user marker for the literal "user", otherwise a short id. */
 export function ownerLabel(ownerId: string, bots: Bot[], userLabel: string): string {

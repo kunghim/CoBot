@@ -5,7 +5,7 @@ import LoadMore from '../../components/LoadMore';
 // controls to show for the current state.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Alert, Badge, Button, cx, EmptyState, Field, Icons, interactive, Select, Skeleton, TextInput, Textarea } from '../../components/ui';
 import { useCreateTask, useTasks } from '../../api/queries';
 import type { Bot, Task } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
@@ -65,85 +65,66 @@ export default function TaskBoardList({
   };
 
   if (tasks.isPending) {
-    return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
+    return (
+      <div className="space-y-2 px-3 py-3" role="status" aria-label={t('status.loading')}>
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
   }
   if (tasks.isError && !tasks.data) {
-    return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('tasks.loadFailed')}</p>;
+    return (
+      <div className="px-3 py-3">
+        <Alert tone="danger">{t('tasks.loadFailed')}</Alert>
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setCreateOpen((open) => !open)}
-          aria-expanded={createOpen}
-          className="flex w-full items-center gap-2 rounded-md border border-dashed border-neutral-300 px-3 py-2 text-sm text-neutral-600 transition-colors hover:border-neutral-400 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500 dark:hover:text-neutral-100"
-        >
-          <Plus size={16} aria-hidden="true" />
+      <div className="px-3 py-3">
+        <Button block icon={Icons.add} aria-expanded={createOpen} onClick={() => setCreateOpen((open) => !open)}>
           {t('tasks.new')}
-        </button>
+        </Button>
       </div>
 
       {createOpen && (
         <form
-          className="mx-3 mb-2 space-y-2 rounded-lg border border-neutral-200 p-2 dark:border-neutral-700"
+          className="mx-3 mb-3 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
           onSubmit={(event) => {
             event.preventDefault();
             submitCreate();
           }}
         >
-          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {t('tasks.titleLabel')}
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </label>
-          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {t('tasks.description')}
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-600" />
-          </label>
-          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {t('tasks.acceptance')}
-            <textarea value={acceptanceCriteria} onChange={(event) => setAcceptanceCriteria(event.target.value)} rows={2} className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-600" />
-          </label>
-          <label className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {t('tasks.ownerLabel')}
-            <select
+          <Field label={t('tasks.titleLabel')}>
+            <TextInput size="sm" value={title} onChange={(event) => setTitle(event.target.value)} />
+          </Field>
+          <Field label={t('tasks.description')}>
+            <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
+          </Field>
+          <Field label={t('tasks.acceptance')}>
+            <Textarea value={acceptanceCriteria} onChange={(event) => setAcceptanceCriteria(event.target.value)} rows={2} />
+          </Field>
+          <Field label={t('tasks.ownerLabel')}>
+            <Select
+              size="sm"
               value={ownerId}
-              onChange={(event) => setOwnerId(event.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">{t('tasks.ownerPlaceholder')}</option>
-              {bots.map((bot) => (
-                <option key={bot.id} value={bot.id}>
-                  {bot.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {errorText && (
-            <p className="text-xs text-red-600" role="alert">
-              {errorText}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={!title.trim() || !ownerId || create.isPending}
-            className="w-full rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
+              placeholder={t('tasks.ownerPlaceholder')}
+              onChange={setOwnerId}
+              options={bots.map((bot) => ({ value: bot.id, label: bot.name }))}
+            />
+          </Field>
+          {errorText && <Alert tone="danger">{errorText}</Alert>}
+          <Button type="submit" variant="primary" block disabled={!title.trim() || !ownerId} loading={create.isPending}>
             {t('tasks.create')}
-          </button>
+          </Button>
         </form>
       )}
 
-      {items.length === 0 && (
-        <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('tasks.empty')}</p>
-      )}
+      {items.length === 0 && <EmptyState icon={<Icons.tasks size={20} aria-hidden />} title={t('tasks.empty')} />}
 
-      <ul className="space-y-1 px-2 pb-3">
+      <ul className="space-y-1.5 px-3 pb-3">
         {items.map((task) => (
           <TaskRow
             key={task.id}
@@ -177,23 +158,22 @@ function TaskRow({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const Chevron = expanded ? Icons.expand : Icons.next;
   return (
-    <li id={`task-${task.id}`} className="rounded-md border border-neutral-200 dark:border-neutral-700">
+    <li id={`task-${task.id}`} className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full items-start gap-2 px-2 py-1.5 text-left text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+        className={cx('flex w-full items-start gap-2 px-2.5 py-2 text-left text-sm transition-colors', interactive.hover)}
       >
         <span className="mt-0.5 shrink-0 text-neutral-400">
-          {expanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+          <Chevron size={14} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusTone(task.status)}`}>
-              {t(`tasks.status.${task.status}`)}
-            </span>
-            <span className="min-w-0 truncate">{task.title}</span>
+            <Badge tone={statusTone(task.status)}>{t(`tasks.status.${task.status}`)}</Badge>
+            <span className="min-w-0 truncate font-medium text-neutral-900 dark:text-neutral-50">{task.title}</span>
           </span>
           <span className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">
             {ownerLabel(task.ownerId, bots, userLabel)}

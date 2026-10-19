@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeleteMemory, useMemories } from '../../api/queries';
 import { apiErrorMessage } from '../../i18n/errors';
+import { Alert, Button, EmptyState, Icons, Skeleton } from '../../components/ui';
 
 export default function MemoryList({ botId }: { botId: string }) {
   const { t, i18n } = useTranslation();
@@ -15,33 +16,33 @@ export default function MemoryList({ botId }: { botId: string }) {
   const [errorText, setErrorText] = useState('');
 
   if (memories.isPending) {
-    return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
+    return <div className="space-y-2 px-3 py-3" role="status" aria-label={t('status.loading')}><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>;
   }
   if (memories.isError && !memories.data) {
-    return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('memories.loadFailed')}</p>;
+    return <div className="px-3 py-3"><Alert tone="danger">{t('memories.loadFailed')}</Alert></div>;
   }
   const items = memories.data?.items ?? [];
   if (items.length === 0) {
-    return <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('memories.empty')}</p>;
+    return <EmptyState icon={<Icons.memory size={20} aria-hidden />} title={t('memories.empty')} />;
   }
   const formatTime = (iso: string) => new Date(iso).toLocaleString(i18n.language);
 
   return (
     <div>
-      <p className="px-3 pb-1 pt-2 text-[11px] text-neutral-400">{t('memories.readOnlyHint')}</p>
+      <p className="px-3 pb-2 pt-3 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{t('memories.readOnlyHint')}</p>
       {errorText && (
-        <p className="px-3 text-xs text-red-600" role="alert">
-          {errorText}
-        </p>
+        <div className="px-3 pb-2"><Alert tone="danger">{errorText}</Alert></div>
       )}
       <ul className="space-y-2 px-3 pb-3">
         {items.map((memory) => (
-          <li key={memory.id} className="rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-700">
+          <li key={memory.id} className="rounded-xl border border-neutral-200 bg-white p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900">
             <p className="whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">{memory.body}</p>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-400">
+            <div className="mt-1.5 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
               <span>{formatTime(memory.createdAt)}</span>
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={Icons.delete}
                 onClick={() => {
                   setErrorText('');
                   remove.mutate(
@@ -50,10 +51,9 @@ export default function MemoryList({ botId }: { botId: string }) {
                   );
                 }}
                 disabled={remove.isPending}
-                className="underline-offset-2 hover:underline disabled:opacity-50"
               >
                 {t('memories.delete')}
-              </button>
+              </Button>
             </div>
           </li>
         ))}

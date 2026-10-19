@@ -8,19 +8,24 @@ import { useTranslation } from 'react-i18next';
 import { useAnswerQuestion, useCancelQuestion, useQuestions } from '../../api/queries';
 import type { Question } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
+import { Alert, Button, Count, Icons, Skeleton, TextInput } from '../../components/ui';
 
 export default function QuestionList({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
   const { t } = useTranslation();
   const questions = useQuestions(teamId, 'open', true, viewBotId);
 
   if (questions.isError && !questions.data) {
-    return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('questions.loadFailed')}</p>;
+    return (
+      <div className="px-3 pt-3">
+        <Alert tone="danger">{t('questions.loadFailed')}</Alert>
+      </div>
+    );
   }
   if (questions.isPending) {
     return (
-      <p className="px-3 py-1 text-[11px] text-neutral-400" role="status">
-        {t('status.loading')}
-      </p>
+      <div className="px-3 pt-3" role="status" aria-label={t('status.loading')}>
+        <Skeleton className="h-8 w-full" />
+      </div>
     );
   }
   const items = questions.data?.items ?? [];
@@ -28,10 +33,12 @@ export default function QuestionList({ teamId, viewBotId }: { teamId: string; vi
 
   return (
     <section aria-label={t('questions.title')} className="border-b border-neutral-200 dark:border-neutral-800">
-      <p className="px-3 pb-1 pt-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-        {t('questions.title')} · {items.length}
+      <p className="flex items-center gap-1.5 px-3 pb-2 pt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+        <Icons.help size={14} aria-hidden />
+        {t('questions.title')}
+        <Count value={items.length} label={t('questions.title')} />
       </p>
-      <ul className="space-y-2 px-3 pb-2">
+      <ul className="space-y-2 px-3 pb-3">
         {items.map((question) =>
           question.kind === 'acceptance' ? (
             <AcceptanceCard key={question.id} question={question} />
@@ -44,6 +51,8 @@ export default function QuestionList({ teamId, viewBotId }: { teamId: string; vi
     </section>
   );
 }
+
+const cardClass = 'rounded-xl border border-neutral-200 bg-white p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900';
 
 function QuestionCard({ question }: { question: Question }) {
   const { t } = useTranslation();
@@ -62,65 +71,47 @@ function QuestionCard({ question }: { question: Question }) {
   };
 
   return (
-    <li className="rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-700">
-      <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
-      <p className="mt-1 text-[11px] text-neutral-400">{t('questions.answerIsInput')}</p>
+    <li className={cardClass}>
+      <p className="whitespace-pre-wrap font-medium leading-6 text-neutral-900 dark:text-neutral-50">{question.question}</p>
+      <p className="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{t('questions.answerIsInput')}</p>
       {(question.options ?? []).length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {(question.options ?? []).map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => send(option)}
-              disabled={answer.isPending}
-              className="rounded-full border border-neutral-300 px-2 py-0.5 text-xs hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
-            >
+            <Button key={option} size="sm" shape="pill" onClick={() => send(option)} disabled={answer.isPending}>
               {option}
-            </button>
+            </Button>
           ))}
         </div>
       )}
       <form
-        className="mt-1.5 flex gap-1"
+        className="mt-2 flex gap-1.5"
         onSubmit={(event) => {
           event.preventDefault();
           send(text);
         }}
       >
-        <input
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder={t('questions.answerPlaceholder')}
-          aria-label={t('questions.answerPlaceholder')}
-          className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-        />
-        <button
-          type="submit"
-          disabled={!text.trim() || answer.isPending}
-          className="rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-        >
+        <TextInput size="sm" className="min-w-0 flex-1" value={text} onChange={(event) => setText(event.target.value)} placeholder={t('questions.answerPlaceholder')} aria-label={t('questions.answerPlaceholder')} />
+        <Button type="submit" size="sm" variant="primary" disabled={!text.trim()} loading={answer.isPending}>
           {t('questions.answerSend')}
-        </button>
+        </Button>
       </form>
-      <button
-        type="button"
-        onClick={() => {
-          setErrorText('');
-          cancel.mutate(
-            { questionId: question.id, expectedRevision: question.revision },
-            { onError: (error) => setErrorText(apiErrorMessage(t, error)) },
-          );
-        }}
-        disabled={cancel.isPending}
-        className="mt-1 text-xs text-neutral-400 underline-offset-2 hover:underline disabled:opacity-50"
-      >
-        {t('questions.cancel')}
-      </button>
-      {errorText && (
-        <p className="mt-1 text-xs text-red-600" role="alert">
-          {errorText}
-        </p>
-      )}
+      <div className="mt-1.5 flex justify-end">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setErrorText('');
+            cancel.mutate(
+              { questionId: question.id, expectedRevision: question.revision },
+              { onError: (error) => setErrorText(apiErrorMessage(t, error)) },
+            );
+          }}
+          loading={cancel.isPending}
+        >
+          {t('questions.cancel')}
+        </Button>
+      </div>
+      {errorText && <Alert tone="danger">{errorText}</Alert>}
     </li>
   );
 }
@@ -143,46 +134,30 @@ function AcceptanceCard({ question }: { question: Question }) {
   };
 
   return (
-    <li className="rounded-lg border border-emerald-300 p-2 text-sm dark:border-emerald-700">
-      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t('questions.acceptance.title')}</p>
-      <p className="mt-1 whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        <button
-          type="button"
-          onClick={() => decide('accept')}
-          disabled={answer.isPending}
-          className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {t('questions.acceptance.accept')}
-        </button>
-      </div>
+    <li className={cardClass}>
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        <Icons.success size={14} aria-hidden />
+        {t('questions.acceptance.title')}
+      </p>
+      <p className="mt-1.5 whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
       <form
-        className="mt-1.5 flex gap-1"
+        className="mt-2 flex gap-1.5"
         onSubmit={(event) => {
           event.preventDefault();
           decide('revise');
         }}
       >
-        <input
-          value={changes}
-          onChange={(event) => setChanges(event.target.value)}
-          placeholder={t('questions.acceptance.changesPlaceholder')}
-          aria-label={t('questions.acceptance.changesPlaceholder')}
-          className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-        />
-        <button
-          type="submit"
-          disabled={!changes.trim() || answer.isPending}
-          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
-        >
+        <TextInput size="sm" className="min-w-0 flex-1" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t('questions.acceptance.changesPlaceholder')} aria-label={t('questions.acceptance.changesPlaceholder')} />
+        <Button type="submit" size="sm" disabled={!changes.trim() || answer.isPending}>
           {t('questions.acceptance.revise')}
-        </button>
+        </Button>
       </form>
-      {errorText && (
-        <p className="mt-1 text-xs text-red-600" role="alert">
-          {errorText}
-        </p>
-      )}
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" variant="primary" icon={Icons.done} onClick={() => decide('accept')} loading={answer.isPending}>
+          {t('questions.acceptance.accept')}
+        </Button>
+      </div>
+      {errorText && <Alert tone="danger">{errorText}</Alert>}
     </li>
   );
 }

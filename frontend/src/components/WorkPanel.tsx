@@ -4,7 +4,7 @@
 // entries can ask it to show a tab or open a task.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PanelToggle } from './ui';
+import { EmptyState, Icons, PanelHeader, PanelToggle, TabPanel, Tabs } from './ui';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
@@ -40,71 +40,21 @@ export default function WorkPanel({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-14 items-center gap-2.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        {context && <Avatar bot={context.bot} />}
-        <div className="min-w-0 flex-1">
-          {context ? (
-            <>
-              <p className="truncate text-sm font-semibold leading-5">{context.bot.name}</p>
-              <p className="truncate text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{context.team.name}</p>
-            </>
-          ) : (
-            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">{t('nav.workPanel')}</p>
-          )}
-        </div>
-        {onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
-      </div>
+      <PanelHeader
+        leading={context ? <Avatar bot={context.bot} /> : undefined}
+        title={context ? context.bot.name : t('nav.workPanel')}
+        subtitle={context?.team.name}
+        actions={onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
+      />
 
       {context && (
-      <div
-        role="tablist"
-        aria-label={t('panel.tablist')}
-        className="flex gap-4 border-b border-neutral-200 px-3 dark:border-neutral-800"
-        onKeyDown={(event) => {
-          const index = TABS.indexOf(tab);
-          let next: number;
-          if (event.key === 'ArrowRight') next = (index + 1) % TABS.length;
-          else if (event.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
-          else if (event.key === 'Home') next = 0;
-          else if (event.key === 'End') next = TABS.length - 1;
-          else return;
-          event.preventDefault();
-          setTab(TABS[next]);
-          // Roving tabindex: focus follows the selection (review C).
-          requestAnimationFrame(() => {
-            document.getElementById(`workpanel-tab-${TABS[next]}`)?.focus();
-          });
-        }}
-      >
-        {TABS.map((id) => (
-          <button
-            key={id}
-            id={`workpanel-tab-${id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            aria-controls="workpanel-tabpanel"
-            tabIndex={tab === id ? 0 : -1}
-            onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 py-2 text-xs transition-colors ${
-              tab === id
-                ? 'border-neutral-900 font-semibold text-neutral-900 dark:border-neutral-100 dark:text-neutral-50'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
-            }`}
-          >
-            {t(`panel.tabs.${id}`)}
-          </button>
-        ))}
-      </div>
+        <div className="px-3">
+          <Tabs idPrefix="workpanel" label={t('panel.tablist')} value={tab} onChange={setTab} tabs={TABS.map((id) => ({ id, label: t(`panel.tabs.${id}`) }))} />
+        </div>
       )}
 
-      <div
-        id="workpanel-tabpanel"
-        role="tabpanel"
-        aria-labelledby={`workpanel-tab-${tab}`}
-        className="min-h-0 flex-1 overflow-y-auto"
-      >
-        {!context && <p className="px-3 py-4 text-sm leading-6 text-neutral-500 dark:text-neutral-400">{t('panel.noSelection')}</p>}
+      <TabPanel idPrefix="workpanel" value={tab} className="min-h-0 flex-1 overflow-y-auto">
+        {!context && <EmptyState icon={<Icons.member size={20} aria-hidden />} title={t('panel.noSelection')} />}
         {/* A team whose folder is gone is read-only: lists stay, actions are off. */}
         <fieldset disabled={context?.team.status === 'directory_missing'} className="m-0 min-w-0 border-0 p-0">
         {context && tab === 'tasks' && (
@@ -117,7 +67,7 @@ export default function WorkPanel({ onClose }: { onClose?: () => void }) {
         {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />}
         {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
         </fieldset>
-      </div>
+      </TabPanel>
     </div>
   );
 }
