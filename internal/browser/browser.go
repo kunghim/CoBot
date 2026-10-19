@@ -345,6 +345,38 @@ func (tb *teamBrowser) reconnectable() (string, error) {
 	return url, nil
 }
 
+// liveTarget is the launch-time check: it reads where the browser says it
+// is listening and asks that endpoint to answer, but never removes the
+// file. A browser that just started can publish the port a moment before it
+// accepts, and deleting the file at that point would hide it for good.
+// The note describes the last observation for the caller's error.
+func (tb *teamBrowser) liveTarget(timeout time.Duration) (string, string) {
+	portFile := filepath.Join(tb.profile, "DevToolsActivePort")
+	data, err := os.ReadFile(portFile)
+	if err != nil {
+		return "", "debugging port file never appeared"
+	}
+	text := strings.TrimSpace(string(data))
+	lines := strings.Split(text, "\n")
+	if len(lines) < 2 {
+		return "", fmt.Sprintf("debugging port file reads %q", text)
+	}
+	port := strings.TrimSpace(lines[0])
+	client := http.Client{Timeout: timeout}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/json/version")
+	if err != nil {
+		return "", fmt.Sprintf("debugging port %s published but /json/version: %v", port, err)
+	}
+	defer resp.Body.Close()
+	var info struct {
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&info) != nil || info.WebSocketDebuggerURL == "" {
+		return "", fmt.Sprintf("debugging port %s published but /json/version answered empty", port)
+	}
+	return info.WebSocketDebuggerURL, ""
+}
+
 // launch starts the browser and waits for its debugging port.
 func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string, error) {
 	portFile := filepath.Join(tb.profile, "DevToolsActivePort")
@@ -363,7 +395,7 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 	}
 	cmd := exec.Command(installed.Path, args...)
 	// The browser's own complaint is the only clue when it will not start.
-	stderr := &tailBuffer{max: 1500}
+	stderr := &tailBuffer{max: 3000}
 	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("start %s: %w", installed.Name, err)
@@ -377,6 +409,7 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 	// A browser starting on a loaded machine (a CI runner running other
 	// work) can take well over 20 seconds.
 	deadline := time.Now().Add(45 * time.Second)
+	note := ""
 	for time.Now().Before(deadline) {
 		select {
 		case <-ctx.Done():
@@ -384,8 +417,10 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 			return "", ctx.Err()
 		case <-time.After(100 * time.Millisecond):
 		}
-		if url, _ := tb.reconnectable(); url != "" {
+		if url, observed := tb.liveTarget(3 * time.Second); url != "" {
 			return url, nil
+		} else {
+			note = observed
 		}
 		// Edge hands the real browser to a separate process and its launcher
 		// exits cleanly, so an exit only counts once the port stays absent.
@@ -401,7 +436,10 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 		}
 	}
 	tb.killProcess()
-	return "", fmt.Errorf("%s did not open its debugging port in time%s", installed.Name, stderr.suffix())
+	if note == "" {
+		note = "debugging port file never appeared"
+	}
+	return "", fmt.Errorf("%s did not open its debugging port in time (%s)%s", installed.Name, note, stderr.suffix())
 }
 
 // tailBuffer keeps the last bytes written to it.
