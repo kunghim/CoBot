@@ -1,0 +1,181 @@
+name: release draft
+run-name: Release draft v${{ inputs.version }}
+
+# Maintainers dispatch from main after promotion. No tag push or branch push
+# publishes a release; this workflow only creates an unpublished draft.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Product version without v (for example 0.1.0-beta.2)"
+        required: true
+        type: string
+      msi_version:
+        description: "Increasing numeric MSI version (for example 0.1.2)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-draft
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: validate release request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.request.outputs.version }}
+      msi_version: ${{ steps.request.outputs.msi_version }}
+      previous_tag: ${{ steps.request.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.18.0"
+      - name: Validate main source, versions and existing releases
+        id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          MSI_VERSION: ${{ inputs.msi_version }}
+        run: node scripts/release.mjs prepare
+
+  checks:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+
+  windows:
+    name: package Windows x64
+    needs: [prepare, checks]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      GOARCH: amd64
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      MSI_VERSION: ${{ needs.prepare.outputs.msi_version }}
+      PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: "8.0.x"
+      - name: Install locked frontend dependencies and packaging tools
+        shell: pwsh
+        run: |
+          npm ci --prefix frontend
+          if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+          if ($LASTEXITCODE -ne 0) { throw "Wails install failed" }
+          dotnet tool install --tool-path "$env:RUNNER_TEMP/wix" wix --version 6.0.2
+          if ($LASTEXITCODE -ne 0) { throw "WiX install failed" }
+          "$env:RUNNER_TEMP/wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install pinned WiX UI extension
+        shell: pwsh
+        run: |
+          wix extension add -g WixToolset.UI.wixext/6.0.2
+          if ($LASTEXITCODE -ne 0) { throw "WiX extension install failed" }
+      - name: Build and inspect MSI and matching ZIP
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $arguments = @{ Version = $env:RELEASE_VERSION; MsiVersion = $env:MSI_VERSION }
+          if ($env:PREVIOUS_TAG) {
+              $previous = Join-Path $env:RUNNER_TEMP "previous-msi"
+              gh release download $env:PREVIOUS_TAG --repo $env:GITHUB_REPOSITORY --pattern "*-windows-x64.msi" --dir $previous
+              if ($LASTEXITCODE -ne 0) { throw "Previous MSI download failed" }
+              $files = @(Get-ChildItem -LiteralPath $previous -Filter "*.msi" -File)
+              if ($files.Count -ne 1) { throw "Expected exactly one previous MSI" }
+              $arguments.PreviousMsi = $files[0].FullName
+          }
+          ./scripts/package-windows.ps1 @arguments
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-windows-x64
+          path: .tmp/release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          include-hidden-files: true
+
+  macos:
+    name: package macOS Apple Silicon
+    needs: [prepare, checks]
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Check runner architecture and install build dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          npm ci --prefix frontend
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+      - name: Build and inspect Apple Silicon DMG
+        run: |
+          bash scripts/build.sh --target desktop --version "$RELEASE_VERSION" --arch arm64
+          bash scripts/verify-macos-package.sh "$RELEASE_VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-macos-arm64
+          path: |
+            .tmp/dist/CoBot-*-macos-arm64.dmg
+            .tmp/dist/CoBot-*-macos-arm64.dmg.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          include-hidden-files: true
+
+  draft:
+    name: create unpublished release draft
+    needs: [prepare, windows, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.18.0"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: .tmp/release-assets
+      - name: Verify exact asset set and create draft with provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          MSI_VERSION: ${{ needs.prepare.outputs.msi_version }}
+        run: node scripts/release.mjs draft .tmp/release-assets

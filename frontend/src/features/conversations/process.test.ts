@@ -29,6 +29,10 @@ describe('linkTarget', () => {
 
 describe('describeStep', () => {
   const nameOf = (id: string) => ({ qa: '测试工程师' })[id] ?? id;
+  it('does not describe a declined command as executed', () => {
+    expect(describeStep(step({ status: 'declined' }), nameOf).key).toBe('conversation.step.commandDeclined');
+    expect(describeStep(step({ status: 'completed' }), nameOf).key).toBe('conversation.step.command');
+  });
   it('describes collaboration tools in plain words', () => {
     const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotId: 'qa', text: 'hi' } } }), nameOf);
     expect(phrase).toEqual(expect.objectContaining({ key: 'conversation.step.cobot.send_message', params: expect.objectContaining({ name: '测试工程师' }) }));

@@ -89,11 +89,11 @@ func (b *Bridge) Serve(ctx context.Context, transport mcp.Transport) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "cobot-collaboration", Version: "0.1.0"}, &mcp.ServerOptions{
 		// The tool descriptions are the model's only view of what it may do,
 		// so they state the permission and idempotency rules explicitly.
-		Instructions: "CoBot 协作工具。所有写工具都必须携带 idempotencyKey；" +
+		Instructions: "CoBot 协作工具。写操作的幂等键由宿主从调用标识生成，无需在参数中提供；" +
 			"权限由宿主校验，调用被拒绝时如实返回 rejected，不会假装成功。",
 	})
 	b.register(server)
-	return server.Run(ctx, transport)
+	return server.Run(ctx, callIDTransport{transport})
 }
 
 // register adds the tools of this bridge's role with their schemas.
