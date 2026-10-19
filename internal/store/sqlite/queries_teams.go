@@ -474,6 +474,10 @@ type OpenWorkCounts struct {
 	PendingApprovals int64 `json:"pendingApprovals"`
 	OpenTasks        int64 `json:"openTasks"`
 	QueuedDeliveries int64 `json:"queuedDeliveries"`
+	// RouteStages counts the running requirements whose route names the
+	// member for a stage, done or still ahead: a send-back or the next stage
+	// would hand it a card.
+	RouteStages int64 `json:"routeStages"`
 }
 
 // TeamOpenWork counts a team's blocking work.
@@ -503,11 +507,14 @@ func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, 
 		(SELECT COUNT(*) FROM approvals WHERE requester_bot_id = ? AND request_state = 'pending'),
 		(SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND status NOT IN ('done', 'cancelled')),
 		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?)),
-        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open')`,
+        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'),
+		(SELECT COUNT(*) FROM requirements r WHERE r.status = ? AND EXISTS (
+			SELECT 1 FROM json_each(r.stages) s WHERE json_extract(s.value, '$.ownerId') = ?))`,
 		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
 		botID, botID,
-		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
+		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID,
+		domain.RequirementActive, botID).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions, &c.RouteStages)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}

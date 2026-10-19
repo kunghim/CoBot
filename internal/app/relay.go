@@ -440,6 +440,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			}
 			b.WriteString("你可以说明处理意见后用 handoff outcome=resume 交回这一环继续；需要用户决定的先用 ask_user 问用户。")
 			e.note = b.String()
+			e.returnTo = card.ReturnTo
 			title := "处理上报：" + req.Stages[card.StageIndex].Name
 			route = func() (relayEffect, error) {
 				return a.leaderCardLocked(ctx, tx, req, domain.CardEscalation, card.StageIndex, title, e)
@@ -459,6 +460,9 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			return domain.Task{}, domain.InvalidRequest("error.card.leader_cannot_escalate", nil)
 		}
 		e.note = fmt.Sprintf("%s上报：%s\n处理后用 handoff outcome=resume 交回这一环继续；需要用户决定的先用 ask_user 问用户。", from, summary)
+		// A rework card escalated mid-way still goes back where it was
+		// sent from once it is resumed and done.
+		e.returnTo = card.ReturnTo
 		route = func() (relayEffect, error) {
 			return a.leaderCardLocked(ctx, tx, req, domain.CardEscalation, card.StageIndex, "处理上报："+card.Title, e)
 		}
@@ -467,6 +471,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			return domain.Task{}, domain.InvalidRequest("error.card.resume_not_escalation", nil)
 		}
 		e.note = "项目经理的处理意见：" + summary
+		e.returnTo = card.ReturnTo
 		route = func() (relayEffect, error) { return a.enterStageLocked(ctx, tx, req, card.StageIndex, e) }
 	default:
 		return domain.Task{}, domain.InvalidRequest("error.card.outcome", nil)

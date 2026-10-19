@@ -280,7 +280,11 @@ func (a *App) cardText(ctx context.Context, q sqlite.Queryer, req domain.Require
 		b.WriteString("\n这是需求文档的返工：按下面的意见修改需求文档。\n")
 	}
 	if card.ReturnTo >= 0 && card.ReturnTo < len(req.Stages) {
-		fmt.Fprintf(&b, "\n这是返工卡片，交接后直接回到第 %d 环「%s」。\n", card.ReturnTo+1, req.Stages[card.ReturnTo].Name)
+		if card.StageKind == domain.CardEscalation {
+			fmt.Fprintf(&b, "\n被上报的是一张返工卡片：交回后，它改完仍直接回到第 %d 环「%s」。\n", card.ReturnTo+1, req.Stages[card.ReturnTo].Name)
+		} else {
+			fmt.Fprintf(&b, "\n这是返工卡片，交接后直接回到第 %d 环「%s」。\n", card.ReturnTo+1, req.Stages[card.ReturnTo].Name)
+		}
 	}
 	if note != "" {
 		fmt.Fprintf(&b, "\n说明：%s\n", note)
