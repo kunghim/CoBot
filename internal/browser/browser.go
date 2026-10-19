@@ -362,6 +362,9 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 		}
 	}
 	cmd := exec.Command(installed.Path, args...)
+	// The browser's own complaint is the only clue when it will not start.
+	stderr := &tailBuffer{max: 1500}
+	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("start %s: %w", installed.Name, err)
 	}
@@ -371,7 +374,9 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 	tb.exited = exited
 	go func() { exitErr = cmd.Wait(); close(exited) }()
 	var exitedAt time.Time
-	deadline := time.Now().Add(20 * time.Second)
+	// A browser starting on a loaded machine (a CI runner running other
+	// work) can take well over 20 seconds.
+	deadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
 		case <-ctx.Done():
@@ -390,13 +395,41 @@ func (tb *teamBrowser) launch(ctx context.Context, installed Installed) (string,
 				exitedAt = time.Now()
 			}
 			if exitErr != nil || time.Since(exitedAt) > 8*time.Second {
-				return "", fmt.Errorf("%s exited right after starting", installed.Name)
+				return "", fmt.Errorf("%s exited right after starting%s", installed.Name, stderr.suffix())
 			}
 		default:
 		}
 	}
 	tb.killProcess()
-	return "", fmt.Errorf("%s did not open its debugging port in time", installed.Name)
+	return "", fmt.Errorf("%s did not open its debugging port in time%s", installed.Name, stderr.suffix())
+}
+
+// tailBuffer keeps the last bytes written to it.
+type tailBuffer struct {
+	mu  sync.Mutex
+	max int
+	buf []byte
+}
+
+func (b *tailBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf = append(b.buf, p...)
+	if len(b.buf) > b.max {
+		b.buf = b.buf[len(b.buf)-b.max:]
+	}
+	return len(p), nil
+}
+
+// suffix is the tail as text to append to an error, or empty.
+func (b *tailBuffer) suffix() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	text := strings.TrimSpace(string(b.buf))
+	if text == "" {
+		return ""
+	}
+	return " (" + text + ")"
 }
 
 func (tb *teamBrowser) killProcess() {
