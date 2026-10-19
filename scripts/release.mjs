@@ -52,10 +52,15 @@ export function validateSource(ref, sha) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) throw new Error('Missing immutable source commit.');
 }
 
-function assertUnusedVersion(tag) {
-  if (releases().some((release) => release.tag_name === tag)) throw new Error('A release or draft already exists for ' + tag + '; do not overwrite it.');
-  const refs = JSON.parse(gh('api', 'repos/' + process.env.GITHUB_REPOSITORY + '/git/matching-refs/tags/' + tag));
+export function validateUnusedVersion(tag, all, refs) {
+  if (all.some((release) => release.tag_name === tag)) throw new Error('A release or draft already exists for ' + tag + '; do not overwrite it.');
   if (refs.some((ref) => ref.ref === 'refs/tags/' + tag)) throw new Error('Tag already exists: ' + tag);
+}
+
+function assertUnusedVersion(tag) {
+  const all = releases();
+  const refs = JSON.parse(gh('api', 'repos/' + process.env.GITHUB_REPOSITORY + '/git/matching-refs/tags/' + tag));
+  validateUnusedVersion(tag, all, refs);
 }
 
 function prepare() {

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { expectedAssets, releaseNotes, validateInputs, validateSource, verifyAssets } from './release.mjs';
+import { expectedAssets, releaseNotes, validateInputs, validateSource, validateUnusedVersion, verifyAssets } from './release.mjs';
 
 const version = '0.1.0-beta.2';
 function fixture(t) {
@@ -36,6 +36,15 @@ test('draft source must be an immutable main commit', () => {
     assert.throws(() => validateSource(ref, 'a'.repeat(40)), /main/);
   }
   assert.throws(() => validateSource('refs/heads/main', 'main'), /commit/);
+});
+
+test('published releases, drafts and existing tags cannot be overwritten', () => {
+  const tag = 'v' + version;
+  for (const draft of [false, true]) {
+    assert.throws(() => validateUnusedVersion(tag, [{ tag_name: tag, draft }], []), /already exists/);
+  }
+  assert.throws(() => validateUnusedVersion(tag, [], [{ ref: 'refs/tags/' + tag }]), /Tag already exists/);
+  validateUnusedVersion(tag, [], [{ ref: 'refs/tags/' + tag + '0' }]);
 });
 
 test('complete supported assets produce checksum provenance', (t) => {

@@ -43,7 +43,8 @@ Contributors normally work in a fork on a short-lived topic branch based
 on the upstream `dev` branch. Target `dev`, including dependency updates.
 The flow is `topic branch -> dev -> main -> release`. Maintainers
 integrate contributions into `dev`, promote tested changes to `main`, and
-publish releases manually. A merged PR is not a promise of an immediate
+dispatch release drafts from GitHub Actions, then publish them after acceptance.
+A merged PR is not a promise of an immediate
 release. Repository write access is not required to propose a change.
 
 Keep `main` as the default stable branch. Only this repository's `dev`
@@ -72,7 +73,7 @@ and only contribute material you have the right to submit.
 
 中文说明：欢迎中文和英文 Issue/PR。一般先 fork，从上游 `dev` 建立短期功能分支，
 向 `dev` 提交 PR；依赖更新也进入 `dev`。维护者负责审查、集成，再将验证后的
-`dev` 合并到 `main`，手动发布。较大的需求先讨论，小修复可直接提 PR。使用 AI 不
+`dev` 合并到 `main`，从 GitHub Actions 生成发布草稿，验收后再公开发布。较大的需求先讨论，小修复可直接提 PR。使用 AI 不
 免除贡献者对代码、来源和测试的责任。贡献默认按 Apache-2.0 提交。
 
 英文是公开文档、提交信息和公共技术摘要的主要语言，但中文反馈、讨论和 PR 同样欢迎，
@@ -173,6 +174,51 @@ MSI/ZIP/源码安装方式及相关 Codex 版本；不清楚可标未知。Bug �
 认领不代表需求获批，PR、关闭 Issue 和发版仍由维护者决定。正常问题无需优先级标签，
 严重影响才标 `priority: high`。PR 合入 `dev` 先说明进展，晋级 `main` 后再关闭对应问题，
 发布时补充修复版本。
+
+## Maintainer release drafts
+
+After promoting tested changes to `main`, open **Actions → release draft →
+Run workflow** and select `main`. Supply a product version without the leading
+v (for example, 0.1.0-beta.2) and a separate numeric Windows Installer version
+(for example, 0.1.2). The MSI version must exceed that of the most recently
+published Windows MSI; the workflow downloads that package and reads its
+ProductVersion without installing it.
+
+The workflow runs CI again for the selected immutable commit, then builds
+Windows x64 on Windows and macOS ARM64 on Apple Silicon. Go 1.25.12, Node
+24.18.0, Wails 2.15.0 and WiX/UI extension 6.0.2 are pinned for packaging.
+It inspects MSI contents, compares the Windows ZIP with the MSI payload,
+mounts and copies the DMG, checks both macOS executables and the copied
+ad-hoc signature, and verifies all upload checksums.
+
+The resulting unpublished draft contains exactly three application downloads:
+Windows x64 MSI and ZIP, and an Apple Silicon DMG, each with a SHA-256 file.
+An additional release-manifest.json records the source commit, build run,
+product/MSI versions, file sizes and hashes. Intel, server binaries, raw build
+logs and runtime profiles are not release assets. The local macOS build may
+also produce a ZIP; the release workflow uploads only the DMG.
+
+Only the final draft job has repository contents write permission. Branch
+pushes, tag pushes and PR merges do not publish a release. Existing release
+versions and tags are rejected rather than replaced. If an upload fails after
+creating a partial draft, inspect it before retrying; the workflow will not
+overwrite it. Do not publish a draft with incomplete assets.
+
+Download the exact draft assets and record native installation, first launch
+and the real Codex checks appropriate to the change before publishing.
+Windows packages are unsigned; macOS has only an ad-hoc bundle signature,
+without Developer ID signing or notarization. Automated packaging does not
+establish real-account or interactive installation acceptance. Preserve those
+limits in the release notes and add actual acceptance evidence before the
+maintainer publishes the draft. No signing credentials or Codex login belong
+in this workflow.
+
+中文说明：维护者将已测试代码晋级到 main 后，在 Actions 的 release draft 中选择
+main，输入产品版本（不带 v）和递增的三段 MSI 版本。流水线完成 CI、Windows x64
+MSI/ZIP 与 Apple Silicon DMG 构建和结构校验，生成含校验文件、源码与构建记录的草稿；
+暂不上传 Intel 包。工作流不会自动公开发布，也不覆盖已有版本。首次使用仍需实际跑通
+GitHub 构建；随后下载草稿中的同一批产物，补充安装、首次打开和必要的真实 Codex
+验收记录，再由维护者发布。账号登录和签名凭据不进入流水线。
 
 ## Working locally
 
