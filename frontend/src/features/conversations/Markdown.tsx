@@ -24,7 +24,7 @@ function Markdown({ text, teamId }: { text: string; teamId: string }) {
     ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-0.5 pl-5">{children}</ol>,
     blockquote: ({ children }) => <blockquote className="my-1.5 border-l-2 border-neutral-300 pl-3 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300">{children}</blockquote>,
     hr: () => <hr className="my-3 border-neutral-200 dark:border-neutral-700" />,
-    pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-md bg-neutral-900 p-3 text-xs leading-5 text-neutral-100 dark:bg-black/60">{children}</pre>,
+    pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-xl bg-neutral-900/[0.04] p-3 text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">{children}</pre>,
     code: ({ className, children }) =>
       className ? <code className={className}>{children}</code> : <code className="rounded bg-neutral-200/70 px-1 py-0.5 font-mono text-[0.85em] dark:bg-neutral-700/70">{children}</code>,
     table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="min-w-full border-collapse text-xs">{children}</table></div>,
@@ -47,7 +47,7 @@ function MarkdownLink({ href, teamId, children }: { href: string; teamId: string
   const [error, setError] = useState('');
   const target = linkTarget(href);
   if (target.kind === 'web') {
-    return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 dark:text-blue-400">{children}</a>;
+    return <a href={href} target="_blank" rel="noopener noreferrer" className="text-signal-600 underline underline-offset-2 dark:text-signal-400">{children}</a>;
   }
   if (target.kind === 'blocked') return <span>{children}</span>;
   const open = (reveal: boolean) => {
@@ -63,7 +63,7 @@ function MarkdownLink({ href, teamId, children }: { href: string; teamId: string
           open(false);
         }}
         title={t('conversation.file.open')}
-        className="text-blue-600 underline underline-offset-2 dark:text-blue-400"
+        className="text-signal-600 underline underline-offset-2 dark:text-signal-400"
       >
         {children}
       </a>
@@ -76,7 +76,7 @@ function MarkdownLink({ href, teamId, children }: { href: string; teamId: string
       >
         <FolderOpen size={12} aria-hidden="true" />
       </button>
-      {error && <span role="alert" className="ml-1 text-xs text-red-600">{error}</span>}
+      {error && <span role="alert" className="ml-1 text-xs text-red-600 dark:text-red-400">{error}</span>}
     </span>
   );
 }

@@ -12,7 +12,8 @@ import { apiErrorMessage } from '../../i18n/errors';
  * changes never trip the optimistic-concurrency check against each other.
  * A save that worked is confirmed by a toast (one at a time, so a run of
  * changes does not stack them); one that failed reports under its field and
- * calls rollback, so the UI never keeps showing a value that was not stored.
+ * in a failure toast, and calls rollback, so the UI never keeps showing a
+ * value that was not stored.
  */
 export function useSettingSaver() {
   const { t } = useTranslation();
@@ -37,7 +38,10 @@ export function useSettingSaver() {
         if (lastToast.current !== null) toast.dismiss(lastToast.current);
         lastToast.current = toast.show({ tone: 'success', title: t('settings.saved'), duration: 2000 });
       } catch (err) {
-        setErrors((prev) => ({ ...prev, [field]: t('settings.saveFailed') + ': ' + apiErrorMessage(t, err) }));
+        const message = apiErrorMessage(t, err);
+        setErrors((prev) => ({ ...prev, [field]: t('settings.saveFailed') + ': ' + message }));
+        if (lastToast.current !== null) toast.dismiss(lastToast.current);
+        lastToast.current = toast.show({ tone: 'danger', title: t('settings.saveFailed'), description: message });
         const persisted = qc.getQueryData<Settings>(queryKeys.settings);
         if (persisted && rollback) rollback(persisted);
       }

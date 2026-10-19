@@ -7,7 +7,7 @@ import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/querie
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
-import { ToastProvider } from '../components/ui';
+import { Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
@@ -98,30 +98,36 @@ export default function App() {
   if (authState !== 'authorized') {
     if (authState === 'checking') {
       return (
-        <div className="flex h-full items-center justify-center text-sm text-neutral-500" role="status">
+        <div className="flex h-full items-center justify-center gap-2 bg-neutral-50 text-sm text-neutral-500 dark:bg-neutral-950 dark:text-neutral-400" role="status">
+          <Spinner size={16} />
           {t('auth.authorizing')}
         </div>
       );
     }
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            {t('auth.unauthorizedTitle')}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('auth.unauthorizedBody')}</p>
-          <button
-            type="button"
-            onClick={() => {
-              attemptedRef.current = false;
-              setAuthState('checking');
-              void status.refetch();
-            }}
-            className="mt-4 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            {t('auth.retry')}
-          </button>
-        </div>
+      <div className="flex h-full items-center justify-center bg-neutral-50 p-6 dark:bg-neutral-950">
+        <Card className="w-full max-w-md">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-neutral-400"><Icons.locked size={20} aria-hidden /></span>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('auth.unauthorizedTitle')}</h1>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('auth.unauthorizedBody')}</p>
+              <div className="mt-5">
+                <Button
+                  variant="primary"
+                  icon={Icons.retry}
+                  onClick={() => {
+                    attemptedRef.current = false;
+                    setAuthState('checking');
+                    void status.refetch();
+                  }}
+                >
+                  {t('auth.retry')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     );
   }

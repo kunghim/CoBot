@@ -1,8 +1,14 @@
 // Gallery: navigation and things that float.
 import { useState } from 'react';
-import { Archive, Copy, Home, MoreHorizontal, Palette, Pencil, Settings, Settings2, Smile, Trash2, Users } from 'lucide-react';
-import { AlertDialog, Breadcrumbs, Button, Count, Dialog, Field, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, Steps, TabPanel, Tabs, TextInput, Tooltip, Tree, shownState } from '../components/ui';
+import { Archive, Copy, Home, MoreHorizontal, Palette, Pencil, Settings, Settings2, ShieldCheck, Smile, Trash2, Users } from 'lucide-react';
+import { AlertDialog, Breadcrumbs, Button, ComposerOption, Count, Dialog, Field, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, Steps, TabPanel, Tabs, TextInput, Tooltip, Tree, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
+
+const MODES = [
+  { label: '只读', description: '只能查看和分析，修改前都会问你' },
+  { label: '默认权限', description: '可在团队目录内自由读写和执行，超出范围时会问你' },
+  { label: '完全访问', description: '不再询问，也不受目录限制' },
+];
 
 export default function NavigationOverlays() {
   const [rail, setRail] = useState('home');
@@ -15,6 +21,7 @@ export default function NavigationOverlays() {
   const [alert, setAlert] = useState(false);
   const [sheet, setSheet] = useState<'left' | 'right' | null>(null);
   const [last, setLast] = useState('');
+  const [mode, setMode] = useState('默认权限');
 
   return (
     <Chapter id="navigation" title="导航与浮层" intro="导航把人带到别处；浮层临时盖在页面上。所有导航项都有静止、悬停、当前三种看得出的状态；所有浮层都能用 Esc 关闭，关闭后焦点回到打开它的按钮。">
@@ -97,7 +104,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="menu" name="Menu 操作菜单" file="components/ui/Overlay.tsx" use="对一个对象的一组操作（团队的“…”菜单）。危险操作放最后，用分隔线隔开。" avoid="导航用 NavItem；选择一个值用 Select 或 Combobox。" a11y="打开后焦点在第一项；上下键移动，回车执行，Esc 关闭并回到按钮。">
+      <Doc id="menu" name="Menu 操作菜单" file="components/ui/Overlay.tsx" use="对一个对象的一组操作（团队的“…”菜单）。危险操作放最后，用分隔线隔开。几个互斥的模式（权限模式）也用菜单：每项给 checked，可带一行说明，底部可放一句备注；触发按钮用 ComposerOption。" avoid="导航用 NavItem；选择一个值用 Select 或 Combobox。" a11y="打开后焦点在第一项；上下键移动，回车执行，Esc 关闭并回到按钮。">
         <Demo>
           <div className="flex items-center gap-3">
             <Menu
@@ -111,6 +118,19 @@ export default function NavigationOverlays() {
                 'separator',
                 { id: 'delete', label: '删除团队', icon: Trash2, danger: true, onSelect: () => setLast('删除团队') },
               ]}
+            />
+            <Menu
+              label="权限模式"
+              trigger={<ComposerOption icon={ShieldCheck}>{mode}</ComposerOption>}
+              placement="bottom-start"
+              note="从每个成员的下一轮开始生效。"
+              items={MODES.map((entry) => ({
+                id: entry.label,
+                label: entry.label,
+                description: entry.description,
+                checked: mode === entry.label,
+                onSelect: () => setMode(entry.label),
+              }))}
             />
             {last && <span className="text-xs text-neutral-500">刚才选了：{last}</span>}
           </div>
@@ -138,7 +158,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
+      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
         <Demo>
           <Matrix
             items={[
