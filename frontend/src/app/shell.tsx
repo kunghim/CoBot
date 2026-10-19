@@ -1,8 +1,11 @@
 // The workspace shell's state: whether the team list and the work panel are
-// open, and whether the window is narrow (panels then slide over the
-// conversation). The toggles live at the two ends of the desktop title bar
-// when the app draws one, otherwise at the two ends of the page header —
-// the conversation header, or the home page's top row — so they never move.
+// open, and whether the window is narrow. The panels always sit in the
+// layout beside the conversation, never over it, so opening one never stops
+// the user from working; on a narrow window opening one side closes the
+// other, so the conversation keeps its room. The toggles live at the two
+// ends of the desktop title bar when the app draws one, otherwise at the two
+// ends of the page header — the conversation header, or the home page's top
+// row — so they never move.
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PanelToggle } from '../components/ui';
@@ -28,25 +31,32 @@ function isWide(): boolean {
 
 export function ShellProvider({ children, titleBar = false }: { children: ReactNode; titleBar?: boolean }) {
   const [narrow, setNarrow] = useState(() => !isWide());
-  // Narrow windows start with both panels closed: a first load shows the
-  // conversation, not a panel covering it.
-  const [listOpen, setListOpen] = useState(isWide);
-  const [panelOpen, setPanelOpen] = useState(isWide);
+  // A wide window starts with both panels open; a narrow one with the team
+  // list only, so the conversation is not squeezed on the first load.
+  const [listOpen, setList] = useState(true);
+  const [panelOpen, setPanel] = useState(isWide);
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia(WIDE);
     const update = () => {
       setNarrow(!query.matches);
-      if (!query.matches) {
-        setListOpen(false);
-        setPanelOpen(false);
-      }
+      // Becoming narrow with both open keeps the list and folds the panel.
+      if (!query.matches) setPanel(false);
     };
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
+  // On a narrow window the two sides take turns.
+  const setListOpen = useCallback((open: boolean) => {
+    setList(open);
+    if (open && !isWide()) setPanel(false);
+  }, []);
+  const setPanelOpen = useCallback((open: boolean) => {
+    setPanel(open);
+    if (open && !isWide()) setList(false);
+  }, []);
   // Showing something in the work panel opens it first.
-  useWorkPanelRequests(useCallback(() => setPanelOpen(true), []));
+  useWorkPanelRequests(useCallback(() => setPanelOpen(true), [setPanelOpen]));
   return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen, titleBar }}>{children}</ShellContext.Provider>;
 }
 

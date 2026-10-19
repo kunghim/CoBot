@@ -4,7 +4,7 @@
 // entries can ask it to show a tab or open a task.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Icons, PanelToggle, TabPanel, Tabs } from './ui';
+import { EmptyState, Icons, TabPanel, Tabs } from './ui';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
@@ -19,8 +19,7 @@ type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
 
 const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'memory'];
 
-/** onClose, when given, puts a close toggle in the header (narrow windows). */
-export default function WorkPanel({ onClose }: { onClose?: () => void }) {
+export default function WorkPanel() {
   const { t } = useTranslation();
   const { botId } = useSelectedBot();
   const teams = useTeams(true);
@@ -49,7 +48,6 @@ export default function WorkPanel({ onClose }: { onClose?: () => void }) {
             <span className="px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{t('nav.workPanel')}</span>
           )}
         </div>
-        {onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
       </div>
 
       <TabPanel idPrefix="workpanel" value={tab} className="min-h-0 flex-1 overflow-y-auto">

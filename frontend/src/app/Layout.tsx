@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTeams } from '../api/queries';
 import WorkPanel from '../components/WorkPanel';
-import { Icons, RailItem, Sheet } from '../components/ui';
+import { Icons, RailItem } from '../components/ui';
 import TeamList from '../features/teams/TeamList';
 import { useSelectedBot } from './SelectedBotContext';
 import { useShell } from './shell';
@@ -11,8 +11,8 @@ import { rememberWorkspacePath } from './workspacePath';
 
 /**
  * Layout implements the product shell: the icon rail, the team list, the
- * conversation (the routed page) and the work panel. On wide windows the
- * panels sit beside the conversation; on narrow ones they slide over it.
+ * conversation (the routed page) and the work panel. The panels always sit
+ * beside the conversation, never over it, so they never block work.
  * Their toggles are at the two ends of the title bar or the page header
  * (see shell.tsx); the shell state lives above, in App.
  */
@@ -40,12 +40,12 @@ export default function Layout() {
 
   const teamList = (
     <aside aria-label={t('nav.teamList')} className="flex h-full w-full flex-col bg-side">
-      <TeamList onClose={shell.narrow ? () => shell.setListOpen(false) : undefined} />
+      <TeamList />
     </aside>
   );
   const workPanel = (
     <aside aria-label={t('nav.workPanel')} className="flex h-full w-full flex-col bg-side">
-      <WorkPanel onClose={shell.narrow ? () => shell.setPanelOpen(false) : undefined} />
+      <WorkPanel />
     </aside>
   );
 
@@ -65,30 +65,20 @@ export default function Layout() {
         </div>
       </nav>
 
-      {shell.narrow ? (
-        <Sheet open={shell.listOpen} onClose={() => shell.setListOpen(false)} side="left" label={t('nav.teamList')}>
-          {teamList}
-        </Sheet>
-      ) : (
-        shell.listOpen && <Column side="left">{teamList}</Column>
-      )}
+      {shell.listOpen && <Column side="left">{teamList}</Column>}
 
       {/* Conversation area: the routed page. */}
       <main className="relative mt-2 flex min-w-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet">
         <Outlet />
       </main>
 
-      {shell.narrow ? (
-        <Sheet open={shell.panelOpen} onClose={() => shell.setPanelOpen(false)} side="right" label={t('nav.workPanel')}>
-          {workPanel}
-        </Sheet>
-      ) : (
-        shell.panelOpen && <Column side="right">{workPanel}</Column>
-      )}
+      {shell.panelOpen && <Column side="right">{workPanel}</Column>}
     </div>
   );
 }
 
+// The side columns stay in the layout at every width; on a small window
+// they give way so the conversation keeps most of the room.
 function Column({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
-  return <div className={side === 'left' ? 'w-64 shrink-0' : 'w-72 shrink-0'}>{children}</div>;
+  return <div className={side === 'left' ? 'w-[min(16rem,40vw)] shrink-0' : 'w-[min(18rem,42vw)] shrink-0'}>{children}</div>;
 }

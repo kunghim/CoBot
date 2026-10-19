@@ -2,7 +2,8 @@
 // something. Popover: a small panel of controls or detail. Tooltip: a few
 // words naming a control, never the only place information lives. Dialog:
 // a task that needs the page to wait. AlertDialog: confirm something that
-// cannot be undone. Sheet: a side panel over the page on narrow screens.
+// cannot be undone. Sheet: a side panel over the page for a task to finish
+// first (never the team list or the work panel, which stay in the layout).
 import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { Check, X } from 'lucide-react';
 import { useDialogFocus } from '../useDialogFocus';
@@ -263,7 +264,7 @@ export function AlertDialog({ open, onCancel, onConfirm, title, description, con
 }
 
 /**
- * A side panel over the page (team list or work panel on narrow screens).
+ * A side panel over the page, for something to finish before going back.
  * Without a title the content brings its own header and close control;
  * label then names the panel.
  */

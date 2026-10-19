@@ -8,7 +8,7 @@ import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
-import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, MemberRow, PanelToggle, Skeleton } from '../../components/ui';
+import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, MemberRow, Skeleton } from '../../components/ui';
 import CreateTeamDialog from './CreateTeamDialog';
 import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
@@ -17,9 +17,7 @@ import Avatar from '../avatars/Avatar';
 // States that want the user: the row carries a dot that stays loud on purpose.
 const ATTENTION = new Set(['waiting_approval', 'waiting_input']);
 
-/** onClose, when given, puts a close toggle in the header (narrow windows,
- * where the list covers the conversation and its header toggle). */
-export default function TeamList({ onClose }: { onClose?: () => void }) {
+export default function TeamList() {
   const { t } = useTranslation();
   const { botId, setBotId } = useSelectedBot();
   const navigate = useNavigate();
@@ -61,7 +59,6 @@ export default function TeamList({ onClose }: { onClose?: () => void }) {
         <span className="px-1 text-2xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
           {t('nav.teamList')}
         </span>
-        {onClose && <PanelToggle side="left" open onToggle={onClose} openLabel={t('nav.openTeamList')} closeLabel={t('nav.closeTeamList')} />}
       </div>
 
       <div className="px-3 pb-2">

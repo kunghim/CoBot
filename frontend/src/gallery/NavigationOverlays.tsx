@@ -187,7 +187,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="sheet" name="Sheet 侧滑面板" file="components/ui/Overlay.tsx" use="窄屏时，团队列表和工作面板从两侧滑出盖在会话上。" a11y="和对话框一样管理焦点；Esc 关闭。">
+      <Doc id="sheet" name="Sheet 侧滑面板" file="components/ui/Overlay.tsx" use="从侧边滑出、需要先处理完再回到页面的面板（比如一份长的详情）。" avoid="团队列表和工作面板不用 Sheet：它们始终在布局里，可以收起，但打开时不能盖住会话、不能挡住继续操作。" a11y="和对话框一样管理焦点；Esc 关闭。">
         <Demo>
           <Matrix
             items={[
