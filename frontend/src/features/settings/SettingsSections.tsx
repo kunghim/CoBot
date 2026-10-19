@@ -16,6 +16,7 @@ import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import type { SaveState } from './useSettingSaver';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
+import { desktopBridge } from '../../platform/native-bridge';
 
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
 type SectionProps = { settings: Settings; save: Save; states: Record<string, SaveState> };
@@ -298,6 +299,13 @@ export function EngineSection() {
     }
   }, [engine.data?.loggedIn]);
 
+  const openNativeLogin = async (url: string) => {
+    try {
+      await desktopBridge()!.OpenLoginURL(url);
+    } catch {
+      setActionError(t('engine.openLoginFailed'));
+    }
+  };
   const startLogin = () => {
     setActionError('');
     login.mutate(undefined, {
@@ -305,6 +313,7 @@ export function EngineSection() {
         setLoginPending(true);
         setAuthUrl(result.authUrl);
         setLoginTimedOut(false);
+        if (desktopBridge()) void openNativeLogin(result.authUrl);
       },
       onError: (err) => setActionError(apiErrorMessage(t, err)),
     });
@@ -336,17 +345,17 @@ export function EngineSection() {
   };
 
   const info = engine.data;
+  const loggedIn = info?.loggedIn ?? false;
   const statusText = !info
     ? t('status.loading')
     : info.status === 'ready'
-      ? t('settings.engineReady')
+      ? loggedIn ? t('settings.engineReady') : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
       : info.status === 'error'
         ? t('settings.engineError')
         : info.status === 'starting'
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
-  const loggedIn = info?.loggedIn ?? false;
-  const engineTone: Tone = !info ? 'idle' : info.status === 'ready' ? 'ok' : info.status === 'starting' ? 'idle' : 'bad';
+  const engineTone: Tone = !info ? 'idle' : info.status === 'ready' ? loggedIn ? 'ok' : 'warn' : info.status === 'starting' ? 'idle' : 'bad';
   const hookState = info?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
   const hookKey = hookState === 'trusted' ? 'Trusted' : hookState === 'failed' ? 'Failed' : 'Untrusted';
 
@@ -355,10 +364,10 @@ export function EngineSection() {
       <Card title="Codex">
         <p className="flex items-center gap-2 text-sm" role="status">
           <StatusDot tone={engineTone} />
-          <span>
+          <span className={info?.status === 'ready' && !loggedIn ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
             {statusText}
             {info?.version ? ` · ${info.version}` : ''}
-            {info?.status === 'ready' ? ` · ${loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}` : ''}
+            {info?.status === 'ready' && loggedIn ? ` · ${t('settings.engineLoggedIn')}` : ''}
           </span>
         </p>
         {info?.binaryPath && (
@@ -386,7 +395,13 @@ export function EngineSection() {
           {loginPending && (
             <>
               {authUrl && (
-                <a href={authUrl} target="_blank" rel="noreferrer" className="text-sm underline">
+                <a href={authUrl} target="_blank" rel="noreferrer" className="text-sm underline" onClick={(event) => {
+                  if (desktopBridge()) {
+                    event.preventDefault();
+                    setActionError('');
+                    void openNativeLogin(authUrl);
+                  }
+                }}>
                   {t('engine.openLogin')}
                 </a>
               )}

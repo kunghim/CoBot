@@ -85,7 +85,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | --- | --- |
 | Windows 10/11 x64 · 本机 Web | **可以试用**，已用真实 Codex 端到端验证 |
 | Windows 独立服务构建 | 可构建、可运行 |
-| Windows 桌面壳（Wails/WebView2） | 可编译；尚未实机验证 |
+| Windows 桌面壳（Wails/WebView2） | **已提供测试版下载**；已在 Windows 沙盒检查桌面启动与安装生命周期，验证限制见发布说明 |
 | macOS（Web / 桌面） | 可交叉编译；`.app` 打包仅做过静态核对；原生运行、安装、签名与公证尚未验证 |
 | Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
 
@@ -101,8 +101,32 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 
 ## 快速开始
 
-当前预览版从源码构建，建议先试用 **Windows 本机 Web 版**。
-macOS 命令仅供源码试用，原生运行尚未验证，不代表已验证的发行版。
+### Windows 桌面版下载
+
+[**v0.1.0-beta.1 — 下载与发布说明**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+
+| 下载 | 使用方法 |
+| --- | --- |
+| [Windows x64 MSI 安装包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | 安装到当前用户，从开始菜单打开 **CoBot** |
+| [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
+
+两种下载包含相同的程序文件。需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
+以及已在 `PATH` 上安装的官方 **Codex CLI 0.161.0 或更新版本**，具备可用账号和访问 Codex 服务的网络。
+安装包不包含 Codex。本测试版支持官方 Codex 账号登录，不承诺支持第三方中转配置。
+使用上述下载包无需安装 Go 或 Node。
+
+程序包尚未签名，发布页面附有可选的 `.sha256` 校验文件。
+GitHub 自动提供的 **Source code** 是源码，不是可直接运行的程序。
+打开 CoBot 后，在 **设置 → Codex 引擎** 登录，再选择模型、创建团队。
+CoBot 使用自己的私有 Codex 环境，需要独立登录。
+
+暂不支持自动更新：更新时先关闭 CoBot，再安装新版 MSI，或将完整新版 ZIP 解压到新文件夹。
+两种版本的配置与团队数据均保存在 `%USERPROFILE%\.cobot`，与程序目录分开。
+卸载 MSI 或删除 ZIP 解压目录会保留这些数据。
+
+### 从源码构建
+
+以下命令构建**本机 Web 版**。macOS 命令仅供源码试用，原生运行尚未验证，本次发布不包含 macOS 应用下载。
 
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
@@ -110,7 +134,7 @@ macOS 命令仅供源码试用，原生运行尚未验证，不代表已验证�
 （最低及已验证版本为 0.161.0），具备可使用 Codex 的账号和访问其服务的网络。
 Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
 
-### Windows（PowerShell）
+#### Windows（PowerShell）
 
 ```powershell
 git clone https://github.com/kunghim/CoBot.git
@@ -120,7 +144,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-### macOS（Bash；原生运行未验证）
+#### macOS（Bash；原生运行未验证）
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git

@@ -54,7 +54,11 @@ case "$TARGET" in
       exit 1
     }
     echo "==> wails build (desktop, production, $VERSION)"
+    # -skipbindings mirrors build.ps1: the bindings phase builds
+    # cmd/cobot-desktop with only the "bindings" tag while internal/desktop is
+    # guarded by "desktop", and the frontend declares the bridge structurally.
     (cd cmd/cobot-desktop && wails build -tags desktop -nosyncgomod -skipembedcreate \
+      -skipbindings -m -s \
       -o cobot-desktop \
       -ldflags "-X main.version=$VERSION -X main.environment=production")
     # Wails packages into the configured build:dir, not a standalone shell.
@@ -65,6 +69,8 @@ case "$TARGET" in
     checksum "$DIST/cobot"
     # The bridge resolves its helper beside os.Executable(), inside the bundle.
     cp "$DIST/cobot" "$APP/Contents/MacOS/cobot"
+    # macOS has no console-subsystem equivalent, so there is no separate
+    # windowless helper to ship; cmd/cobot-helper exists for Windows only.
     # Adding the helper changes the bundle after Wails' ad-hoc signature.
     # This remains a local trial signature, not Developer ID / notarization.
     /usr/bin/codesign --force --sign - "$APP/Contents/MacOS/cobot"
