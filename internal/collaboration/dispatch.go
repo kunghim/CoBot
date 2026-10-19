@@ -10,6 +10,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
@@ -23,6 +24,7 @@ type App interface {
 	Handoff(ctx context.Context, principal auth.Principal, in app.HandoffInput) (domain.Task, error)
 	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	AskUser(ctx context.Context, principal auth.Principal, in app.AskUserInput) (domain.Question, error)
+	UseBrowser(ctx context.Context, principal auth.Principal, req browser.Request) (browser.Result, error)
 	// Write idempotency (E05): a retried side-effect call replays its stored
 	// result; the same key with different arguments is a conflict.
 	WriteReplay(ctx context.Context, scope, principal, key, argsHash string) (string, bool, error)
@@ -56,6 +58,10 @@ func (d *Dispatcher) ResolveToken(token string) (auth.Principal, auth.BotBinding
 // dispatchTimeout bounds every bridge-driven call so a stuck application call
 // can never hang the engine's tool loop.
 const dispatchTimeout = 30 * time.Second
+
+// browserTimeout fits inside the bridge's 60 seconds: a page may take a while,
+// and the browser's own budget (50s) ends the call first.
+const browserTimeout = 55 * time.Second
 
 // ToolCall is one MCP tool invocation arriving from the bridge.
 type ToolCall struct {
@@ -178,7 +184,11 @@ func canonicalArgsHash(raw json.RawMessage) string {
 
 // callToolOnce is the routing switch itself (pre-idempotency behavior).
 func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
-	ctx, cancel := context.WithTimeout(ctx, dispatchTimeout)
+	timeout := dispatchTimeout
+	if call.Name == "browser" {
+		timeout = browserTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if principal.SubAgent && handoffOnly[call.Name] {
@@ -300,6 +310,24 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 			return errorResult(err)
 		}
 		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID}}
+
+	case "browser":
+		var req browser.Request
+		if err := decodeArgs(call.Arguments, &req); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		result, err := d.app.UseBrowser(ctx, principal, req)
+		if err != nil {
+			return errorResult(err)
+		}
+		// The member reads this back as JSON; round-trip it into the wire map.
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return errorResult(err)
+		}
+		data := map[string]any{}
+		_ = json.Unmarshal(raw, &data)
+		return ToolResult{Status: StatusOK, Data: data}
 
 	default:
 		return rejected("invalid_request", "error.tool.unknown", map[string]any{"tool": call.Name})

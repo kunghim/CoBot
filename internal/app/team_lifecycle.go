@@ -312,6 +312,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	}
 	a.deleteEngineThreads(ctx, teamID, threads)
 	a.removeTeamFolderData(directory, teamID)
+	a.releaseTeamBrowser(teamID, true)
 	a.Hub.Publish()
 	return team, nil
 }
@@ -319,6 +320,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 // releaseTeamRuntime shuts the team's engine down and revokes nothing else;
 // archive and delete both leave no idle process behind.
 func (a *App) releaseTeamRuntime(ctx context.Context, teamID string) {
+	a.releaseTeamBrowser(teamID, false)
 	if a.Scheduler == nil {
 		return
 	}

@@ -269,7 +269,8 @@
         "handoff_escalate": "Escalated to the project manager",
         "handoff_resume": "Returned the escalation to its stage",
         "view_tasks": "Looked at the requirements",
-        "ask_user": "Asked you: {{question}}"
+        "ask_user": "Asked you: {{question}}",
+        "browser": "Used the browser {{url}}"
       }
     },
     "placeholder": "Message {{name}}…",
@@ -748,6 +749,11 @@
     "error.invalid_request": "Invalid request",
     "error.team.not_retryable": "This team state cannot retry creation",
     "error.tool.unknown": "Unknown tool: {{tool}}",
+    "error.browser.not_installed": "No Chrome-based browser (Chrome, Edge, Brave, Chromium or Vivaldi) is installed on this computer.",
+    "error.browser.leader": "The project manager does not use the browser.",
+    "error.browser.bad_request": "The browser call was wrong: {{reason}}",
+    "error.browser.failed": "The browser ran into a problem: {{reason}}",
+    "error.browser.unavailable": "The browser is not available.",
     "error.unauthorized.bad_token": "Invalid bridge credential",
     "error.unauthorized.missing_token": "Missing bridge credential",
     "error.unauthorized.stale_token": "The bridge credential is stale (epoch mismatch)",

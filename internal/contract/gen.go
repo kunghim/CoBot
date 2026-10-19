@@ -70,6 +70,7 @@ const (
 // Defines values for CollaborationRequestTool.
 const (
 	AskUser          CollaborationRequestTool = "ask_user"
+	Browser          CollaborationRequestTool = "browser"
 	Handoff          CollaborationRequestTool = "handoff"
 	SendMessage      CollaborationRequestTool = "send_message"
 	StartRequirement CollaborationRequestTool = "start_requirement"

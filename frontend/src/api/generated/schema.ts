@@ -1086,7 +1086,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user";
+            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "browser";
             arguments?: {
                 [key: string]: unknown;
             };

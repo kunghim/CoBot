@@ -3,6 +3,7 @@ package collaboration
 import (
 	"encoding/json"
 
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/roles"
 )
@@ -69,6 +70,50 @@ func toolSchema(name string) json.RawMessage {
 	case "ask_user":
 		add("question", text("Specific input needed from the user. End this turn after asking."), true)
 		add("options", strings("Optional suggested answers, not security permissions."), false)
+	case "browser":
+		str := func(description string) any { return map[string]any{"type": "string", "description": description} }
+		num := func(description string) any { return map[string]any{"type": "integer", "description": description} }
+		flag := func(description string) any { return map[string]any{"type": "boolean", "description": description} }
+		step := map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"action": map[string]any{"type": "string", "enum": browser.Actions(), "description": "" +
+					"goto(url) open an address; back, forward, reload; click(ref|selector|text); doubleClick; hover; " +
+					"type(ref|selector, text, clear?, submit?) fill a field; key(key) e.g. Enter, Tab, Control+a; select(ref, value) choose an option; " +
+					"scroll(ref? | value=top|bottom|up|down | dx,dy); wait(text? gone? | ms | selector) until text/element shows up or goes away; " +
+					"eval(expression) run JavaScript and return its value; screenshot(fullPage?, ref?) save a picture; snapshot; " +
+					"newTab(url?), closeTab; upload(ref, files) attach files from the team folder; viewport(width,height,mobile?); dialog(accept, text?) answer the next alert/confirm/prompt."},
+				"url":        str("Address for goto and newTab. Without a scheme: http for localhost/127.0.0.1, https otherwise."),
+				"ref":        str("The [eN] reference of an element in the latest snapshot."),
+				"selector":   str("A CSS selector, when there is no reference."),
+				"text":       str("Visible text to click or wait for; or the text to type."),
+				"key":        str("Key name for key: Enter, Escape, Tab, Backspace, Delete, Space, arrows, Home, End, PageUp, PageDown, a single character, optionally with Control+/Shift+/Alt+/Meta+."),
+				"value":      str("Option for select; top|bottom|up|down for scroll."),
+				"expression": str("JavaScript for eval."),
+				"ms":         num("Milliseconds for wait."),
+				"dx":         num("Horizontal scroll in pixels."),
+				"dy":         num("Vertical scroll in pixels."),
+				"clear":      flag("type: replace the field's content (default true)."),
+				"submit":     flag("type: press Enter after typing."),
+				"accept":     flag("dialog: accept (true) or dismiss (false)."),
+				"files":      strings("upload: paths of files inside the team folder."),
+				"fullPage":   flag("screenshot: the whole page."),
+				"gone":       flag("wait: wait for the text or element to disappear."),
+				"force":      flag("click: click even when another element covers the target."),
+				"width":      num("viewport width."),
+				"height":     num("viewport height."),
+				"mobile":     flag("viewport: emulate a phone."),
+				"timeoutMs":  num("Longest wait for this step (default 15000, at most 40000)."),
+			},
+			"required":             []string{"action"},
+			"additionalProperties": false,
+		}
+		add("url", str("Open this address first (same as a leading goto step)."), false)
+		add("tab", str("One of your tabs, from an earlier result; omit for your current tab."), false)
+		add("steps", map[string]any{"type": "array", "items": step, "maxItems": 30,
+			"description": "Actions run in order; the first failure stops the call and the rest are reported skipped."}, false)
+		add("snapshot", flag("Report the page's outline at the end (default true). Turn off for long scripted runs."), false)
+		add("screenshot", flag("Save a screenshot at the end; the result gives its path under the team folder."), false)
 	default:
 		panic("missing MCP schema: " + name)
 	}

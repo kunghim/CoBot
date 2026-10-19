@@ -269,7 +269,8 @@
         "handoff_escalate": "上报了项目经理",
         "handoff_resume": "把上报交回原环节",
         "view_tasks": "查看需求和卡片",
-        "ask_user": "向你提问：{{question}}"
+        "ask_user": "向你提问：{{question}}",
+        "browser": "用浏览器 {{url}}"
       }
     },
     "placeholder": "给 {{name}} 发消息……",
@@ -740,6 +741,11 @@
     "error.invalid_request": "请求无效",
     "error.team.not_retryable": "该团队状态不能重试创建",
     "error.tool.unknown": "未知工具：{{tool}}",
+    "error.browser.not_installed": "这台电脑上没有可用的 Chrome 系浏览器（Chrome、Edge、Brave、Chromium 或 Vivaldi）。",
+    "error.browser.leader": "项目经理不使用浏览器。",
+    "error.browser.bad_request": "浏览器调用的参数不对：{{reason}}",
+    "error.browser.failed": "浏览器出了问题：{{reason}}",
+    "error.browser.unavailable": "浏览器功能不可用。",
     "error.unauthorized.bad_token": "桥凭据无效",
     "error.unauthorized.missing_token": "缺少桥凭据",
     "error.unauthorized.stale_token": "桥凭据已失效（代际不匹配）",

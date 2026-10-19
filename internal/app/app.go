@@ -15,6 +15,7 @@ import (
 	"errors"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/avatars"
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
@@ -82,6 +83,10 @@ type App struct {
 	// Avatars is this profile's downloaded avatar catalog; nil serves an
 	// empty catalog and never downloads.
 	Avatars *avatars.Catalog
+
+	// Browser runs the teams' browsers for the members' browser tool; nil
+	// answers the tool as unavailable.
+	Browser *browser.Manager
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.
