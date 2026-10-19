@@ -3,7 +3,7 @@
 #   scripts/build.sh --target server   -> standalone cobot executable
 #   scripts/build.sh --target desktop  -> Wails desktop shell + helper cobot
 # Use --arch arm64|amd64 to select the macOS CPU architecture.
-# Output is summarized under .tmp/dist with SHA-256 checksums.
+# Desktop builds produce a DMG and ZIP under .tmp/dist with SHA-256 checksums.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -103,6 +103,7 @@ case "$TARGET" in
     ARCHIVE="$DIST/CoBot-${VERSION#v}-macos-$BUILD_ARCH.zip"
     /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
     checksum "$ARCHIVE"
+    bash scripts/build-dmg.sh --app "$APP" --version "$VERSION" --arch "$BUILD_ARCH"
     ;;
 esac
 echo "==> artifacts in $DIST"
