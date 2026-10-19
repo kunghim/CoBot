@@ -4,6 +4,9 @@ import type { components } from './generated/schema';
 
 export type Status = components['schemas']['Status'];
 export type Settings = components['schemas']['Settings'];
+export type AvatarCatalog = components['schemas']['AvatarCatalog'];
+export type AvatarSeries = components['schemas']['AvatarSeries'];
+export type AvatarRef = components['schemas']['AvatarRef'];
 export type SettingsPatch = components['schemas']['SettingsPatch'];
 export type Event = components['schemas']['Event'];
 export type ErrorEnvelope = components['schemas']['ErrorEnvelope'];
@@ -81,6 +84,8 @@ export interface Role {
   name: string;
   contentVersion?: string;
   scenarios?: string[];
+  /** The avatar the user chose for the role; absent follows the catalog. */
+  avatar?: AvatarRef;
 }
 
 /** A built-in scenario groups roles and preselects its usual members. */

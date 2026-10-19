@@ -14,6 +14,7 @@ import (
 
 	"errors"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/avatars"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
@@ -77,6 +78,10 @@ type App struct {
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
+
+	// Avatars is this profile's downloaded avatar catalog; nil serves an
+	// empty catalog and never downloads.
+	Avatars *avatars.Catalog
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.

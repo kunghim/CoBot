@@ -193,6 +193,155 @@ paths:
                         $ref: "#/components/schemas/EngineStatus"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/roles/{id}/avatar:
+    put:
+      operationId: setRoleAvatar
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set a role's avatar (null returns it to the catalog default); members without their own follow it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, avatar]
+              properties:
+                requestId: { type: string, format: uuid }
+                avatar:
+                  description: The avatar to use; null follows the default again
+                  nullable: true
+                  allOf:
+                    - $ref: "#/components/schemas/AvatarRef"
+      responses:
+        "200":
+          description: Role avatar set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [roleId]
+                        properties:
+                          roleId: { type: string }
+                          avatar: { $ref: "#/components/schemas/AvatarRef" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/uploads:
+    post:
+      operationId: saveAvatarUpload
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Keep a local picture (already cropped to a 256×256 PNG) for use as an avatar; it stays in the data root
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, data]
+              properties:
+                requestId: { type: string, format: uuid }
+                data: { type: string, format: byte, description: Base64 PNG, at most 512 KB }
+      responses:
+        "201":
+          description: Stored picture
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [file]
+                        properties:
+                          file: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/uploads/{file}:
+    get:
+      operationId: getAvatarUpload
+      security:
+        - SessionCookie: []
+      summary: A stored avatar picture
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The picture
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/catalog:
+    get:
+      operationId: getAvatarCatalog
+      security:
+        - SessionCookie: []
+      summary: The avatar catalog cached in this profile, and its last sync
+      responses:
+        "200":
+          description: Cached catalog; empty until a sync succeeds
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AvatarCatalog"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/avatars/catalog/sync:
+    post:
+      operationId: syncAvatarCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Catalog after the check
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AvatarCatalog"
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/engine/check:
     post:
       operationId: checkEngine
@@ -377,6 +526,7 @@ paths:
                                 scenarios:
                                   type: array
                                   items: { type: string }
+                                avatar: { $ref: "#/components/schemas/AvatarRef" }
                           scenarios:
                             type: array
                             items:
@@ -637,6 +787,47 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
   /api/v1/bots/{id}:
+    patch:
+      operationId: patchBot
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set or clear a member's own avatar
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, expectedRevision, avatar]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
+                avatar:
+                  description: The avatar to use; null follows the default again
+                  nullable: true
+                  allOf:
+                    - $ref: "#/components/schemas/AvatarRef"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       operationId: deleteBot
       security:
@@ -1991,6 +2182,48 @@ components:
           type: string
           description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
         bearerExpiresAt: { type: string, format: date-time }
+    AvatarCatalog:
+      type: object
+      required: [series, status]
+      properties:
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvatarSeries"
+        status:
+          type: object
+          required: [syncing]
+          properties:
+            syncing: { type: boolean }
+            lastSyncAt: { type: string, format: date-time }
+            lastError: { type: string }
+    AvatarRef:
+      type: object
+      description: >-
+        An avatar the user chose: catalog parts (kind catalog: series, shape,
+        eyes, color) or a local picture (kind upload: file). Never an image.
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [catalog, upload] }
+        series: { type: string }
+        shape: { type: string }
+        eyes: { type: string }
+        color: { type: string, pattern: "^#[0-9a-f]{6}$" }
+        file: { type: string, pattern: "^[0-9a-f]{64}\\.png$" }
+    AvatarSeries:
+      type: object
+      required: [id, name, kind, version, data]
+      properties:
+        id: { type: string }
+        name:
+          type: object
+          additionalProperties: { type: string }
+        kind: { type: string }
+        version: { type: integer }
+        data:
+          type: object
+          description: The series file as published (format in assets/avatars)
+          additionalProperties: true
     Settings:
       type: object
       required:
@@ -1999,7 +2232,7 @@ components:
         revision: { type: integer, format: int64 }
         language: { type: string, enum: [zh-CN, en] }
         colorMode: { type: string, enum: [system, light, dark] }
-        theme: { type: string, enum: [graphite, harbor, dusk] }
+        theme: { type: string, enum: [graphite, harbor, dusk, classic] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }
@@ -2012,7 +2245,7 @@ components:
       properties:
         language: { type: string, enum: [zh-CN, en] }
         colorMode: { type: string, enum: [system, light, dark] }
-        theme: { type: string, enum: [graphite, harbor, dusk] }
+        theme: { type: string, enum: [graphite, harbor, dusk, classic] }
         defaultModel: { type: string }
         memberLimit: { type: integer }
         chainLimit: { type: integer }
@@ -2071,7 +2304,17 @@ components:
           type: string
           enum: [idle, queued, working, waiting_approval, waiting_input, interrupted, unknown]
         currentRunId: { type: string }
+        avatar: { $ref: "#/components/schemas/AvatarRef" }
         revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        lastMessage: { $ref: "#/components/schemas/MessagePreview" }
+    MessagePreview:
+      type: object
+      description: The start of the latest message between the user and a member, for the team list.
+      required: [kind, text, createdAt]
+      properties:
+        kind: { type: string, enum: [user, assistant] }
+        text: { type: string }
         createdAt: { type: string, format: date-time }
     TeamWithBots:
       type: object

@@ -76,6 +76,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/archive", s.handleArchiveTeam)
 	mux.HandleFunc("POST /api/v1/teams/{id}/restore", s.handleRestoreTeam)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}", s.handleDeleteBot)
+	mux.HandleFunc("PATCH /api/v1/bots/{id}", s.handlePatchBot)
+	mux.HandleFunc("PUT /api/v1/roles/{id}/avatar", s.handlePutRoleAvatar)
 	mux.HandleFunc("GET /api/v1/teams/{id}/activity", s.handleListActivity)
 	mux.HandleFunc("GET /api/v1/bots/{id}/memories", s.handleListMemories)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)
@@ -88,6 +90,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/open-path", s.handleOpenTeamPath)
 	mux.HandleFunc("POST /api/v1/teams/{id}/warm", s.handleWarmTeam)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
+	mux.HandleFunc("GET /api/v1/avatars/catalog", s.handleGetAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/catalog/sync", s.handleSyncAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/uploads", s.handleSaveAvatarUpload)
+	mux.HandleFunc("GET /api/v1/avatars/uploads/{file}", s.handleGetAvatarUpload)
 
 	// Conversations and runs.
 	mux.HandleFunc("GET /api/v1/bots/{id}/messages", s.handleListMessages)

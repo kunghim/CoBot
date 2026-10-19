@@ -1,12 +1,16 @@
 {
   "app": { "title": "CoBot" },
+  "window": { "minimize": "Minimize", "maximize": "Maximize", "restore": "Restore", "close": "Close" },
+  "common": { "close": "Close", "cancel": "Cancel", "clearSearch": "Clear search", "decrease": "Decrease", "increase": "Increase" },
   "nav": {
     "home": "Home",
     "settings": "Settings",
     "teamList": "Team list",
     "workPanel": "Work panel",
-    "toggleTeamList": "Collapse/expand team list",
-    "toggleWorkPanel": "Collapse/expand work panel"
+    "openTeamList": "Expand team list",
+    "closeTeamList": "Collapse team list",
+    "openWorkPanel": "Expand work panel",
+    "closeWorkPanel": "Collapse work panel"
   },
   "home": {
     "noTeams": "No teams yet. Create one and the project manager and members will collaborate here.",
@@ -15,6 +19,25 @@
     "pickTitle": "Who do you want to talk to?",
     "selectBot": "Pick a member on the left, or go straight to a project manager.",
     "openLeader": "Open project manager"
+  },
+  "avatar": {
+    "change": "Change avatar",
+    "memberTitle": "{{name}}'s avatar",
+    "roleTitle": "Default avatar of the {{name}} role",
+    "series": "Series: {{name}}",
+    "shape": "Shape",
+    "eyes": "Eyes",
+    "color": "Color",
+    "save": "Use this avatar",
+    "useDefault": "Use default",
+    "usePicture": "Use a picture",
+    "pictureNote": "Local picture: kept on this computer only",
+    "pictureType": "Only PNG, JPEG or WebP pictures are supported.",
+    "pictureUnreadable": "This picture could not be read. Try another one.",
+    "pictureTooLarge": "This picture is still too large after resizing. Try one with less detail.",
+    "custom": "Customized",
+    "default": "Default avatar",
+    "noCatalog": "The avatar catalog has not been downloaded yet, so avatars cannot be changed. Check for updates in Settings > Appearance."
   },
   "archived": {
     "search": "Search team name or folder",
@@ -74,6 +97,7 @@
     "expand": "Expand team",
     "collapse": "Collapse team",
     "leader": "Project manager",
+    "previewYou": "You: ",
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {
@@ -130,6 +154,11 @@
     "default": "Default",
     "modelDefault": "Left to the model (its default: {{level}})",
     "note": "Applies from each member's next turn. Higher effort thinks more, takes longer and uses more.",
+    "modelNote": "The model is the default model all teams share.",
+    "reset": "Reset to default",
+    "chooseModel": "Choose model",
+    "back": "Back",
+    "saveFailed": "Thinking effort was not changed",
     "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" }
   },
   "permission": {
@@ -283,6 +312,7 @@
       "chain": "Chain confirmation"
     },
     "requester": "Requested by: {{name}}",
+    "requesterAsks": "asks for your approval",
     "reason": "Reason",
     "prev": "Previous approval card",
     "next": "Next approval card",
@@ -507,7 +537,6 @@
     "revoke": "Revoke",
     "title": "Settings",
     "back": "Back",
-    "saving": "Saving…",
     "version": "Version",
     "modelsNeedEngine": "Models can be chosen once Codex is available; see Codex engine first.",
     "limitsTitle": "Collaboration limits",
@@ -515,6 +544,7 @@
     "sections": {
       "general": "General",
       "appearance": "Appearance",
+      "roles": "Roles",
       "engine": "Codex engine",
       "models": "Models",
       "collaboration": "Collaboration & budget",
@@ -525,6 +555,7 @@
     "sectionHints": {
       "general": "Basic preferences such as the interface language.",
       "appearance": "Light, dark or following the system, and the interface colors. Members keep their role colors in every theme.",
+      "roles": "Each role's default avatar. Members without an avatar of their own follow it; click a member's avatar in its conversation to change just that member.",
       "engine": "CoBot detects Codex and authorizes its safety hook at startup; this page shows the result.",
       "models": "Changes apply right away to work that starts afterwards.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
@@ -536,10 +567,18 @@
     "colorMode": "Mode",
     "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
     "theme": "Theme",
+    "avatarCatalog": "Avatar catalog",
+    "avatarCatalogNone": "The avatar catalog has not been downloaded yet; members show the default avatar for now.",
+    "avatarCatalogSeries": "{{name}}: version {{version}}",
+    "avatarCatalogSyncing": "Checking for updates…",
+    "avatarCatalogChecked": "Last checked: {{time}}",
+    "avatarCatalogFailed": "The last check did not finish: {{error}}",
+    "avatarCatalogCheck": "Check for updates",
     "themes": {
       "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
       "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
-      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a coral accent" }
+      "classic": { "name": "Classic", "summary": "Rice paper and ink: soft black, white and gray" },
+      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a plum-blossom accent" }
     },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
@@ -599,6 +638,11 @@
     "error.settings.unsupported_language": "Unsupported language",
     "error.settings.unsupported_color_mode": "Unsupported color mode",
     "error.settings.unsupported_theme": "Unsupported theme",
+    "error.avatar.invalid": "Invalid avatar",
+    "error.avatar.upload_size": "The picture is too large (512 KB at most)",
+    "error.avatar.upload_format": "The picture must be a 256×256 PNG",
+    "error.avatar.upload_missing": "This picture is no longer stored; choose it again",
+    "error.role.not_found": "Role not found",
     "error.settings.member_limit_range": "Member limit must be between {{min}} and {{max}}",
     "error.settings.chain_limit_range": "Chain limit must be between {{min}} and {{max}}",
     "error.settings.review_reject_limit_range": "Review send-back limit must be between {{min}} and {{max}}",

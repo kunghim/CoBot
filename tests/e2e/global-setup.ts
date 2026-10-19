@@ -1,5 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { request as pwRequest } from '@playwright/test';
@@ -44,6 +45,22 @@ export default async function globalSetup(): Promise<void> {
   build();
   rmSync(profileRoot, { recursive: true, force: true });
   mkdirSync(profileRoot, { recursive: true });
+
+  // The avatar catalog comes from this checkout's assets, served the way the
+  // repository publishes them (LF line endings), never from the network.
+  const assets = createServer((req, res) => {
+    const rel = decodeURIComponent((req.url ?? '/').split('?')[0]).replace(/^\/+/, '');
+    const file = resolve(root, rel);
+    if (!file.startsWith(join(root, 'assets')) || !existsSync(file)) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200).end(readFileSync(file, 'utf8').replace(/\r\n/g, '\n'));
+  });
+  await new Promise<void>((done) => assets.listen(0, '127.0.0.1', done));
+  assets.unref();
+  const assetsPort = (assets.address() as { port: number }).port;
+  writeFileSync(join(profileRoot, 'config.json'), JSON.stringify({ assetsBaseUrl: `http://127.0.0.1:${assetsPort}/assets/` }));
 
   // Set every control var the core and its engine children read *before*
   // spawn: a child process captures the parent environment at spawn time, so

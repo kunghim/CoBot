@@ -63,16 +63,29 @@ const (
 
 // Bot is one agent instance in a team.
 type Bot struct {
-	ID           string    `json:"id"`
-	TeamID       string    `json:"teamId"`
-	Name         string    `json:"name"`
-	RoleID       string    `json:"roleId"`
-	RoleVersion  string    `json:"roleVersion,omitempty"`
-	IsLeader     bool      `json:"isLeader"`
-	Status       string    `json:"status"`
-	CurrentRunID string    `json:"currentRunId,omitempty"`
-	Revision     int64     `json:"revision"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID           string `json:"id"`
+	TeamID       string `json:"teamId"`
+	Name         string `json:"name"`
+	RoleID       string `json:"roleId"`
+	RoleVersion  string `json:"roleVersion,omitempty"`
+	IsLeader     bool   `json:"isLeader"`
+	Status       string `json:"status"`
+	CurrentRunID string `json:"currentRunId,omitempty"`
+	// Avatar is the member's own avatar; nil follows its role's.
+	Avatar    *AvatarRef `json:"avatar,omitempty"`
+	Revision  int64      `json:"revision"`
+	CreatedAt time.Time  `json:"createdAt"`
+	// LastMessage previews the latest message between the user and this
+	// member; only team listings fill it.
+	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+}
+
+// MessagePreview is the start of a conversation's latest message, for the
+// team list.
+type MessagePreview struct {
+	Kind      string    `json:"kind"` // user|assistant
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // ProviderSession maps a bot onto its engine thread.
@@ -87,12 +100,16 @@ type ProviderSession struct {
 
 // Event types recorded by the M2 surface; append, never rename.
 const (
-	EventTeamCreated     = "team.created"
-	EventTeamUpdated     = "team.updated"
-	EventTeamArchived    = "team.archived"
-	EventTeamRestored    = "team.restored"
-	EventBotDeleted      = "bot.deleted"
-	EventBotAdded        = "bot.added"
+	EventTeamCreated  = "team.created"
+	EventTeamUpdated  = "team.updated"
+	EventTeamArchived = "team.archived"
+	EventTeamRestored = "team.restored"
+	EventBotDeleted   = "bot.deleted"
+	EventBotAdded     = "bot.added"
+	// EventBotUpdated records a change to a member itself (its avatar).
+	EventBotUpdated = "bot.updated"
+	// EventRoleUpdated records a change to a role's avatar.
+	EventRoleUpdated     = "role.updated"
 	EventMessageCreated  = "message.created"
 	EventMessageUpdated  = "message.updated"
 	EventRunUpdated      = "run.updated"

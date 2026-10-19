@@ -107,6 +107,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/roles/{id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a role's avatar (null returns it to the catalog default); members without their own follow it */
+        put: operations["setRoleAvatar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep a local picture (already cropped to a 256×256 PNG) for use as an avatar; it stays in the data root */
+        post: operations["saveAvatarUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/uploads/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A stored avatar picture */
+        get: operations["getAvatarUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The avatar catalog cached in this profile, and its last sync */
+        get: operations["getAvatarCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status */
+        post: operations["syncAvatarCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/engine/check": {
         parameters: {
             query?: never;
@@ -314,7 +399,8 @@ export interface paths {
         delete: operations["deleteBot"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Set or clear a member's own avatar */
+        patch: operations["patchBot"];
         trace?: never;
     };
     "/api/v1/teams/{id}/bots": {
@@ -1087,6 +1173,37 @@ export interface components {
             /** Format: date-time */
             bearerExpiresAt?: string;
         };
+        AvatarCatalog: {
+            series: components["schemas"]["AvatarSeries"][];
+            status: {
+                syncing: boolean;
+                /** Format: date-time */
+                lastSyncAt?: string;
+                lastError?: string;
+            };
+        };
+        /** @description An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image. */
+        AvatarRef: {
+            /** @enum {string} */
+            kind: "catalog" | "upload";
+            series?: string;
+            shape?: string;
+            eyes?: string;
+            color?: string;
+            file?: string;
+        };
+        AvatarSeries: {
+            id: string;
+            name: {
+                [key: string]: string;
+            };
+            kind: string;
+            version: number;
+            /** @description The series file as published (format in assets/avatars) */
+            data: {
+                [key: string]: unknown;
+            };
+        };
         Settings: {
             /** Format: int64 */
             revision: number;
@@ -1095,7 +1212,7 @@ export interface components {
             /** @enum {string} */
             colorMode: "system" | "light" | "dark";
             /** @enum {string} */
-            theme: "graphite" | "harbor" | "dusk";
+            theme: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel: string;
             memberLimit: number;
             chainLimit: number;
@@ -1112,7 +1229,7 @@ export interface components {
             /** @enum {string} */
             colorMode?: "system" | "light" | "dark";
             /** @enum {string} */
-            theme?: "graphite" | "harbor" | "dusk";
+            theme?: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel?: string;
             memberLimit?: number;
             chainLimit?: number;
@@ -1166,8 +1283,18 @@ export interface components {
             /** @enum {string} */
             status: "idle" | "queued" | "working" | "waiting_approval" | "waiting_input" | "interrupted" | "unknown";
             currentRunId?: string;
+            avatar?: components["schemas"]["AvatarRef"];
             /** Format: int64 */
             revision: number;
+            /** Format: date-time */
+            createdAt: string;
+            lastMessage?: components["schemas"]["MessagePreview"];
+        };
+        /** @description The start of the latest message between the user and a member, for the team list. */
+        MessagePreview: {
+            /** @enum {string} */
+            kind: "user" | "assistant";
+            text: string;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1503,6 +1630,157 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
+    setRoleAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Role avatar set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            roleId: string;
+                            avatar?: components["schemas"]["AvatarRef"];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    saveAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /**
+                     * Format: byte
+                     * @description Base64 PNG
+                     */
+                    data: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored picture */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            file: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached catalog; empty until a sync succeeds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    syncAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Catalog after the check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
     checkEngine: {
         parameters: {
             query?: never;
@@ -1685,6 +1963,7 @@ export interface operations {
                                 name?: string;
                                 contentVersion?: string;
                                 scenarios?: string[];
+                                avatar?: components["schemas"]["AvatarRef"];
                             }[];
                             scenarios?: {
                                 id: string;
@@ -1954,6 +2233,43 @@ export interface operations {
             };
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    patchBot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     addBot: {

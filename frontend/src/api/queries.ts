@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { applyLiveSignal } from './live';
-import type { Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
+import type { AvatarRef, Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
 import { api, apiUrl, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
@@ -11,6 +11,7 @@ export const queryKeys = {
   teams: ['teams'] as const,
   roles: ['roles'] as const,
   engine: ['engine'] as const,
+  avatarCatalog: ['avatarCatalog'] as const,
   models: ['models'] as const,
   messages: (botId: string) => ['messages', botId] as const,
   exchanges: (botId: string, peerBotId: string) => ['exchanges', botId, peerBotId] as const,
@@ -279,6 +280,56 @@ export function useDecideApproval() {
 
 /** GET /engine: the real engine projection; the snapshot copy is only a
  * cheap cached hint. */
+/** The avatar catalog cached by the core. While a sync runs it is re-read
+ * until the sync ends; a finished download also arrives as an event. */
+export function useAvatarCatalog(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.avatarCatalog,
+    queryFn: api.getAvatarCatalog,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: (query) => (query.state.data?.status.syncing ? 2_000 : false),
+  });
+}
+
+/** A stored avatar picture as a blob URL; pictures never change. */
+export function useAvatarUpload(file: string | undefined) {
+  return useQuery({
+    queryKey: ['avatarUpload', file ?? ''],
+    queryFn: () => api.getAvatarUpload(file!),
+    enabled: !!file,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
+/** Sets or clears a member's own avatar. */
+export function useSetBotAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, avatar, expectedRevision }: { botId: string; avatar: AvatarRef | null; expectedRevision: number }) =>
+      api.setBotAvatar(botId, avatar, expectedRevision),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.teams }),
+  });
+}
+
+/** Sets or clears a role's avatar. */
+export function useSetRoleAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, avatar }: { roleId: string; avatar: AvatarRef | null }) => api.setRoleAvatar(roleId, avatar),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.roles }),
+  });
+}
+
+export function useSyncAvatarCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.syncAvatarCatalog(),
+    onSuccess: (catalog) => qc.setQueryData(queryKeys.avatarCatalog, catalog),
+  });
+}
+
 export function useEngine(enabled = true) {
   return useQuery({ queryKey: queryKeys.engine, queryFn: api.getEngine, enabled, staleTime: 0 });
 }

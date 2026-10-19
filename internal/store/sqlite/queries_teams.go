@@ -166,16 +166,17 @@ func InsertBotTx(ctx context.Context, tx *sql.Tx, bot domain.Bot) error {
 	return nil
 }
 
-const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, revision, created_at`
+const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, avatar, revision, created_at`
 
 func scanBot(rows *sql.Rows) (domain.Bot, error) {
 	var b domain.Bot
 	var isLeader int
-	var created string
-	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &b.Revision, &created); err != nil {
+	var created, avatar string
+	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &avatar, &b.Revision, &created); err != nil {
 		return domain.Bot{}, err
 	}
 	b.IsLeader = isLeader != 0
+	b.Avatar = domain.DecodeAvatar(avatar)
 	b.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	return b, nil
 }

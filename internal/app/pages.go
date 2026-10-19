@@ -154,9 +154,7 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 			team, _, e := sqlite.GetTeam(ctx, q, id)
 			err = e
 			if err == nil {
-				bots, e := sqlite.ListBots(ctx, q, id)
-				err = e
-				value = TeamWithBots{Team: team, Bots: bots}
+				value, err = teamWithBotsOn(ctx, q, team)
 			}
 		case "tasks":
 			value, err = sqlite.GetTask(ctx, q, id)

@@ -319,8 +319,8 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 
 	// Appearance starts at the system mode with the default palette and
 	// takes only the listed values.
-	if saved.ColorMode != "system" || saved.Theme != "graphite" {
-		t.Fatalf("appearance defaults = %q/%q, want system/graphite", saved.ColorMode, saved.Theme)
+	if saved.ColorMode != "system" || saved.Theme != "classic" {
+		t.Fatalf("appearance defaults = %q/%q, want system/classic", saved.ColorMode, saved.Theme)
 	}
 	dark, harbor := "dark", "harbor"
 	saved, err = UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &dark, Theme: &harbor}, 2)

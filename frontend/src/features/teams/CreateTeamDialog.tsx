@@ -9,14 +9,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Check, FolderOpen, Lock } from 'lucide-react';
 import { useCreateTeam, useRoles } from '../../api/queries';
 import { api } from '../../api/client';
 import type { DirectoryCheckResult } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
-import { useDialogFocus } from '../../components/useDialogFocus';
+import { Alert, Button, CheckboxCards, cx, Dialog, Field, Fieldset, Icons, SegmentedControl, Skeleton, Spinner, TextInput } from '../../components/ui';
 import { pickDirectory } from '../../platform/pickDirectory';
-import { MemberMark } from './roleTone';
+import Avatar from '../avatars/Avatar';
 
 /** folderName is the last path segment, used as the suggested team name. */
 function folderName(path: string): string {
@@ -69,8 +68,6 @@ export default function CreateTeamDialog({
   useEffect(() => {
     if (open && scenario) setSelectedRoles(new Set(scenario.defaultRoleIds));
   }, [open, scenario]);
-
-  const dialogRef = useDialogFocus(open, onClose);
 
   if (!open) return null;
 
@@ -145,76 +142,41 @@ export default function CreateTeamDialog({
     );
   };
 
-  const roleCard = (id: string, label: string, summary: string, selected: boolean, locked: boolean) => (
-    <button
-      key={id}
-      type="button"
-      role="checkbox"
-      aria-checked={selected}
-      aria-disabled={locked}
-      onClick={() => {
-        if (!locked) toggleRole(id);
-      }}
-      className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
-        selected
-          ? 'border-neutral-900 bg-neutral-50 dark:border-neutral-200 dark:bg-neutral-800'
-          : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-700 dark:hover:border-neutral-500'
-      } ${locked ? 'cursor-default' : ''}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-          selected
-            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-            : 'border-neutral-300 dark:border-neutral-600'
-        }`}
-      >
-        {locked ? <Lock size={10} /> : selected ? <Check size={12} /> : null}
-      </span>
-      <MemberMark bot={{ name: label, roleId: id, isLeader: locked }} />
-      <span className="min-w-0">
-        <span className="flex items-center gap-1.5 text-sm font-medium">
-          {label}
-          {locked && (
-            <span className="rounded bg-neutral-200 px-1 text-[10px] font-normal text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
-              {t('team.required')}
-            </span>
-          )}
-        </span>
-        {summary && <span className="mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400">{summary}</span>}
-      </span>
-    </button>
-  );
+  const roleOption = (id: string, label: string, summary: string, isLeader: boolean) => ({
+    value: id,
+    label,
+    description: summary || undefined,
+    media: <Avatar bot={{ roleId: id, isLeader }} />,
+  });
 
   return (
-    <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-neutral-950/45 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div
-        ref={dialogRef as React.RefObject<HTMLDivElement>}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-team-title"
-        onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-xl rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900"
-      >
-        <h2 id="create-team-title" className="text-lg font-semibold tracking-tight">
-          {t('team.createTitle')}
-        </h2>
-
-        <div className="mt-4 text-sm">
-          <span className="text-neutral-500 dark:text-neutral-400">{t('team.directory')}</span>
-          <div className="mt-1 flex gap-2">
-            <button
-              type="button"
-              onClick={choose}
-              disabled={picking}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-            >
-              <FolderOpen size={15} aria-hidden="true" />
+    <Dialog
+      open
+      size="lg"
+      onClose={onClose}
+      busy={create.isPending}
+      closeLabel={t('common.close')}
+      title={t('team.createTitle')}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={create.isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onClick={submit} loading={create.isPending} disabled={!canSubmit}>
+            {create.isPending ? t('team.creating') : t('team.submit')}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <Field label={t('team.directory')}>
+          <div className="flex gap-2">
+            <Button variant="secondary" icon={Icons.openFolder} onClick={choose} loading={picking} className="shrink-0">
               {picking ? t('team.choosing') : t('team.chooseDirectory')}
-            </button>
-            <input
-              aria-label={t('team.directory')}
+            </Button>
+            <TextInput
+              mono
+              className="min-w-0 flex-1"
               value={directory}
               onChange={(event) => {
                 setDirectory(event.target.value);
@@ -227,43 +189,42 @@ export default function CreateTeamDialog({
                 if (event.key === 'Enter' && directory.trim()) applyDirectory(directory.trim());
               }}
               placeholder={t('team.directoryPlaceholder')}
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 font-mono text-xs focus:border-signal-500 focus:outline-none dark:border-neutral-700"
             />
           </div>
           {/* One line is kept for the check result, so the dialog does not
               shift under the pointer when leaving the field starts a check. */}
-          <div className="mt-1.5 min-h-[1.125rem]">
-          {checking && (
-            <p role="status" className="text-xs text-neutral-500">
-              {t('status.loading')}
-            </p>
-          )}
-          {verdict && (
-            <p
-              role="status"
-              className={`break-all text-xs ${verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}
-            >
-              {verdictText(verdict)}
-              {verdict.duplicate && verdict.archived && verdict.teamId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    navigate(`/settings/archived?team=${encodeURIComponent(verdict.teamId ?? '')}`);
-                  }}
-                  className="ml-2 font-medium underline underline-offset-2"
-                >
-                  {t('team.goRestore')}
-                </button>
-              )}
-            </p>
-          )}
+          <div className="min-h-[1.25rem]">
+            {checking && (
+              <p role="status" className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <Spinner size={12} />
+                {t('status.loading')}
+              </p>
+            )}
+            {verdict && (
+              <p role="status" className={cx('flex items-start gap-1.5 break-all text-xs leading-5', verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400')}>
+                {verdict.ok ? <Icons.success size={14} className="mt-0.5 shrink-0" aria-hidden /> : <Icons.warning size={14} className="mt-0.5 shrink-0" aria-hidden />}
+                <span>
+                  {verdictText(verdict)}
+                  {verdict.duplicate && verdict.archived && verdict.teamId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        navigate(`/settings/archived?team=${encodeURIComponent(verdict.teamId ?? '')}`);
+                      }}
+                      className="ml-2 font-medium underline underline-offset-2"
+                    >
+                      {t('team.goRestore')}
+                    </button>
+                  )}
+                </span>
+              </p>
+            )}
           </div>
-        </div>
+        </Field>
 
-        <label className="mt-3 block text-sm">
-          <span className="text-neutral-500 dark:text-neutral-400">{t('team.name')}</span>
-          <input
+        <Field label={t('team.name')}>
+          <TextInput
             value={name}
             onChange={(event) => {
               setName(event.target.value);
@@ -273,96 +234,42 @@ export default function CreateTeamDialog({
               if (event.key === 'Enter') submit();
             }}
             placeholder={t('team.namePlaceholder')}
-            className="mt-1 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm focus:border-signal-500 focus:outline-none dark:border-neutral-700"
           />
-        </label>
+        </Field>
 
-        {scenarios.length > 0 && (
-          <div className="mt-4 text-sm">
-            <span className="text-neutral-500 dark:text-neutral-400">{t('team.scenario')}</span>
-            <div role="radiogroup" aria-label={t('team.scenario')} className="mt-1 flex flex-wrap gap-2">
-              {scenarios.map((entry) => {
-                const active = entry.id === scenario?.id;
-                return (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setScenarioId(entry.id)}
-                    className={`rounded-full border px-3 py-1 text-sm ${
-                      active
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-                        : 'border-neutral-300 text-neutral-600 hover:border-neutral-500 dark:border-neutral-700 dark:text-neutral-300'
-                    }`}
-                  >
-                    {t(entry.nameKey, { defaultValue: entry.name })}
-                  </button>
-                );
-              })}
+        {scenarios.length > 1 && (
+          <Field label={t('team.scenario')}>
+            <div>
+              <SegmentedControl
+                label={t('team.scenario')}
+                value={scenario?.id ?? ''}
+                onChange={setScenarioId}
+                options={scenarios.map((entry) => ({ value: entry.id, label: t(entry.nameKey, { defaultValue: entry.name }) }))}
+              />
             </div>
-          </div>
+          </Field>
         )}
 
-        <fieldset className="mt-4">
-          <legend className="text-sm text-neutral-500 dark:text-neutral-400">{t('team.members')}</legend>
-          {roles.isPending && (
-            <p className="mt-1 text-xs text-neutral-400" role="status">
-              {t('status.loading')}
-            </p>
-          )}
-          {roles.isError && (
-            <p className="mt-1 text-xs text-red-600" role="alert">
-              {t('status.error')}
-            </p>
-          )}
+        <Fieldset legend={t('team.members')}>
+          {roles.isPending && <Skeleton className="h-24 w-full" />}
+          {roles.isError && <Alert tone="danger">{t('status.error')}</Alert>}
           {roles.isSuccess && (
-            <div className="mt-1 grid gap-2 sm:grid-cols-2">
-              {leader &&
-                roleCard(
-                  leader.id,
-                  t(leader.nameKey, { defaultValue: leader.name }),
-                  leader.summaryKey ? t(leader.summaryKey, { defaultValue: '' }) : '',
-                  true,
-                  true,
-                )}
-              {offered.map((role) =>
-                roleCard(
-                  role.id,
-                  t(role.nameKey, { defaultValue: role.name }),
-                  role.summaryKey ? t(role.summaryKey, { defaultValue: '' }) : '',
-                  selectedRoles.has(role.id),
-                  false,
-                ),
-              )}
-            </div>
+            <CheckboxCards
+              label={t('team.members')}
+              values={selectedRoles}
+              onToggle={toggleRole}
+              locked={leader ? [leader.id] : []}
+              lockedLabel={t('team.required')}
+              options={[
+                ...(leader ? [roleOption(leader.id, t(leader.nameKey, { defaultValue: leader.name }), leader.summaryKey ? t(leader.summaryKey, { defaultValue: '' }) : '', true)] : []),
+                ...offered.map((role) => roleOption(role.id, t(role.nameKey, { defaultValue: role.name }), role.summaryKey ? t(role.summaryKey, { defaultValue: '' }) : '', false)),
+              ]}
+            />
           )}
-        </fieldset>
+        </Fieldset>
 
-        {errorText && (
-          <p className="mt-3 text-sm text-red-600" role="alert">
-            {errorText}
-          </p>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
-          >
-            {t('team.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            {create.isPending ? t('team.creating') : t('team.submit')}
-          </button>
-        </div>
+        {errorText && <Alert tone="danger">{errorText}</Alert>}
       </div>
-    </div>
+    </Dialog>
   );
 }

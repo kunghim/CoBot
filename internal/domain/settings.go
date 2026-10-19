@@ -11,8 +11,8 @@ var SupportedLanguages = []string{"zh-CN", "en"}
 // ColorModes choose light or dark; system follows the operating system.
 var ColorModes = []string{"system", "light", "dark"}
 
-// Themes are the interface's palettes; graphite is the default.
-var Themes = []string{"graphite", "harbor", "dusk"}
+// Themes are the interface's palettes; classic is the default for new profiles.
+var Themes = []string{"graphite", "harbor", "dusk", "classic"}
 
 // BudgetScopes select which entity a token budget applies to.
 const (
@@ -50,7 +50,7 @@ func DefaultSettings() Settings {
 		ChainLimit:        10,
 		ReviewRejectLimit: 3,
 		ColorMode:         "system",
-		Theme:             "graphite",
+		Theme:             "classic",
 		BudgetScope:       BudgetScopeNone,
 	}
 }

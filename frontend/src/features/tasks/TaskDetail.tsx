@@ -14,7 +14,7 @@ export default function TaskDetail({ task, bots }: { task: Task; bots: Bot[] }) 
   const userLabel = t('tasks.ownerUser');
 
   return (
-    <div className="space-y-1.5 border-t border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-700">
+    <div className="space-y-2 px-2.5 pb-2.5 pt-1 text-xs">
       {current.stageKind && (
         <p className="text-neutral-500 dark:text-neutral-400">
           {t(`tasks.stageKind.${current.stageKind}`)}
@@ -27,10 +27,10 @@ export default function TaskDetail({ task, bots }: { task: Task; bots: Bot[] }) 
         </p>
       )}
       <section aria-label={t('tasks.handoffs')}>
-        {records.length === 0 && <p className="text-neutral-400">{t('tasks.handoffsEmpty')}</p>}
+        {records.length === 0 && <p className="text-neutral-500 dark:text-neutral-400">{t('tasks.handoffsEmpty')}</p>}
         <ul className="space-y-1">
           {records.map((item) => (
-            <li key={item.id} className="rounded bg-neutral-50 px-2 py-1 dark:bg-neutral-800/60">
+            <li key={item.id} className="space-y-0.5 rounded-lg bg-card px-2.5 py-2 shadow-sm ring-1 ring-neutral-900/[0.05] dark:ring-white/[0.06]">
               <p className="text-neutral-500 dark:text-neutral-400">
                 {ownerLabel(item.authorId, bots, userLabel)} · {t(`tasks.outcome.${item.outcome ?? 'done'}`)}
                 {item.mode ? ` · ${t(`tasks.mode.${item.mode}`)}` : ''}
@@ -41,7 +41,7 @@ export default function TaskDetail({ task, bots }: { task: Task; bots: Bot[] }) 
                   {t('tasks.suggestions')}: {item.suggestions}
                 </p>
               )}
-              {(item.artifactRefs ?? []).length > 0 && <p className="break-all text-neutral-400">{(item.artifactRefs ?? []).join(', ')}</p>}
+              {(item.artifactRefs ?? []).length > 0 && <p className="break-all font-mono text-neutral-500 dark:text-neutral-400">{(item.artifactRefs ?? []).join(', ')}</p>}
               {item.execution && (
                 <div className="mt-0.5 text-neutral-500 dark:text-neutral-400">
                   <p className="font-medium">{t('tasks.execution')}</p>
@@ -51,7 +51,7 @@ export default function TaskDetail({ task, bots }: { task: Task; bots: Bot[] }) 
                       <li key={index} className="break-all">
                         $ {command.command}
                         {command.exitCode !== undefined && (
-                          <span className={command.exitCode === 0 ? 'text-emerald-600' : 'text-red-600'}> → {command.exitCode}</span>
+                          <span className={command.exitCode === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}> → {command.exitCode}</span>
                         )}
                       </li>
                     ))}

@@ -4,7 +4,8 @@
 // expands into the same steps.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, Brain, Check, ChevronDown, ChevronRight, FileDiff, Globe, ListChecks, Loader2, Minus, RefreshCw, TerminalSquare, TriangleAlert, Wrench, X } from 'lucide-react';
+import { Check, Loader2, Minus, X } from 'lucide-react';
+import { Badge, Button, cx, Icons, interactive } from '../../components/ui';
 import type { RunStep, RunWithSteps } from '../../api/types';
 import type { LiveRun } from '../../api/live';
 import { mergeSteps } from '../../api/live';
@@ -48,7 +49,7 @@ export default function RunProcess({
 
   if (!active && shown.length === 0) {
     if (run.status === 'failed' || run.status === 'interrupted') {
-      return <p className="text-xs text-neutral-400">{t(`conversation.process.${run.status}`)}</p>;
+      return <p className="text-xs text-neutral-500 dark:text-neutral-400">{t(`conversation.process.${run.status}`)}</p>;
     }
     return null;
   }
@@ -66,9 +67,9 @@ export default function RunProcess({
         type="button"
         onClick={() => setOpen(!expanded)}
         aria-expanded={expanded}
-        className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+        className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
       >
-        {active ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : expanded ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
+        {active ? <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" /> : expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
         <span role={active ? 'status' : undefined}>{header}</span>
       </button>
       {expanded && shown.length > 0 && (
@@ -81,7 +82,7 @@ export default function RunProcess({
         </ol>
       )}
       {active && live?.reply && (
-        <div className="rounded-xl bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100" data-testid="streaming-reply">
+        <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
           <Markdown text={live.reply} teamId={teamId} />
         </div>
       )}
@@ -89,17 +90,17 @@ export default function RunProcess({
   );
 }
 
-const kindIcon: Record<string, typeof Brain> = {
-  reasoning: Brain,
-  command: TerminalSquare,
-  file_change: FileDiff,
-  tool: Wrench,
-  web_search: Globe,
-  plan: ListChecks,
-  retry: RefreshCw,
-  notice: TriangleAlert,
-  agent: Bot,
-  diff: FileDiff,
+const kindIcon: Record<string, (typeof Icons)[keyof typeof Icons]> = {
+  reasoning: Icons.thinking,
+  command: Icons.command,
+  file_change: Icons.fileChange,
+  tool: Icons.tool,
+  web_search: Icons.webSearch,
+  plan: Icons.plan,
+  retry: Icons.retry,
+  notice: Icons.warning,
+  agent: Icons.subagent,
+  diff: Icons.diff,
 };
 
 function StatusMark({ status, running }: { status: string; running: boolean }) {
@@ -113,7 +114,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const phrase = describeStep(step, nameOf);
-  const Icon = kindIcon[step.kind] ?? Wrench;
+  const Icon = kindIcon[step.kind] ?? Icons.tool;
   const d = step.detail ?? {};
   const tone =
     step.kind === 'notice'
@@ -148,12 +149,12 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
         disabled={!body}
         onClick={() => setOpen(!open)}
         aria-expanded={body ? open : undefined}
-        className="flex w-full min-w-0 items-center gap-1.5 text-left enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100"
+        className={cx('-mx-1.5 flex w-[calc(100%+0.75rem)] min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100', body && interactive.hover)}
       >
         <Icon size={12} className="shrink-0" aria-hidden="true" />
-        {typeof d.subAgentThread === 'string' && <span className="shrink-0 rounded bg-violet-100 px-1 text-[10px] text-violet-700 dark:bg-violet-950 dark:text-violet-300">{t('conversation.step.agent.badge')}</span>}
+        {typeof d.subAgentThread === 'string' && <Badge tone="info">{t('conversation.step.agent.badge')}</Badge>}
         <span className={step.kind === 'command' ? 'shrink-0' : 'min-w-0 truncate'}>{t(phrase.key, phrase.params)}</span>
-        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-[11px] text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
+        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-2xs text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
         {step.kind === 'command' && typeof d.exitCode === 'number' && d.exitCode !== 0 && <span className="shrink-0 text-red-500">{t('conversation.step.exitCode', { code: d.exitCode })}</span>}
         <span className="ml-auto shrink-0"><StatusMark status={step.status} running={running} /></span>
       </button>
@@ -169,8 +170,8 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       const output = (typeof d.output === 'string' ? d.output : '') || live?.output[step.id] || '';
       return (
         <div className="space-y-1">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-neutral-900 p-2 font-mono text-[11px] leading-4 text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
-          {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-[11px] leading-4 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-400">{t('conversation.step.noOutput')}</p>}
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
+          {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-700 dark:bg-black/30 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-500 dark:text-neutral-400">{t('conversation.step.noOutput')}</p>}
         </div>
       );
     }
@@ -192,7 +193,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
           {message ? (
             <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={teamId} /></div>
           ) : (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-[11px] dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-2xs dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
           )}
           {extra && <p className="text-red-600">{extra}</p>}
         </div>
@@ -206,7 +207,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={teamId} /></div> : null;
     case 'retry':
     case 'notice':
-      return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-400">{d.message}</p> : null;
+      return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-500 dark:text-neutral-400">{d.message}</p> : null;
     default:
       return null;
   }
@@ -221,24 +222,25 @@ function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; te
   const diff = typeof change.diff === 'string' ? change.diff : '';
   return (
     <li>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-w-0 items-center gap-1.5 text-left hover:text-neutral-900 dark:hover:text-neutral-100">
-        {open ? <ChevronDown size={11} aria-hidden="true" /> : <ChevronRight size={11} aria-hidden="true" />}
-        <span className="shrink-0 rounded bg-neutral-200 px-1 text-[10px] dark:bg-neutral-700">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
-        <span className="min-w-0 truncate font-mono text-[11px]">{path}</span>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={cx('-mx-1 flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:text-neutral-900 dark:hover:text-neutral-100', interactive.hover)}>
+        {open ? <Icons.expand size={11} aria-hidden /> : <Icons.next size={11} aria-hidden />}
+        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-2xs dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
+        <span className="min-w-0 truncate font-mono text-2xs">{path}</span>
       </button>
       {open && (
         <div className="mt-1 space-y-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Icons.openExternal}
             onClick={() => {
               setError('');
               api.openTeamPath(teamId, path).catch((err) => setError(apiErrorMessage(t, err)));
             }}
-            className="text-blue-600 underline underline-offset-2 dark:text-blue-400"
           >
             {t('conversation.file.open')}
-          </button>
-          {error && <span role="alert" className="ml-2 text-red-600">{error}</span>}
+          </Button>
+          {error && <span role="alert" className="ml-2 text-red-600 dark:text-red-400">{error}</span>}
           {diff && <DiffView diff={diff} />}
         </div>
       )}

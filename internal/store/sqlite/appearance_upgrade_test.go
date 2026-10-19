@@ -73,7 +73,13 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 			if version == 20 {
 				limit = 5
 			}
-			if saved.ColorMode != "system" || saved.Theme != "graphite" || saved.ReviewRejectLimit != limit {
+			// A new profile starts on classic; an upgraded one keeps the
+			// palette it had (graphite, the earlier default).
+			theme := "classic"
+			if version > 0 {
+				theme = "graphite"
+			}
+			if saved.ColorMode != "system" || saved.Theme != theme || saved.ReviewRejectLimit != limit {
 				t.Fatalf("combined settings not preserved: %+v", saved)
 			}
 			if version > 0 && (saved.Language != "en" || saved.DefaultModel != "kept-model" || saved.Revision != 7) {

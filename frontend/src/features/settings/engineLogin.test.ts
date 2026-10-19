@@ -58,7 +58,8 @@ describe('engine sign-in state and browser handoff', () => {
     render();
     const status = host.querySelector('[role="status"]')!;
     expect(status.textContent).toContain('已登录');
-    expect(status.querySelector('.bg-green-500')).not.toBeNull();
+    // The library's success tone (StatusDot) is emerald.
+    expect(status.querySelector('.bg-emerald-500')).not.toBeNull();
     expect(nativeOpen).not.toHaveBeenCalled();
   });
 
@@ -99,6 +100,6 @@ describe('engine sign-in state and browser handoff', () => {
     fixture.info.loggedIn = true;
     render();
     expect(host.querySelector('a')).toBeNull();
-    expect(host.querySelector('[role="status"] .bg-green-500')).not.toBeNull();
+    expect(host.querySelector('[role="status"] .bg-emerald-500')).not.toBeNull();
   });
 });

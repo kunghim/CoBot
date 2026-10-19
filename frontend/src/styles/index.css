@@ -10,7 +10,11 @@
  * takes the theme's tint; the members' role colors (features/teams/roleTone)
  * and the status colors stay the same in every theme.
  *
- * graphite (default): sage-tinted graphite, cobalt signal.
+ * Text and icons drawn on a signal fill use on-signal, which is white
+ * except where a theme's signal turns light (classic in dark mode).
+ *
+ * The @theme values are graphite: sage-tinted graphite, cobalt signal. New
+ * profiles start on classic (below); graphite stays for earlier profiles.
  */
 @theme {
   --color-neutral-50: #f4f6f3;
@@ -28,9 +32,69 @@
   --color-signal-400: #8c98ff;
   --color-signal-500: #5568f0;
   --color-signal-600: #3346d3;
+  --color-on-signal: #ffffff;
+
+  /* Surfaces of the window, from back to front: the rail (deepest), the
+     side columns (team list, work panel), the canvas (the conversation, the
+     one raised sheet), cards floating on it, and sunk wells (the user's
+     bubble, commands). Values per theme and mode are below. */
+  --color-rail: var(--surface-rail);
+  --color-side: var(--surface-side);
+  --color-canvas: var(--surface-canvas);
+  --color-card: var(--surface-card);
+  --color-sunk: var(--surface-sunk);
+
+  /* Type scale: 11 (2xs: meta, badges, captions), 12 (xs), 14 (sm: body),
+     16 (base), 18 (lg), 20 (xl), 24 (2xl). No sizes in between. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 16px;
+
+  /* Shadows take the theme's darkest neutral, so a shadow on warm paper is
+     warm and one on blue-slate is cool. raised: the composer; floating:
+     cards that wait above it. */
+  --shadow-sm: 0 1px 3px 0 color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 1px 2px -1px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-md: 0 4px 6px -1px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 2px 4px -2px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-lg: 0 10px 15px -3px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-xl: 0 20px 25px -5px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 8px 10px -6px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-2xl: 0 25px 50px -12px color-mix(in srgb, var(--color-neutral-950) 25%, transparent);
+  --shadow-sheet: 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 5%, transparent), 0 2px 12px -6px color-mix(in srgb, var(--color-neutral-900) 10%, transparent);
+  --shadow-raised: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--color-neutral-900) 18%, transparent);
+  --shadow-floating: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 12px 32px -16px color-mix(in srgb, var(--color-neutral-900) 25%, transparent);
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
+
+  /* Motion: things that appear rise slightly into place; nothing bounces. */
+  --animate-pop-in: pop-in 160ms ease-out;
+  --animate-drop-in: drop-in 180ms ease-out;
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-in-right: slide-in-right 200ms ease-out;
+  --animate-slide-in-left: slide-in-left 200ms ease-out;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+}
+@keyframes shimmer {
+  50% { opacity: 0.45; }
+}
+@keyframes indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
 }
 
 /* harbor: cool blue-slate, sea-green signal. */
@@ -52,7 +116,8 @@
   --color-signal-600: #0e7a6f;
 }
 
-/* dusk: plum-tinted warm gray, coral signal. */
+/* dusk: plum-tinted warm gray, plum-blossom signal (kept apart from the
+   error red and the warning amber). */
 :root[data-theme="dusk"] {
   --color-neutral-50: #f7f4f5;
   --color-neutral-100: #efe9ec;
@@ -66,9 +131,70 @@
   --color-neutral-900: #1f171c;
   --color-neutral-950: #140e12;
 
-  --color-signal-400: #ff9a85;
-  --color-signal-500: #e5654b;
-  --color-signal-600: #c44a31;
+  --color-signal-400: #e48bbd;
+  --color-signal-500: #b04f86;
+  --color-signal-600: #923c6c;
+}
+
+/* classic: CoBot's own classic, rice paper and ink. Black, white and gray,
+   but neither end is pure: the side columns are warm off-white, the
+   conversation a brighter sheet, the text and the signal soft ink; dark mode is warm
+   charcoal with paper-white text. The warmth is kept so low (a few percent
+   of saturation) that it still reads as gray, only softer. Layers part by
+   tone more than by lines. The only color left is the members' own and the
+   status colors. */
+:root[data-theme="classic"] {
+  --color-black: #141311;
+
+  --color-neutral-50: #f4f3ef;
+  --color-neutral-100: #ecebe6;
+  --color-neutral-200: #e1dfd9;
+  --color-neutral-300: #cac7c0;
+  --color-neutral-400: #a19e96;
+  --color-neutral-500: #6f6c65;
+  --color-neutral-600: #57544e;
+  --color-neutral-700: #403e3a;
+  --color-neutral-800: #2c2a27;
+  --color-neutral-900: #22211e;
+  --color-neutral-950: #1b1a18;
+
+  --color-signal-400: #e6e3dc;
+  --color-signal-500: #34322e;
+  --color-signal-600: #2a2825;
+  --color-on-signal: #fbfaf7;
+}
+:root[data-theme="classic"][data-mode="dark"] {
+  --color-signal-500: #dedad2;
+  --color-on-signal: #22211e;
+}
+/* Surfaces, derived from each theme's neutrals; classic sets its own. */
+:root {
+  --surface-rail: var(--color-neutral-100);
+  --surface-side: var(--color-neutral-50);
+  --surface-canvas: color-mix(in srgb, var(--color-neutral-50) 35%, #ffffff);
+  --surface-card: #ffffff;
+  --surface-sunk: var(--color-neutral-100);
+}
+:root[data-mode="dark"] {
+  --surface-rail: color-mix(in srgb, var(--color-neutral-950) 75%, #000000);
+  --surface-side: var(--color-neutral-950);
+  --surface-canvas: color-mix(in srgb, var(--color-neutral-900) 70%, var(--color-neutral-950));
+  --surface-card: var(--color-neutral-800);
+  --surface-sunk: var(--color-neutral-800);
+}
+:root[data-theme="classic"] {
+  --surface-rail: #efede8;
+  --surface-side: #f7f6f3;
+  --surface-canvas: #fdfcfa;
+  --surface-card: #ffffff;
+  --surface-sunk: #efede7;
+}
+:root[data-theme="classic"][data-mode="dark"] {
+  --surface-rail: #121110;
+  --surface-side: #181715;
+  --surface-canvas: #211f1d;
+  --surface-card: #2b2a27;
+  --surface-sunk: #302e2b;
 }
 
 html,

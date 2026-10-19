@@ -1,30 +1,31 @@
 // taskFlow holds the pure rules of the requirement board: where a requirement
 // stands on its route and how its cards are shown. The server moves the work;
 // these helpers only describe it.
+import type { Tone } from '../../components/ui';
 import type { Bot, Requirement, Task, TaskStatus } from '../../api/types';
 
-const TONE: Record<TaskStatus, string> = {
-  todo: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
-  doing: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  done: 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+// Each card status's tone in the component library (Badge, StatusDot).
+const TONE: Record<TaskStatus, Tone> = {
+  todo: 'neutral',
+  doing: 'success',
+  done: 'neutral',
+  cancelled: 'danger',
 };
 
-export function statusTone(status: string): string {
+export function statusTone(status: string): Tone {
   return TONE[status as TaskStatus] ?? TONE.todo;
 }
 
-const REQUIREMENT_TONE: Record<string, string> = {
-  active: TONE.doing,
-  accepting: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-  done: TONE.done,
-  cancelled: TONE.cancelled,
+const REQUIREMENT_TONE: Record<string, Tone> = {
+  active: 'success',
+  accepting: 'info',
+  done: 'neutral',
+  cancelled: 'danger',
 };
 
-export function requirementTone(status: string): string {
-  return REQUIREMENT_TONE[status] ?? TONE.todo;
+export function requirementTone(status: string): Tone {
+  return REQUIREMENT_TONE[status] ?? 'neutral';
 }
-
 /** Display name for an owner id: member name when it is a bot of the team,
  * the user marker for the literal "user", otherwise a short id. */
 export function ownerLabel(ownerId: string, bots: Bot[], userLabel: string): string {

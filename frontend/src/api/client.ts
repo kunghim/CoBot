@@ -238,6 +238,24 @@ export const api = {
   // Engine account and models (M2).
   getEngine: () => request<import('./types').EngineStatus>('GET', '/api/v1/engine'),
   checkEngine: () => request<import('./types').EngineStatus>('POST', '/api/v1/engine/check', {}),
+  getAvatarCatalog: () => request<import('./types').AvatarCatalog>('GET', '/api/v1/avatars/catalog'),
+  syncAvatarCatalog: () => request<import('./types').AvatarCatalog>('POST', '/api/v1/avatars/catalog/sync', {}),
+  setBotAvatar: (botId: string, avatar: import('./types').AvatarRef | null, expectedRevision: number) =>
+    request<import('./types').Bot>('PATCH', `/api/v1/bots/${botId}`, { avatar, expectedRevision }),
+  saveAvatarUpload: (data: string) => request<{ file: string }>('POST', '/api/v1/avatars/uploads', { data }),
+  /** A stored picture as a blob URL; fetched with the session like any call,
+   * which a plain <img src> cannot do in the desktop shell. */
+  getAvatarUpload: async (file: string) => {
+    const token = bearerToken();
+    const resp = await fetch(apiUrl(`/api/v1/avatars/uploads/${encodeURIComponent(file)}`), {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+      credentials: token ? 'omit' : 'include',
+    });
+    if (!resp.ok) throw new Error(`avatar picture ${resp.status}`);
+    return URL.createObjectURL(await resp.blob());
+  },
+  setRoleAvatar: (roleId: string, avatar: import('./types').AvatarRef | null) =>
+    request<{ roleId: string }>('PUT', `/api/v1/roles/${encodeURIComponent(roleId)}/avatar`, { avatar }),
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),

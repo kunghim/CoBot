@@ -16,6 +16,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/roles"
+	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // controlServer is the profile-wide app-server used only for account and
@@ -415,16 +416,24 @@ func (a *App) RoleLibrary(ctx context.Context) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	chosen, err := sqlite.RoleAvatars(ctx, a.DB)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]map[string]any, 0, len(all))
 	for _, role := range all {
-		out = append(out, map[string]any{
+		entry := map[string]any{
 			"id":             role.ID,
 			"nameKey":        role.NameKey,
 			"summaryKey":     strings.TrimSuffix(role.NameKey, ".name") + ".summary",
 			"name":           role.Name,
 			"contentVersion": role.ContentVersion,
 			"scenarios":      roles.ScenariosOf(role.ID),
-		})
+		}
+		if avatar, ok := chosen[role.ID]; ok {
+			entry["avatar"] = avatar
+		}
+		out = append(out, entry)
 	}
 	return out, nil
 }

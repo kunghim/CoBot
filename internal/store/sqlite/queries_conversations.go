@@ -100,6 +100,59 @@ func ListMessages(ctx context.Context, q Queryer, botID string, before string, l
 	return out, rows.Err()
 }
 
+// previewRunes bounds a message preview; the list shows one truncated line.
+const previewRunes = 120
+
+// LatestMessagePreviews returns, per member of a team, the start of the
+// latest user or assistant message that has text. Members without one are
+// absent.
+func LatestMessagePreviews(ctx context.Context, q Queryer, teamID string) (map[string]domain.MessagePreview, error) {
+	rows, err := q.QueryContext(ctx, `SELECT bot_id, kind, blocks, created_at FROM (
+		SELECT bot_id, kind, blocks, created_at,
+			ROW_NUMBER() OVER (PARTITION BY bot_id ORDER BY created_at DESC, id DESC) AS rn
+		FROM messages
+		WHERE team_id = ? AND kind IN (?, ?) AND blocks LIKE '%"text"%'
+	) WHERE rn = 1`, teamID, domain.MessageKindUser, domain.MessageKindAssistant)
+	if err != nil {
+		return nil, fmt.Errorf("latest message previews: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]domain.MessagePreview{}
+	for rows.Next() {
+		var botID, kind, blocks, created string
+		if err := rows.Scan(&botID, &kind, &blocks, &created); err != nil {
+			return nil, fmt.Errorf("scan message preview: %w", err)
+		}
+		text := previewText(blocks)
+		if text == "" {
+			continue
+		}
+		at, _ := time.Parse(time.RFC3339Nano, created)
+		out[botID] = domain.MessagePreview{Kind: kind, Text: text, CreatedAt: at}
+	}
+	return out, rows.Err()
+}
+
+// previewText joins a message's text blocks into one line and cuts it to
+// previewRunes.
+func previewText(blocks string) string {
+	var parsed []domain.TextBlock
+	if err := json.Unmarshal([]byte(blocks), &parsed); err != nil {
+		return ""
+	}
+	parts := make([]string, 0, len(parsed))
+	for _, block := range parsed {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			parts = append(parts, block.Text)
+		}
+	}
+	text := strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
+	if runes := []rune(text); len(runes) > previewRunes {
+		text = string(runes[:previewRunes]) + "…"
+	}
+	return text
+}
+
 // ListCollaborationMessages returns exchanges between the given bot and one
 // peer, oldest first. Both directions are included so either collaboration
 // page can show the same read-only segment. An empty peerBotID means the

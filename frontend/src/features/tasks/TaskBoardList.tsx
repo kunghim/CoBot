@@ -6,11 +6,11 @@ import LoadMore from '../../components/LoadMore';
 // cancel a requirement.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useCancelRequirement, useRequirements, useTasks } from '../../api/queries';
 import type { Bot, Requirement, Task } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
+import { Alert, AlertDialog, Badge, Button, cx, EmptyState, Icons, interactive, Skeleton } from '../../components/ui';
 import TaskDetail from './TaskDetail';
 import { canCancel, cardsOf, currentStage, ownerLabel, requirementOrder, requirementTone, statusTone } from './taskFlow';
 
@@ -44,10 +44,19 @@ export default function TaskBoardList({
   }, [focusTaskId, focusNonce, cards.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (requirements.isPending || tasks.isPending) {
-    return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
+    return (
+      <div className="space-y-2 px-3 py-3" role="status" aria-label={t('status.loading')}>
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
   }
   if ((requirements.isError && !requirements.data) || (tasks.isError && !tasks.data)) {
-    return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('tasks.loadFailed')}</p>;
+    return (
+      <div className="px-3 py-3">
+        <Alert tone="danger">{t('tasks.loadFailed')}</Alert>
+      </div>
+    );
   }
 
   // A member's view shows the requirements it holds cards of.
@@ -56,8 +65,8 @@ export default function TaskBoardList({
 
   return (
     <div>
-      {items.length === 0 && <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('tasks.empty')}</p>}
-      <ul className="space-y-1 px-2 py-2">
+      {items.length === 0 && <EmptyState icon={<Icons.tasks size={20} aria-hidden />} title={t('tasks.empty')} />}
+      <ul className="space-y-0.5 px-2 py-1">
         {items.map((req) => (
           <RequirementRow
             key={req.id}
@@ -107,22 +116,18 @@ function RequirementRow({
   const owner = (ownerId?: string, kind?: string) => (kind === 'confirm' ? userLabel : ownerLabel(ownerId ?? '', bots, userLabel));
 
   return (
-    <li id={`requirement-${requirement.id}`} className="rounded-md border border-neutral-200 dark:border-neutral-700">
+    <li id={`requirement-${requirement.id}`} className={cx('overflow-hidden rounded-xl transition-colors', expanded && 'bg-card shadow-sm ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]')}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full items-start gap-2 px-2 py-1.5 text-left text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+        className={cx('flex w-full items-start gap-2 px-2.5 py-2 text-left text-sm transition-colors', interactive.hover)}
       >
-        <span className="mt-0.5 shrink-0 text-neutral-400">
-          {expanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-        </span>
+        <span className="mt-0.5 shrink-0 text-neutral-400">{expanded ? <Icons.expand size={14} aria-hidden /> : <Icons.next size={14} aria-hidden />}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${requirementTone(requirement.status)}`}>
-              {t(`tasks.requirementStatus.${requirement.status}`)}
-            </span>
-            <span className="min-w-0 truncate">{requirement.title}</span>
+            <Badge tone={requirementTone(requirement.status)}>{t(`tasks.requirementStatus.${requirement.status}`)}</Badge>
+            <span className="min-w-0 truncate font-medium text-neutral-900 dark:text-neutral-50">{requirement.title}</span>
           </span>
           {stage && (
             <span className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">
@@ -132,25 +137,36 @@ function RequirementRow({
         </span>
       </button>
       {expanded && (
-        <div className="space-y-2 border-t border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700">
+        <div className="space-y-3 border-t border-neutral-900/[0.06] px-3 py-3 text-sm dark:border-white/[0.08]">
           <section aria-label={t('tasks.route')}>
-            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('tasks.route')}</p>
-            <ol className="mt-1 space-y-0.5">
-              {requirement.stages.map((item, index) => (
-                <li
-                  key={index}
-                  aria-current={index === at ? 'step' : undefined}
-                  className={`flex items-center gap-1.5 text-xs ${index === at ? 'font-medium text-neutral-900 dark:text-neutral-100' : 'text-neutral-500 dark:text-neutral-400'}`}
-                >
-                  <span className="w-4 shrink-0 text-center">
-                    {index < at || requirement.status === 'done' ? <Check size={12} aria-hidden="true" /> : index === at ? '▶' : index + 1}
-                  </span>
-                  <span className="min-w-0 truncate">
-                    {item.name} · {t(`tasks.stageKind.${item.kind}`)}
-                    {item.kind === 'review' && item.reviewType ? `（${t(`tasks.reviewType.${item.reviewType}`)}）` : ''} · {owner(item.ownerId, item.kind)}
-                  </span>
-                </li>
-              ))}
+            <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('tasks.route')}</p>
+            <ol className="mt-1.5 space-y-1">
+              {requirement.stages.map((item, index) => {
+                const done = index < at || requirement.status === 'done';
+                const current = index === at;
+                return (
+                  <li
+                    key={index}
+                    aria-current={current ? 'step' : undefined}
+                    className={cx('flex items-center gap-2 text-xs', current ? 'font-medium text-neutral-900 dark:text-neutral-50' : 'text-neutral-500 dark:text-neutral-400')}
+                  >
+                    <span
+                      className={cx(
+                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-2xs tabular-nums',
+                        done && 'bg-neutral-900/[0.08] dark:bg-white/[0.1]',
+                        current && 'bg-signal-500 text-on-signal',
+                        !done && !current && 'ring-1 ring-neutral-900/15 dark:ring-white/20',
+                      )}
+                    >
+                      {done ? <Icons.done size={10} aria-hidden /> : index + 1}
+                    </span>
+                    <span className="min-w-0 truncate">
+                      {item.name} · {t(`tasks.stageKind.${item.kind}`)}
+                      {item.kind === 'review' && item.reviewType ? `（${t(`tasks.reviewType.${item.reviewType}`)}）` : ''} · {owner(item.ownerId, item.kind)}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           </section>
           <section aria-label={t('tasks.document')}>
@@ -158,34 +174,32 @@ function RequirementRow({
               type="button"
               onClick={() => setShowDocument((open) => !open)}
               aria-expanded={showDocument}
-              className="flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              className={cx('-mx-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-semibold text-neutral-700 transition-colors dark:text-neutral-200', interactive.hover)}
             >
-              {showDocument ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+              {showDocument ? <Icons.expand size={12} aria-hidden /> : <Icons.next size={12} aria-hidden />}
               {t('tasks.document')}
             </button>
             {showDocument && (
-              <div className="mt-1 rounded bg-neutral-50 px-2 py-1 text-xs dark:bg-neutral-800/60">
+              <div className="mt-1.5 max-h-96 overflow-y-auto rounded-lg bg-sunk px-3 py-2 text-xs">
                 <Markdown text={requirement.document} teamId={teamId} />
               </div>
             )}
           </section>
           <section aria-label={t('tasks.cards')}>
-            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('tasks.cards')}</p>
-            {cards.length === 0 && <p className="text-xs text-neutral-400">{t('tasks.cardsEmpty')}</p>}
-            <ul className="mt-1 space-y-1">
+            <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('tasks.cards')}</p>
+            {cards.length === 0 && <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{t('tasks.cardsEmpty')}</p>}
+            <ul className="mt-1.5 space-y-1">
               {cards.map((item) => (
-                <li key={item.id} id={`task-${item.id}`} className="rounded border border-neutral-200 dark:border-neutral-700">
+                <li key={item.id} id={`task-${item.id}`} className={cx('overflow-hidden rounded-lg', cardId === item.id && 'bg-sunk')}>
                   <button
                     type="button"
                     onClick={() => onCard(item.id)}
                     aria-expanded={cardId === item.id}
-                    className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                    className={cx('flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs transition-colors', interactive.hover)}
                   >
-                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusTone(item.status)}`}>
-                      {t(`tasks.status.${item.status}`)}
-                    </span>
+                    <Badge tone={statusTone(item.status)}>{t(`tasks.status.${item.status}`)}</Badge>
                     <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                    <span className="shrink-0 text-neutral-400">{ownerLabel(item.ownerId, bots, userLabel)}</span>
+                    <span className="shrink-0 text-neutral-500 dark:text-neutral-400">{ownerLabel(item.ownerId, bots, userLabel)}</span>
                   </button>
                   {cardId === item.id && <TaskDetail task={item} bots={bots} />}
                 </li>
@@ -193,44 +207,32 @@ function RequirementRow({
             </ul>
           </section>
           {canCancel(requirement) && (
-            <div className="flex flex-wrap items-center gap-1">
-              {!confirming ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(true)}
-                  className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                >
-                  {t('tasks.cancelRequirement')}
-                </button>
-              ) : (
-                <>
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400">{t('tasks.cancelConfirmHint')}</span>
-                  <button
-                    type="button"
-                    disabled={cancel.isPending}
-                    onClick={() => {
-                      setErrorText('');
-                      cancel.mutate(requirement.id, {
-                        onSuccess: () => setConfirming(false),
-                        onError: (error) => setErrorText(apiErrorMessage(t, error)),
-                      });
-                    }}
-                    className={`rounded-md px-2 py-1 text-xs font-medium ${statusTone('cancelled')} hover:opacity-80 disabled:opacity-50`}
-                  >
-                    {t('tasks.cancelConfirm')}
-                  </button>
-                  <button type="button" onClick={() => setConfirming(false)} className="rounded-md px-2 py-1 text-xs text-neutral-500 hover:underline">
-                    {t('tasks.cancelKeep')}
-                  </button>
-                </>
-              )}
+            <div className="flex justify-end">
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+                {t('tasks.cancelRequirement')}
+              </Button>
             </div>
           )}
-          {errorText && (
-            <p className="text-xs text-red-600" role="alert">
-              {errorText}
-            </p>
-          )}
+          {errorText && <Alert tone="danger">{errorText}</Alert>}
+          <AlertDialog
+            open={confirming}
+            title={t('tasks.cancelRequirement')}
+            description={t('tasks.cancelConfirmHint')}
+            confirmLabel={t('tasks.cancelConfirm')}
+            cancelLabel={t('tasks.cancelKeep')}
+            busy={cancel.isPending}
+            onCancel={() => setConfirming(false)}
+            onConfirm={() => {
+              setErrorText('');
+              cancel.mutate(requirement.id, {
+                onSuccess: () => setConfirming(false),
+                onError: (error) => {
+                  setConfirming(false);
+                  setErrorText(apiErrorMessage(t, error));
+                },
+              });
+            }}
+          />
         </div>
       )}
     </li>

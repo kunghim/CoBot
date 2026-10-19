@@ -1,23 +1,26 @@
 // How member-to-member traffic reads in a conversation: one centered line,
-// "发给 [前端开发]" or "来自 [测试工程师]". The member name is a badge;
-// clicking the line opens the whole exchange with that member above the
-// conversation. Task assignments and review notices are such messages too.
-import { createContext, useContext, type ReactNode } from 'react';
+// "发给 [avatar] 前端开发" or "来自 [avatar] 测试工程师". Clicking a member
+// opens the whole exchange with it above the conversation. Task assignments
+// and review notices are such messages too.
+import { createContext, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Bot, Message } from '../../api/types';
-import { roleTone } from '../teams/roleTone';
+import { ExchangeLine as Line, type PersonRef } from '../../components/ui';
+import Avatar from '../avatars/Avatar';
 
-/** The team's members by name, so a badge can wear its member's role color. */
+/** The team's members by id, so a mention can show its member's avatar. */
 export const TeamMembersContext = createContext<ReadonlyMap<string, Bot>>(new Map());
 
-export function RoleBadge({ name }: { name: string }) {
-  const member = useContext(TeamMembersContext).get(name);
-  const tone = member ? roleTone(member.roleId, member.isLeader).chip : 'bg-neutral-200/80 text-neutral-700 dark:bg-neutral-700/80 dark:text-neutral-200';
-  return (
-    <span className={`inline-flex max-w-[12rem] shrink-0 items-center truncate rounded-md px-1.5 py-px text-[11px] font-medium leading-4 ${tone}`}>
-      {name}
-    </span>
-  );
+/** A member named in the conversation: its avatar and its name. */
+export function usePerson(): (botId: string, fallbackName?: string) => PersonRef {
+  const members = useContext(TeamMembersContext);
+  return (botId, fallbackName) => {
+    const bot = members.get(botId);
+    return {
+      avatar: bot ? <Avatar bot={bot} size="sm" /> : <span aria-hidden className="inline-block h-4 w-4 rounded-[30%] bg-neutral-300 dark:bg-neutral-600" />,
+      name: bot?.name ?? fallbackName ?? botId,
+    };
+  };
 }
 
 /** What identifies an assignment; only its presence matters for drawing. */
@@ -72,42 +75,15 @@ export function ExchangeLine({
   onOpen: (peerId: string) => void;
 }) {
   const { t } = useTranslation();
+  const person = usePerson();
   const label = t(direction === 'to' ? 'conversation.exchange.to' : 'conversation.exchange.from');
-  const lineClass = 'flex flex-wrap items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-neutral-500 dark:text-neutral-400';
-  const content = (badges: ReactNode) => (
-    <>
-      <span>{label}</span>
-      {badges}
-    </>
-  );
-  if (peers.length === 0) {
-    return (
-      <div className="flex justify-center" data-testid="exchange-line">
-        <div className={lineClass}>{content(<RoleBadge name={t('conversation.exchange.you')} />)}</div>
-      </div>
-    );
-  }
-  if (peers.length === 1) {
-    return (
-      <div className="flex justify-center" data-testid="exchange-line">
-        <button type="button" onClick={() => onOpen(peers[0])} className={`${lineClass} hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200`}>
-          {content(<RoleBadge name={nameOf(peers[0])} />)}
-        </button>
-      </div>
-    );
-  }
-  // A message to several members: each name opens the exchange with that one.
   return (
-    <div className="flex justify-center" data-testid="exchange-line">
-      <div className={lineClass}>
-        {content(
-          peers.map((peer) => (
-            <button key={peer} type="button" onClick={() => onOpen(peer)} className="shrink-0 rounded-md hover:ring-1 hover:ring-neutral-400">
-              <RoleBadge name={nameOf(peer)} />
-            </button>
-          )),
-        )}
-      </div>
+    <div data-testid="exchange-line">
+      {peers.length === 0 ? (
+        <Line label={label} people={[{ avatar: null, name: t('conversation.exchange.you') }]} />
+      ) : (
+        <Line label={label} people={peers.map((peer) => person(peer, nameOf(peer)))} onOpen={(index) => onOpen(peers[index])} />
+      )}
     </div>
   );
 }

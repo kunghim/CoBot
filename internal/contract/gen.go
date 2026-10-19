@@ -50,6 +50,12 @@ const (
 	Recovery   ApprovalType = "recovery"
 )
 
+// Defines values for AvatarRefKind.
+const (
+	Catalog AvatarRefKind = "catalog"
+	Upload  AvatarRefKind = "upload"
+)
+
 // Defines values for BotStatus.
 const (
 	BotStatusIdle            BotStatus = "idle"
@@ -127,6 +133,12 @@ const (
 	MessageKindCollaboration MessageKind = "collaboration"
 	MessageKindSystem        MessageKind = "system"
 	MessageKindUser          MessageKind = "user"
+)
+
+// Defines values for MessagePreviewKind.
+const (
+	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
+	MessagePreviewKindUser      MessagePreviewKind = "user"
 )
 
 // Defines values for QuestionKind.
@@ -221,6 +233,7 @@ const (
 
 // Defines values for SettingsTheme.
 const (
+	SettingsThemeClassic  SettingsTheme = "classic"
 	SettingsThemeDusk     SettingsTheme = "dusk"
 	SettingsThemeGraphite SettingsTheme = "graphite"
 	SettingsThemeHarbor   SettingsTheme = "harbor"
@@ -235,9 +248,9 @@ const (
 
 // Defines values for SettingsPatchColorMode.
 const (
-	Dark   SettingsPatchColorMode = "dark"
-	Light  SettingsPatchColorMode = "light"
-	System SettingsPatchColorMode = "system"
+	SettingsPatchColorModeDark   SettingsPatchColorMode = "dark"
+	SettingsPatchColorModeLight  SettingsPatchColorMode = "light"
+	SettingsPatchColorModeSystem SettingsPatchColorMode = "system"
 )
 
 // Defines values for SettingsPatchLanguage.
@@ -248,6 +261,7 @@ const (
 
 // Defines values for SettingsPatchTheme.
 const (
+	SettingsPatchThemeClassic  SettingsPatchTheme = "classic"
 	SettingsPatchThemeDusk     SettingsPatchTheme = "dusk"
 	SettingsPatchThemeGraphite SettingsPatchTheme = "graphite"
 	SettingsPatchThemeHarbor   SettingsPatchTheme = "harbor"
@@ -424,6 +438,39 @@ type ApprovalOption struct {
 	Text              *string `json:"text,omitempty"`
 }
 
+// AvatarCatalog defines model for AvatarCatalog.
+type AvatarCatalog struct {
+	Series []AvatarSeries `json:"series"`
+	Status struct {
+		LastError  *string    `json:"lastError,omitempty"`
+		LastSyncAt *time.Time `json:"lastSyncAt,omitempty"`
+		Syncing    bool       `json:"syncing"`
+	} `json:"status"`
+}
+
+// AvatarRef An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image.
+type AvatarRef struct {
+	Color  *string       `json:"color,omitempty"`
+	Eyes   *string       `json:"eyes,omitempty"`
+	File   *string       `json:"file,omitempty"`
+	Kind   AvatarRefKind `json:"kind"`
+	Series *string       `json:"series,omitempty"`
+	Shape  *string       `json:"shape,omitempty"`
+}
+
+// AvatarRefKind defines model for AvatarRef.Kind.
+type AvatarRefKind string
+
+// AvatarSeries defines model for AvatarSeries.
+type AvatarSeries struct {
+	// Data The series file as published (format in assets/avatars)
+	Data    map[string]interface{} `json:"data"`
+	Id      string                 `json:"id"`
+	Kind    string                 `json:"kind"`
+	Name    map[string]string      `json:"name"`
+	Version int                    `json:"version"`
+}
+
 // BootstrapResult defines model for BootstrapResult.
 type BootstrapResult struct {
 	BearerExpiresAt *time.Time `json:"bearerExpiresAt,omitempty"`
@@ -438,16 +485,21 @@ type BootstrapResult struct {
 
 // Bot defines model for Bot.
 type Bot struct {
-	CreatedAt    time.Time `json:"createdAt"`
-	CurrentRunId *string   `json:"currentRunId,omitempty"`
-	Id           string    `json:"id"`
-	IsLeader     bool      `json:"isLeader"`
-	Name         string    `json:"name"`
-	Revision     int64     `json:"revision"`
-	RoleId       string    `json:"roleId"`
-	RoleVersion  *string   `json:"roleVersion,omitempty"`
-	Status       BotStatus `json:"status"`
-	TeamId       string    `json:"teamId"`
+	// Avatar An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image.
+	Avatar       *AvatarRef `json:"avatar,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	CurrentRunId *string    `json:"currentRunId,omitempty"`
+	Id           string     `json:"id"`
+	IsLeader     bool       `json:"isLeader"`
+
+	// LastMessage The start of the latest message between the user and a member, for the team list.
+	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+	Name        string          `json:"name"`
+	Revision    int64           `json:"revision"`
+	RoleId      string          `json:"roleId"`
+	RoleVersion *string         `json:"roleVersion,omitempty"`
+	Status      BotStatus       `json:"status"`
+	TeamId      string          `json:"teamId"`
 }
 
 // BotStatus defines model for Bot.Status.
@@ -604,6 +656,16 @@ type MessageDeliveryStatus string
 
 // MessageKind defines model for Message.Kind.
 type MessageKind string
+
+// MessagePreview The start of the latest message between the user and a member, for the team list.
+type MessagePreview struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Kind      MessagePreviewKind `json:"kind"`
+	Text      string             `json:"text"`
+}
+
+// MessagePreviewKind defines model for MessagePreview.Kind.
+type MessagePreviewKind string
 
 // Model One engine model, reduced to non-secret identifier fields.
 type Model struct {
@@ -1002,10 +1064,30 @@ type RevokeAuthorizationJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// SyncAvatarCatalogJSONBody defines parameters for SyncAvatarCatalog.
+type SyncAvatarCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// SaveAvatarUploadJSONBody defines parameters for SaveAvatarUpload.
+type SaveAvatarUploadJSONBody struct {
+	// Data Base64 PNG
+	Data      []byte             `json:"data"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteBotParams defines parameters for DeleteBot.
 type DeleteBotParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 	IfMatch        int64  `json:"If-Match"`
+}
+
+// PatchBotJSONBody defines parameters for PatchBot.
+type PatchBotJSONBody struct {
+	// Avatar The avatar to use; null follows the default again
+	Avatar           *AvatarRef         `json:"avatar"`
+	ExpectedRevision int64              `json:"expectedRevision"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // ListCollaborationParams defines parameters for ListCollaboration.
@@ -1108,6 +1190,13 @@ type CancelQuestionJSONBody struct {
 
 // CancelRequirementJSONBody defines parameters for CancelRequirement.
 type CancelRequirementJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// SetRoleAvatarJSONBody defines parameters for SetRoleAvatar.
+type SetRoleAvatarJSONBody struct {
+	// Avatar The avatar to use; null follows the default again
+	Avatar    *AvatarRef         `json:"avatar"`
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -1245,6 +1334,15 @@ type EngineLogoutJSONRequestBody EngineLogoutJSONBody
 // RevokeAuthorizationJSONRequestBody defines body for RevokeAuthorization for application/json ContentType.
 type RevokeAuthorizationJSONRequestBody RevokeAuthorizationJSONBody
 
+// SyncAvatarCatalogJSONRequestBody defines body for SyncAvatarCatalog for application/json ContentType.
+type SyncAvatarCatalogJSONRequestBody SyncAvatarCatalogJSONBody
+
+// SaveAvatarUploadJSONRequestBody defines body for SaveAvatarUpload for application/json ContentType.
+type SaveAvatarUploadJSONRequestBody SaveAvatarUploadJSONBody
+
+// PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
+type PatchBotJSONRequestBody PatchBotJSONBody
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
 
@@ -1268,6 +1366,9 @@ type CancelQuestionJSONRequestBody CancelQuestionJSONBody
 
 // CancelRequirementJSONRequestBody defines body for CancelRequirement for application/json ContentType.
 type CancelRequirementJSONRequestBody CancelRequirementJSONBody
+
+// SetRoleAvatarJSONRequestBody defines body for SetRoleAvatar for application/json ContentType.
+type SetRoleAvatarJSONRequestBody SetRoleAvatarJSONBody
 
 // InterruptRunJSONRequestBody defines body for InterruptRun for application/json ContentType.
 type InterruptRunJSONRequestBody InterruptRunJSONBody
