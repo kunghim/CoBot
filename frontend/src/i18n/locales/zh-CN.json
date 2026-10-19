@@ -270,7 +270,8 @@
         "handoff_escalate": "上报了项目经理",
         "handoff_resume": "把上报交回原环节",
         "view_tasks": "查看需求和卡片",
-        "ask_user": "向你提问：{{question}}"
+        "ask_user": "向你提问：{{question}}",
+        "browser": "用浏览器 {{url}}"
       }
     },
     "placeholder": "给 {{name}} 发消息……",
@@ -448,8 +449,24 @@
       "tasks": "任务",
       "approvals": "审批",
       "activity": "动态",
-      "memory": "记忆"
+      "memory": "记忆",
+      "browser": "浏览器"
     }
+  },
+  "browser": {
+    "loading": "正在连接浏览器……",
+    "notInstalled": "这台电脑上没有可用的浏览器",
+    "notInstalledHint": "需要安装 Chrome、Edge、Brave、Chromium 或 Vivaldi 之一，成员才能使用浏览器。",
+    "idle": "团队还没有打开浏览器",
+    "idleHint": "成员需要看网页时会自动打开，这里能实时看到并直接操作。",
+    "tabs": "标签页",
+    "blank": "空白页",
+    "back": "后退",
+    "forward": "前进",
+    "reload": "刷新",
+    "address": "地址",
+    "view": "团队浏览器画面，可直接点击和输入",
+    "sharedHint": "这是和成员共用的浏览器：你的操作会直接作用在页面上，成员下次操作时会知道你动过。登录一次，团队里所有成员共用登录状态。"
   },
   "tasks": {
     "ownerUser": "你",
@@ -745,6 +762,11 @@
     "error.invalid_request": "请求无效",
     "error.team.not_retryable": "该团队状态不能重试创建",
     "error.tool.unknown": "未知工具：{{tool}}",
+    "error.browser.not_installed": "这台电脑上没有可用的 Chrome 系浏览器（Chrome、Edge、Brave、Chromium 或 Vivaldi）。",
+    "error.browser.leader": "项目经理不使用浏览器。",
+    "error.browser.bad_request": "浏览器调用的参数不对：{{reason}}",
+    "error.browser.failed": "浏览器出了问题：{{reason}}",
+    "error.browser.unavailable": "浏览器功能不可用。",
     "error.unauthorized.bad_token": "桥凭据无效",
     "error.unauthorized.missing_token": "缺少桥凭据",
     "error.unauthorized.stale_token": "桥凭据已失效（代际不匹配）",

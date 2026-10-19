@@ -270,7 +270,8 @@
         "handoff_escalate": "Escalated to the project manager",
         "handoff_resume": "Returned the escalation to its stage",
         "view_tasks": "Looked at the requirements",
-        "ask_user": "Asked you: {{question}}"
+        "ask_user": "Asked you: {{question}}",
+        "browser": "Used the browser {{url}}"
       }
     },
     "placeholder": "Message {{name}}…",
@@ -450,8 +451,24 @@
       "tasks": "Tasks",
       "approvals": "Approvals",
       "activity": "Activity",
-      "memory": "Memories"
+      "memory": "Memories",
+      "browser": "Browser"
     }
+  },
+  "browser": {
+    "loading": "Connecting to the browser…",
+    "notInstalled": "No browser is available on this computer",
+    "notInstalledHint": "Install Chrome, Edge, Brave, Chromium or Vivaldi so members can use a browser.",
+    "idle": "The team has not opened a browser yet",
+    "idleHint": "It opens by itself when a member needs a web page; you can watch and use it here.",
+    "tabs": "Tabs",
+    "blank": "Blank page",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "address": "Address",
+    "view": "The team's browser; click and type to use it",
+    "sharedHint": "This browser is shared with the members: what you do acts on the page, and a member is told when you touched its tab. Sign in once and every member shares the login."
   },
   "tasks": {
     "ownerUser": "You",
@@ -753,6 +770,11 @@
     "error.invalid_request": "Invalid request",
     "error.team.not_retryable": "This team state cannot retry creation",
     "error.tool.unknown": "Unknown tool: {{tool}}",
+    "error.browser.not_installed": "No Chrome-based browser (Chrome, Edge, Brave, Chromium or Vivaldi) is installed on this computer.",
+    "error.browser.leader": "The project manager does not use the browser.",
+    "error.browser.bad_request": "The browser call was wrong: {{reason}}",
+    "error.browser.failed": "The browser ran into a problem: {{reason}}",
+    "error.browser.unavailable": "The browser is not available.",
     "error.unauthorized.bad_token": "Invalid bridge credential",
     "error.unauthorized.missing_token": "Missing bridge credential",
     "error.unauthorized.stale_token": "The bridge credential is stale (epoch mismatch)",

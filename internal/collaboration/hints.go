@@ -19,6 +19,10 @@ var hints = map[string]string{
 	"error.requirement.route_invalid":     "链路不符合规则，按 reason 修改后重新提交。",
 	"error.tool.subagent_forbidden":       "子智能体不能交接卡片、提交需求或向用户提问。把结果交给主智能体，由它来做。",
 	"error.message.target_required":       "请在 targetBotIds 或 targetBotId 里写明发给谁。",
+	"error.browser.not_installed":         "这台电脑上没有可用的 Chrome 系浏览器（Chrome、Edge、Brave、Chromium 或 Vivaldi），浏览器工具用不了。在交接里如实写明没能打开页面，不要假装验证过。",
+	"error.browser.leader":                "项目经理不使用浏览器，需要看网页的工作交给对应的成员。",
+	"error.browser.bad_request":           "浏览器调用的参数不对，按 reason 修改后再调用。",
+	"error.browser.failed":                "浏览器出了问题，见 reason。可以再试一次；仍不行就在交接里如实写明。",
 	"error.idempotency.required":          "这次调用缺少调用标识，请重试一次。",
 }
 

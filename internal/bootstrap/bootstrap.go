@@ -21,6 +21,7 @@ import (
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/avatars"
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/config"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -225,6 +226,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		catalog, _ = avatars.New(paths.AvatarsDir(), "")
 	}
 	application.Avatars = catalog
+	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
 
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
@@ -435,6 +437,9 @@ func (c *Core) Shutdown(ctx context.Context) error {
 		if err := c.scheduler.Stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("scheduler shutdown: %w", err))
 		}
+	}
+	if c.App != nil && c.App.Browser != nil {
+		c.App.Browser.Shutdown()
 	}
 	if c.App != nil {
 		if err := c.App.ShutdownControl(ctx); err != nil {

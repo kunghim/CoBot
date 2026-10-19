@@ -70,6 +70,7 @@ const (
 // Defines values for CollaborationRequestTool.
 const (
 	AskUser          CollaborationRequestTool = "ask_user"
+	Browser          CollaborationRequestTool = "browser"
 	Handoff          CollaborationRequestTool = "handoff"
 	SendMessage      CollaborationRequestTool = "send_message"
 	StartRequirement CollaborationRequestTool = "start_requirement"
@@ -372,6 +373,22 @@ const (
 	PatchTeamJSONBodyPermissionModeDefault  PatchTeamJSONBodyPermissionMode = "default"
 	PatchTeamJSONBodyPermissionModeFull     PatchTeamJSONBodyPermissionMode = "full"
 	PatchTeamJSONBodyPermissionModeReadOnly PatchTeamJSONBodyPermissionMode = "read_only"
+)
+
+// Defines values for SendTeamBrowserInputJSONBodyButton.
+const (
+	Left   SendTeamBrowserInputJSONBodyButton = "left"
+	Middle SendTeamBrowserInputJSONBodyButton = "middle"
+	Right  SendTeamBrowserInputJSONBodyButton = "right"
+)
+
+// Defines values for SendTeamBrowserInputJSONBodyKind.
+const (
+	Key   SendTeamBrowserInputJSONBodyKind = "key"
+	Mouse SendTeamBrowserInputJSONBodyKind = "mouse"
+	Nav   SendTeamBrowserInputJSONBodyKind = "nav"
+	Text  SendTeamBrowserInputJSONBodyKind = "text"
+	Wheel SendTeamBrowserInputJSONBodyKind = "wheel"
 )
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
@@ -1283,6 +1300,42 @@ type AddBotJSONBody struct {
 	RoleId    string             `json:"roleId"`
 }
 
+// SendTeamBrowserInputJSONBody defines parameters for SendTeamBrowserInput.
+type SendTeamBrowserInputJSONBody struct {
+	// Action mouse: move, down, up. key: down, up.
+	Action     *string                             `json:"action,omitempty"`
+	Button     *SendTeamBrowserInputJSONBodyButton `json:"button,omitempty"`
+	ClickCount *int                                `json:"clickCount,omitempty"`
+	Code       *string                             `json:"code,omitempty"`
+	Dx         *float32                            `json:"dx,omitempty"`
+	Dy         *float32                            `json:"dy,omitempty"`
+	Key        *string                             `json:"key,omitempty"`
+	Kind       SendTeamBrowserInputJSONBodyKind    `json:"kind"`
+
+	// Modifiers Bit mask: 1 alt, 2 control, 4 meta, 8 shift.
+	Modifiers *int                `json:"modifiers,omitempty"`
+	RequestId *openapi_types.UUID `json:"requestId,omitempty"`
+	Tab       string              `json:"tab"`
+	Text      *string             `json:"text,omitempty"`
+
+	// To nav: back, forward, reload or an address.
+	To *string  `json:"to,omitempty"`
+	Vk *int     `json:"vk,omitempty"`
+	X  *float32 `json:"x,omitempty"`
+	Y  *float32 `json:"y,omitempty"`
+}
+
+// SendTeamBrowserInputJSONBodyButton defines parameters for SendTeamBrowserInput.
+type SendTeamBrowserInputJSONBodyButton string
+
+// SendTeamBrowserInputJSONBodyKind defines parameters for SendTeamBrowserInput.
+type SendTeamBrowserInputJSONBodyKind string
+
+// StreamTeamBrowserTabParams defines parameters for StreamTeamBrowserTab.
+type StreamTeamBrowserTabParams struct {
+	Tab string `form:"tab" json:"tab"`
+}
+
 // OpenTeamPathJSONBody defines parameters for OpenTeamPath.
 type OpenTeamPathJSONBody struct {
 	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
@@ -1398,6 +1451,9 @@ type ArchiveTeamJSONRequestBody ArchiveTeamJSONBody
 
 // AddBotJSONRequestBody defines body for AddBot for application/json ContentType.
 type AddBotJSONRequestBody AddBotJSONBody
+
+// SendTeamBrowserInputJSONRequestBody defines body for SendTeamBrowserInput for application/json ContentType.
+type SendTeamBrowserInputJSONRequestBody SendTeamBrowserInputJSONBody
 
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody

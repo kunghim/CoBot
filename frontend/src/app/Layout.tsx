@@ -72,13 +72,16 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {shell.panelOpen && <Column side="right">{workPanel}</Column>}
+      {shell.panelOpen && <Column side="right" wide={shell.panelWide}>{workPanel}</Column>}
     </div>
   );
 }
 
 // The side columns stay in the layout at every width; on a small window
 // they give way so the conversation keeps most of the room.
-function Column({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
-  return <div className={side === 'left' ? 'w-[min(16rem,40vw)] shrink-0' : 'w-[min(18rem,42vw)] shrink-0'}>{children}</div>;
+// The browser page of the work panel takes more room: a web page is unreadable
+// in a narrow column.
+function Column({ side, wide = false, children }: { side: 'left' | 'right'; wide?: boolean; children: ReactNode }) {
+  const width = side === 'left' ? 'w-[min(16rem,40vw)]' : wide ? 'w-[min(42rem,48vw)]' : 'w-[min(18rem,42vw)]';
+  return <div className={`${width} shrink-0`}>{children}</div>;
 }

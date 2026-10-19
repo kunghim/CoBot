@@ -88,8 +88,11 @@ func (p Paths) RolesDir() string       { return p.join("roles") }
 func (p Paths) AvatarUploadsDir() string { return p.join("avatars", "uploads") }
 
 // AvatarsDir caches the downloaded avatar catalog of this profile.
-func (p Paths) AvatarsDir() string     { return p.join("assets", "avatars") }
-func (p Paths) WorkspacesDir() string  { return p.join("workspaces") }
+func (p Paths) AvatarsDir() string    { return p.join("assets", "avatars") }
+func (p Paths) WorkspacesDir() string { return p.join("workspaces") }
+
+// BrowserDir keeps the teams' browser profiles (their login state).
+func (p Paths) BrowserDir() string     { return p.join("browser") }
 func (p Paths) RuntimeDir() string     { return p.join("runtime") }
 func (p Paths) LockFile() string       { return p.join("runtime", "instance.lock") }
 func (p Paths) InstanceFile() string   { return p.join("runtime", "instance.json") }

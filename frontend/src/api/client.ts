@@ -312,6 +312,7 @@ export const api = {
   warmTeam: (teamId: string) => request<{ warming: boolean }>('POST', `/api/v1/teams/${teamId}/warm`, {}),
   openTeamPath: (teamId: string, path: string, reveal = false) =>
     request<{ path: string }>('POST', `/api/v1/teams/${teamId}/open-path`, { path, reveal }),
+  getTeamBrowser: (teamId: string) => request<BrowserPanelState>('GET', `/api/v1/teams/${teamId}/browser`),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
   listAuthorizations: () =>
@@ -321,6 +322,76 @@ export const api = {
 };
 
 import { desktopBridge } from '../platform/native-bridge';
+
+export interface BrowserTab { id: string; memberId: string; url: string; title: string }
+export interface BrowserPanelState { available: boolean; running: boolean; tabs: BrowserTab[] }
+export interface BrowserFrame { tab: string; width: number; height: number; data: string }
+/** One thing the user did in the live view; see POST /teams/{id}/browser/input. */
+export interface BrowserInput {
+  kind: 'mouse' | 'wheel' | 'key' | 'text' | 'nav';
+  action?: string; x?: number; y?: number; button?: string; clickCount?: number; dx?: number; dy?: number;
+  key?: string; code?: string; vk?: number; text?: string; modifiers?: number; to?: string;
+}
+
+function authHeaders(writing: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = bearerToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
+  else if (writing) headers['X-CSRF-Token'] = csrfToken();
+  return headers;
+}
+
+/** Applies one input to a tab of the team's browser. Inputs are never retried:
+ * replaying a click would click twice. */
+export async function sendBrowserInput(teamId: string, tab: string, input: BrowserInput): Promise<void> {
+  await initializeTransport();
+  const resp = await fetch(apiUrl(`/api/v1/teams/${teamId}/browser/input`), {
+    method: 'POST',
+    headers: { ...authHeaders(true), 'Content-Type': 'application/json' },
+    credentials: bearerToken() ? 'omit' : 'include',
+    // Every write names itself; an input is never replayed, so each is new.
+    body: JSON.stringify({ ...input, tab, requestId: newRequestId() }),
+  });
+  if (resp.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!resp.ok) {
+    const envelope = (await resp.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(resp.status, envelope?.error?.code ?? 'internal', envelope?.error?.messageKey ?? 'error.internal', envelope?.error?.params ?? {});
+  }
+}
+
+/** Follows a tab's pictures until the signal aborts or the stream ends.
+ * Resolves with the reason the server gave when it ended the stream. */
+export async function streamBrowserTab(teamId: string, tab: string, onFrame: (frame: BrowserFrame) => void, signal: AbortSignal): Promise<string | null> {
+  await initializeTransport();
+  const resp = await fetch(apiUrl(`/api/v1/teams/${teamId}/browser/stream?tab=${encodeURIComponent(tab)}`), {
+    headers: { ...authHeaders(false), Accept: 'text/event-stream' },
+    credentials: bearerToken() ? 'omit' : 'include',
+    signal,
+  });
+  if (resp.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!resp.ok || !resp.body) {
+    const envelope = (await resp.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(resp.status, envelope?.error?.code ?? 'internal', envelope?.error?.messageKey ?? 'error.internal', envelope?.error?.params ?? {});
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return null;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf('\n\n');
+    while (idx >= 0) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const lines = block.split('\n');
+      const data = lines.find((line) => line.startsWith('data: '))?.slice(6);
+      if (data && lines.includes('event: frame')) onFrame(JSON.parse(data) as BrowserFrame);
+      else if (data && lines.includes('event: ended')) return JSON.parse(data) as string;
+      idx = buffer.indexOf('\n\n');
+    }
+  }
+}
 
 /** Dev-only: ask the Vite dev server to mint a bootstrap secret via the
  * same-user runtime credential handed to it by scripts/dev.*. */
