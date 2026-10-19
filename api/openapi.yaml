@@ -1876,6 +1876,10 @@ components:
           type: string
           enum: [accept, revise]
           description: Required for a confirmation or acceptance question, refused for any other.
+        mode:
+          type: string
+          enum: [rerun, return_to_me]
+          description: For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
         expectedRevision: { type: integer, format: int64 }
     CollaborationRequest:
       type: object

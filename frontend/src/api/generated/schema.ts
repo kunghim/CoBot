@@ -988,6 +988,11 @@ export interface components {
              * @enum {string}
              */
             decision?: "accept" | "revise";
+            /**
+             * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+             * @enum {string}
+             */
+            mode?: "rerun" | "return_to_me";
             /** Format: int64 */
             expectedRevision: number;
         };

@@ -462,7 +462,8 @@
       "title": "Needs your confirmation",
       "accept": "Confirm and continue",
       "revise": "Request changes",
-      "changesPlaceholder": "What needs to change (required to request changes)"
+      "changesPlaceholder": "What needs to change (required to request changes)",
+      "returnToMe": "Bring the changes straight back to me (skip the reviews again)"
     },
     "title": "Needs your answer",
     "loadFailed": "Failed to load questions",
@@ -677,6 +678,7 @@
     "error.question.text_required": "Question text cannot be empty",
     "error.question.answer_required": "Answer text cannot be empty",
     "error.question.acceptance_decision": "Delivery acceptance needs Accept or Request changes",
+    "error.question.revise_mode": "Unknown destination for the changes",
     "error.question.revise_reason_required": "Say what needs to change",
     "error.question.not_acceptance": "This is not a delivery acceptance",
     "error.question.requester_only": "Only the asking member can withdraw the question",

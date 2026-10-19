@@ -372,7 +372,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	if err != nil {
 		return domain.Task{}, err
 	}
-	execution, err := collectExecutionLocked(ctx, tx, card)
+	execution, err := collectExecutionLocked(ctx, tx, card, principal.RunID)
 	if err != nil {
 		return domain.Task{}, err
 	}
@@ -561,9 +561,11 @@ func requirementSuggestions(ctx context.Context, q sqlite.Queryer, requirementID
 // AnswerDecision records the user's verdict on a confirm stage or on the
 // finished requirement. Confirming moves the route on; asking for changes
 // sends the work back to the stage that produced it (the requirement
-// document for the first confirmation). Accepting the finished requirement
-// closes it; asking for changes there is new input for the project manager.
-func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, questionID, decision, comment string, expectedRevision int64) (domain.Question, error) {
+// document for the first confirmation); with mode return_to_me the fixed
+// work comes straight back to this confirmation instead of running the
+// stages in between again. Accepting the finished requirement closes it;
+// asking for changes there is new input for the project manager.
+func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, questionID, decision, mode, comment string, expectedRevision int64) (domain.Question, error) {
 	cached, unlock, writeErr := beginWrite[domain.Question](ctx, a, principal)
 	defer unlock()
 	if writeErr != nil {
@@ -584,6 +586,9 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 	}
 	if question.Status != domain.QuestionOpen {
 		return domain.Question{}, domain.Conflict("error.question.already_answered", map[string]any{"status": question.Status})
+	}
+	if mode != "" && mode != domain.ReworkRerun && mode != domain.ReworkReturnToMe {
+		return domain.Question{}, domain.InvalidRequest("error.question.revise_mode", nil)
 	}
 	comment = strings.TrimSpace(comment)
 	var answerText string
@@ -625,7 +630,12 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		if decision == domain.AcceptanceAccept {
 			effect, err = a.enterStageLocked(ctx, tx, req, question.StageIndex+1, e)
 		} else {
-			e.note = "用户在「" + req.Stages[question.StageIndex].Name + "」提出修改意见：" + comment
+			after := "改完后按链路重新往下走，会再经过评审"
+			if mode == domain.ReworkReturnToMe {
+				e.returnTo = question.StageIndex
+				after = "改完后直接回到用户确认"
+			}
+			e.note = "用户在「" + req.Stages[question.StageIndex].Name + "」提出修改意见（" + after + "）：" + comment
 			effect, err = a.reworkLocked(ctx, tx, req, producingStage(req, question.StageIndex), e)
 		}
 		if err != nil {

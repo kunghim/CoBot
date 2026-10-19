@@ -22,6 +22,12 @@ const (
 	AnswerQuestionRequestDecisionRevise AnswerQuestionRequestDecision = "revise"
 )
 
+// Defines values for AnswerQuestionRequestMode.
+const (
+	AnswerQuestionRequestModeRerun      AnswerQuestionRequestMode = "rerun"
+	AnswerQuestionRequestModeReturnToMe AnswerQuestionRequestMode = "return_to_me"
+)
+
 // Defines values for ApprovalRequestState.
 const (
 	ApprovalRequestStateDecided     ApprovalRequestState = "decided"
@@ -93,8 +99,8 @@ const (
 
 // Defines values for EvidenceMode.
 const (
-	Rerun      EvidenceMode = "rerun"
-	ReturnToMe EvidenceMode = "return_to_me"
+	EvidenceModeRerun      EvidenceMode = "rerun"
+	EvidenceModeReturnToMe EvidenceMode = "return_to_me"
 )
 
 // Defines values for EvidenceOutcome.
@@ -362,11 +368,17 @@ type AnswerQuestionRequest struct {
 	// Decision Required for a confirmation or acceptance question, refused for any other.
 	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
 	ExpectedRevision int64                          `json:"expectedRevision"`
-	RequestId        openapi_types.UUID             `json:"requestId"`
+
+	// Mode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+	Mode      *AnswerQuestionRequestMode `json:"mode,omitempty"`
+	RequestId openapi_types.UUID         `json:"requestId"`
 }
 
 // AnswerQuestionRequestDecision Required for a confirmation or acceptance question, refused for any other.
 type AnswerQuestionRequestDecision string
+
+// AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+type AnswerQuestionRequestMode string
 
 // Approval defines model for Approval.
 type Approval struct {

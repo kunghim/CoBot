@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
@@ -217,7 +219,7 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	if _, err := h.app.AnswerQuestion(ctx, h.user, confirm.ID, "随便答", confirm.Revision); err == nil {
 		t.Fatal("a confirmation answered as a plain question")
 	}
-	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceRevise, "失败时要返回原因", confirm.Revision); err != nil {
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceRevise, "", "失败时要返回原因", confirm.Revision); err != nil {
 		t.Fatal(err)
 	}
 	draft := f.waitTurnAfter(pm, pmTurns, "修改需求文档", "失败时要返回原因")
@@ -234,17 +236,25 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "done", "summary": "可以", "idempotencyKey": "s7-rr2"})
 	f.finish(reviewer, again, "")
 	confirm = f.openQuestion(team.ID, domain.QuestionKindConfirm)
-	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", confirm.Revision); err != nil {
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", "", confirm.Revision); err != nil {
 		t.Fatal(err)
 	}
 
 	// Implementation, then a code review that sends it back once.
 	work := f.waitTurn(dev, "【接力卡片】实现登录接口", "返回 200")
 	devCard := f.card(dev)
+	// What the engine reports the member ran travels with the handoff.
+	f.fake.Emit(engine.Notification{Method: "item/completed", ThreadID: work.ThreadID, TurnID: work.TurnID,
+		Step: &engine.Step{ID: "build-1", Kind: engine.StepCommand, Status: engine.StepCompleted, Detail: json.RawMessage(`{"command":"go build ./...","exitCode":0}`)}})
+	waitUntil(t, 5*time.Second, "command step recorded", func() bool {
+		var n int
+		_ = h.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM run_steps WHERE bot_id = ? AND kind = ?`, dev.ID, engine.StepCommand).Scan(&n)
+		return n == 1
+	})
 	f.refused(dev, "handoff", map[string]any{"cardId": devCard.ID, "outcome": "back", "summary": "x", "mode": "rerun", "idempotencyKey": "s7-x"}, "error.card.back_not_allowed")
 	f.call(dev, "handoff", map[string]any{"cardId": devCard.ID, "outcome": "done", "summary": "实现了，curl 返回 200", "idempotencyKey": "s7-i1"})
 	f.finish(dev, work, "")
-	codeReview := f.waitTurnAfter(reviewer, reviewerTurns, "【接力卡片】代码评审", "实现了，curl 返回 200")
+	codeReview := f.waitTurnAfter(reviewer, reviewerTurns, "【接力卡片】代码评审", "实现了，curl 返回 200", "运行：go build ./...（退出码 0）")
 	codeCard := f.card(reviewer)
 	f.refused(reviewer, "handoff", map[string]any{"cardId": codeCard.ID, "outcome": "back", "summary": "缺少错误处理", "idempotencyKey": "s7-c0"}, "error.card.back_mode")
 	f.call(reviewer, "handoff", map[string]any{"cardId": codeCard.ID, "outcome": "back", "summary": "缺少错误处理", "mode": "rerun", "idempotencyKey": "s7-c1"})
@@ -268,7 +278,12 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	resumed := f.waitTurn(reviewer, "项目经理的处理意见：超时不在本次范围")
 	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "done", "summary": "通过", "suggestions": "以后补超时处理", "idempotencyKey": "s7-c3"})
 	f.finish(reviewer, resumed, "")
-	accept := f.waitTurn(pm, "【接力卡片】验收汇报", "以后补超时处理")
+	accept := f.waitTurn(pm, "【接力卡片】验收汇报", "以后补超时处理", "补了错误处理", "更早的几轮交接没有列出")
+	// Each stage shows only its latest handoff: the first implementation and
+	// the send-backs it got were superseded.
+	if strings.Contains(accept.Text, "实现了，curl 返回 200") || strings.Contains(accept.Text, "缺少错误处理") {
+		t.Fatalf("the acceptance card repeats superseded rounds:\n%s", accept.Text)
+	}
 	f.call(pm, "handoff", map[string]any{"cardId": f.card(pm).ID, "outcome": "done", "summary": "登录接口已完成：curl 返回 200。", "idempotencyKey": "s7-a"})
 	f.finish(pm, accept, "")
 
@@ -284,13 +299,13 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	if blocked, err := sqlite.HasBlockingQuestion(ctx, h.app.DB, pm.ID, ""); err != nil || blocked {
 		t.Fatalf("acceptance blocks the project manager: %v %v", blocked, err)
 	}
-	_, err = h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "  ", acceptance.Revision)
+	_, err = h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "", "  ", acceptance.Revision)
 	var de *domain.Error
 	if !errors.As(err, &de) || de.MessageKey != "error.question.revise_reason_required" {
 		t.Fatalf("revise without changes = %v", err)
 	}
 	turns := len(f.fake.Turns())
-	if _, err := h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceAccept, "", acceptance.Revision); err != nil {
+	if _, err := h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceAccept, "", "", acceptance.Revision); err != nil {
 		t.Fatal(err)
 	}
 	if req, _ := sqlite.GetRequirement(ctx, h.app.DB, acceptance.RequirementID); req.Status != domain.RequirementDone {
@@ -339,7 +354,7 @@ func TestRouteRulesNotesAndCancel(t *testing.T) {
 	f.finish(pm, talk, "")
 
 	confirm := f.openQuestion(team.ID, domain.QuestionKindConfirm)
-	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", confirm.Revision); err != nil {
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", "", confirm.Revision); err != nil {
 		t.Fatal(err)
 	}
 	work := f.waitTurn(dev, "【接力卡片】改文案")
@@ -368,5 +383,48 @@ func TestRouteRulesNotesAndCancel(t *testing.T) {
 	f.finish(dev, work, "")
 	if _, err := h.app.CancelRequirement(ctx, h.user, reqs[0].ID); err == nil {
 		t.Fatal("a cancelled requirement cancelled again")
+	}
+}
+
+// A user who asks for changes on a confirmation can have the fix come
+// straight back, without the review in between running again.
+func TestConfirmChangesCanComeStraightBack(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "code-reviewer"})
+	pm, dev, reviewer := bots[0], bots[1], bots[2]
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: pm.ID, Text: "加个导出按钮"}); err != nil {
+		t.Fatal(err)
+	}
+	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
+	talk := f.waitTurn(pm, "加个导出按钮")
+	f.call(pm, "start_requirement", map[string]any{
+		"title": "导出", "document": "导出 CSV", "stages": relayRoute(reviewer, dev), "idempotencyKey": "s7c-start",
+	})
+	f.finish(pm, talk, "")
+	review := f.waitTurn(reviewer, "【接力卡片】需求评审")
+	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "done", "summary": "可以", "idempotencyKey": "s7c-r"})
+	f.finish(reviewer, review, "")
+	reviewerTurns := len(f.turnsOf(reviewer))
+	pmTurns := len(f.turnsOf(pm))
+
+	confirm := f.openQuestion(team.ID, domain.QuestionKindConfirm)
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceRevise, "bogus", "要支持 Excel", confirm.Revision); err == nil {
+		t.Fatal("an unknown destination for the changes was accepted")
+	}
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceRevise, domain.ReworkReturnToMe, "要支持 Excel", confirm.Revision); err != nil {
+		t.Fatal(err)
+	}
+	draft := f.waitTurnAfter(pm, pmTurns, "修改需求文档", "要支持 Excel", "直接回到第 2 环「用户确认需求」")
+	f.call(pm, "handoff", map[string]any{"cardId": f.card(pm).ID, "outcome": "done", "summary": "加了 Excel", "document": "导出 CSV 和 Excel", "idempotencyKey": "s7c-d"})
+	f.finish(pm, draft, "")
+
+	again := f.openQuestion(team.ID, domain.QuestionKindConfirm)
+	if again.ID == confirm.ID || !strings.Contains(again.Question, "导出 CSV 和 Excel") {
+		t.Fatalf("the revised document did not come back for confirmation: %+v", again)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if n := len(f.turnsOf(reviewer)); n != reviewerTurns {
+		t.Fatalf("the review ran again: reviewer turns %d -> %d", reviewerTurns, n)
 	}
 }

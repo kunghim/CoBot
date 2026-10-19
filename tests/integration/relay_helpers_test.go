@@ -33,7 +33,7 @@ func (h *m2Harness) handCard(t *testing.T, team domain.Team, pm, owner domain.Bo
 	}
 	for _, q := range questions {
 		if q.RequirementID == req.ID && q.Kind == domain.QuestionKindConfirm {
-			if _, err := h.app.AnswerDecision(ctx, h.user, q.ID, domain.AcceptanceAccept, "", q.Revision); err != nil {
+			if _, err := h.app.AnswerDecision(ctx, h.user, q.ID, domain.AcceptanceAccept, "", "", q.Revision); err != nil {
 				t.Fatal(err)
 			}
 		}

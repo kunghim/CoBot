@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -25,12 +24,16 @@ const (
 )
 
 // collectExecutionLocked is what the engine reported a card's owner ran and
-// changed since it was handed the card: the commands with their exit codes
-// and the files touched. It comes from the run steps, never from the model.
-func collectExecutionLocked(ctx context.Context, q sqlite.Queryer, card domain.Task) (*domain.Execution, error) {
+// changed while working on the card: the commands with their exit codes and
+// the files touched, from the turns that took the card up and the turn
+// handing it off. Another card's turns stay out, however close in time. It
+// comes from the run steps, never from the model.
+func collectExecutionLocked(ctx context.Context, q sqlite.Queryer, card domain.Task, runID string) (*domain.Execution, error) {
 	rows, err := q.QueryContext(ctx, `SELECT s.kind, s.detail FROM run_steps s
-		WHERE s.bot_id = ? AND s.kind IN (?, ?) AND s.started_at >= ? ORDER BY s.started_at, s.seq`,
-		card.OwnerID, engine.StepCommand, engine.StepFileChange, card.CreatedAt.UTC().Format(time.RFC3339Nano))
+		WHERE s.bot_id = ? AND s.kind IN (?, ?)
+		  AND (s.run_id = ? OR s.run_id IN (SELECT run_id FROM deliveries WHERE task_id = ? AND run_id != ''))
+		ORDER BY s.started_at, s.seq`,
+		card.OwnerID, engine.StepCommand, engine.StepFileChange, runID, card.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,49 +140,110 @@ var outcomeNames = map[string]string{
 	domain.HandoffDone: "完成", domain.HandoffBack: "退回", domain.HandoffEscalate: "上报", domain.HandoffResume: "交回继续",
 }
 
-// handoffsText lists what earlier cards of a requirement handed off, oldest
-// first, with what the engine saw them run.
-func handoffsText(ctx context.Context, q sqlite.Queryer, req domain.Requirement, names map[string]string) (string, error) {
+// handoffRecord is one handoff with the card it came from.
+type handoffRecord struct {
+	card   domain.Task
+	record domain.Evidence
+}
+
+// requirementHandoffs lists every handoff of a requirement's finished cards,
+// oldest first.
+func requirementHandoffs(ctx context.Context, q sqlite.Queryer, req domain.Requirement) ([]handoffRecord, error) {
 	cards, err := sqlite.ListRequirementTasks(ctx, q, req.ID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	var b strings.Builder
+	var out []handoffRecord
 	for _, card := range cards {
 		if card.Status != domain.TaskDone {
 			continue
 		}
 		records, err := sqlite.ListEvidence(ctx, q, card.ID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, r := range records {
-			author := names[r.AuthorID]
-			if author == "" {
-				author = "已离开的成员"
-			}
-			fmt.Fprintf(&b, "- %s · %s（%s，%s）：%s\n", stageLabel(req, card), card.Title, author, outcomeNames[r.Outcome], r.Summary)
-			if r.Suggestions != "" {
-				fmt.Fprintf(&b, "  建议：%s\n", r.Suggestions)
-			}
-			if len(r.ArtifactRefs) > 0 {
-				fmt.Fprintf(&b, "  产出：%s\n", strings.Join(r.ArtifactRefs, "、"))
-			}
-			if r.Execution != nil {
-				if len(r.Execution.Files) > 0 {
-					fmt.Fprintf(&b, "  改动文件：%s\n", strings.Join(r.Execution.Files, "、"))
-				}
-				for _, c := range r.Execution.Commands {
-					if c.ExitCode != nil {
-						fmt.Fprintf(&b, "  运行：%s（退出码 %d）\n", c.Command, *c.ExitCode)
-					} else {
-						fmt.Fprintf(&b, "  运行：%s\n", c.Command)
-					}
-				}
-			}
+			out = append(out, handoffRecord{card: card, record: r})
 		}
 	}
+	return out, nil
+}
+
+// writeHandoff renders one handoff; detail adds what the engine saw run and
+// change.
+func writeHandoff(b *strings.Builder, req domain.Requirement, h handoffRecord, names map[string]string, detail bool) {
+	r := h.record
+	author := names[r.AuthorID]
+	if author == "" {
+		author = "已离开的成员"
+	}
+	fmt.Fprintf(b, "- %s · %s（%s，%s）：%s\n", stageLabel(req, h.card), h.card.Title, author, outcomeNames[r.Outcome], r.Summary)
+	if r.Suggestions != "" {
+		fmt.Fprintf(b, "  建议：%s\n", r.Suggestions)
+	}
+	if len(r.ArtifactRefs) > 0 {
+		fmt.Fprintf(b, "  产出：%s\n", strings.Join(r.ArtifactRefs, "、"))
+	}
+	if !detail || r.Execution == nil {
+		return
+	}
+	if len(r.Execution.Files) > 0 {
+		fmt.Fprintf(b, "  改动文件：%s\n", strings.Join(r.Execution.Files, "、"))
+	}
+	for _, c := range r.Execution.Commands {
+		if c.ExitCode != nil {
+			fmt.Fprintf(b, "  运行：%s（退出码 %d）\n", c.Command, *c.ExitCode)
+		} else {
+			fmt.Fprintf(b, "  运行：%s\n", c.Command)
+		}
+	}
+}
+
+// handoffsText lists every handoff of a requirement in full, for a member
+// looking the requirement up.
+func handoffsText(ctx context.Context, q sqlite.Queryer, req domain.Requirement, names map[string]string) (string, error) {
+	all, err := requirementHandoffs(ctx, q, req)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, h := range all {
+		writeHandoff(&b, req, h, names, true)
+	}
 	return b.String(), nil
+}
+
+// cardHandoffsText is what a card carries of the work before it: each
+// stage's latest handoff up to the card's own stage (earlier rounds and
+// escalations are superseded), with the commands and files only for the
+// stages its work builds on: from the nearest stage that produced something
+// on. The rest is one view_tasks call away. It reports whether it left
+// anything out.
+func cardHandoffsText(ctx context.Context, q sqlite.Queryer, req domain.Requirement, card domain.Task, names map[string]string) (string, bool, error) {
+	all, err := requirementHandoffs(ctx, q, req)
+	if err != nil {
+		return "", false, err
+	}
+	upTo := card.StageIndex
+	if card.StageKind == domain.CardDraft || upTo >= len(req.Stages) {
+		upTo = len(req.Stages) - 1
+	}
+	from := producingStage(req, upTo)
+	latest := map[int]int{} // stage index -> position in all
+	for i, h := range all {
+		if h.card.StageKind == domain.CardEscalation || h.card.StageIndex > upTo {
+			continue
+		}
+		latest[h.card.StageIndex] = i
+	}
+	var b strings.Builder
+	for i, h := range all {
+		if pos, ok := latest[h.card.StageIndex]; !ok || pos != i || h.card.StageKind == domain.CardEscalation {
+			continue
+		}
+		writeHandoff(&b, req, h, names, h.card.StageIndex >= from)
+	}
+	return b.String(), len(latest) < len(all), nil
 }
 
 // handoffHelp says how a card of this kind is handed off.
@@ -230,13 +294,16 @@ func (a *App) cardText(ctx context.Context, q sqlite.Queryer, req domain.Require
 		}
 	}
 	fmt.Fprintf(&b, "\n需求文档：\n%s\n", req.Document)
-	handoffs, err := handoffsText(ctx, q, req, names)
+	handoffs, trimmed, err := cardHandoffsText(ctx, q, req, card, names)
 	if err != nil {
 		return "", err
 	}
 	if handoffs != "" {
-		b.WriteString("\n之前的交接：\n")
+		b.WriteString("\n之前的交接（各环最近一次）：\n")
 		b.WriteString(handoffs)
+		if trimmed {
+			fmt.Fprintf(&b, "更早的几轮交接没有列出，需要时用 view_tasks({requirementId:%q}) 查看。\n", req.ID)
+		}
 	}
 	b.WriteString("\n")
 	b.WriteString(handoffHelp(card, req))
@@ -307,6 +374,8 @@ type RequirementView struct {
 	Route    string     `json:"route"`
 	Document string     `json:"document,omitempty"`
 	Cards    []CardLine `json:"cards"`
+	// Handoffs is every handoff in full, when one requirement is looked up.
+	Handoffs string `json:"handoffs,omitempty"`
 }
 
 // currentStage is the stage a requirement's work is at: the stage of its
@@ -334,6 +403,9 @@ func (a *App) requirementView(ctx context.Context, req domain.Requirement, names
 		Route: routeText(req, currentStage(ctx, a.DB, req, cards), names)}
 	if withDocument {
 		view.Document = req.Document
+		if view.Handoffs, err = handoffsText(ctx, a.DB, req, names); err != nil {
+			return RequirementView{}, err
+		}
 	}
 	for _, card := range cards {
 		view.Cards = append(view.Cards, CardLine{ID: card.ID, Title: card.Title, Owner: names[card.OwnerID], OwnerID: card.OwnerID,

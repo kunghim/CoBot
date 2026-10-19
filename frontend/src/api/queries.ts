@@ -388,13 +388,16 @@ export function useAnswerQuestion() {
       questionId,
       answerText,
       decision,
+      mode,
       expectedRevision,
     }: {
       questionId: string;
       answerText: string;
       decision?: 'accept' | 'revise';
+      /** For revise on a confirmation: where the fixed work goes. */
+      mode?: 'rerun' | 'return_to_me';
       expectedRevision: number;
-    }) => api.answerQuestion(questionId, { answerText, decision, expectedRevision }),
+    }) => api.answerQuestion(questionId, { answerText, decision, mode, expectedRevision }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['questions'] });
       void qc.invalidateQueries({ queryKey: queryKeys.teams });

@@ -456,7 +456,7 @@
     "cancelKeep": "不取消"
   },
   "questions": {
-    "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "需要修改什么（选「提修改意见」时必填）" },
+    "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "需要修改什么（选「提修改意见」时必填）", "returnToMe": "改完直接回到我确认（不再重新评审）" },
     "title": "待你回答",
     "loadFailed": "问题加载失败",
     "answerPlaceholder": "输入回答…",
@@ -670,6 +670,7 @@
     "error.question.text_required": "问题内容不能为空",
     "error.question.answer_required": "回答内容不能为空",
     "error.question.acceptance_decision": "交付验收需要选择「验收通过」或「继续修改」",
+    "error.question.revise_mode": "修改后的去向无效",
     "error.question.revise_reason_required": "继续修改时请写明需要修改什么",
     "error.question.not_acceptance": "这不是交付验收",
     "error.question.requester_only": "只有提问者可以撤回问题",

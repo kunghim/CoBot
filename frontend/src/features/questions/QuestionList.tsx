@@ -136,13 +136,22 @@ function AcceptanceCard({ question }: { question: Question }) {
   const answer = useAnswerQuestion();
   const [changes, setChanges] = useState('');
   const [errorText, setErrorText] = useState('');
+  // A confirmation's changes run the reviews again unless the user only
+  // wants to see the fix itself.
+  const [returnToMe, setReturnToMe] = useState(false);
   const kind = question.kind === 'confirm' ? 'confirm' : 'acceptance';
 
   const decide = (decision: 'accept' | 'revise') => {
     if (decision === 'revise' && !changes.trim()) return;
     setErrorText('');
     answer.mutate(
-      { questionId: question.id, answerText: decision === 'revise' ? changes.trim() : '', decision, expectedRevision: question.revision },
+      {
+        questionId: question.id,
+        answerText: decision === 'revise' ? changes.trim() : '',
+        decision,
+        mode: decision === 'revise' && kind === 'confirm' && returnToMe ? 'return_to_me' : undefined,
+        expectedRevision: question.revision,
+      },
       { onSuccess: () => setChanges(''), onError: (error) => setErrorText(apiErrorMessage(t, error)) },
     );
   };
@@ -185,6 +194,12 @@ function AcceptanceCard({ question }: { question: Question }) {
           {t(`questions.${kind}.revise`)}
         </button>
       </form>
+      {kind === 'confirm' && (
+        <label className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <input type="checkbox" checked={returnToMe} onChange={(event) => setReturnToMe(event.target.checked)} />
+          {t('questions.confirm.returnToMe')}
+        </label>
+      )}
       {errorText && (
         <p className="mt-1 text-xs text-red-600" role="alert">
           {errorText}
