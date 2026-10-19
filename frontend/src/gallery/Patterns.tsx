@@ -41,7 +41,7 @@ export default function Patterns() {
             <div className="flex-1">
               <div className="flex items-center gap-2 border-b border-neutral-200 px-2 py-2 dark:border-neutral-800">
                 <PanelToggle side="left" open={listOpen} onToggle={() => setListOpen(!listOpen)} openLabel="展开团队列表" closeLabel="收起团队列表" />
-                <span className="flex-1 text-sm font-semibold">队长</span>
+                <span className="flex-1 text-sm font-semibold">项目经理</span>
                 <PanelToggle side="right" open={false} onToggle={() => undefined} openLabel="展开工作面板" closeLabel="收起工作面板" />
               </div>
             </div>

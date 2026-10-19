@@ -4,8 +4,8 @@
 
 English · [简体中文](README.zh-CN.md)
 
-> **Status: early preview.** The Windows local Web version is ready to try. The desktop shell
-> and macOS compile, but native runtime and installation are not yet verified. See [Status](#status).
+> **Status: early preview.** Windows beta downloads are available. The macOS ARM64 desktop
+> package has passed a local native smoke test with real Codex. See [Status](#status).
 
 CoBot is a local-first app where AI agents work together as a team. The *Co* stands for
 **cooperation**: CoBot doesn't try to be a smarter agent. It is the team structure around your
@@ -27,50 +27,53 @@ A single coding agent works well. Several of them on the same project quickly tu
 - Agents wake each other up in endless loops and burn your budget.
 - When something crashes, you can't tell what actually ran.
 
-CoBot handles this the way a well-run team does: a lead who breaks down work, members with
-clear roles, a task board, written deliveries that get reviewed, and a human who signs off on
+CoBot handles this the way a well-run team does: a project manager who writes the requirement
+and plans the route, members who pass the work along that route, handoffs that are written down
+with what actually ran, reviews and tests that can send work back, and a human who signs off on
 what matters.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    U([You]) -->|goal| L[Leader bot]
-    L -->|create_task / send_message| M1[Member bot]
-    L -->|create_task / send_message| M2[Member bot]
-    M1 & M2 -->|deliver_task / send_message / ask_user| C[(CoBot core<br/>tasks · messages · approvals)]
-    L -->|review_task / ask_user| C
-    C -->|deliveries wake the right member| L & M1 & M2
-    C -->|approval cards · questions| U
+    U([You]) -->|goal| L[Project manager]
+    L -->|start_requirement: document + route| C[(CoBot core<br/>requirements · cards · approvals)]
+    C -->|hands each stage's card on| M1[Member bot] & M2[Member bot]
+    M1 & M2 -->|handoff: done / back / escalate| C
+    C -->|escalations · acceptance report| L
+    C -->|confirmations · acceptance · approvals · questions| U
     M1 & M2 -. execute in team directory .-> E[[Codex]]
 ```
 
-1. **Create a team** on a working directory. A leader and members with built-in roles
-   (product manager, backend, frontend, QA, code reviewer) get their own agent sessions.
+1. **Create a team** on a working directory. A project manager and members with built-in roles
+   (product manager, full-stack engineer, QA engineer, reviewer) get their own agent sessions.
    You can add or remove members later from the team's settings.
-2. **Give the leader a goal.** It agrees the plan with you, then breaks it into tasks with
-   owners, dependencies and acceptance criteria.
-3. **Members collaborate through structured tools** (MCP), not by parsing chat. Every
-   action they take becomes a fact in CoBot's database, and that fact wakes up whoever needs
-   to act next.
-4. **You stay in charge.** Native command and file approvals, questions from agents, and
-   collaboration chains that hit their limit all come to you.
+2. **Give the project manager a goal.** Once the need is clear it writes a requirement document and
+   picks this requirement's route from the full process (requirements review, product design, test
+   cases, implementation, testing, code review…), and you confirm both.
+3. **Members pass the work along the route.** Each stage is a card handed to its owner; the owner
+   hands it off with `handoff`, and CoBot moves it to the next stage, so no model decides who is next.
+   Reviews and tests can send work back to the stage that produced it; past the limit, or when
+   stuck, the card goes to the project manager.
+4. **You stay in charge.** Confirmations, the final acceptance, native command and file approvals and
+   questions from agents all come to you, and you can cancel a requirement at any time.
 
 ## Features
 
-- **Role-based collaboration.** Each bot sees only the tools its role needs. The leader has
-  `send_message`, `ask_user`, `create_task`, `review_task` and `view_tasks`; members have
-  `send_message`, `ask_user`, `deliver_task` and `view_tasks`; a reviewer also has
-  `review_task`. The host binds each call to the member's identity, so a model can't act as
-  someone else.
-- **Delivery and review.** A member delivers a task with what it did, how to check it and
-  what it verified. A task the leader marks for review (requirements, design, test cases,
-  code…) goes to a reviewer member with the matching checklist, and the reviewer's verdict
-  decides it; after too many send-backs (3 by default, adjustable in settings) the leader
-  decides instead. Other tasks the leader (or you) accepts. Accepting completes the task and
-  releases the tasks waiting on it; sending back needs a reason. When every task of a confirmed
-  plan has ended, the leader reports the result and you accept it or ask for changes. CoBot
-  moves the task status itself; the model never drives the state machine.
+- **Role-based collaboration.** The project manager has `start_requirement`, `handoff`,
+  `view_tasks`, `send_message` and `ask_user`; members have `handoff`, `view_tasks`,
+  `send_message` and `ask_user` (only for what only you can decide). `send_message` leaves a note
+  and wakes nobody: work moves only on cards. The host binds each call to the member's identity, so
+  a model can't act as someone else, and a sub-agent can't hand off a card, start a requirement or
+  ask you.
+- **Relay and acceptance.** Each card opens with the requirement, the route and where it stands,
+  then the requirement document and earlier handoffs; a review card also carries its checklist. On
+  handoff CoBot attaches the commands, exit codes and changed files the engine reported. Reviews and
+  tests can send work back (rerun the route, or straight back to the reviewer); past the limit (3
+  by default, adjustable in settings) the project manager decides. Optional improvements pass with
+  suggestions, collected for the final report. The route ends with the project manager's acceptance
+  report, which becomes your acceptance card. CoBot moves the cards itself; the model never drives
+  the state machine.
 - **Human in the loop.** Native Codex approvals show the full command or diff, with Codex's
   own choices: allow, allow for this session, decline, or decline and stop (requests for extra
   access: allow for this turn or this session, or deny). Each team has a permission mode
@@ -110,15 +113,16 @@ the agent you already trust.
 | --- | --- |
 | Windows 10/11 x64, local Web | **Ready to try.** Verified with real Codex end to end |
 | Windows standalone server build | Builds and runs |
-| Windows desktop shell (Wails/WebView2) | Compiles; not yet verified at runtime |
-| macOS (Web / desktop) | Cross-compiles; `.app` packaging reviewed statically only; native runtime, installation, signing and notarization not yet verified |
+| Windows desktop shell (Wails/WebView2) | **Beta downloads available.** Desktop startup and installer lifecycle checked in Windows Sandbox; see the release notes for limitations |
+| macOS ARM64 desktop | Local app smoke test passed on macOS 26.6.2 with Codex 0.146.0: sign-in, messages, task handoff/delivery/acceptance, file tools, command approval/rejection and restart. DMG mount, Finder copy to Applications, launch after eject and team persistence also passed. Downloaded-package first launch and notarized distribution remain unverified |
+| macOS Intel (x86_64) desktop | Not included in the planned beta release. Cross-built shell/helper, UI startup, native directory dialog, team creation/restart and shared-core tests passed under Rosetta on Apple Silicon. Physical Intel Mac and Intel Codex end-to-end use remain unverified |
 | Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
 
 With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
 questions, native file approvals and rejections, collaboration limits, reconnecting after a
 dropped connection, graceful shutdown, crash recovery and upgrades.
 The headline test was two consecutive rounds of **CoBot developing CoBot**. In each round
-the leader planned the work, a member implemented it, a separate member reviewed it, and a
+the project manager planned the work, a member implemented it, a separate member reviewed it, and a
 human approved the exact candidate commit. The second round ran on the upgraded build that
 included the first round's change.
 
@@ -133,18 +137,44 @@ not yet.
 
 ## Quick start
 
-This preview is built from source. Start with the **Windows local Web** version;
-macOS instructions are for unverified source trials, not a verified native release.
+### Windows desktop downloads
+
+[**v0.1.0-beta.1 — downloads and release notes**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+
+| Download | How to use |
+| --- | --- |
+| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | Install for your current user, then open **CoBot** from the Start menu |
+| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
+
+Both downloads contain the same application files. You need **Windows 10/11 x64**, an existing
+**WebView2 Runtime**, and the official **Codex CLI 0.161.0 or newer on `PATH`**, with an eligible
+account and network access to Codex services. Codex is not bundled. This beta supports official
+Codex account sign-in; third-party relay configurations are outside its supported scope.
+You do not need Go or Node to use these downloads.
+
+The packages are unsigned. Optional `.sha256` checksum files are on the release page.
+GitHub's **Source code** archives are for building, not ready-to-run applications.
+After opening CoBot, sign in under **Settings → Codex engine**, choose a model and create a team.
+CoBot uses a private Codex environment with its own login.
+
+Updates are manual: close CoBot before installing a newer MSI, or extract a complete newer ZIP
+into a new folder. Both editions store settings and team data in `%USERPROFILE%\.cobot`, separate
+from program files. Uninstalling the MSI or deleting an extracted ZIP folder retains that data.
+
+### Build from source
+
+The commands below build the **local Web** version. The published beta currently provides
+Windows downloads only; a macOS desktop package can also be built locally as described below.
 
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
 For agent work, install the [Codex CLI](https://github.com/openai/codex) on `PATH`
-(minimum and verified version: 0.161.0), with an account that can use Codex and
+(Windows/Linux minimum: 0.161.0; macOS minimum: 0.146.0), with an account that can use Codex and
 network access to its service. Go and Node are build tools; the resulting CoBot
 executable still needs Codex for agent work. Local-first does not mean offline
 model execution.
 
-### Windows (PowerShell)
+#### Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/kunghim/CoBot.git
@@ -154,7 +184,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-### macOS (Bash; native runtime unverified)
+#### macOS (Bash)
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
@@ -163,6 +193,31 @@ npm ci --prefix frontend
 ./scripts/build.sh --target server
 ./.tmp/dist/cobot serve
 ```
+
+For the macOS desktop package, also provide Wails CLI v2.15.0 and the Apple
+command-line build tools, then run
+`./scripts/build.sh --target desktop --version 0.1.0-beta.2-dev --arch arm64`.
+This writes `.tmp/dist/CoBot-0.1.0-beta.2-dev-macos-arm64.dmg`, a companion ZIP,
+and SHA-256 files. Open the DMG, copy `CoBot.app` to its Applications shortcut,
+then eject the image and open CoBot from Applications. The DMG is the planned
+macOS beta download; it is not published yet.
+Use `--arch arm64` for Apple Silicon or `--arch amd64` for an experimental Intel
+build; filenames include the selected architecture, and both shell and helper target it.
+Intel builds can be smoke-tested through an existing Rosetta installation on
+Apple Silicon, which does not replace testing on a physical Intel Mac.
+When using the ZIP, extract and keep the entire `CoBot.app` bundle together. It uses the production
+profile by default. For an isolated trial, launch its executable with an explicit
+`--data-root <empty-directory>`; the temporary root still uses production semantics.
+The bundle has an ad-hoc signature for local testing, without Developer ID signing
+or notarization. Local DMG installation and restart passed, but Gatekeeper assessment
+rejects this build; browser-download first launch and the manual approval flow
+have not been accepted.
+
+The macOS Codex 0.146.0 smoke test uses an isolated data root and real model turns;
+it is not the full Windows acceptance suite. With a minimal GUI `PATH`, CoBot also
+checks common standalone, Cargo and Homebrew installation directories. Codex inherits
+static macOS system proxies when no proxy environment variable was supplied; this
+does not change system settings or evaluate automatic proxy (PAC) scripts.
 
 Run these commands in a terminal on the same computer as your browser and team
 files. This starts the local Web app, not the desktop shell or a remote server.
@@ -186,7 +241,7 @@ This preference is saved for subsequent visits; agent replies are not translated
    CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
    both, with a button to authorize again if that failed.
 2. **New team:** choose a working directory and the members you want.
-3. **Message the leader** with a small, checkable goal. For example: "Inspect this
+3. **Message the project manager** with a small, checkable goal. For example: "Inspect this
    project and propose three improvements. Do not edit files yet." Agent replies
    follow the conversation and role instructions, not the interface language.
 

@@ -23,8 +23,9 @@ import (
 func openWorkError(scope string, c sqlite.OpenWorkCounts) error {
 	return domain.Conflict("error."+scope+".open_work", map[string]any{
 		"activeRuns": c.ActiveRuns, "pendingApprovals": c.PendingApprovals,
-		"offeredTransfers": c.OfferedTransfers, "openTasks": c.OpenTasks,
+		"openTasks":        c.OpenTasks,
 		"queuedDeliveries": c.QueuedDeliveries, "openQuestions": c.OpenQuestions,
+		"routeStages": c.RouteStages,
 	})
 }
 
@@ -148,11 +149,12 @@ func (a *App) PatchTeamReasoningEffort(ctx context.Context, principal auth.Princ
 
 // archiveBlockers is the one census for archiving. A team may be archived
 // only when it is completely idle: no running member, no queued message, no
-// pending approval, no open question, no offered hand-over and no unfinished
-// task. Passing it is what makes an archived team safe to delete outright.
+// pending approval, no open question, no unfinished card and, for a member,
+// no stage on a running requirement's route. Passing it is what makes an
+// archived team safe to delete outright.
 func archiveBlockers(c sqlite.OpenWorkCounts) bool {
 	return c.ActiveRuns > 0 || c.QueuedDeliveries > 0 || c.PendingApprovals > 0 ||
-		c.OpenQuestions > 0 || c.OfferedTransfers > 0 || c.OpenTasks > 0
+		c.OpenQuestions > 0 || c.OpenTasks > 0 || c.RouteStages > 0
 }
 
 // ArchiveTeam sets an idle team aside. It leaves the sidebar for the

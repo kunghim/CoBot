@@ -14,7 +14,7 @@ test('members show their role avatar from the downloaded catalog', async ({ page
   mkdirSync(teamDir, { recursive: true });
 
   await page.goto('/settings/appearance');
-  await expect(page.getByText(/团子：第 1 版|Dango: version 1/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/团子：第 \d+ 版|Dango: version \d+/)).toBeVisible({ timeout: 15000 });
 
   await page.goto('/');
   await page.getByRole('button', { name: /新建团队|create team/i }).first().click();
@@ -24,13 +24,13 @@ test('members show their role avatar from the downloaded catalog', async ({ page
   await dialog.getByRole('button', { name: /创建|create/i }).click();
 
   const list = page.getByRole('complementary', { name: /团队列表|team list/i });
-  const leader = list.locator('li').filter({ hasText: '头像团队' }).getByRole('button', { name: /队长/ }).first();
+  const leader = list.locator('li').filter({ hasText: '头像团队' }).getByRole('button', { name: /项目经理|Project manager/ }).first();
   await expect(leader).toBeVisible({ timeout: 15000 });
   const avatar = leader.locator('img').first();
   await expect(avatar).toHaveAttribute('src', /^data:image\/svg\+xml/);
 
   // Two members of different roles are drawn differently.
-  const member = list.locator('li').filter({ hasText: '头像团队' }).getByRole('button', { name: /前端开发|Frontend/ }).first();
+  const member = list.locator('li').filter({ hasText: '头像团队' }).getByRole('button', { name: /全栈工程师|Full-stack/ }).first();
   const leaderSrc = await avatar.getAttribute('src');
   const memberSrc = await member.locator('img').first().getAttribute('src');
   expect(memberSrc).toMatch(/^data:image\/svg\+xml/);
@@ -49,7 +49,7 @@ test('a member can be given its own avatar', async ({ page }) => {
   await dialog.getByRole('button', { name: /创建|create/i }).click();
 
   const list = page.getByRole('complementary', { name: /团队列表|team list/i });
-  const leader = list.locator('li').filter({ hasText: '换头像团队' }).getByRole('button', { name: /队长/ }).first();
+  const leader = list.locator('li').filter({ hasText: '换头像团队' }).getByRole('button', { name: /项目经理|Project manager/ }).first();
   await expect(leader).toBeVisible({ timeout: 15000 });
   await leader.click();
   const before = await leader.locator('img').first().getAttribute('src');
@@ -79,7 +79,7 @@ test('a member can use a local picture as its avatar', async ({ page }) => {
   await dialog.getByRole('button', { name: /创建|create/i }).click();
 
   const list = page.getByRole('complementary', { name: /团队列表|team list/i });
-  const leader = list.locator('li').filter({ hasText: '图片头像团队' }).getByRole('button', { name: /队长/ }).first();
+  const leader = list.locator('li').filter({ hasText: '图片头像团队' }).getByRole('button', { name: /项目经理|Project manager/ }).first();
   await expect(leader).toBeVisible({ timeout: 15000 });
   await leader.click();
 

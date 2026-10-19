@@ -11,15 +11,15 @@ interface UsageRow {
 }
 
 const ROWS: UsageRow[] = [
-  { member: '队长', turns: 4, tokens: 182400 },
-  { member: '前端开发', turns: 1, tokens: 96210 },
+  { member: '项目经理', turns: 4, tokens: 182400 },
+  { member: '全栈工程师', turns: 1, tokens: 96210 },
   { member: '测试工程师', turns: 2, tokens: 51877 },
 ];
 
 export default function FeedbackData() {
   const toast = useToast();
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'tokens', direction: 'desc' });
-  const [tags, setTags] = useState(['进行中', '前端开发']);
+  const [tags, setTags] = useState(['进行中', '全栈工程师']);
   const [leftOpen, setLeftOpen] = useState(true);
   const rows = [...ROWS].sort((a, b) => {
     const k = sort.key as keyof UsageRow;
@@ -96,7 +96,7 @@ export default function FeedbackData() {
 
       <Doc id="empty" name="EmptyState 空状态" file="components/ui/Feedback.tsx" use="一个地方暂时没有内容：说明为什么空、下一步做什么，最多一个主要操作。">
         <Demo surface="raised">
-          <EmptyState icon={<Inbox size={28} />} title="还没有任务" description="和队长对齐方案后，任务会出现在这里。" action={<Button variant="primary" size="sm" icon={Plus}>新建任务</Button>} />
+          <EmptyState icon={<Inbox size={28} />} title="还没有任务" description="和项目经理对齐方案后，任务会出现在这里。" action={<Button variant="primary" size="sm" icon={Plus}>新建任务</Button>} />
         </Demo>
       </Doc>
 
@@ -144,9 +144,9 @@ export default function FeedbackData() {
       <Doc id="list" name="List 列表" file="components/ui/Display.tsx" use="一列同类的东西（角色、已归档团队）。行可以整体可点，也可以只有尾部操作。">
         <Demo surface="raised">
           <List label="角色">
-            <ListRow leading={<span className="h-9 w-9 rounded-lg bg-[#9cc8fb]" />} title="前端开发" description="默认头像" trailing={<Button size="sm">更换头像</Button>} />
+            <ListRow leading={<span className="h-9 w-9 rounded-lg bg-[#9cc8fb]" />} title="全栈工程师" description="默认头像" trailing={<Button size="sm">更换头像</Button>} />
             <ListRow leading={<span className="h-9 w-9 rounded-lg bg-[#fbb271]" />} title="测试工程师" description="已自定义" onClick={() => undefined} selected />
-            <ListRow leading={<span className="h-9 w-9 rounded-lg bg-[#6fd6c8]" />} title="后端开发" description="可点的行" onClick={() => undefined} />
+            <ListRow leading={<span className="h-9 w-9 rounded-lg bg-[#d8b1fb]" />} title="产品经理" description="可点的行" onClick={() => undefined} />
           </List>
         </Demo>
       </Doc>
@@ -195,7 +195,7 @@ export default function FeedbackData() {
             <Accordion
               defaultOpen={['delivery']}
               items={[
-                { id: 'delivery', title: '交付记录', meta: '2 次', content: '前端开发 09:52 交付：添加和删除可用，本地保存已完成，已用 Playwright 验证。' },
+                { id: 'delivery', title: '交付记录', meta: '2 次', content: '全栈工程师 09:52 交付：添加和删除可用，本地保存已完成，已用 Playwright 验证。' },
                 { id: 'criteria', title: '验收标准', content: '刷新后数据仍在；空输入不能添加；删除需要确认。' },
                 { id: 'advanced', title: '高级设置', content: '协作轮次上限、预算等。' },
               ]}
@@ -221,7 +221,7 @@ export default function FeedbackData() {
             <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
               <PanelHeader
                 leading={<PanelToggle side="left" open={leftOpen} onToggle={() => setLeftOpen(!leftOpen)} openLabel="展开团队列表" closeLabel="收起团队列表" />}
-                title="队长"
+                title="项目经理"
                 subtitle="待办应用 · E:\work\todo-app"
                 actions={<PanelToggle side="right" open onToggle={() => undefined} openLabel="展开工作面板" closeLabel="收起工作面板" />}
               />

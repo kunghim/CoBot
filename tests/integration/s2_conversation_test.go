@@ -10,22 +10,20 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
-// Member-to-member messages appear in both conversations, a task assignment
+// Member-to-member messages appear in both conversations, a card
 // carries a card block the engine never reads, and the activity page keeps
 // only what the user cares about, with the facts to say it plainly.
 func TestConversationsShowCollaborationAndActivityIsReadable(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, member := bots[0], bots[1]
 	token := h.botToken(t, captain)
 
 	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotId": member.ID, "text": "接口定好了吗？", "idempotencyKey": "s2-msg"}); status != 200 {
 		t.Fatalf("send_message = %d %v", status, body)
 	}
-	if status, body := h.callTool(t, token, "create_task", map[string]any{"title": "实现登录接口", "ownerId": member.ID, "acceptanceCriteria": "返回 200", "idempotencyKey": "s2-task"}); status != 200 {
-		t.Fatalf("create_task = %d %v", status, body)
-	}
+	h.handCard(t, team, captain, member, "实现登录接口", "返回 200")
 
 	page := func(botID string) []domain.Message {
 		result, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "messages", BotID: botID})

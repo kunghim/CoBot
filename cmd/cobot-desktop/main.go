@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -42,6 +43,10 @@ var desktopOrigins = []string{
 }
 
 func main() {
+	// Release builds keep their production default, while native acceptance
+	// can use an explicit throwaway root without touching the user's profile.
+	dataRoot := flag.String("data-root", "", "override the profile data directory")
+	flag.Parse()
 	env, err := platform.ParseEnvironment(environment)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -69,7 +74,7 @@ func main() {
 		Mac:       &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
 		OnStartup: func(ctx context.Context) {
 			bridge.SetContext(ctx)
-			if err := bridge.StartCore(ctx, ""); err != nil {
+			if err := bridge.StartCore(ctx, *dataRoot); err != nil {
 				wailsruntime.MessageDialog(ctx, messageDialogError(err))
 				wailsruntime.Quit(ctx)
 			}

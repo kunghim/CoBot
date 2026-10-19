@@ -5,13 +5,14 @@
 const CHIPS: Record<string, string> = {
   leader: 'bg-neutral-200 text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100',
   'product-manager': 'bg-[#f3e6f7] text-[#6b2c7d] dark:bg-[#3a2242] dark:text-[#e3c4ec]',
-  'frontend-dev': 'bg-[#e3ecfb] text-[#1b4c9b] dark:bg-[#1c2a45] dark:text-[#bcd2f7]',
-  'backend-dev': 'bg-[#dcf1ee] text-[#0b5e54] dark:bg-[#15332f] dark:text-[#a6e3da]',
+  'fullstack-engineer': 'bg-[#e3ecfb] text-[#1b4c9b] dark:bg-[#1c2a45] dark:text-[#bcd2f7]',
+  // Unused by built-in roles; it keeps custom roles in five distinct colors.
+  teal: 'bg-[#dcf1ee] text-[#0b5e54] dark:bg-[#15332f] dark:text-[#a6e3da]',
   'qa-engineer': 'bg-[#fbe8e1] text-[#97391f] dark:bg-[#3f2119] dark:text-[#f5c3b2]',
   'code-reviewer': 'bg-[#f6efd9] text-[#7a5c0c] dark:bg-[#3a3016] dark:text-[#ecd9a2]',
 };
 
-const EXTRA = ['product-manager', 'frontend-dev', 'backend-dev', 'qa-engineer', 'code-reviewer'];
+const EXTRA = ['product-manager', 'fullstack-engineer', 'teal', 'qa-engineer', 'code-reviewer'];
 
 /** The badge classes of a role. */
 export function roleChip(roleId: string | undefined, isLeader = false): string {

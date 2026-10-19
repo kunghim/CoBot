@@ -7,7 +7,7 @@
 
 export const series = {
   id: 'dango',
-  version: 1,
+  version: 2,
   name: { 'zh-CN': '团子', en: 'Dango' },
 };
 
@@ -98,6 +98,9 @@ export const states = {
 export const roleDefaults = {
   leader: { shape: 'star', eyes: 'shine', color: '#7d8c85' },
   'product-manager': { shape: 'cloud', eyes: 'happy', color: '#d8b1fb' },
+  'fullstack-engineer': { shape: 'circle', eyes: 'dots', color: '#9cc8fb' },
+  // The frontend and backend roles became fullstack-engineer; their lines
+  // stay so members on builds from before the change keep their look.
   'frontend-dev': { shape: 'circle', eyes: 'dots', color: '#9cc8fb' },
   'backend-dev': { shape: 'square', eyes: 'beans', color: '#6fd6c8' },
   'qa-engineer': { shape: 'arch', eyes: 'wide', color: '#fbb271' },

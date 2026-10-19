@@ -9,6 +9,9 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: process.env.COBOT_E2E_BASE_URL ?? 'http://127.0.0.1:18777',
+    // Allow native acceptance to use an existing Chrome/Edge installation;
+    // CI keeps Playwright's pinned Chromium when no channel is supplied.
+    channel: process.env.COBOT_E2E_CHANNEL,
     trace: 'retain-on-failure',
     // Wide enough that the team list and work panel are laid out in-flow
     // rather than overlaying the conversation (the product collapses them on

@@ -473,9 +473,12 @@ type OpenWorkCounts struct {
 	OpenQuestions    int64 `json:"openQuestions"`
 	ActiveRuns       int64 `json:"activeRuns"`
 	PendingApprovals int64 `json:"pendingApprovals"`
-	OfferedTransfers int64 `json:"offeredTransfers"`
 	OpenTasks        int64 `json:"openTasks"`
 	QueuedDeliveries int64 `json:"queuedDeliveries"`
+	// RouteStages counts the running requirements whose route names the
+	// member for a stage, done or still ahead: a send-back or the next stage
+	// would hand it a card.
+	RouteStages int64 `json:"routeStages"`
 }
 
 // TeamOpenWork counts a team's blocking work.
@@ -484,14 +487,13 @@ func TeamOpenWork(ctx context.Context, q Queryer, teamID string) (OpenWorkCounts
 	err := q.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM runs WHERE team_id = ? AND status IN (?, ?, ?, ?, ?)),
 		(SELECT COUNT(*) FROM approvals WHERE team_id = ? AND request_state = 'pending'),
-		(SELECT COUNT(*) FROM transfers t JOIN tasks k ON k.id = t.task_id WHERE k.team_id = ? AND t.status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE team_id = ? AND status NOT IN ('done', 'cancelled')),
 		(SELECT COUNT(*) FROM deliveries WHERE team_id = ? AND status IN (?, ?)),
         (SELECT COUNT(*) FROM questions WHERE team_id = ? AND status = 'open')`,
 		teamID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
-		teamID, teamID, teamID, teamID,
+		teamID, teamID, teamID,
 		domain.DeliveryQueued, domain.DeliveryWaitingDependency, teamID).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
+		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}
@@ -504,14 +506,16 @@ func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, 
 	err := q.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM runs WHERE bot_id = ? AND status IN (?, ?, ?, ?, ?)),
 		(SELECT COUNT(*) FROM approvals WHERE requester_bot_id = ? AND request_state = 'pending'),
-		(SELECT COUNT(*) FROM transfers WHERE (from_bot_id = ? OR to_bot_id = ?) AND status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND status NOT IN ('done', 'cancelled')),
 		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?)),
-        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open')`,
+        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'),
+		(SELECT COUNT(*) FROM requirements r WHERE r.status = ? AND EXISTS (
+			SELECT 1 FROM json_each(r.stages) s WHERE json_extract(s.value, '$.ownerId') = ?))`,
 		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
-		botID, botID, botID, botID,
-		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
+		botID, botID,
+		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID,
+		domain.RequirementActive, botID).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions, &c.RouteStages)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}
@@ -588,10 +592,9 @@ func PurgeTeamTx(ctx context.Context, tx *sql.Tx, teamID string) error {
 		`DELETE FROM chain_wakes WHERE chain_id IN (SELECT id FROM chains WHERE team_id = ?)`,
 		`DELETE FROM chains WHERE team_id = ?`,
 		`DELETE FROM deliveries WHERE team_id = ?`,
-		`DELETE FROM task_dependencies WHERE task_id IN (` + teamTasks + `) OR depends_on_task_id IN (` + teamTasks + `)`,
 		`DELETE FROM task_evidence WHERE task_id IN (` + teamTasks + `)`,
-		`DELETE FROM transfers WHERE task_id IN (` + teamTasks + `)`,
 		`DELETE FROM tasks WHERE team_id = ?`,
+		`DELETE FROM requirements WHERE team_id = ?`,
 		`DELETE FROM questions WHERE team_id = ?`,
 		`DELETE FROM memories WHERE team_id = ?`,
 		`DELETE FROM messages WHERE team_id = ?`,
@@ -636,7 +639,7 @@ func BotThreadIDs(ctx context.Context, q Queryer, botID string) ([]string, error
 
 // PurgeBotTx removes one member and what is its own in its team: its
 // conversation and deliveries, runs, memories, the approvals and questions
-// it raised, the finished tasks it owned with their hand-overs, its events
+// it raised, the finished cards it held with their handoff records, its events
 // and its engine session. Messages it sent into other members'
 // conversations stay as their history, and the usage ledger stays because
 // team budgets are counted from it. Role definitions are never touched.
@@ -650,8 +653,6 @@ func PurgeBotTx(ctx context.Context, tx *sql.Tx, botID string) error {
 		`DELETE FROM approval_responses WHERE approval_id IN (` + ownApprovals + `)`,
 		`DELETE FROM approvals WHERE requester_bot_id = ?`,
 		`DELETE FROM deliveries WHERE target_bot_id = ? OR message_id IN (` + ownMessages + `)`,
-		`DELETE FROM transfers WHERE from_bot_id = ? OR to_bot_id = ? OR task_id IN (` + ownTasks + `)`,
-		`DELETE FROM task_dependencies WHERE task_id IN (` + ownTasks + `) OR depends_on_task_id IN (` + ownTasks + `)`,
 		`DELETE FROM task_evidence WHERE task_id IN (` + ownTasks + `)`,
 		`DELETE FROM questions WHERE requester_bot_id = ? OR task_id IN (` + ownTasks + `)`,
 		`DELETE FROM tasks WHERE owner_id = ?`,

@@ -16,8 +16,7 @@ import { Button, Card, Icons, List, ListRow } from '../../components/ui';
 const LINEUP = [
   { roleId: 'leader', isLeader: true },
   { roleId: 'product-manager', isLeader: false },
-  { roleId: 'frontend-dev', isLeader: false },
-  { roleId: 'backend-dev', isLeader: false },
+  { roleId: 'fullstack-engineer', isLeader: false },
   { roleId: 'qa-engineer', isLeader: false },
   { roleId: 'code-reviewer', isLeader: false },
 ];

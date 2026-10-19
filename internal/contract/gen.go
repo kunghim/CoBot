@@ -18,8 +18,14 @@ const (
 
 // Defines values for AnswerQuestionRequestDecision.
 const (
-	Accept AnswerQuestionRequestDecision = "accept"
-	Revise AnswerQuestionRequestDecision = "revise"
+	AnswerQuestionRequestDecisionAccept AnswerQuestionRequestDecision = "accept"
+	AnswerQuestionRequestDecisionRevise AnswerQuestionRequestDecision = "revise"
+)
+
+// Defines values for AnswerQuestionRequestMode.
+const (
+	AnswerQuestionRequestModeRerun      AnswerQuestionRequestMode = "rerun"
+	AnswerQuestionRequestModeReturnToMe AnswerQuestionRequestMode = "return_to_me"
 )
 
 // Defines values for ApprovalRequestState.
@@ -63,12 +69,11 @@ const (
 
 // Defines values for CollaborationRequestTool.
 const (
-	AskUser     CollaborationRequestTool = "ask_user"
-	CreateTask  CollaborationRequestTool = "create_task"
-	DeliverTask CollaborationRequestTool = "deliver_task"
-	ReviewTask  CollaborationRequestTool = "review_task"
-	SendMessage CollaborationRequestTool = "send_message"
-	ViewTasks   CollaborationRequestTool = "view_tasks"
+	AskUser          CollaborationRequestTool = "ask_user"
+	Handoff          CollaborationRequestTool = "handoff"
+	SendMessage      CollaborationRequestTool = "send_message"
+	StartRequirement CollaborationRequestTool = "start_requirement"
+	ViewTasks        CollaborationRequestTool = "view_tasks"
 )
 
 // Defines values for EngineLoginType.
@@ -98,6 +103,20 @@ const (
 	Unauthorized        ErrorEnvelopeErrorCode = "unauthorized"
 )
 
+// Defines values for EvidenceMode.
+const (
+	EvidenceModeRerun      EvidenceMode = "rerun"
+	EvidenceModeReturnToMe EvidenceMode = "return_to_me"
+)
+
+// Defines values for EvidenceOutcome.
+const (
+	EvidenceOutcomeBack     EvidenceOutcome = "back"
+	EvidenceOutcomeDone     EvidenceOutcome = "done"
+	EvidenceOutcomeEscalate EvidenceOutcome = "escalate"
+	EvidenceOutcomeResume   EvidenceOutcome = "resume"
+)
+
 // Defines values for MessageDeliveryStatus.
 const (
 	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
@@ -122,17 +141,10 @@ const (
 	MessagePreviewKindUser      MessagePreviewKind = "user"
 )
 
-// Defines values for PatchTaskRequestStatus.
-const (
-	PatchTaskRequestStatusCancelled PatchTaskRequestStatus = "cancelled"
-	PatchTaskRequestStatusDoing     PatchTaskRequestStatus = "doing"
-	PatchTaskRequestStatusReview    PatchTaskRequestStatus = "review"
-	PatchTaskRequestStatusTodo      PatchTaskRequestStatus = "todo"
-)
-
 // Defines values for QuestionKind.
 const (
 	QuestionKindAcceptance QuestionKind = "acceptance"
+	QuestionKindConfirm    QuestionKind = "confirm"
 	QuestionKindEmpty      QuestionKind = ""
 )
 
@@ -141,6 +153,14 @@ const (
 	QuestionStatusAnswered  QuestionStatus = "answered"
 	QuestionStatusCancelled QuestionStatus = "cancelled"
 	QuestionStatusOpen      QuestionStatus = "open"
+)
+
+// Defines values for RequirementStatus.
+const (
+	RequirementStatusAccepting RequirementStatus = "accepting"
+	RequirementStatusActive    RequirementStatus = "active"
+	RequirementStatusCancelled RequirementStatus = "cancelled"
+	RequirementStatusDone      RequirementStatus = "done"
 )
 
 // Defines values for RunStatus.
@@ -247,6 +267,26 @@ const (
 	SettingsPatchThemeHarbor   SettingsPatchTheme = "harbor"
 )
 
+// Defines values for StageKind.
+const (
+	StageKindAccept    StageKind = "accept"
+	StageKindConfirm   StageKind = "confirm"
+	StageKindDesign    StageKind = "design"
+	StageKindImplement StageKind = "implement"
+	StageKindReview    StageKind = "review"
+	StageKindTest      StageKind = "test"
+	StageKindTestCases StageKind = "test_cases"
+)
+
+// Defines values for StageReviewType.
+const (
+	StageReviewTypeCode         StageReviewType = "code"
+	StageReviewTypeDesign       StageReviewType = "design"
+	StageReviewTypeGeneral      StageReviewType = "general"
+	StageReviewTypeRequirements StageReviewType = "requirements"
+	StageReviewTypeTestPlan     StageReviewType = "test_plan"
+)
+
 // Defines values for StatusEnvironment.
 const (
 	StatusEnvironmentDevelopment StatusEnvironment = "development"
@@ -261,11 +301,24 @@ const (
 
 // Defines values for TaskReviewType.
 const (
-	Code         TaskReviewType = "code"
-	Design       TaskReviewType = "design"
-	General      TaskReviewType = "general"
-	Requirements TaskReviewType = "requirements"
-	TestPlan     TaskReviewType = "test_plan"
+	TaskReviewTypeCode         TaskReviewType = "code"
+	TaskReviewTypeDesign       TaskReviewType = "design"
+	TaskReviewTypeGeneral      TaskReviewType = "general"
+	TaskReviewTypeRequirements TaskReviewType = "requirements"
+	TaskReviewTypeTestPlan     TaskReviewType = "test_plan"
+)
+
+// Defines values for TaskStageKind.
+const (
+	Accept     TaskStageKind = "accept"
+	Confirm    TaskStageKind = "confirm"
+	Design     TaskStageKind = "design"
+	Draft      TaskStageKind = "draft"
+	Escalation TaskStageKind = "escalation"
+	Implement  TaskStageKind = "implement"
+	Review     TaskStageKind = "review"
+	Test       TaskStageKind = "test"
+	TestCases  TaskStageKind = "test_cases"
 )
 
 // Defines values for TaskStatus.
@@ -273,7 +326,6 @@ const (
 	TaskStatusCancelled TaskStatus = "cancelled"
 	TaskStatusDoing     TaskStatus = "doing"
 	TaskStatusDone      TaskStatus = "done"
-	TaskStatusReview    TaskStatus = "review"
 	TaskStatusTodo      TaskStatus = "todo"
 )
 
@@ -294,20 +346,12 @@ const (
 
 // Defines values for ToolResultStatus.
 const (
-	ToolResultStatusAccepted    ToolResultStatus = "accepted"
-	ToolResultStatusDuplicate   ToolResultStatus = "duplicate"
-	ToolResultStatusOk          ToolResultStatus = "ok"
-	ToolResultStatusRejected    ToolResultStatus = "rejected"
-	ToolResultStatusUnavailable ToolResultStatus = "unavailable"
-	ToolResultStatusWaiting     ToolResultStatus = "waiting"
-)
-
-// Defines values for TransferStatus.
-const (
-	TransferStatusAccepted  TransferStatus = "accepted"
-	TransferStatusCancelled TransferStatus = "cancelled"
-	TransferStatusOffered   TransferStatus = "offered"
-	TransferStatusStale     TransferStatus = "stale"
+	Accepted    ToolResultStatus = "accepted"
+	Duplicate   ToolResultStatus = "duplicate"
+	Ok          ToolResultStatus = "ok"
+	Rejected    ToolResultStatus = "rejected"
+	Unavailable ToolResultStatus = "unavailable"
+	Waiting     ToolResultStatus = "waiting"
 )
 
 // Defines values for ListApprovalsParamsState.
@@ -318,9 +362,9 @@ const (
 
 // Defines values for ListQuestionsParamsStatus.
 const (
-	Answered  ListQuestionsParamsStatus = "answered"
-	Cancelled ListQuestionsParamsStatus = "cancelled"
-	Open      ListQuestionsParamsStatus = "open"
+	ListQuestionsParamsStatusAnswered  ListQuestionsParamsStatus = "answered"
+	ListQuestionsParamsStatusCancelled ListQuestionsParamsStatus = "cancelled"
+	ListQuestionsParamsStatusOpen      ListQuestionsParamsStatus = "open"
 )
 
 // Defines values for PatchTeamJSONBodyPermissionMode.
@@ -332,17 +376,23 @@ const (
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
-	// AnswerText The answer; for an acceptance question
+	// AnswerText The answer; for a confirmation or acceptance
 	AnswerText string `json:"answerText"`
 
-	// Decision Required for an acceptance question, refused for any other.
+	// Decision Required for a confirmation or acceptance question, refused for any other.
 	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
 	ExpectedRevision int64                          `json:"expectedRevision"`
-	RequestId        openapi_types.UUID             `json:"requestId"`
+
+	// Mode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+	Mode      *AnswerQuestionRequestMode `json:"mode,omitempty"`
+	RequestId openapi_types.UUID         `json:"requestId"`
 }
 
-// AnswerQuestionRequestDecision Required for an acceptance question, refused for any other.
+// AnswerQuestionRequestDecision Required for a confirmation or acceptance question, refused for any other.
 type AnswerQuestionRequestDecision string
+
+// AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+type AnswerQuestionRequestMode string
 
 // Approval defines model for Approval.
 type Approval struct {
@@ -488,17 +538,6 @@ type ConversationPage struct {
 	Runs []RunWithSteps `json:"runs"`
 }
 
-// CreateTaskRequest defines model for CreateTaskRequest.
-type CreateTaskRequest struct {
-	AcceptanceCriteria *string            `json:"acceptanceCriteria,omitempty"`
-	DependencyIds      *[]string          `json:"dependencyIds,omitempty"`
-	Description        *string            `json:"description,omitempty"`
-	OwnerId            string             `json:"ownerId"`
-	ParentId           *string            `json:"parentId,omitempty"`
-	RequestId          openapi_types.UUID `json:"requestId"`
-	Title              string             `json:"title"`
-}
-
 // EngineLogin defines model for EngineLogin.
 type EngineLogin struct {
 	AuthUrl string          `json:"authUrl"`
@@ -556,17 +595,35 @@ type Event struct {
 	Type       string                 `json:"type"`
 }
 
-// Evidence defines model for Evidence.
+// Evidence A handoff record.
 type Evidence struct {
 	ArtifactRefs []string  `json:"artifactRefs"`
 	AuthorId     string    `json:"authorId"`
-	CandidateRef *string   `json:"candidateRef,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
-	Id           string    `json:"id"`
-	ReviewResult *string   `json:"reviewResult,omitempty"`
-	Summary      string    `json:"summary"`
-	TaskId       string    `json:"taskId"`
-	TestResult   *string   `json:"testResult,omitempty"`
+
+	// Execution What the engine reported a member ran and changed while it held the card.
+	Execution   *Execution       `json:"execution,omitempty"`
+	Id          string           `json:"id"`
+	Mode        *EvidenceMode    `json:"mode,omitempty"`
+	Outcome     *EvidenceOutcome `json:"outcome,omitempty"`
+	Suggestions *string          `json:"suggestions,omitempty"`
+	Summary     string           `json:"summary"`
+	TaskId      string           `json:"taskId"`
+}
+
+// EvidenceMode defines model for Evidence.Mode.
+type EvidenceMode string
+
+// EvidenceOutcome defines model for Evidence.Outcome.
+type EvidenceOutcome string
+
+// Execution What the engine reported a member ran and changed while it held the card.
+type Execution struct {
+	Commands []struct {
+		Command  string `json:"command"`
+		ExitCode *int   `json:"exitCode,omitempty"`
+	} `json:"commands"`
+	Files []string `json:"files"`
 }
 
 // Memory defines model for Memory.
@@ -626,25 +683,6 @@ type Model struct {
 	Slug *string `json:"slug,omitempty"`
 }
 
-// OfferTransferRequest defines model for OfferTransferRequest.
-type OfferTransferRequest struct {
-	Note      *string            `json:"note,omitempty"`
-	RequestId openapi_types.UUID `json:"requestId"`
-	ToBotId   string             `json:"toBotId"`
-}
-
-// PatchTaskRequest defines model for PatchTaskRequest.
-type PatchTaskRequest struct {
-	BlockedReason    *string                 `json:"blockedReason,omitempty"`
-	ExpectedRevision int64                   `json:"expectedRevision"`
-	OwnerId          *string                 `json:"ownerId,omitempty"`
-	RequestId        openapi_types.UUID      `json:"requestId"`
-	Status           *PatchTaskRequestStatus `json:"status,omitempty"`
-}
-
-// PatchTaskRequestStatus defines model for PatchTaskRequest.Status.
-type PatchTaskRequestStatus string
-
 // Question defines model for Question.
 type Question struct {
 	AnswerMessageId *string    `json:"answerMessageId,omitempty"`
@@ -653,7 +691,7 @@ type Question struct {
 	CreatedAt       time.Time  `json:"createdAt"`
 	Id              string     `json:"id"`
 
-	// Kind acceptance hands a finished requirement to the user; '' is an ask_user question.
+	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
 	Kind           QuestionKind   `json:"kind"`
 	Options        []string       `json:"options"`
 	Question       string         `json:"question"`
@@ -661,16 +699,36 @@ type Question struct {
 	RequirementId  *string        `json:"requirementId,omitempty"`
 	Revision       int64          `json:"revision"`
 	RunId          *string        `json:"runId,omitempty"`
+	StageIndex     *int           `json:"stageIndex,omitempty"`
 	Status         QuestionStatus `json:"status"`
 	TaskId         *string        `json:"taskId,omitempty"`
 	TeamId         string         `json:"teamId"`
 }
 
-// QuestionKind acceptance hands a finished requirement to the user; ” is an ask_user question.
+// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question.
 type QuestionKind string
 
 // QuestionStatus defines model for Question.Status.
 type QuestionStatus string
+
+// Requirement defines model for Requirement.
+type Requirement struct {
+	CreatedAt time.Time `json:"createdAt"`
+	CreatedBy string    `json:"createdBy"`
+
+	// Document The project manager's requirement document (Markdown).
+	Document  string            `json:"document"`
+	Id        string            `json:"id"`
+	Revision  int64             `json:"revision"`
+	Stages    []Stage           `json:"stages"`
+	Status    RequirementStatus `json:"status"`
+	TeamId    string            `json:"teamId"`
+	Title     string            `json:"title"`
+	UpdatedAt time.Time         `json:"updatedAt"`
+}
+
+// RequirementStatus defines model for Requirement.Status.
+type RequirementStatus string
 
 // Run defines model for Run.
 type Run struct {
@@ -824,6 +882,21 @@ type Snapshot struct {
 	Teams      []TeamWithBots `json:"teams"`
 }
 
+// Stage defines model for Stage.
+type Stage struct {
+	Criteria   *string          `json:"criteria,omitempty"`
+	Kind       StageKind        `json:"kind"`
+	Name       string           `json:"name"`
+	OwnerId    *string          `json:"ownerId,omitempty"`
+	ReviewType *StageReviewType `json:"reviewType,omitempty"`
+}
+
+// StageKind defines model for Stage.Kind.
+type StageKind string
+
+// StageReviewType defines model for Stage.ReviewType.
+type StageReviewType string
+
 // Status defines model for Status.
 type Status struct {
 	Authorized        bool              `json:"authorized"`
@@ -847,57 +920,47 @@ type StatusEnvironment string
 // StatusProfile defines model for Status.Profile.
 type StatusProfile string
 
-// SubmitEvidenceRequest defines model for SubmitEvidenceRequest.
-type SubmitEvidenceRequest struct {
-	ArtifactRefs *[]string          `json:"artifactRefs,omitempty"`
-	CandidateRef *string            `json:"candidateRef,omitempty"`
-	RequestId    openapi_types.UUID `json:"requestId"`
-	ReviewResult *string            `json:"reviewResult,omitempty"`
-	Summary      string             `json:"summary"`
-	TestResult   *string            `json:"testResult,omitempty"`
-}
-
-// Task defines model for Task.
+// Task A card, one stage of a requirement's route held by one member.
 type Task struct {
 	AcceptanceCriteria *string   `json:"acceptanceCriteria,omitempty"`
-	BlockedReason      *string   `json:"blockedReason,omitempty"`
 	CreatedAt          time.Time `json:"createdAt"`
 	CreatedBy          string    `json:"createdBy"`
-	DependencyIds      []string  `json:"dependencyIds"`
 	Description        *string   `json:"description,omitempty"`
 	Id                 string    `json:"id"`
 	OwnerId            string    `json:"ownerId"`
-	ParentId           *string   `json:"parentId,omitempty"`
+	RequirementId      *string   `json:"requirementId,omitempty"`
 
-	// RejectCount The reviewer's send-backs since the leader last decided.
-	RejectCount int `json:"rejectCount"`
+	// ReturnTo The stage a return-to-me rework card goes back to; -1 runs the route on.
+	ReturnTo int `json:"returnTo"`
 
-	// RequirementId Groups the tasks one confirmed plan created.
-	RequirementId *string `json:"requirementId,omitempty"`
-
-	// ReviewType The checklist a reviewer member applies; absent when the leader accepts the delivery.
+	// ReviewType The checklist of a review stage's card.
 	ReviewType *TaskReviewType `json:"reviewType,omitempty"`
+	Revision   int64           `json:"revision"`
 
-	// ReviewerId The reviewer member whose verdict decides the task.
-	ReviewerId *string    `json:"reviewerId,omitempty"`
-	Revision   int64      `json:"revision"`
-	Status     TaskStatus `json:"status"`
-	TeamId     string     `json:"teamId"`
-	Title      string     `json:"title"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	// StageIndex The card's stage on the route; -1 for a requirement-document card.
+	StageIndex int            `json:"stageIndex"`
+	StageKind  *TaskStageKind `json:"stageKind,omitempty"`
+	Status     TaskStatus     `json:"status"`
+	TeamId     string         `json:"teamId"`
+	Title      string         `json:"title"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
 }
 
-// TaskReviewType The checklist a reviewer member applies; absent when the leader accepts the delivery.
+// TaskReviewType The checklist of a review stage's card.
 type TaskReviewType string
+
+// TaskStageKind defines model for Task.StageKind.
+type TaskStageKind string
 
 // TaskStatus defines model for Task.Status.
 type TaskStatus string
 
 // TaskDetail defines model for TaskDetail.
 type TaskDetail struct {
-	Evidence  []Evidence `json:"evidence"`
-	Task      Task       `json:"task"`
-	Transfers []Transfer `json:"transfers"`
+	Evidence []Evidence `json:"evidence"`
+
+	// Task A card, one stage of a requirement's route held by one member.
+	Task Task `json:"task"`
 }
 
 // Team defines model for Team.
@@ -954,22 +1017,6 @@ type ToolResult struct {
 
 // ToolResultStatus defines model for ToolResult.Status.
 type ToolResultStatus string
-
-// Transfer defines model for Transfer.
-type Transfer struct {
-	CreatedAt    time.Time      `json:"createdAt"`
-	FromBotId    string         `json:"fromBotId"`
-	Id           string         `json:"id"`
-	Note         *string        `json:"note,omitempty"`
-	Status       TransferStatus `json:"status"`
-	TaskId       string         `json:"taskId"`
-	TaskRevision int64          `json:"taskRevision"`
-	ToBotId      string         `json:"toBotId"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
-}
-
-// TransferStatus defines model for Transfer.Status.
-type TransferStatus string
 
 // Error defines model for Error.
 type Error = ErrorEnvelope
@@ -1141,6 +1188,11 @@ type CancelQuestionJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// CancelRequirementJSONBody defines parameters for CancelRequirement.
+type CancelRequirementJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // SetRoleAvatarJSONBody defines parameters for SetRoleAvatar.
 type SetRoleAvatarJSONBody struct {
 	// Avatar The avatar to use; null follows the default again
@@ -1163,13 +1215,6 @@ type ExchangeBootstrapJSONBody struct {
 type UpdateSettingsJSONBody struct {
 	ExpectedRevision int64              `json:"expectedRevision"`
 	Patch            SettingsPatch      `json:"patch"`
-	RequestId        openapi_types.UUID `json:"requestId"`
-}
-
-// ConfirmTaskJSONBody defines parameters for ConfirmTask.
-type ConfirmTaskJSONBody struct {
-	EvidenceIds      *[]string          `json:"evidenceIds,omitempty"`
-	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
@@ -1264,17 +1309,6 @@ type WarmTeamJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
-// AcceptTaskTransferJSONBody defines parameters for AcceptTaskTransfer.
-type AcceptTaskTransferJSONBody struct {
-	ExpectedRevision int64              `json:"expectedRevision"`
-	RequestId        openapi_types.UUID `json:"requestId"`
-}
-
-// CancelTaskTransferJSONBody defines parameters for CancelTaskTransfer.
-type CancelTaskTransferJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
-}
-
 // InternalServiceStopJSONBody defines parameters for InternalServiceStop.
 type InternalServiceStopJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -1330,6 +1364,9 @@ type AnswerQuestionJSONRequestBody = AnswerQuestionRequest
 // CancelQuestionJSONRequestBody defines body for CancelQuestion for application/json ContentType.
 type CancelQuestionJSONRequestBody CancelQuestionJSONBody
 
+// CancelRequirementJSONRequestBody defines body for CancelRequirement for application/json ContentType.
+type CancelRequirementJSONRequestBody CancelRequirementJSONBody
+
 // SetRoleAvatarJSONRequestBody defines body for SetRoleAvatar for application/json ContentType.
 type SetRoleAvatarJSONRequestBody SetRoleAvatarJSONBody
 
@@ -1341,18 +1378,6 @@ type ExchangeBootstrapJSONRequestBody ExchangeBootstrapJSONBody
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
-
-// PatchTaskJSONRequestBody defines body for PatchTask for application/json ContentType.
-type PatchTaskJSONRequestBody = PatchTaskRequest
-
-// ConfirmTaskJSONRequestBody defines body for ConfirmTask for application/json ContentType.
-type ConfirmTaskJSONRequestBody ConfirmTaskJSONBody
-
-// SubmitTaskEvidenceJSONRequestBody defines body for SubmitTaskEvidence for application/json ContentType.
-type SubmitTaskEvidenceJSONRequestBody = SubmitEvidenceRequest
-
-// OfferTaskTransferJSONRequestBody defines body for OfferTaskTransfer for application/json ContentType.
-type OfferTaskTransferJSONRequestBody = OfferTransferRequest
 
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
@@ -1372,17 +1397,8 @@ type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
-// CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
-type CreateTaskJSONRequestBody = CreateTaskRequest
-
 // WarmTeamJSONRequestBody defines body for WarmTeam for application/json ContentType.
 type WarmTeamJSONRequestBody WarmTeamJSONBody
-
-// AcceptTaskTransferJSONRequestBody defines body for AcceptTaskTransfer for application/json ContentType.
-type AcceptTaskTransferJSONRequestBody AcceptTaskTransferJSONBody
-
-// CancelTaskTransferJSONRequestBody defines body for CancelTaskTransfer for application/json ContentType.
-type CancelTaskTransferJSONRequestBody CancelTaskTransferJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest

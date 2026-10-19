@@ -45,7 +45,7 @@ func TestEnsureProfileCopyUpgradesOnlyUneditedRetiredDefaults(t *testing.T) {
 			}
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, "frontend_dev.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "fullstack_engineer.json")); err != nil {
 		t.Fatal("missing default role was not added")
 	}
 }

@@ -47,7 +47,7 @@ export default function TeamConversation() {
       <Doc id="avatar" name="Avatar 头像" file="features/avatars/Avatar.tsx · render.ts" use="所有显示成员的地方。尺寸：16（行内、往来行）、24（列表）、28（消息旁）、36（会话头部）、48（空状态）、96（选头像）。" avoid="不要自己画首字母方块；头像库没下载时组件会自动用打包的默认头像。" a11y="头像本身对读屏器隐藏，成员名和状态由旁边的文字或外层的标签说出。">
         <Demo>
           <div className="space-y-5">
-            <Matrix items={[16, 24, 28, 36, 48, 96].map((size) => ({ label: `${size}px`, node: <RoleAvatar roleId="frontend-dev" size={size} /> }))} />
+            <Matrix items={[16, 24, 28, 36, 48, 96].map((size) => ({ label: `${size}px`, node: <RoleAvatar roleId="fullstack-engineer" size={size} /> }))} />
             <Matrix
               items={[
                 { label: '空闲', node: <RoleAvatar roleId="qa-engineer" size={48} /> },
@@ -58,7 +58,7 @@ export default function TeamConversation() {
                 { label: '本地图片 · 工作中', node: <span className="inline-block h-12 w-12 animate-pulse rounded-[28%] bg-gradient-to-br from-amber-300 to-rose-400 ring-2 ring-emerald-500" /> },
               ]}
             />
-            <Matrix items={['leader', 'product-manager', 'frontend-dev', 'backend-dev', 'qa-engineer', 'code-reviewer'].map((roleId) => ({ label: roleId, node: <RoleAvatar roleId={roleId} size={36} /> }))} />
+            <Matrix items={['leader', 'product-manager', 'fullstack-engineer', 'qa-engineer', 'code-reviewer'].map((roleId) => ({ label: roleId, node: <RoleAvatar roleId={roleId} size={36} /> }))} />
           </div>
         </Demo>
       </Doc>
@@ -67,25 +67,24 @@ export default function TeamConversation() {
         <Demo>
           <div className="flex flex-wrap items-center gap-4">
             <span className="flex flex-wrap gap-1.5">
-              <RoleChip name="队长" isLeader />
+              <RoleChip name="项目经理" isLeader />
               <RoleChip name="产品经理" roleId="product-manager" />
-              <RoleChip name="前端开发" roleId="frontend-dev" />
-              <RoleChip name="后端开发" roleId="backend-dev" />
+              <RoleChip name="全栈工程师" roleId="fullstack-engineer" />
               <RoleChip name="测试工程师" roleId="qa-engineer" />
               <RoleChip name="评审员" roleId="code-reviewer" />
             </span>
-            <AvatarStack avatars={['leader', 'frontend-dev', 'backend-dev', 'qa-engineer'].map((roleId) => <RoleAvatar key={roleId} roleId={roleId} size={28} />)} more="+2" />
+            <AvatarStack avatars={['leader', 'fullstack-engineer', 'product-manager', 'qa-engineer'].map((roleId) => <RoleAvatar key={roleId} roleId={roleId} size={28} />)} more="+2" />
           </div>
         </Demo>
       </Doc>
 
-      <Doc id="member-row" name="MemberRow 成员行" file="components/ui/Team.tsx" use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息（只显示一行，超出用省略号截断，不会撑出侧栏）。当前成员白底加描边；等你处理时头像右下角加琥珀色点。队长和成员暂时用同一种样式（怎么区分队长以后再定）。">
+      <Doc id="member-row" name="MemberRow 成员行" file="components/ui/Team.tsx" use="团队列表里的一个成员：头像、名字、右上角状态或时间、下面一行是最近一条消息（只显示一行，超出用省略号截断，不会撑出侧栏）。当前成员白底加描边；等你处理时头像右下角加琥珀色点。项目经理和成员暂时用同一种样式（怎么区分项目经理以后再定）。">
         <Demo surface="sunken">
           <div className="w-64 space-y-px">
             {[
-              ['leader', '队长', 'idle', '', '空闲', '方案已经发你了，确认后我就分派给成员。', '09:41'],
-              ['frontend-dev', '前端开发', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存', ''],
-              ['backend-dev', '后端开发', 'idle', '', '空闲', '', ''],
+              ['leader', '项目经理', 'idle', '', '空闲', '方案已经发你了，确认后我就分派给成员。', '09:41'],
+              ['fullstack-engineer', '全栈工程师', 'working', '工作中', '工作中', '正在写 src/components/TodoList.tsx，添加和删除已经能用，接下来补本地保存', ''],
+              ['product-manager', '产品经理', 'idle', '', '空闲', '', ''],
               ['qa-engineer', '测试工程师', 'waiting', '等你审批', '等你审批', '想在沙箱外运行 npx playwright test --headed 来验证页面', ''],
             ].map(([roleId, name, state, status, statusLabel, preview, time]) => (
               <MemberRow
@@ -108,10 +107,10 @@ export default function TeamConversation() {
         <Demo>
           <div className="mx-auto max-w-2xl space-y-4">
             <MessageBubble from="user" meta="已送达">做一个本地待办页面，能添加和删除</MessageBubble>
-            <MessageBubble from="member" avatar={<RoleAvatar roleId="leader" size={28} />} author="队长">
+            <MessageBubble from="member" avatar={<RoleAvatar roleId="leader" size={28} />} author="项目经理">
               好的。我先确认两点：数据要不要在刷新后保留？要不要支持标记完成？
             </MessageBubble>
-            <ExchangeLine label="发给" people={[person('frontend-dev', '前端开发'), person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
+            <ExchangeLine label="发给" people={[person('fullstack-engineer', '全栈工程师'), person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
             <ExchangeLine label="来自" people={[person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
             <SystemNote>团队成员有变化：加入了评审员</SystemNote>
           </div>
@@ -161,7 +160,7 @@ export default function TeamConversation() {
             />
             <QuestionCard
               title="问题"
-              asker={person('leader', '队长')}
+              asker={person('leader', '项目经理')}
               question="数据要不要在刷新后保留？要的话我会用浏览器本地存储。"
               answer={answer}
               onAnswer={setAnswer}
@@ -193,7 +192,7 @@ export default function TeamConversation() {
               }}
               onStop={() => setRunning(false)}
               running={running}
-              placeholder="给 队长 发消息……"
+              placeholder="给 项目经理 发消息……"
               sendLabel="发送"
               stopLabel="停止"
               options={
@@ -271,7 +270,7 @@ export default function TeamConversation() {
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
             <AppTitleBar
               platform="windows"
-              title="CoBot — 待办应用 · 队长"
+              title="CoBot — 待办应用 · 项目经理"
               left={<PanelToggle side="left" open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}
               right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
               windowControls={{ minimizeLabel: '最小化', maximizeLabel: '最大化', restoreLabel: '还原', closeLabel: '关闭', maximized, onMinimize: () => undefined, onToggleMaximize: () => setMaximized(!maximized), onClose: () => undefined }}
@@ -287,7 +286,7 @@ export default function TeamConversation() {
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
             <AppTitleBar
               platform="mac"
-              title="CoBot — 待办应用 · 队长"
+              title="CoBot — 待办应用 · 项目经理"
               left={<PanelToggle side="left" open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}
               right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
             />

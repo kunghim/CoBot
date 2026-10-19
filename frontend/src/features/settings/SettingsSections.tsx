@@ -36,7 +36,7 @@ import {
   StatusDot,
   type Tone,
 } from '../../components/ui';
-
+import { desktopBridge } from '../../platform/native-bridge';
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
 type SectionProps = { settings: Settings; save: Save; errors: Record<string, string> };
 
@@ -272,6 +272,13 @@ export function EngineSection() {
     }
   }, [engine.data?.loggedIn]);
 
+  const openNativeLogin = async (url: string) => {
+    try {
+      await desktopBridge()!.OpenLoginURL(url);
+    } catch {
+      setActionError(t('engine.openLoginFailed'));
+    }
+  };
   const startLogin = () => {
     setActionError('');
     login.mutate(undefined, {
@@ -279,6 +286,7 @@ export function EngineSection() {
         setLoginPending(true);
         setAuthUrl(result.authUrl);
         setLoginTimedOut(false);
+        if (desktopBridge()) void openNativeLogin(result.authUrl);
       },
       onError: (err) => setActionError(apiErrorMessage(t, err)),
     });
@@ -310,17 +318,18 @@ export function EngineSection() {
   };
 
   const info = engine.data;
+  const loggedIn = info?.loggedIn ?? false;
   const statusText = !info
     ? t('status.loading')
     : info.status === 'ready'
-      ? t('settings.engineReady')
+      ? loggedIn ? t('settings.engineReady') : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
       : info.status === 'error'
         ? t('settings.engineError')
         : info.status === 'starting'
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
-  const loggedIn = info?.loggedIn ?? false;
-  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? 'success' : info.status === 'starting' ? 'neutral' : 'danger';
+  // Ready but signed out is not ready to work: it reads as a warning.
+  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
   const hookState = info?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
   const hookKey = hookState === 'trusted' ? 'Trusted' : hookState === 'failed' ? 'Failed' : 'Untrusted';
   const hookTone: Tone = hookState === 'trusted' ? 'success' : hookState === 'failed' ? 'danger' : 'warning';
@@ -336,10 +345,10 @@ export function EngineSection() {
         <div className="space-y-4">
           <p className="flex items-center gap-2 text-sm" role="status">
             <StatusDot tone={engineTone} label={statusText} />
-            <span>
+            <span className={info?.status === 'ready' && !loggedIn ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
               {statusText}
               {info?.version ? ` · ${info.version}` : ''}
-              {info?.status === 'ready' ? ` · ${loggedIn ? t('settings.engineLoggedIn') : t('settings.engineLoggedOut')}` : ''}
+              {info?.status === 'ready' && loggedIn ? ` · ${t('settings.engineLoggedIn')}` : ''}
             </span>
           </p>
           {details.length > 0 && <DescriptionList items={details} />}
@@ -353,7 +362,20 @@ export function EngineSection() {
             {loginPending && (
               <>
                 {authUrl && (
-                  <a href={authUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-signal-600 hover:underline dark:text-signal-400">
+                  <a
+                    href={authUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-signal-600 hover:underline dark:text-signal-400"
+                    onClick={(event) => {
+                      // The desktop shell opens it in the default browser.
+                      if (desktopBridge()) {
+                        event.preventDefault();
+                        setActionError('');
+                        void openNativeLogin(authUrl);
+                      }
+                    }}
+                  >
                     {t('engine.openLogin')}
                     <Icons.openExternal size={14} aria-hidden />
                   </a>
@@ -377,8 +399,7 @@ export function EngineSection() {
               </Button>
             )}
           </div>
-          {loginTimedOut && <Alert tone="warning">{t('engine.loginTimeout')}</Alert>}
-        </div>
+          {loginTimedOut && <Alert tone="warning">{t('engine.loginTimeout')}</Alert>}        </div>
       </Card>
 
       {info?.status === 'ready' && (

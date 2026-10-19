@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -22,9 +23,10 @@ import (
 // model operations (login coordinator). Business turns never run on it; it
 // shares the environment's private CODEX_HOME so every team reuses one login.
 type controlServer struct {
-	mu     sync.Mutex
-	server *codex.Server
-	cwd    string
+	mu         sync.Mutex
+	server     *codex.Server
+	cwd        string
+	enginePath string
 }
 
 // EngineStatusInfo caching window; login changes arrive through the
@@ -69,6 +71,9 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	if !codex.VersionSupported(version) {
 		info.Status = "error"
 		info.ErrorKey = "error.engine.version_unsupported"
+		if runtime.GOOS == "darwin" {
+			info.ErrorKey = "error.engine.version_unsupported_macos"
+		}
 		a.cacheEngineStatus(info)
 		return info
 	}
@@ -218,10 +223,21 @@ func parseAccount(raw json.RawMessage) accountInfo {
 func (a *App) control(ctx context.Context) (*codex.Server, error) {
 	a.engineControlMu.Lock()
 	defer a.engineControlMu.Unlock()
+	settings, err := a.GetSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if a.engineControl != nil && a.engineControl.server != nil {
-		if err := a.engineControl.server.Ping(ctx); err == nil {
-			return a.engineControl.server, nil
+		if a.engineControl.enginePath == settings.EnginePath {
+			if err := a.engineControl.server.Ping(ctx); err == nil {
+				return a.engineControl.server, nil
+			}
 		}
+		// Engine selection can change after startup's self-check. Account,
+		// login and model calls must not keep talking to the previous binary.
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		_ = a.engineControl.server.Shutdown(shutdownCtx)
+		cancel()
 		a.engineControl = nil
 		a.engineLoginMu.Lock()
 		a.engineLogin = nil
@@ -235,7 +251,7 @@ func (a *App) control(ctx context.Context) (*codex.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("start control app-server: %w", err)
 	}
-	a.engineControl = &controlServer{server: server, cwd: cwd}
+	a.engineControl = &controlServer{server: server, cwd: cwd, enginePath: settings.EnginePath}
 	return server, nil
 }
 

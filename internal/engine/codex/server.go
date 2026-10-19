@@ -119,6 +119,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
+	hideChildWindow(cmd)
 	if opts.Env != nil {
 		cmd.Env = opts.Env
 	}
@@ -905,6 +906,27 @@ func isExitError(err error) bool {
 // protocol stream. Lines are emitted at warn level: the engine writes its
 // diagnostics to stderr, and hiding them below the default info threshold
 // means a failing engine leaves no trace in the product log.
+// stderrLevel reads the level Codex gave a log line ("<time>  INFO target: ..."),
+// so its own errors and warnings stay visible while its info and debug
+// output (a recording turns those on) stays out of the core's log; the
+// recording keeps every line. A line without a level, such as a panic
+// message, is kept as a warning.
+func stderrLevel(line string) slog.Level {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return slog.LevelWarn
+	}
+	switch fields[1] {
+	case "ERROR":
+		return slog.LevelError
+	case "WARN":
+		return slog.LevelWarn
+	case "INFO", "DEBUG", "TRACE":
+		return slog.LevelDebug
+	}
+	return slog.LevelWarn
+}
+
 type stderrLog struct {
 	logger *slog.Logger
 	mu     sync.Mutex
@@ -931,7 +953,7 @@ func (w *stderrLog) Write(p []byte) (int, error) {
 		if len(w.buf) > 8*1024 {
 			w.buf = w.buf[len(w.buf)-8*1024:]
 		}
-		w.logger.Warn("codex stderr", "line", line)
+		w.logger.Log(context.Background(), stderrLevel(line), "codex stderr", "line", line)
 	}
 	return len(p), nil
 }

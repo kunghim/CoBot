@@ -434,12 +434,12 @@ func TestTeamCreationValidation(t *testing.T) {
 	ctx := context.Background()
 
 	// Same directory twice is refused even after status changes.
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	if team.Status != domain.TeamStatusActive {
 		t.Fatalf("team status = %s, want active", team.Status)
 	}
 	if len(bots) != 2 || !bots[0].IsLeader {
-		t.Fatalf("expected leader + backend-dev, got %+v", bots)
+		t.Fatalf("expected leader + fullstack-engineer, got %+v", bots)
 	}
 	// The marker and the Git-exclude path behaviour: plain dir has no Git,
 	// but the marker must exist.
@@ -472,7 +472,7 @@ func TestTeamCreationValidation(t *testing.T) {
 	limit, _ := h.app.GetSettings(ctx)
 	members := make([]string, 0, limit.MemberLimit)
 	for i := 1; i < limit.MemberLimit+2; i++ {
-		members = append(members, "backend-dev")
+		members = append(members, "fullstack-engineer")
 	}
 	dir2 := filepath.Join(filepath.Dir(h.teamDir), "team-2")
 	if err := os.MkdirAll(dir2, 0o755); err != nil {

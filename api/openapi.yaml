@@ -1160,7 +1160,7 @@ paths:
       operationId: listTasks
       security:
         - SessionCookie: []
-      summary: Project a team's task board
+      summary: Project a team's cards
       parameters:
         - name: cursor
           in: query
@@ -1197,45 +1197,12 @@ paths:
                             items: { $ref: "#/components/schemas/Task" }
         "401":
           $ref: "#/components/responses/Error"
-    post:
-      operationId: createTask
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Create a task with a unique owner
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateTaskRequest" }
-      responses:
-        "201":
-          description: Created task
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/Task" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
   /api/v1/tasks/{id}:
     get:
       operationId: getTask
       security:
         - SessionCookie: []
-      summary: One task with its evidence and transfer history
+      summary: One card with its handoff records
       parameters:
         - name: id
           in: path
@@ -1254,51 +1221,20 @@ paths:
                       data: { $ref: "#/components/schemas/TaskDetail" }
         "404":
           $ref: "#/components/responses/Error"
-    patch:
-      operationId: patchTask
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
+  /api/v1/teams/{id}/requirements:
+    get:
+      operationId: listRequirements
       security:
         - SessionCookie: []
-          CSRFToken: []
-      summary: Change status, or change owner through the transfer safety rules
+      summary: A team's requirements with their documents and routes, newest first
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PatchTaskRequest" }
       responses:
         "200":
-          description: Updated task
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/tasks/{id}/evidence:
-    post:
-      operationId: submitTaskEvidence
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Record a proof reference for a task
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/SubmitEvidenceRequest" }
-      responses:
-        "201":
-          description: Evidence recorded
+          description: Requirements
           content:
             application/json:
               schema:
@@ -1306,121 +1242,24 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - type: object
                     properties:
-                      data: { $ref: "#/components/schemas/Evidence" }
-        "400":
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Requirement" }
+        "401":
           $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-  /api/v1/tasks/{id}/confirm:
+  /api/v1/requirements/{id}/cancel:
     post:
-      operationId: confirmTask
+      operationId: cancelRequirement
       # Cookie-authenticated writes must echo the CSRF token; the scheme
       # documents the header rather than changing the handler.
       security:
         - SessionCookie: []
           CSRFToken: []
-      summary: Confirm a review task as done against evidence
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, expectedRevision]
-              properties:
-                requestId: { type: string, format: uuid }
-                evidenceIds:
-                  type: array
-                  items: { type: string }
-                expectedRevision: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Confirmed task
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/tasks/{id}/transfers:
-    post:
-      operationId: offerTaskTransfer
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Offer a two-phase hand-over; the owner is unchanged until accepted
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/OfferTransferRequest" }
-      responses:
-        "201":
-          description: Offered transfer
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/Transfer" }
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/transfers/{id}/accept:
-    post:
-      operationId: acceptTaskTransfer
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Accept and swap the owner atomically
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, expectedRevision]
-              properties:
-                requestId: { type: string, format: uuid }
-                expectedRevision: { type: integer, format: int64, minimum: 1 }
-      responses:
-        "200":
-          description: Transferred task
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/Task" }
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/transfers/{id}/cancel:
-    post:
-      operationId: cancelTaskTransfer
-      # Cookie-authenticated writes must echo the CSRF token; the scheme
-      # documents the header rather than changing the handler.
-      security:
-        - SessionCookie: []
-          CSRFToken: []
-      summary: Withdraw a live offer
+      summary: Cancel a requirement; its open cards and confirmations end
       parameters:
         - name: id
           in: path
@@ -1437,7 +1276,7 @@ paths:
                 requestId: { type: string, format: uuid }
       responses:
         "200":
-          description: Cancelled transfer
+          description: Cancelled requirement
           content:
             application/json:
               schema:
@@ -1445,7 +1284,7 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - type: object
                     properties:
-                      data: { $ref: "#/components/schemas/Transfer" }
+                      data: { $ref: "#/components/schemas/Requirement" }
         "409":
           $ref: "#/components/responses/Error"
   /api/v1/questions:
@@ -2058,33 +1897,33 @@ components:
   schemas:
     Task:
       type: object
-      required: [id, teamId, ownerId, title, status, revision, createdAt, updatedAt, dependencyIds, createdBy, rejectCount]
+      description: A card, one stage of a requirement's route held by one member.
+      required: [id, teamId, ownerId, title, status, stageIndex, returnTo, revision, createdAt, updatedAt, createdBy]
       properties:
         id: { type: string }
         teamId: { type: string }
         ownerId: { type: string }
-        parentId: { type: string }
         title: { type: string }
         description: { type: string }
         acceptanceCriteria: { type: string }
-        status: { type: string, enum: [todo, doing, review, done, cancelled] }
-        blockedReason: { type: string }
-        dependencyIds:
-          type: array
-          items: { type: string }
+        status: { type: string, enum: [todo, doing, done, cancelled] }
         reviewType:
           type: string
           enum: [requirements, design, test_plan, code, general]
-          description: The checklist a reviewer member applies; absent when the leader accepts the delivery.
-        reviewerId: { type: string, description: The reviewer member whose verdict decides the task. }
-        rejectCount: { type: integer, description: The reviewer's send-backs since the leader last decided. }
-        requirementId: { type: string, description: Groups the tasks one confirmed plan created. }
+          description: The checklist of a review stage's card.
+        requirementId: { type: string }
+        stageIndex: { type: integer, description: The card's stage on the route; -1 for a requirement-document card. }
+        stageKind:
+          type: string
+          enum: [confirm, design, review, test_cases, implement, test, accept, draft, escalation]
+        returnTo: { type: integer, description: The stage a return-to-me rework card goes back to; -1 runs the route on. }
         revision: { type: integer, format: int64 }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     Evidence:
       type: object
+      description: A handoff record.
       required: [id, taskId, authorId, summary, createdAt, artifactRefs]
       properties:
         id: { type: string }
@@ -2094,21 +1933,50 @@ components:
         artifactRefs:
           type: array
           items: { type: string }
-        candidateRef: { type: string }
-        testResult: { type: string }
-        reviewResult: { type: string }
+        outcome: { type: string, enum: [done, back, escalate, resume] }
+        mode: { type: string, enum: [rerun, return_to_me] }
+        suggestions: { type: string }
+        execution: { $ref: "#/components/schemas/Execution" }
         createdAt: { type: string, format: date-time }
-    Transfer:
+    Execution:
       type: object
-      required: [id, taskId, fromBotId, toBotId, taskRevision, status, createdAt, updatedAt]
+      description: What the engine reported a member ran and changed while it held the card.
+      required: [commands, files]
+      properties:
+        commands:
+          type: array
+          items:
+            type: object
+            required: [command]
+            properties:
+              command: { type: string }
+              exitCode: { type: integer }
+        files:
+          type: array
+          items: { type: string }
+    Stage:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [confirm, design, review, test_cases, implement, test, accept] }
+        ownerId: { type: string }
+        reviewType: { type: string, enum: [requirements, design, test_plan, code, general] }
+        criteria: { type: string }
+    Requirement:
+      type: object
+      required: [id, teamId, title, document, stages, status, createdBy, revision, createdAt, updatedAt]
       properties:
         id: { type: string }
-        taskId: { type: string }
-        fromBotId: { type: string }
-        toBotId: { type: string }
-        taskRevision: { type: integer, format: int64 }
-        note: { type: string }
-        status: { type: string, enum: [offered, accepted, cancelled, stale] }
+        teamId: { type: string }
+        title: { type: string }
+        document: { type: string, description: The project manager's requirement document (Markdown). }
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/Stage" }
+        status: { type: string, enum: [active, accepting, done, cancelled] }
+        createdBy: { type: string }
+        revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     Question:
@@ -2118,9 +1986,10 @@ components:
         id: { type: string }
         kind:
           type: string
-          enum: ['', acceptance]
-          description: acceptance hands a finished requirement to the user; '' is an ask_user question.
+          enum: ['', confirm, acceptance]
+          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
         requirementId: { type: string }
+        stageIndex: { type: integer }
         teamId: { type: string }
         requesterBotId: { type: string }
         taskId: { type: string }
@@ -2188,57 +2057,20 @@ components:
         sourceRunId: { type: string }
         sourceTaskId: { type: string }
         createdAt: { type: string, format: date-time }
-    CreateTaskRequest:
-      type: object
-      required: [requestId, title, ownerId]
-      properties:
-        requestId: { type: string, format: uuid }
-        title: { type: string }
-        description: { type: string }
-        acceptanceCriteria: { type: string }
-        ownerId: { type: string }
-        parentId: { type: string }
-        dependencyIds:
-          type: array
-          items: { type: string }
-    PatchTaskRequest:
-      type: object
-      required: [requestId, expectedRevision]
-      properties:
-        requestId: { type: string, format: uuid }
-        status: { type: string, enum: [todo, doing, review, cancelled] }
-        blockedReason: { type: string }
-        ownerId: { type: string }
-        expectedRevision: { type: integer, format: int64 }
-    SubmitEvidenceRequest:
-      type: object
-      required: [requestId, summary]
-      properties:
-        requestId: { type: string, format: uuid }
-        summary: { type: string }
-        artifactRefs:
-          type: array
-          items: { type: string }
-        candidateRef: { type: string }
-        testResult: { type: string }
-        reviewResult: { type: string }
-    OfferTransferRequest:
-      type: object
-      required: [requestId, toBotId]
-      properties:
-        requestId: { type: string, format: uuid }
-        toBotId: { type: string }
-        note: { type: string }
     AnswerQuestionRequest:
       type: object
       required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        answerText: { type: string, description: The answer; for an acceptance question, the requested changes (required with revise). }
+        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise). }
         decision:
           type: string
           enum: [accept, revise]
-          description: Required for an acceptance question, refused for any other.
+          description: Required for a confirmation or acceptance question, refused for any other.
+        mode:
+          type: string
+          enum: [rerun, return_to_me]
+          description: For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
         expectedRevision: { type: integer, format: int64 }
     CollaborationRequest:
       type: object
@@ -2247,7 +2079,7 @@ components:
         requestId: { type: string, format: uuid }
         tool:
           type: string
-          enum: [view_tasks, deliver_task, review_task, send_message, create_task, ask_user]
+          enum: [view_tasks, start_requirement, handoff, send_message, ask_user]
         arguments: { type: object, additionalProperties: true }
         callId: { type: string, description: "Bridge-only: the engine's id for this tool call; a write without an idempotencyKey derives its key from it." }
         providerThreadId: { type: string, description: "Bridge-only native transport identity, never a model argument." }
@@ -2615,15 +2447,12 @@ components:
           items: { $ref: "#/components/schemas/RunWithSteps" }
     TaskDetail:
       type: object
-      required: [task, evidence, transfers]
+      required: [task, evidence]
       properties:
         task: { $ref: "#/components/schemas/Task" }
         evidence:
           type: array
           items: { $ref: "#/components/schemas/Evidence" }
-        transfers:
-          type: array
-          items: { $ref: "#/components/schemas/Transfer" }
     Model:
       type: object
       description: One engine model, reduced to non-secret identifier fields.

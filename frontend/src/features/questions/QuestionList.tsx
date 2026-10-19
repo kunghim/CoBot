@@ -1,6 +1,7 @@
 import LoadMore from '../../components/LoadMore';
 // QuestionList surfaces the ask_user questions the user still owes an answer
-// to, and the finished requirements waiting for the user's acceptance. An
+// to, the route stages waiting for the user's confirmation, and the finished
+// requirements waiting for the user's acceptance. An
 // answer is ordinary input delivered to the asking bot; it is never a security
 // authorization, and the panel says so.
 import { useState } from 'react';
@@ -8,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { useAnswerQuestion, useCancelQuestion, useQuestions } from '../../api/queries';
 import type { Question } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
-import { Alert, Button, Count, Icons, Skeleton, TextInput } from '../../components/ui';
+import { Alert, Button, Checkbox, Count, Icons, Skeleton, TextInput } from '../../components/ui';
+import Markdown from '../conversations/Markdown';
 
 export default function QuestionList({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
   const { t } = useTranslation();
@@ -40,7 +42,7 @@ export default function QuestionList({ teamId, viewBotId }: { teamId: string; vi
       </p>
       <ul className="space-y-2 px-3 pb-3">
         {items.map((question) =>
-          question.kind === 'acceptance' ? (
+          question.kind === 'acceptance' || question.kind === 'confirm' ? (
             <AcceptanceCard key={question.id} question={question} />
           ) : (
             <QuestionCard key={question.id} question={question} />
@@ -116,19 +118,31 @@ function QuestionCard({ question }: { question: Question }) {
   );
 }
 
-// AcceptanceCard hands a finished requirement to the user: the leader's
-// delivery report, then accept, or ask for changes, which must say what.
+// AcceptanceCard puts a decision to the user: a confirm stage of a route (the
+// requirement document, a design) or the finished requirement with the
+// project manager's report. The user accepts, or asks for changes, which
+// must say what.
 function AcceptanceCard({ question }: { question: Question }) {
   const { t } = useTranslation();
   const answer = useAnswerQuestion();
   const [changes, setChanges] = useState('');
   const [errorText, setErrorText] = useState('');
+  // A confirmation's changes run the reviews again unless the user only
+  // wants to see the fix itself.
+  const [returnToMe, setReturnToMe] = useState(false);
+  const kind = question.kind === 'confirm' ? 'confirm' : 'acceptance';
 
   const decide = (decision: 'accept' | 'revise') => {
     if (decision === 'revise' && !changes.trim()) return;
     setErrorText('');
     answer.mutate(
-      { questionId: question.id, answerText: decision === 'revise' ? changes.trim() : '', decision, expectedRevision: question.revision },
+      {
+        questionId: question.id,
+        answerText: decision === 'revise' ? changes.trim() : '',
+        decision,
+        mode: decision === 'revise' && kind === 'confirm' && returnToMe ? 'return_to_me' : undefined,
+        expectedRevision: question.revision,
+      },
       { onSuccess: () => setChanges(''), onError: (error) => setErrorText(apiErrorMessage(t, error)) },
     );
   };
@@ -137,9 +151,11 @@ function AcceptanceCard({ question }: { question: Question }) {
     <li className={cardClass}>
       <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
         <Icons.success size={14} aria-hidden />
-        {t('questions.acceptance.title')}
+        {t(`questions.${kind}.title`)}
       </p>
-      <p className="mt-1.5 whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{question.question}</p>
+      <div className="mt-1.5 max-h-96 overflow-y-auto text-neutral-800 dark:text-neutral-200">
+        <Markdown text={question.question} teamId={question.teamId} />
+      </div>
       <form
         className="mt-2 flex gap-1.5"
         onSubmit={(event) => {
@@ -147,14 +163,19 @@ function AcceptanceCard({ question }: { question: Question }) {
           decide('revise');
         }}
       >
-        <TextInput size="sm" className="min-w-0 flex-1" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t('questions.acceptance.changesPlaceholder')} aria-label={t('questions.acceptance.changesPlaceholder')} />
+        <TextInput size="sm" className="min-w-0 flex-1" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t(`questions.${kind}.changesPlaceholder`)} aria-label={t(`questions.${kind}.changesPlaceholder`)} />
         <Button type="submit" size="sm" disabled={!changes.trim() || answer.isPending}>
-          {t('questions.acceptance.revise')}
+          {t(`questions.${kind}.revise`)}
         </Button>
       </form>
+      {kind === 'confirm' && (
+        <div className="mt-2">
+          <Checkbox checked={returnToMe} onChange={setReturnToMe} label={t('questions.confirm.returnToMe')} />
+        </div>
+      )}
       <div className="mt-2 flex justify-end">
         <Button size="sm" variant="primary" icon={Icons.done} onClick={() => decide('accept')} loading={answer.isPending}>
-          {t('questions.acceptance.accept')}
+          {t(`questions.${kind}.accept`)}
         </Button>
       </div>
       {errorText && <Alert tone="danger">{errorText}</Alert>}

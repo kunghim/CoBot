@@ -13,8 +13,8 @@ const NEUTRAL_USE: Record<string, string> = {
   '500': '辅助文字', '600': '次要正文', '700': '强调正文（深色模式描边）', '800': '深色模式卡片描边', '900': '主文字、主要按钮、深色卡片', '950': '页面底色（深）',
 };
 const ROLE_COLORS: Array<[string, string, string]> = [
-  ['队长', 'leader', '#7d8c85'], ['产品经理', 'product-manager', '#d8b1fb'], ['前端开发', 'frontend-dev', '#9cc8fb'],
-  ['后端开发', 'backend-dev', '#6fd6c8'], ['测试工程师', 'qa-engineer', '#fbb271'], ['评审员', 'code-reviewer', '#f2d16b'],
+  ['项目经理', 'leader', '#7d8c85'], ['产品经理', 'product-manager', '#d8b1fb'], ['全栈工程师', 'fullstack-engineer', '#9cc8fb'],
+  ['测试工程师', 'qa-engineer', '#fbb271'], ['评审员', 'code-reviewer', '#f2d16b'],
 ];
 
 export default function Foundations() {

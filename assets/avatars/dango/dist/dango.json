@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "dango",
-  "version": 1,
+  "version": 2,
   "name": {
     "zh-CN": "团子",
     "en": "Dango"
@@ -85,6 +85,11 @@
       "shape": "cloud",
       "eyes": "happy",
       "color": "#d8b1fb"
+    },
+    "fullstack-engineer": {
+      "shape": "circle",
+      "eyes": "dots",
+      "color": "#9cc8fb"
     },
     "frontend-dev": {
       "shape": "circle",

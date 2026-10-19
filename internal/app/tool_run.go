@@ -30,32 +30,35 @@ func (a *App) validateToolRunOn(ctx context.Context, q sqlite.Queryer, principal
 	}
 }
 
-func (a *App) ValidateNativeToolSource(ctx context.Context, principal auth.Principal, threadID, turnID string) error {
+// ValidateNativeToolSource checks that a call carrying the engine's thread
+// and turn comes from the member's live run, and reports whether a
+// sub-agent the member spawned made it.
+func (a *App) ValidateNativeToolSource(ctx context.Context, principal auth.Principal, threadID, turnID string) (bool, error) {
 	if err := a.ValidateToolRun(ctx, principal); err != nil {
-		return err
+		return false, err
 	}
 	run, err := sqlite.GetRun(ctx, a.DB, principal.RunID)
 	if err != nil || turnID == "" || threadID == "" {
-		return domain.Forbidden("error.tool.no_active_run", nil)
+		return false, domain.Forbidden("error.tool.no_active_run", nil)
 	}
 	session, err := sqlite.GetProviderSession(ctx, a.DB, principal.BotID)
 	if err != nil || session.EngineEpoch != run.EngineEpoch {
-		return domain.Forbidden("error.tool.no_active_run", nil)
+		return false, domain.Forbidden("error.tool.no_active_run", nil)
 	}
 	if threadID == session.ProviderThreadID {
 		if run.ProviderTurnID != turnID {
-			return domain.Forbidden("error.tool.no_active_run", nil)
+			return false, domain.Forbidden("error.tool.no_active_run", nil)
 		}
-		return nil
+		return false, nil
 	}
 	// A sub-agent the member spawned calls with its own thread and turn; it
 	// acts within the member's run, which must still be live.
 	if a.Scheduler == nil || a.Scheduler.RootThread(principal.TeamID, threadID) != session.ProviderThreadID {
-		return domain.Forbidden("error.tool.no_active_run", nil)
+		return false, domain.Forbidden("error.tool.no_active_run", nil)
 	}
 	switch run.Status {
 	case domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval:
-		return nil
+		return true, nil
 	}
-	return domain.Forbidden("error.tool.no_active_run", nil)
+	return false, domain.Forbidden("error.tool.no_active_run", nil)
 }

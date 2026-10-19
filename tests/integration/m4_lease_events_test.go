@@ -25,7 +25,7 @@ import (
 // instance, so external helpers can trust it.
 func TestSchedulerKeepsLeasesFresh(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	_ = team
 	h.ensureFake(t, team.ID)
@@ -44,7 +44,7 @@ func TestSchedulerKeepsLeasesFresh(t *testing.T) {
 // keep working so the model can still inspect state.
 func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 
 	leaseRoot := t.TempDir()
@@ -138,7 +138,7 @@ func mustText(t *testing.T, res *mcp.CallToolResult) string {
 func TestEventLedgerAppendImportAndGap(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	fake := h.ensureFake(t, team.ID)
 

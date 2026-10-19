@@ -86,8 +86,8 @@ export default function NavigationOverlays() {
               onSelect={setNode}
               defaultExpanded={['team-a']}
               nodes={[
-                { id: 'team-a', label: '待办应用', children: [{ id: 'lead', label: '队长' }, { id: 'fe', label: '前端开发' }, { id: 'qa', label: '测试工程师' }] },
-                { id: 'team-b', label: '官网改版', children: [{ id: 'lead-b', label: '队长' }] },
+                { id: 'team-a', label: '待办应用', children: [{ id: 'lead', label: '项目经理' }, { id: 'fe', label: '全栈工程师' }, { id: 'qa', label: '测试工程师' }] },
+                { id: 'team-b', label: '官网改版', children: [{ id: 'lead-b', label: '项目经理' }] },
               ]}
             />
           </div>

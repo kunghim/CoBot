@@ -124,7 +124,7 @@ func TestMemberAndRoleAvatarsAreStored(t *testing.T) {
 	request := func() string { return fmt.Sprintf("req-%d", time.Now().UnixNano()) }
 
 	resp, body := c.do("POST", "/api/v1/teams", map[string]any{
-		"requestId": request(), "name": "头像", "directory": t.TempDir(), "initialRoleIds": []string{"frontend-dev"},
+		"requestId": request(), "name": "头像", "directory": t.TempDir(), "initialRoleIds": []string{"fullstack-engineer"},
 	}, csrf)
 	if resp.StatusCode != 201 {
 		t.Fatalf("create team: %d %v", resp.StatusCode, body)
@@ -161,7 +161,7 @@ func TestMemberAndRoleAvatarsAreStored(t *testing.T) {
 		t.Fatal("cleared member still has an avatar")
 	}
 
-	resp, body = c.do("PUT", "/api/v1/roles/frontend-dev/avatar", map[string]any{"requestId": request(), "avatar": avatar}, csrf)
+	resp, body = c.do("PUT", "/api/v1/roles/fullstack-engineer/avatar", map[string]any{"requestId": request(), "avatar": avatar}, csrf)
 	if resp.StatusCode != 200 {
 		t.Fatalf("set role avatar: %d %v", resp.StatusCode, body)
 	}
@@ -171,17 +171,17 @@ func TestMemberAndRoleAvatarsAreStored(t *testing.T) {
 	roleAvatar := func() any {
 		_, body := c.do("GET", "/api/v1/roles", nil, nil)
 		for _, r := range body["data"].(map[string]any)["items"].([]any) {
-			if role := r.(map[string]any); role["id"] == "frontend-dev" {
+			if role := r.(map[string]any); role["id"] == "fullstack-engineer" {
 				return role["avatar"]
 			}
 		}
-		t.Fatal("frontend-dev missing from the role library")
+		t.Fatal("fullstack-engineer missing from the role library")
 		return nil
 	}
 	if got, ok := roleAvatar().(map[string]any); !ok || got["eyes"] != "grin" {
 		t.Fatalf("role avatar = %v", roleAvatar())
 	}
-	resp, body = c.do("PUT", "/api/v1/roles/frontend-dev/avatar", map[string]any{"requestId": request(), "avatar": nil}, csrf)
+	resp, body = c.do("PUT", "/api/v1/roles/fullstack-engineer/avatar", map[string]any{"requestId": request(), "avatar": nil}, csrf)
 	if resp.StatusCode != 200 {
 		t.Fatalf("clear role avatar: %d %v", resp.StatusCode, body)
 	}
@@ -246,7 +246,7 @@ func TestLocalPicturesBecomeAvatars(t *testing.T) {
 	anonymous.Body.Close()
 
 	resp, body = c.do("POST", "/api/v1/teams", map[string]any{
-		"requestId": request(), "name": "图片", "directory": t.TempDir(), "initialRoleIds": []string{"frontend-dev"},
+		"requestId": request(), "name": "图片", "directory": t.TempDir(), "initialRoleIds": []string{"fullstack-engineer"},
 	}, csrf)
 	if resp.StatusCode != 201 {
 		t.Fatalf("create team: %d %v", resp.StatusCode, body)

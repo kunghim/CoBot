@@ -23,7 +23,7 @@ import (
 func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	leader, owner, target := bots[0], bots[1], bots[2]
 	fake := h.ensureFake(t, team.ID)
 
@@ -34,12 +34,8 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 		t.Fatalf("leader delete = %v, want conflict leader_delete", err)
 	}
 
-	// An owned, unfinished task blocks the delete with named counts.
-	if _, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
-		TeamID: team.ID, OwnerID: owner.ID, Title: "在办任务", AcceptanceCriteria: "不能留下无主任务",
-	}); err != nil {
-		t.Fatalf("create task: %v", err)
-	}
+	// A card the member holds blocks the delete with named counts.
+	_, req := h.handCard(t, team, leader, owner, "在办卡片", "不能留下无主卡片")
 	_, err = h.app.DeleteBot(ctx, h.user, owner.ID, 0)
 	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
 		t.Fatalf("delete with open task = %v, want conflict open_work", err)
@@ -54,16 +50,12 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	})
 	_, err = h.app.DeleteBot(ctx, h.user, owner.ID, 0)
 	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
-		t.Fatalf("delete before hand-over = %v, want conflict open_work (task still owned)", err)
+		t.Fatalf("delete before the card ended = %v, want conflict open_work (card still held)", err)
 	}
 
-	// Hand the task over: the owner's work is finished, the member may go.
-	transfer, err := h.app.OfferTransfer(ctx, h.user, taskIDOf(t, h, owner.ID), target.ID, "交给测试")
-	if err != nil {
-		t.Fatalf("offer: %v", err)
-	}
-	if _, err := h.app.AcceptTransfer(ctx, h.user, transfer.ID); err != nil {
-		t.Fatalf("accept: %v", err)
+	// Cancelling the requirement ends the card: the member may go.
+	if _, err := h.app.CancelRequirement(ctx, h.user, req.ID); err != nil {
+		t.Fatalf("cancel: %v", err)
 	}
 	deleted, err := h.app.DeleteBot(ctx, h.user, owner.ID, 0)
 	if err != nil {
@@ -83,7 +75,6 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 		`SELECT COUNT(*) FROM messages WHERE bot_id = ?`,
 		`SELECT COUNT(*) FROM runs WHERE bot_id = ?`,
 		`SELECT COUNT(*) FROM provider_sessions WHERE bot_id = ?`,
-		`SELECT COUNT(*) FROM transfers WHERE from_bot_id = ? OR to_bot_id = ?`,
 	} {
 		args := []any{owner.ID}
 		if strings.Count(query, "?") == 2 {
@@ -96,10 +87,6 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 		if n != 0 {
 			t.Fatalf("%s left %d rows of the deleted member", query, n)
 		}
-	}
-	// The handed-over task stays with its new owner.
-	if id := taskIDOf(t, h, target.ID); id == "" {
-		t.Fatal("the handed-over task must stay")
 	}
 	// The role is a shared definition, not member data: it stays in the
 	// library and can staff this team again.
@@ -123,12 +110,6 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 
 	// A live (unknown) execution also blocks deletion: it is unfinished work
 	// that must be resolved, not deleted around.
-	waitUntil(t, 5*time.Second, "target assignment turn", func() bool { return len(fake.Turns()) >= 2 })
-	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "收到")
-	waitUntil(t, 5*time.Second, "target run ended", func() bool {
-		_, err := sqlite.FindActiveRun(ctx, h.app.DB, target.ID)
-		return errors.Is(err, sqlite.ErrNotFound)
-	})
 	fake.StartTurnErr = errors.New("engine refuses to start")
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: target.ID, Text: "触发未知执行"}); err != nil {
 		t.Fatalf("msg: %v", err)
@@ -144,16 +125,6 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	fake.StartTurnErr = nil
 }
 
-// taskIDOf finds the single task owned by a bot, for the hand-over above.
-func taskIDOf(t *testing.T, h *m2Harness, ownerID string) string {
-	t.Helper()
-	var id string
-	if err := h.app.DB.QueryRow(`SELECT id FROM tasks WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1`, ownerID).Scan(&id); err != nil {
-		t.Fatalf("find task: %v", err)
-	}
-	return id
-}
-
 // TestArchiveOnlyIdleTeam walks B09: archiving is the one gate. A pending
 // approval, an unfinished task, a running member and a queued message each
 // refuse it; once the team is idle the archive succeeds, records its time,
@@ -161,7 +132,7 @@ func taskIDOf(t *testing.T, h *m2Harness, ownerID string) string {
 func TestArchiveOnlyIdleTeam(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, owner := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 	refused := func(why string) {
@@ -192,13 +163,8 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 		return errors.Is(err, sqlite.ErrNotFound)
 	})
 
-	// An unfinished task blocks the archive until it is cancelled.
-	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
-		TeamID: team.ID, OwnerID: owner.ID, Title: "归档前任务", AcceptanceCriteria: "先收尾",
-	})
-	if err != nil {
-		t.Fatalf("create task: %v", err)
-	}
+	// An open card blocks the archive until its requirement is cancelled.
+	_, req := h.handCard(t, team, captain, owner, "归档前卡片", "先收尾")
 	waitUntil(t, 5*time.Second, "owner assignment turn", func() bool { return len(fake.Turns()) >= 2 })
 	fake.EmitTurnCompleted(fake.Turns()[1].ThreadID, fake.Turns()[1].TurnID, "completed", "收到")
 	waitUntil(t, 5*time.Second, "owner run ended", func() bool {
@@ -206,8 +172,8 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 		return errors.Is(err, sqlite.ErrNotFound)
 	})
 	refused("an unfinished task")
-	if _, err := h.app.UpdateTaskStatus(ctx, h.user, task.ID, domain.TaskCancelled, "", 0); err != nil {
-		t.Fatalf("cancel task: %v", err)
+	if _, err := h.app.CancelRequirement(ctx, h.user, req.ID); err != nil {
+		t.Fatalf("cancel requirement: %v", err)
 	}
 
 	// A running member blocks the archive.
@@ -272,7 +238,7 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 func TestDeleteRemovesTeamCompletely(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	userFile := filepath.Join(h.teamDir, "README.md")
 	if err := os.WriteFile(userFile, []byte("project"), 0o644); err != nil {
 		t.Fatal(err)
@@ -376,7 +342,7 @@ func TestClaimedFolderIsRefused(t *testing.T) {
 func TestTeamFollowsItsFolder(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	status := func() string {
 		t.Helper()
 		current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
@@ -430,7 +396,7 @@ func TestCreateTeamIsAtomic(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("a user file, not a folder"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	input := app.CreateTeamInput{Name: "原子创建", Directory: dir, InitialRoleIDs: []string{"backend-dev"}, RequestID: "atomic-create"}
+	input := app.CreateTeamInput{Name: "原子创建", Directory: dir, InitialRoleIDs: []string{"fullstack-engineer"}, RequestID: "atomic-create"}
 	_, _, err := h.app.CreateTeam(ctx, h.user, input)
 	var de *domain.Error
 	if !errors.As(err, &de) || de.MessageKey != "error.team.prepare_failed" {

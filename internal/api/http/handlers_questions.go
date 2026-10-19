@@ -17,9 +17,12 @@ func (s *Server) handleListQuestions(w http.ResponseWriter, r *http.Request) {
 type answerQuestionRequest struct {
 	RequestID  string `json:"requestId"`
 	AnswerText string `json:"answerText"`
-	// Decision answers an acceptance question: accept, or revise with the
+	// Decision answers a confirmation or acceptance: accept, or revise with the
 	// changes in answerText.
-	Decision         string `json:"decision,omitempty"`
+	Decision string `json:"decision,omitempty"`
+	// Mode is where a confirmation's changes go once made: rerun (through
+	// the stages in between again, the default) or return_to_me.
+	Mode             string `json:"mode,omitempty"`
 	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
 }
 
@@ -42,7 +45,7 @@ func (s *Server) handleAnswerQuestion(w http.ResponseWriter, r *http.Request) {
 	answer := s.App.AnswerQuestion
 	if req.Decision != "" {
 		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
-			return s.App.AnswerAcceptance(ctx, principal, id, req.Decision, text, expected)
+			return s.App.AnswerDecision(ctx, principal, id, req.Decision, req.Mode, text, expected)
 		}
 	}
 	question, err := answer(r.Context(), principal, r.PathValue("id"), req.AnswerText, expected)

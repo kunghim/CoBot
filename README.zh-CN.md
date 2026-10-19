@@ -4,8 +4,8 @@
 
 [English](README.md) · 简体中文
 
-> **状态：早期预览。** Windows 本机 Web 版已经可以试用；桌面壳和 macOS 版可以编译，
-> 原生运行与安装尚未实机验证。详见[当前状态](#当前状态)。
+> **状态：早期预览。** Windows 已提供 beta 下载；macOS ARM64 桌面包已通过使用真实 Codex 的本机原生冒烟测试。
+> 详见[当前状态](#当前状态)。
 
 CoBot 是一个本地运行的应用，让多个 AI Agent 像团队一样协作。名字里的 **Co 是“合作”**：
 CoBot 不想当一个更聪明的 Agent，而是 Agent 周围的团队组织。它管角色、任务、沟通和审批；
@@ -25,40 +25,40 @@ CoBot 不想当一个更聪明的 Agent，而是 Agent 周围的团队组织。�
 - Agent 之间互相唤醒、停不下来，额度烧光；
 - 出了崩溃，搞不清到底执行了什么。
 
-CoBot 用一个靠谱团队的方式解决这些问题：有队长拆任务，成员职责明确，有任务板，交付要写清楚并经过验收，
-关键决定由人拍板。
+CoBot 用一个靠谱团队的方式解决这些问题：项目经理写需求、排流程，成员按确认过的链路接力，每一环交接都写清楚、
+附上实际执行记录，评审和测试能把问题退回，关键决定由人拍板。
 
 ## 工作方式
 
 ```mermaid
 flowchart LR
-    U([你]) -->|目标| L[队长]
-    L -->|create_task / send_message| M1[成员]
-    L -->|create_task / send_message| M2[成员]
-    M1 & M2 -->|deliver_task / send_message / ask_user| C[(CoBot 核心<br/>任务 · 消息 · 审批)]
-    L -->|review_task / ask_user| C
-    C -->|投递唤醒该行动的成员| L & M1 & M2
-    C -->|审批卡片 · 提问| U
+    U([你]) -->|目标| L[项目经理]
+    L -->|start_requirement：需求文档 + 链路| C[(CoBot 核心<br/>需求 · 卡片 · 审批)]
+    C -->|按链路送出卡片| M1[成员] & M2[成员]
+    M1 & M2 -->|handoff：完成 / 退回 / 上报| C
+    C -->|上报 · 验收汇报卡| L
+    C -->|确认卡 · 验收卡 · 审批 · 提问| U
     M1 & M2 -. 在团队目录中执行 .-> E[[Codex]]
 ```
 
-1. **建团队**：选一个工作目录，生成队长和内置角色成员（产品经理、后端、前端、测试、代码审查），
+1. **建团队**：选一个工作目录，生成项目经理和内置角色成员（产品经理、全栈工程师、测试工程师、评审员），
    每个成员有自己的 Agent 会话。之后可以在团队设置里增删成员。
-2. **给队长一个目标**：队长先和你对齐方案，再拆成任务，写明负责人、依赖和验收标准。
-3. **成员用结构化工具（MCP）协作**，不靠解析聊天。每个动作都成为 CoBot 数据库里的事实，
-   再由事实唤醒下一个该行动的人。
-4. **你始终掌控**：原生命令/文件审批、Agent 的提问、达到上限的协作链，都会交给你处理。
+2. **给项目经理一个目标**：项目经理和你沟通清楚后，写成需求文档，并按需求规模从完整流程里挑出这次的链路
+   （需求评审、产品设计、测试用例、实现、测试、代码评审……），交给你确认。
+3. **成员按链路接力**：每一环是一张卡片，送到负责人手上；做完用 `handoff` 交接，CoBot 按链路交给下一环，
+   不靠模型决定交给谁。评审和测试可以退回给产出的那一环，超过上限或遇到阻塞就上报项目经理。
+4. **你始终掌控**：确认卡、最终验收卡、原生命令/文件审批、Agent 的提问都会交给你处理，你也可以随时取消一个需求。
 
 ## 功能
 
-- **按角色协作**：每个成员只看到自己角色需要的工具。队长有 `send_message`、`ask_user`、`create_task`、
-  `review_task`、`view_tasks`；成员有 `send_message`、`ask_user`、`deliver_task`、`view_tasks`，
-  评审员另有 `review_task`。每次调用的身份由宿主绑定，模型无法冒充其他成员。
-- **交付与验收**：成员交付任务时写清做了什么、怎么查看成果、实际做了哪些验证。队长标注需要评审的任务
-  （需求、设计、测试用例、代码等）交付后送评审员，附上对应的检查清单，由评审员的结论直接决定通过或打回；
-  打回次数超过上限（默认 3 次，可在设置中调整）后改由队长决定。其他任务由队长（或你）验收。通过后任务完成，
-  并放行依赖它的任务，打回时必须写明原因。一次方案的任务全部结束后，队长汇报交付结果，由你验收通过或要求修改。
-  任务状态由 CoBot 自己推进，模型不用操作状态机。
+- **按角色协作**：项目经理有 `start_requirement`、`handoff`、`view_tasks`、`send_message`、`ask_user`；
+  成员有 `handoff`、`view_tasks`、`send_message`、`ask_user`（只用于只有你能决定的问题）。
+  `send_message` 只留言、不唤醒对方，业务只走卡片。每次调用的身份由宿主绑定，模型无法冒充其他成员；
+  子智能体不能交接卡片、提交需求或向你提问。
+- **接力与验收**：每张卡片开头写着需求、链路和当前位置，附上需求文档和前面各环的交接；评审卡还附有对应的检查清单。
+  交接时 CoBot 自动附上这一轮实际执行的命令、退出码和改动的文件。评审和测试可以退回（“重走”或“只回我”），
+  退回次数超过上限（默认 3 次，可在设置中调整）后交给项目经理处理；只有可选改进时“带建议通过”，建议汇总到最终汇报。
+  链路最后一环是项目经理的验收汇报，汇报会变成给你的验收卡。卡片状态由 CoBot 自己推进，模型不用操作状态机。
 - **人在回路中**：Codex 原生审批显示完整命令或 diff，选项与 Codex 一致：允许、本会话内允许、拒绝、
   拒绝并停止（申请额外权限时为：本轮允许、本会话内允许、拒绝）。每个团队可选权限模式（只读、默认、完全访问）。
   Agent 可以向你提问，你回答后它会被唤醒。成员工作时你发的消息会并入它正在进行的这一轮；
@@ -86,13 +86,14 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | --- | --- |
 | Windows 10/11 x64 · 本机 Web | **可以试用**，已用真实 Codex 端到端验证 |
 | Windows 独立服务构建 | 可构建、可运行 |
-| Windows 桌面壳（Wails/WebView2） | 可编译；尚未实机验证 |
-| macOS（Web / 桌面） | 可交叉编译；`.app` 打包仅做过静态核对；原生运行、安装、签名与公证尚未验证 |
+| Windows 桌面壳（Wails/WebView2） | **已提供测试版下载**；已在 Windows 沙盒检查桌面启动与安装生命周期，验证限制见发布说明 |
+| macOS ARM64 桌面 | 本机应用已在 macOS 26.6.2、Codex 0.146.0 上通过冒烟测试：登录、消息、任务交接/交付/验收、文件工具、命令审批允许/拒绝及重启。DMG 挂载、Finder 复制到应用程序、弹出映像后启动及团队数据恢复也已通过。下载后首次打开与公证发行尚未验证 |
+| macOS Intel（x86_64）桌面 | 暂不纳入 beta 发布。已交叉构建主程序和助手；在 Apple Silicon 的 Rosetta 下通过界面启动、原生目录对话框、创建团队/重启及共享核心测试。Intel 真机及 Intel Codex 端到端使用尚未验证 |
 | Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
 
 在 Windows 上用真实 Codex 验证过的内容：登录、多成员并行、任务交接与提问、原生文件审批与拒绝、
 协作限轮、断线重连、正常退出、崩溃恢复和升级。
-最关键的一项是连续两轮 **用 CoBot 开发 CoBot**：每一轮都由队长规划、一名成员实现、另一名成员独立审查，
+最关键的一项是连续两轮 **用 CoBot 开发 CoBot**：每一轮都由项目经理规划、一名成员实现、另一名成员独立审查，
 再由人批准确切的候选提交；第二轮运行在已经包含第一轮改动的升级版本上。
 
 此后协作方式做了精简：按角色提供工具、一步交付与验收、去掉模型风险评估，也去掉了招募和合并审批卡。
@@ -102,16 +103,40 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 
 ## 快速开始
 
-当前预览版从源码构建，建议先试用 **Windows 本机 Web 版**。
-macOS 命令仅供源码试用，原生运行尚未验证，不代表已验证的发行版。
+### Windows 桌面版下载
+
+[**v0.1.0-beta.1 — 下载与发布说明**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+
+| 下载 | 使用方法 |
+| --- | --- |
+| [Windows x64 MSI 安装包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | 安装到当前用户，从开始菜单打开 **CoBot** |
+| [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
+
+两种下载包含相同的程序文件。需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
+以及已在 `PATH` 上安装的官方 **Codex CLI 0.161.0 或更新版本**，具备可用账号和访问 Codex 服务的网络。
+安装包不包含 Codex。本测试版支持官方 Codex 账号登录，不承诺支持第三方中转配置。
+使用上述下载包无需安装 Go 或 Node。
+
+程序包尚未签名，发布页面附有可选的 `.sha256` 校验文件。
+GitHub 自动提供的 **Source code** 是源码，不是可直接运行的程序。
+打开 CoBot 后，在 **设置 → Codex 引擎** 登录，再选择模型、创建团队。
+CoBot 使用自己的私有 Codex 环境，需要独立登录。
+
+暂不支持自动更新：更新时先关闭 CoBot，再安装新版 MSI，或将完整新版 ZIP 解压到新文件夹。
+两种版本的配置与团队数据均保存在 `%USERPROFILE%\.cobot`，与程序目录分开。
+卸载 MSI 或删除 ZIP 解压目录会保留这些数据。
+
+### 从源码构建
+
+以下命令构建**本机 Web 版**。已发布的 beta 目前仅提供 Windows 下载；macOS 桌面包可按下文在本机构建。
 
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
 让 Agent 工作还需在 `PATH` 上安装 [Codex CLI](https://github.com/openai/codex)
-（最低及已验证版本为 0.161.0），具备可使用 Codex 的账号和访问其服务的网络。
+（Windows/Linux 最低 0.161.0，macOS 最低 0.146.0），具备可使用 Codex 的账号和访问其服务的网络。
 Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
 
-### Windows（PowerShell）
+#### Windows（PowerShell）
 
 ```powershell
 git clone https://github.com/kunghim/CoBot.git
@@ -121,7 +146,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-### macOS（Bash；原生运行未验证）
+#### macOS（Bash）
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
@@ -130,6 +155,23 @@ npm ci --prefix frontend
 ./scripts/build.sh --target server
 ./.tmp/dist/cobot serve
 ```
+
+构建 macOS 桌面包还需 Wails CLI v2.15.0 和 Apple 命令行构建工具，然后运行
+`./scripts/build.sh --target desktop --version 0.1.0-beta.2-dev --arch arm64`。
+产物为 `.tmp/dist/CoBot-0.1.0-beta.2-dev-macos-arm64.dmg`，另附 ZIP 和 SHA-256 校验文件。
+打开 DMG，将 `CoBot.app` 复制到其中的 Applications 入口，再弹出映像，从「应用程序」打开 CoBot。
+计划以 DMG 提供 macOS beta 下载，目前尚未发布。
+可用 `--arch arm64` 指定 Apple Silicon，或用 `--arch amd64` 构建实验性的 Intel 包；
+文件名包含目标架构，主程序与助手保持一致。
+Apple Silicon 可通过已安装的 Rosetta 做 Intel 包冒烟测试，但不能代替 Intel 真机验收。
+使用 ZIP 时，解压后保持整个 `CoBot.app` 完整。桌面包默认使用 production profile；隔离试用时，
+为包内可执行文件传入 `--data-root <空目录>`，该临时目录仍按 production 规则运行。
+包使用本地 ad-hoc 签名，没有 Developer ID 签名或公证；本机 DMG 安装和重启已通过，
+但 Gatekeeper 评估会拒绝该包，浏览器下载后的首次打开及手动允许流程尚未验收。
+
+macOS 的 Codex 0.146.0 冒烟测试使用隔离数据目录和真实模型，不代表已完成 Windows 全部验收项。
+图形启动的 `PATH` 精简时，还会检查常见 standalone、Cargo 和 Homebrew 安装目录。
+未显式提供代理环境变量时，Codex 会继承 macOS 的静态系统代理；不会修改系统设置，也不会执行自动代理（PAC）脚本。
 
 请在浏览器和团队文件所在的同一台电脑运行这些命令。这启动的是本机 Web 应用，
 不是桌面壳或远程服务器。Windows 产物为 `.tmp/dist/cobot.exe`，macOS 为 `.tmp/dist/cobot`，
@@ -147,7 +189,7 @@ npm ci --prefix frontend
    然后选择默认模型。CoBot 启动时会自动找到 Codex 并授权它的安全钩子；设置页会展示这两项状态，
    授权失败时可以点按钮重新授权。
 2. **新建团队**：选择工作目录和需要的成员。
-3. **给队长发消息**，先给一个小而可检查的目标，例如：“查看这个项目并提出三项改进建议，
+3. **给项目经理发消息**，先给一个小而可检查的目标，例如：“查看这个项目并提出三项改进建议，
    暂时不要修改文件。”模型回复取决于对话和角色指令，不由界面语言自动翻译。
 
 关闭浏览器不会停止服务。退出时，在启动服务的终端按 **Ctrl+C**，等待正常关闭完成。

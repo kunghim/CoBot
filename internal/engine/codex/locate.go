@@ -15,10 +15,6 @@ import (
 	"github.com/kunghim/CoBot/internal/platform"
 )
 
-// MinSupportedVersion is the lowest app-server protocol version CoBot has
-// verified. Older builds are reported, never silently substituted.
-const MinSupportedVersion = "0.161.0"
-
 // ErrNotFound reports that no codex binary could be located.
 var ErrNotFound = errors.New("codex binary not found")
 
@@ -40,15 +36,22 @@ func Locate(configuredPath string) (string, error) {
 	}
 	found, err := exec.LookPath("codex")
 	if err != nil {
-		return "", fmt.Errorf("%w (not on PATH and no configured path)", ErrNotFound)
+		found, err = locatePlatformBinary()
+		if err != nil {
+			return "", fmt.Errorf("%w (not on PATH or in a supported installation directory)", ErrNotFound)
+		}
 	}
-	return found, nil
+	return resolveLauncher(found), nil
 }
 
 // VersionSupported reports whether a `codex --version` result is at least
 // MinSupportedVersion. Pre-release suffixes count as their release, and an
 // unparsable version is unsupported.
 func VersionSupported(version string) bool {
+	return versionSupported(version, MinSupportedVersion)
+}
+
+func versionSupported(version, minimum string) bool {
 	parse := func(v string) ([3]int, bool) {
 		var out [3]int
 		core, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(v), "v"), "-")
@@ -66,8 +69,8 @@ func VersionSupported(version string) bool {
 		return out, true
 	}
 	have, ok := parse(version)
-	want, _ := parse(MinSupportedVersion)
-	if !ok {
+	want, validMinimum := parse(minimum)
+	if !ok || !validMinimum {
 		return false
 	}
 	for i := range have {
@@ -84,6 +87,7 @@ func ProbeVersion(ctx context.Context, binary string) (string, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
+	hideChildWindow(cmd)
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("codex --version: %w", err)
 	}
@@ -113,7 +117,7 @@ func EngineEnv(paths platform.Paths) []string {
 		"CODEX_HOME":        paths.CodexHome(),
 		"CODEX_SQLITE_HOME": paths.CodexSQLiteDir(),
 	}
-	base := os.Environ()
+	base := platformEngineEnv(os.Environ())
 	out := make([]string, 0, len(base)+len(overrides))
 	for _, kv := range base {
 		key, _, ok := strings.Cut(kv, "=")

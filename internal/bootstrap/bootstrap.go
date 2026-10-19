@@ -258,6 +258,16 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
 		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
 	})
+	// A developer can shorten the idle engine shutdown to watch it happen
+	// (for example COBOT_IDLE_ENGINE_TIMEOUT=30s); it is not a user setting.
+	if raw := os.Getenv("COBOT_IDLE_ENGINE_TIMEOUT"); raw != "" {
+		if timeout, err := time.ParseDuration(raw); err == nil {
+			scheduler.IdleEngineTimeout = timeout
+			logger.Info("idle engine timeout overridden", "timeout", timeout.String())
+		} else {
+			logger.Warn("ignoring COBOT_IDLE_ENGINE_TIMEOUT", "value", raw, "error", err)
+		}
+	}
 	application.Scheduler = scheduler
 	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
 		return newServer(startCtx, cwd, engine.Callbacks{

@@ -185,10 +185,10 @@ export default function Actions() {
         <Demo surface="raised">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-3">
-              <Checkbox checked={checked} onChange={setChecked} label="前端开发" description="实现界面与交互。" />
+              <Checkbox checked={checked} onChange={setChecked} label="全栈工程师" description="实现界面与交互。" />
               <Checkbox checked={false} onChange={() => undefined} label="产品经理" />
               <Checkbox checked={false} indeterminate onChange={() => undefined} label="全部成员（部分选中）" />
-              <Checkbox checked onChange={() => undefined} disabled label="队长（必选）" />
+              <Checkbox checked onChange={() => undefined} disabled label="项目经理（必选）" />
             </div>
             <div className="space-y-4">
               <Switch checked={switchOn} onChange={setSwitchOn} label="启动时检查头像库更新" description="关闭后只在点“检查更新”时下载。" />
@@ -236,9 +236,9 @@ export default function Actions() {
             locked={['leader']}
             lockedLabel="必选"
             options={[
-              { value: 'leader', label: '队长', description: '理解目标、拆分任务、协调成员。' },
-              { value: 'frontend', label: '前端开发', description: '实现界面与交互。' },
-              { value: 'backend', label: '后端开发', description: '实现服务端逻辑与接口。' },
+              { value: 'leader', label: '项目经理', description: '理解目标、拆分任务、协调成员。' },
+              { value: 'frontend', label: '全栈工程师', description: '实现界面与交互。' },
+              { value: 'pm', label: '产品经理', description: '整理需求，写清范围和验收标准。' },
               { value: 'qa', label: '测试工程师', description: '编写和执行测试。' },
             ]}
           />

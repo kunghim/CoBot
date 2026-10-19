@@ -26,87 +26,12 @@ func finishTurn(t *testing.T, h *m2Harness, fake *fakeengine.Server, turn fakeen
 	})
 }
 
-// The model only says what it means: a member is handed a task (which CoBot
-// marks as started), delivers once, the leader sends it back with a reason,
-// the member delivers again, the leader accepts, and the waiting task is
-// released to its owner.
-func TestDeliverAndReviewMoveTheTaskForTheModel(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev", "qa-engineer"})
-	leader, dev, qa := bots[0], bots[1], bots[2]
-	fake := h.ensureFake(t, team.ID)
-
-	build, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: dev.ID, Title: "做页面", AcceptanceCriteria: "能打开"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	check, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: qa.ID, Title: "测页面", AcceptanceCriteria: "测过", DependencyIDs: []string{build.ID}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, 5*time.Second, "developer handed the task", func() bool { return len(fake.Turns()) == 1 })
-	waitUntil(t, 5*time.Second, "task started", func() bool {
-		task, _ := sqlite.GetTask(ctx, h.app.DB, build.ID)
-		return task.Status == domain.TaskDoing
-	})
-	devTurn := fake.Turns()[0]
-
-	// Someone else's task cannot be delivered.
-	if _, err := h.app.DeliverTask(ctx, auth.NewPrincipalBot(qa.ID, team.ID), build.ID, "我测过了", nil); err == nil {
-		t.Fatal("a member delivered another member's task")
-	}
-	asDev := auth.NewPrincipalBot(dev.ID, team.ID)
-	delivered, err := h.app.DeliverTask(ctx, asDev, build.ID, "index.html 双击打开；node check.js 通过", []string{"index.html"})
-	if err != nil || delivered.Status != domain.TaskReview {
-		t.Fatalf("deliver = %+v %v", delivered, err)
-	}
-	finishTurn(t, h, fake, devTurn, dev.ID)
-	waitUntil(t, 5*time.Second, "leader woken", func() bool { return len(fake.Turns()) == 2 })
-	notice := fake.Turns()[1]
-	if !strings.Contains(notice.Text, "node check.js 通过") || !strings.Contains(notice.Text, "review_task") {
-		t.Fatalf("leader notice:\n%s", notice.Text)
-	}
-
-	// Only the leader reviews.
-	if _, err := h.app.ReviewTask(ctx, auth.NewPrincipalBot(qa.ID, team.ID), build.ID, true, ""); err == nil {
-		t.Fatal("a member reviewed a task")
-	}
-	asLeader := auth.NewPrincipalBot(leader.ID, team.ID)
-	if _, err := h.app.ReviewTask(ctx, asLeader, build.ID, false, ""); err == nil {
-		t.Fatal("rejected without a reason")
-	}
-	back, err := h.app.ReviewTask(ctx, asLeader, build.ID, false, "删除按钮不起作用")
-	if err != nil || back.Status != domain.TaskDoing {
-		t.Fatalf("reject = %+v %v", back, err)
-	}
-	finishTurn(t, h, fake, notice, leader.ID)
-	waitUntil(t, 5*time.Second, "developer gets the reason", func() bool { return len(fake.Turns()) == 3 })
-	if again := fake.Turns()[2]; !strings.Contains(again.Text, "删除按钮不起作用") {
-		t.Fatalf("rejection text:\n%s", again.Text)
-	}
-	if _, err := h.app.DeliverTask(ctx, asDev, build.ID, "修好了删除", nil); err != nil {
-		t.Fatal(err)
-	}
-	finishTurn(t, h, fake, fake.Turns()[2], dev.ID)
-	waitUntil(t, 5*time.Second, "leader woken again", func() bool { return len(fake.Turns()) == 4 })
-	done, err := h.app.ReviewTask(ctx, asLeader, build.ID, true, "")
-	if err != nil || done.Status != domain.TaskDone {
-		t.Fatalf("accept = %+v %v", done, err)
-	}
-	finishTurn(t, h, fake, fake.Turns()[3], leader.ID)
-	waitUntil(t, 5*time.Second, "tester handed its task", func() bool { return len(fake.Turns()) == 5 })
-	if qaTurn := fake.Turns()[4]; !strings.Contains(qaTurn.Text, check.ID) {
-		t.Fatalf("tester turn:\n%s", qaTurn.Text)
-	}
-}
-
 // A thread is told the role, the team and the tools once; a turn carries
 // only what changed since.
 func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	dev := bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -122,10 +47,10 @@ func TestTurnsCarryOnlyWhatChanged(t *testing.T) {
 	}
 	first := turn("第一件事", 1)
 	instructions := fake.Instructions()
-	if len(instructions) != 1 || !strings.Contains(instructions[0], "deliver_task") || !strings.Contains(instructions[0], dev.ID) || !strings.Contains(instructions[0], "协作约定") {
+	if len(instructions) != 1 || !strings.Contains(instructions[0], "handoff") || !strings.Contains(instructions[0], dev.ID) || !strings.Contains(instructions[0], "你在一个 CoBot 团队中工作") {
 		t.Fatalf("thread instructions:\n%v", instructions)
 	}
-	if strings.Contains(first.Text, "协作约定") || strings.Contains(first.Text, "# 你的角色") || strings.Contains(first.Text, "成员：") {
+	if strings.Contains(first.Text, "处理卡片") || strings.Contains(first.Text, "# 你的角色") || strings.Contains(first.Text, "成员：") {
 		t.Fatalf("first turn repeats the instructions:\n%s", first.Text)
 	}
 	if second := turn("第二件事", 2); second.Text != "第二件事" {
@@ -324,29 +249,24 @@ func TestTurnUsageSumsEveryModelCall(t *testing.T) {
 	}
 }
 
-// Notes left without waking a member are read in its next turn; a message
-// to a member whose task still waits says so to the sender.
-func TestNotesAndWaitingTasksReachTheRightSide(t *testing.T) {
+// Notes left without waking a member are read in its next turn, with the
+// cards it holds.
+func TestNotesReachTheNextTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"frontend-dev", "qa-engineer"})
-	dev, qa := bots[1], bots[2]
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
+	pm, dev, qa := bots[0], bots[1], bots[2]
 	fake := h.ensureFake(t, team.ID)
 
-	build, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: dev.ID, Title: "做页面", AcceptanceCriteria: "能打开"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: qa.ID, Title: "测页面", AcceptanceCriteria: "测过", DependencyIDs: []string{build.ID}}); err != nil {
-		t.Fatal(err)
-	}
+	h.handCard(t, team, pm, dev, "做页面", "能打开")
 	waitUntil(t, 5*time.Second, "developer turn", func() bool { return len(fake.Turns()) == 1 })
 	asDev := auth.NewPrincipalBot(dev.ID, team.ID)
-	if waiting := h.app.WaitingTasksOf(ctx, team.ID, qa.ID); len(waiting) != 1 || !strings.Contains(waiting[0], "做页面") {
-		t.Fatalf("waiting tasks of tester = %v", waiting)
-	}
 	if _, err := h.app.NotifyFromBot(ctx, asDev, qa.ID, "页面结构是单文件", "", "note-1"); err != nil {
 		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if len(fake.Turns()) != 1 {
+		t.Fatal("a note woke its recipient")
 	}
 	finishTurn(t, h, fake, fake.Turns()[0], dev.ID)
 
@@ -354,10 +274,15 @@ func TestNotesAndWaitingTasksReachTheRightSide(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitUntil(t, 5*time.Second, "tester turn", func() bool { return len(fake.Turns()) == 2 })
-	text := fake.Turns()[1].Text
-	for _, want := range []string{"页面结构是单文件", "测页面", "现在不要开工"} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("tester turn lacks %q:\n%s", want, text)
-		}
+	if text := fake.Turns()[1].Text; !strings.Contains(text, "页面结构是单文件") || !strings.Contains(text, "不需要回复") {
+		t.Fatalf("tester turn lacks the note:\n%s", text)
+	}
+	// The developer's next turn lists the card it still holds.
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: dev.ID, Text: "进度？"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "developer turn", func() bool { return len(fake.Turns()) == 3 })
+	if text := fake.Turns()[2].Text; !strings.Contains(text, "# 你手上的卡片") || !strings.Contains(text, "做页面") {
+		t.Fatalf("developer turn lacks its cards:\n%s", text)
 	}
 }
