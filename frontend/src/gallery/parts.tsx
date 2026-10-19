@@ -57,7 +57,7 @@ export function Matrix({ items }: { items: Array<{ label: ReactNode; node: React
       {items.map((item, index) => (
         <div key={index} className="flex flex-col items-start gap-2">
           {item.node}
-          <span className="text-[11px] text-neutral-500 dark:text-neutral-400">{item.label}</span>
+          <span className="text-2xs text-neutral-500 dark:text-neutral-400">{item.label}</span>
         </div>
       ))}
     </div>

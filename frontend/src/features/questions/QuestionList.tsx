@@ -73,7 +73,7 @@ function QuestionCard({ question }: { question: Question }) {
   return (
     <li className={cardClass}>
       <p className="whitespace-pre-wrap font-medium leading-6 text-neutral-900 dark:text-neutral-50">{question.question}</p>
-      <p className="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{t('questions.answerIsInput')}</p>
+      <p className="mt-1 text-2xs leading-4 text-neutral-500 dark:text-neutral-400">{t('questions.answerIsInput')}</p>
       {(question.options ?? []).length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(question.options ?? []).map((option) => (

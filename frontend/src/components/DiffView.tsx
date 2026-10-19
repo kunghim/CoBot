@@ -1,7 +1,7 @@
 // DiffView shows a unified diff with added, removed and hunk lines tinted.
 export default function DiffView({ diff, className = 'max-h-80' }: { diff: string; className?: string }) {
   return (
-    <pre className={`${className} overflow-auto rounded-lg bg-neutral-900/[0.03] p-2 font-mono text-[11px] leading-4 dark:bg-black/30`}>
+    <pre className={`${className} overflow-auto rounded-lg bg-neutral-900/[0.03] p-2 font-mono text-2xs leading-4 dark:bg-black/30`}>
       {diff.split('\n').map((line, index) => {
         const tone =
           line.startsWith('+') && !line.startsWith('+++')

@@ -9,7 +9,7 @@ import { cx, interactive } from './foundation';
 
 /** A member's name as a badge in its role's color. */
 export function RoleChip({ name, roleId, isLeader = false }: { name: ReactNode; roleId?: string; isLeader?: boolean }) {
-  return <span className={cx('inline-flex max-w-[12rem] shrink-0 items-center truncate rounded-md px-1.5 py-px text-[11px] font-medium leading-4', roleChip(roleId, isLeader))}>{name}</span>;
+  return <span className={cx('inline-flex max-w-[12rem] shrink-0 items-center truncate rounded-md px-1.5 py-px text-2xs font-medium leading-4', roleChip(roleId, isLeader))}>{name}</span>;
 }
 
 /**
@@ -30,11 +30,14 @@ export function MemberRow({ avatar, name, status, statusLabel, preview, time, cu
       aria-labelledby={`${id}-state ${id}-name`}
       aria-describedby={describedBy}
       className={cx(
-        'flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors',
+        'relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors',
         preview ? 'py-2' : 'py-1.5',
-        current ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-50 dark:ring-neutral-700' : cx('text-neutral-600 dark:text-neutral-300', interactive.hover),
+        // The same current state as every navigation row: an ink layer and
+        // the signal bar on the left.
+        current ? interactive.selected : cx('text-neutral-600 dark:text-neutral-300', interactive.hover),
       )}
     >
+      {current && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-signal-500" />}
       <span id={`${id}-state`} className="relative shrink-0" role="img" aria-label={statusLabel} title={statusLabel}>
         {avatar}
         {attention && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-neutral-100 dark:ring-neutral-900" />}
@@ -42,7 +45,7 @@ export function MemberRow({ avatar, name, status, statusLabel, preview, time, cu
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
           <span id={`${id}-name`} className={cx('min-w-0 flex-1 truncate', current ? 'font-semibold' : 'font-medium text-neutral-800 dark:text-neutral-100')}>{name}</span>
-          {meta && <span id={`${id}-meta`} className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{meta}</span>}
+          {meta && <span id={`${id}-meta`} className="shrink-0 text-2xs text-neutral-500 dark:text-neutral-400">{meta}</span>}
         </span>
         {preview && <span id={`${id}-preview`} className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">{preview}</span>}
       </span>
@@ -83,7 +86,7 @@ export function MessageBubble({ from, avatar, author, children, meta }: { from: 
         >
           {children}
         </div>
-        {meta && <div className={cx('flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400', user ? 'justify-end' : 'justify-start')}>{meta}</div>}
+        {meta && <div className={cx('flex items-center gap-2 text-2xs text-neutral-500 dark:text-neutral-400', user ? 'justify-end' : 'justify-start')}>{meta}</div>}
       </div>
     </div>
   );
@@ -175,7 +178,7 @@ export function ProcessStep({ kind, status, title, detail, duration, badge }: { 
 export function WaitingCard({ icon, title, position, onPrevious, onNext, previousLabel, nextLabel, onClose, closeLabel, children, actions }: { icon: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; children: ReactNode; actions: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(23_30_27/0.06),0_12px_32px_-16px_rgb(23_30_27/0.25)] dark:border-neutral-700 dark:bg-neutral-800 dark:shadow-none">
+    <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-floating dark:border-neutral-700 dark:bg-neutral-800 dark:shadow-none">
       <header className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span className="flex shrink-0 items-center" aria-hidden>{icon}</span>
         <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate">{title}</h3>
@@ -247,7 +250,7 @@ export function Composer({ value, onChange, onSend, placeholder, running = false
     element.style.height = `${element.scrollHeight}px`;
   }, [value]);
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgb(23_30_27/0.06),0_8px_24px_-12px_rgb(23_30_27/0.18)] transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
+    <div className="rounded-2xl border border-neutral-200 bg-white shadow-raised transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
       <textarea
         ref={area}
         rows={1}

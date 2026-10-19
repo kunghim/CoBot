@@ -81,7 +81,7 @@ export function NavSection({ title, children, action }: { title: ReactNode; chil
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between px-2.5 pb-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{title}</span>
+        <span className="text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{title}</span>
         {action}
       </div>
       {children}
@@ -134,7 +134,7 @@ export function Tabs<T extends string>({ label, tabs, value, onChange, variant =
             )}
           >
             {tab.label}
-            {tab.count !== undefined && <span className="rounded-full bg-neutral-900/[0.07] px-1.5 text-[11px] tabular-nums dark:bg-white/[0.1]">{tab.count}</span>}
+            {tab.count !== undefined && <span className="rounded-full bg-neutral-900/[0.07] px-1.5 text-2xs tabular-nums dark:bg-white/[0.1]">{tab.count}</span>}
           </button>
         );
       })}

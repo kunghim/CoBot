@@ -586,7 +586,7 @@
       "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
       "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
       "classic": { "name": "Classic", "summary": "Rice paper and ink: soft black, white and gray" },
-      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a coral accent" }
+      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a plum-blossom accent" }
     },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",

@@ -77,7 +77,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
               <div key={id} className="mb-4">
                 <a href={`#${id}`} aria-current={current === id ? 'location' : undefined} className={cx('block rounded-md px-2 py-1 font-semibold hover:bg-neutral-900/[0.06] dark:hover:bg-white/[0.07]', current === id && 'text-signal-600 dark:text-signal-400')}>{title}</a>
                 {children.map(([childId, label]) => (
-                  <a key={childId} href={`#${childId}`} aria-current={current === childId ? 'location' : undefined} className={cx('block rounded-md border-l-2 px-2 py-0.5 text-[13px] hover:bg-neutral-900/[0.06] hover:text-neutral-900 dark:hover:bg-white/[0.07] dark:hover:text-neutral-100', current === childId ? 'border-signal-500 font-medium text-neutral-900 dark:text-neutral-50' : 'border-transparent text-neutral-500 dark:text-neutral-400')}>{label}</a>
+                  <a key={childId} href={`#${childId}`} aria-current={current === childId ? 'location' : undefined} className={cx('block rounded-md border-l-2 px-2 py-0.5 text-sm hover:bg-neutral-900/[0.06] hover:text-neutral-900 dark:hover:bg-white/[0.07] dark:hover:text-neutral-100', current === childId ? 'border-signal-500 font-medium text-neutral-900 dark:text-neutral-50' : 'border-transparent text-neutral-500 dark:text-neutral-400')}>{label}</a>
                 ))}
               </div>
             ))}

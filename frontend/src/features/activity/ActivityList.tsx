@@ -76,7 +76,7 @@ function ActivityRow({
     <>
       <span className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 text-neutral-800 dark:text-neutral-200">{line.text}</span>
-        <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{time}</span>
+        <span className="shrink-0 text-2xs text-neutral-500 dark:text-neutral-400">{time}</span>
       </span>
       {line.quote && <span className="mt-0.5 line-clamp-2 break-all text-neutral-500 dark:text-neutral-400">{line.quote}</span>}
     </>

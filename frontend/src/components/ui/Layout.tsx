@@ -11,7 +11,7 @@ export function PageHeader({ title, description, actions, eyebrow }: { title: Re
   return (
     <header className="flex flex-wrap items-end gap-4">
       <div className="min-w-0 flex-1">
-        {eyebrow && <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{eyebrow}</p>}
+        {eyebrow && <p className="mb-1 text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{eyebrow}</p>}
         <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{title}</h1>
         {description && <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{description}</p>}
       </div>

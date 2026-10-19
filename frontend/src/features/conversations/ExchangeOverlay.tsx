@@ -124,7 +124,7 @@ export default function ExchangeOverlay({
             return (
               <li key={message.id} ref={anchor ? anchorRef : undefined} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] space-y-1 ${mine ? 'items-end text-right' : ''}`}>
-                  <div className={`flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 ${mine ? 'justify-end' : ''}`}>
+                  <div className={`flex items-center gap-1.5 text-2xs text-neutral-500 dark:text-neutral-400 ${mine ? 'justify-end' : ''}`}>
                     <Person entry={person(message.sourceBotId ?? '', nameOf(message.sourceBotId ?? ''))} />
                     <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>
                   </div>

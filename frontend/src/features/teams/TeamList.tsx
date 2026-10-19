@@ -58,7 +58,7 @@ export default function TeamList({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex min-h-14 items-center justify-between px-3 py-2">
-        <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
+        <span className="px-1 text-2xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
           {t('nav.teamList')}
         </span>
         {onClose && <PanelToggle side="left" open onToggle={onClose} openLabel={t('nav.openTeamList')} closeLabel={t('nav.closeTeamList')} />}
@@ -147,7 +147,7 @@ function TeamRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center text-neutral-400" aria-hidden="true">
             <Chevron size={14} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-neutral-800 dark:text-neutral-100">{team.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">{team.name}</span>
           {badgeKey && (
             <span title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}>
               <Badge tone="warning">{t(badgeKey)}</Badge>

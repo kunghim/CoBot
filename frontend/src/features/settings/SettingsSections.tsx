@@ -118,7 +118,7 @@ const THEMES: Array<{ id: Theme; rail: string; paper: string; card: string; line
   { id: 'classic', rail: '#22211e', paper: '#f4f3ef', card: '#fbfaf7', line: '#e1dfd9', signal: '#34322e' },
   { id: 'graphite', rail: '#171e1b', paper: '#f4f6f3', card: '#ffffff', line: '#dbe0da', signal: '#5568f0' },
   { id: 'harbor', rail: '#141c24', paper: '#f2f5f8', card: '#ffffff', line: '#d5dee6', signal: '#1c9f92' },
-  { id: 'dusk', rail: '#1f171c', paper: '#f7f4f5', card: '#ffffff', line: '#e1d7dc', signal: '#e5654b' },
+  { id: 'dusk', rail: '#1f171c', paper: '#f7f4f5', card: '#ffffff', line: '#e1d7dc', signal: '#b04f86' },
 ];
 
 function ThemeSwatch({ theme }: { theme: (typeof THEMES)[number] }) {

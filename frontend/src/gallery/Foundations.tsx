@@ -23,13 +23,14 @@ export default function Foundations() {
       <Doc id="principles" name="设计原则" file="frontend/src/styles/index.css" use="判断一个界面“对不对”时的依据。">
         <Rules
           items={[
-            '安静的桌面，颜色留给成员：界面主体是带一点绿意的石墨灰，强调色只出现在焦点、选中和主要操作上；最鲜明的颜色是成员的角色色。',
+            '安静的桌面，颜色留给成员：界面主体是主题的中性灰（默认经典：宣纸与墨），强调色只出现在焦点、选中这类提示上；最鲜明的颜色是成员的角色色。',
+            '“当前项”只有一种样子：淡墨色底，左侧一道强调色竖条（导航项、成员行都是）。分段选择里的“当前值”是浮起的小块，那是分段控件自己的写法。',
             '一个视图只有一个主要操作（实心深色按钮）；其他操作用次要或文字按钮。',
             '状态要看得见：每个可点的东西都有静止、悬停、按下、选中、键盘焦点、禁用几种可分辨的样子。',
             '悬停和按下用“半透明墨色叠层”，不用固定灰色——固定灰色放在同色底上就看不见了。',
             '机器的值（路径、ID、数字、命令）用等宽字体；人说的话用正文字体。',
             '同一件事在所有地方长得一样、叫法一样、在同一个位置。',
-            '主题只换中性色和强调色；成员角色色、状态色在所有主题和明暗模式下不变。',
+            '主题只换中性色和强调色（阴影也取主题自己的深色）；成员角色色、状态色在所有主题和明暗模式下不变。主题的强调色要和状态色（尤其错误红、警告琥珀）明显分开。',
           ]}
         />
       </Doc>
@@ -40,7 +41,7 @@ export default function Foundations() {
             {NEUTRALS.map(([step, bg]) => (
               <div key={step} className="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
                 <div className={cx('h-12', bg)} />
-                <div className="px-2 py-1.5 text-[11px] leading-4">
+                <div className="px-2 py-1.5 text-2xs leading-4">
                   <b className="font-mono">neutral-{step}</b>
                   <span className="block text-neutral-500 dark:text-neutral-400">{NEUTRAL_USE[step]}</span>
                 </div>
@@ -80,7 +81,7 @@ export default function Foundations() {
                 <span className="h-6 w-6 rounded-md" style={{ background: hex }} />
                 <span>
                   {name}
-                  <code className="block font-mono text-[10px] text-neutral-500">{hex}</code>
+                  <code className="block font-mono text-2xs text-neutral-500">{hex}</code>
                 </span>
               </span>
             ))}
@@ -88,7 +89,7 @@ export default function Foundations() {
         </Demo>
       </Doc>
 
-      <Doc id="type" name="字体与字号" file="--font-sans · --font-mono" use="正文字体：Segoe UI Variable / PingFang SC / 微软雅黑；等宽字体：Cascadia Code / JetBrains Mono。" avoid="不要引入网络字体；不要在一个视图里用超过四种字号。">
+      <Doc id="type" name="字体与字号" file="--font-sans · --font-mono" use="正文字体：Segoe UI Variable / PingFang SC / 微软雅黑；等宽字体：Cascadia Code / JetBrains Mono。" avoid="字号只用这一套阶梯（11/12/14/16/18/20/24），不写 text-[13px] 这类中间值；不要引入网络字体；一个视图里不超过四种字号。">
         <Demo>
           <div className="space-y-3">
             {[
@@ -98,7 +99,8 @@ export default function Foundations() {
               ['text-base font-semibold', '16 · 分区标题'],
               ['text-sm', '14 · 正文、控件文字（默认）'],
               ['text-xs', '12 · 辅助说明、提示、标签'],
-              ['text-[11px] font-semibold uppercase tracking-[0.12em]', '11 · 分组小标题（全大写）'],
+              ['text-2xs', '11 · 时间、计数、徽章、元信息（text-2xs）'],
+              ['text-2xs font-semibold uppercase tracking-[0.12em]', '11 · 分组小标题（全大写）'],
               ['font-mono text-xs', '12 · 等宽：E:\\work\\todo-app · 1,280 tok'],
             ].map(([cls, label]) => (
               <p key={label} className={cls}>{label}</p>
@@ -118,9 +120,9 @@ export default function Foundations() {
             ))}
           </div>
         </Demo>
-        <Demo title="深度：阴影只给浮起来的东西">
+        <Demo title="深度：阴影只给浮起来的东西；阴影颜色取主题自己的深色，不写死">
           <div className="flex flex-wrap gap-6 text-xs">
-            {[['', '平面：页面里的卡片用描边，不用阴影'], ['shadow-sm', '轻：按钮、输入框、选中的列表行'], ['shadow-xl ring-1 ring-neutral-900/10', '浮层：菜单、提示、Toast'], ['shadow-2xl', '最高：对话框、侧滑面板']].map(([cls, label]) => (
+            {[['', '平面：页面里的卡片用描边，不用阴影'], ['shadow-sm', '轻：按钮、输入框'], ['shadow-raised', '输入区（shadow-raised）'], ['shadow-floating', '等你处理的卡片（shadow-floating）'], ['shadow-xl ring-1 ring-neutral-900/10', '浮层：菜单、提示、Toast'], ['shadow-2xl', '最高：对话框、侧滑面板']].map(([cls, label]) => (
               <div key={label} className={cx('w-40 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900', cls)}>{label}</div>
             ))}
           </div>
@@ -168,7 +170,7 @@ export default function Foundations() {
                   <Icon size={16} aria-hidden className="shrink-0 text-neutral-700 dark:text-neutral-200" />
                   <span className="min-w-0">
                     <span className="block truncate text-neutral-800 dark:text-neutral-100">{iconMeaning[name]}</span>
-                    <code className="block truncate font-mono text-[10px] text-neutral-500">Icons.{name}</code>
+                    <code className="block truncate font-mono text-2xs text-neutral-500">Icons.{name}</code>
                   </span>
                 </div>
               );

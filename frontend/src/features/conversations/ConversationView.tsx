@@ -137,13 +137,13 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         <ShellToggle side="left" />
         <MemberAvatarButton bot={bot} disabled={readOnly} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold leading-5">{headerTitle}</p>
+          <p className="truncate text-base font-semibold leading-5">{headerTitle}</p>
           <p className="flex min-w-0 items-baseline gap-1.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
             <span className="shrink-0">{team.name}</span>
             {bot.isLeader && team.directory && (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="truncate font-mono text-[11px]" title={team.directory}>{team.directory}</span>
+                <span className="truncate font-mono text-2xs" title={team.directory}>{team.directory}</span>
               </>
             )}
           </p>

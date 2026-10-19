@@ -56,12 +56,12 @@ export default function NavigationOverlays() {
             ].map(([label, cls]) => (
               <div key={label} className="w-40 space-y-1">
                 <NavItem icon={Palette} label="外观" className={cls} onClick={() => undefined} />
-                <p className="px-2.5 text-[11px] text-neutral-500">{label}</p>
+                <p className="px-2.5 text-2xs text-neutral-500">{label}</p>
               </div>
             ))}
             <div className="w-40 space-y-1">
               <NavItem icon={Palette} label="外观" current onClick={() => undefined} />
-              <p className="px-2.5 text-[11px] text-neutral-500">当前</p>
+              <p className="px-2.5 text-2xs text-neutral-500">当前</p>
             </div>
           </div>
         </Demo>

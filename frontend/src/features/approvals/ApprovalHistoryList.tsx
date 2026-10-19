@@ -65,14 +65,14 @@ function HistoryRow({ approval, bots }: { approval: Approval; bots: Bot[] }) {
             <span className="min-w-0 flex-1 truncate font-medium text-neutral-800 dark:text-neutral-200">
               {t(`approvals.type.${approval.type}`, { defaultValue: t('approvals.title') })} · {requester?.name ?? t('activity.someone')}
             </span>
-            <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{time}</span>
+            <span className="shrink-0 text-2xs text-neutral-500 dark:text-neutral-400">{time}</span>
           </span>
-          <span className="block truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{headline(approval, t)}</span>
+          <span className="block truncate font-mono text-2xs text-neutral-500 dark:text-neutral-400">{headline(approval, t)}</span>
           <span className="flex flex-wrap items-center gap-1.5">
             <Badge tone={declined ? 'danger' : 'success'}>{t('approvals.decisionBy', { actor, choice })}</Badge>
-            {approval.requestState === 'invalidated' && <span className="text-[10px] text-neutral-500 dark:text-neutral-400">{t('approvals.laterInvalidatedShort')}</span>}
+            {approval.requestState === 'invalidated' && <span className="text-2xs text-neutral-500 dark:text-neutral-400">{t('approvals.laterInvalidatedShort')}</span>}
             {(approval.responseState === 'unknown' || approval.responseState === 'expired') && (
-              <span className="text-[10px] text-amber-700 dark:text-amber-400">{t(`approvals.response.${approval.responseState}`)}</span>
+              <span className="text-2xs text-amber-700 dark:text-amber-400">{t(`approvals.response.${approval.responseState}`)}</span>
             )}
           </span>
         </span>

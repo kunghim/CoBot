@@ -154,7 +154,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
         <Icon size={12} className="shrink-0" aria-hidden="true" />
         {typeof d.subAgentThread === 'string' && <Badge tone="info">{t('conversation.step.agent.badge')}</Badge>}
         <span className={step.kind === 'command' ? 'shrink-0' : 'min-w-0 truncate'}>{t(phrase.key, phrase.params)}</span>
-        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-[11px] text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
+        {step.kind === 'command' && typeof d.command === 'string' && <code className="min-w-0 truncate font-mono text-2xs text-neutral-500" title={d.command}>{displayCommand(d.command)}</code>}
         {step.kind === 'command' && typeof d.exitCode === 'number' && d.exitCode !== 0 && <span className="shrink-0 text-red-500">{t('conversation.step.exitCode', { code: d.exitCode })}</span>}
         <span className="ml-auto shrink-0"><StatusMark status={step.status} running={running} /></span>
       </button>
@@ -170,8 +170,8 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       const output = (typeof d.output === 'string' ? d.output : '') || live?.output[step.id] || '';
       return (
         <div className="space-y-1">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-[11px] leading-4 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
-          {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-[11px] leading-4 text-neutral-700 dark:bg-black/30 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-500 dark:text-neutral-400">{t('conversation.step.noOutput')}</p>}
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
+          {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-700 dark:bg-black/30 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-500 dark:text-neutral-400">{t('conversation.step.noOutput')}</p>}
         </div>
       );
     }
@@ -193,7 +193,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
           {message ? (
             <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={teamId} /></div>
           ) : (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-[11px] dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-2xs dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
           )}
           {extra && <p className="text-red-600">{extra}</p>}
         </div>
@@ -224,8 +224,8 @@ function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; te
     <li>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={cx('-mx-1 flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:text-neutral-900 dark:hover:text-neutral-100', interactive.hover)}>
         {open ? <Icons.expand size={11} aria-hidden /> : <Icons.next size={11} aria-hidden />}
-        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-[10px] dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
-        <span className="min-w-0 truncate font-mono text-[11px]">{path}</span>
+        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-2xs dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
+        <span className="min-w-0 truncate font-mono text-2xs">{path}</span>
       </button>
       {open && (
         <div className="mt-1 space-y-1">

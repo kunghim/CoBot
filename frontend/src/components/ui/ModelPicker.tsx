@@ -166,7 +166,7 @@ export function ModelEffortPicker({ placement = 'top-start', triggerLabel, disab
       {open && (
         <div ref={floating} role="dialog" aria-label={triggerLabel} className={cx('absolute w-72 animate-pop-in rounded-2xl p-3', surface.overlay, layer.dropdown, placementClass[placed])}>
           <ModelEffortPanel {...panel} />
-          {note && <p className="mt-3 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
+          {note && <p className="mt-3 text-2xs leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
         </div>
       )}
     </div>

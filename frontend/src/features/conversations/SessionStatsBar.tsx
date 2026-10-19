@@ -71,14 +71,14 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
   const tps = stats.outputTokensPerSecond ? Math.round(stats.outputTokensPerSecond) : 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-1 px-1 font-mono text-[11px] tracking-tight text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
+    <div className="flex flex-wrap items-center gap-1 px-1 font-mono text-2xs tracking-tight text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
       <Item testId="stats-turns" title={t('stats.timeTitle')} label={<><Timer size={12} aria-hidden="true" />{t('stats.turns', { turns: stats.turns, steps: stats.steps })}{tps > 0 && ` · ${tps} tok/s`}</>}>
         <span className="mb-1 block font-semibold">{t('stats.timeTitle')}</span>
         <Row name={t('stats.modelTime')} value={seconds(stats.modelMs)} />
         <Row name={t('stats.toolTime')} value={seconds(stats.toolMs)} />
         {stats.firstStepMs ? <Row name={t('stats.firstToken')} value={`${(stats.firstStepMs / 1000).toFixed(1)}s`} /> : null}
         {tps > 0 && <Row name={t('stats.speed')} value={`${tps} tok/s`} />}
-        <span className="mt-1 block text-[10px] text-neutral-500 dark:text-neutral-400">{t('stats.estimateNote')}</span>
+        <span className="mt-1 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.estimateNote')}</span>
       </Item>
       <Item testId="stats-tokens" title={t('stats.tokensTitle')} label={<><Database size={12} aria-hidden="true" />{compactTokens(total)} tok · {t('stats.cacheHit', { percent: hit })}</>}>
         <span className="mb-1 flex justify-between font-semibold"><span>{t('stats.tokensTitle')}</span><span className="tabular-nums">{total.toLocaleString()}</span></span>
@@ -93,16 +93,16 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
         <Item testId="stats-context" title={t('stats.contextTitle', { percent: used })} label={<><ProgressRing value={used} label={t('stats.contextTitle', { percent: used })} size={14} showValue={false} tone={used >= 90 ? 'danger' : used >= 70 ? 'warning' : 'neutral'} />{used}%</>}>
           <span className="mb-1 flex justify-between font-semibold"><span>{t('stats.contextTitle', { percent: used })}</span><span className="tabular-nums">{compactTokens(stats.context.used)} / {compactTokens(window)}</span></span>
           <span className="block h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span className="block h-full bg-signal-500" style={{ width: `${Math.min(used, 100)}%` }} /></span>
-          <span className="mt-1.5 block text-[10px] text-neutral-500 dark:text-neutral-400">{t('stats.contextNote')}</span>
+          <span className="mt-1.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.contextNote')}</span>
         </Item>
       )}
       {(limits.primary || limits.secondary) && (
         <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<><Gauge size={12} aria-hidden="true" />{t('stats.limitShort', { percent: limitText(limits.secondary ?? limits.primary) })}</>}>
           <span className="mb-1 block font-semibold">{t('stats.limitsTitle')}</span>
           {limits.primary && <Row name={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} value={limitText(limits.primary)} />}
-          {limits.primary?.resetsAt ? <span className="block text-[10px] text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
+          {limits.primary?.resetsAt ? <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
           {limits.secondary && <Row name={t('stats.limitWeek')} value={limitText(limits.secondary)} />}
-          {limits.secondary?.resetsAt ? <span className="block text-[10px] text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.secondary) })}</span> : null}
+          {limits.secondary?.resetsAt ? <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.secondary) })}</span> : null}
         </Item>
       )}
     </div>

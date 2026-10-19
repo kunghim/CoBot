@@ -215,7 +215,7 @@ export function CheckboxCards<T extends string>({ label, options, values, onTogg
             <span className="min-w-0">
               <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-900 dark:text-neutral-50">
                 {option.label}
-                {isLocked && lockedLabel && <span className="rounded bg-neutral-900/[0.06] px-1 text-[10px] font-normal text-neutral-600 dark:bg-white/[0.08] dark:text-neutral-300">{lockedLabel}</span>}
+                {isLocked && lockedLabel && <span className="rounded bg-neutral-900/[0.06] px-1 text-2xs font-normal text-neutral-600 dark:bg-white/[0.08] dark:text-neutral-300">{lockedLabel}</span>}
               </span>
               {option.description && <span className="mt-0.5 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{option.description}</span>}
             </span>

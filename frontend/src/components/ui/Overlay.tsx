@@ -116,12 +116,12 @@ export function Menu({ trigger, items, placement = 'bottom-end', label, note }: 
                   <span className={cx('block', item.description ? 'font-medium' : 'whitespace-nowrap')}>{item.label}</span>
                   {item.description && <span className="mt-0.5 block text-xs font-normal leading-5 text-neutral-500 dark:text-neutral-400">{item.description}</span>}
                 </span>
-                {item.shortcut && <kbd className="ml-4 whitespace-nowrap font-mono text-[11px] text-neutral-400">{item.shortcut}</kbd>}
+                {item.shortcut && <kbd className="ml-4 whitespace-nowrap font-mono text-2xs text-neutral-400">{item.shortcut}</kbd>}
                 {item.checked !== undefined && <Check size={14} aria-hidden className={cx('shrink-0 text-signal-500', !!item.description && 'mt-1', !item.checked && 'opacity-0')} />}
               </button>
             ),
           )}
-          {note && <p className="px-2.5 pb-1.5 pt-1 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
+          {note && <p className="px-2.5 pb-1.5 pt-1 text-2xs leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
         </div>
       )}
     </div>

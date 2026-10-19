@@ -67,7 +67,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
 /** A short label of state or category. */
 export function Badge({ tone = 'neutral', children, dot = false }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium leading-4', toneSoft[tone])}>
+    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium leading-4', toneSoft[tone])}>
       {dot && <span className={cx('h-1.5 w-1.5 rounded-full', toneSolid[tone])} />}
       {children}
     </span>
@@ -101,7 +101,7 @@ export function StatusDot({ tone, label, pulse = false }: { tone: Tone; label: s
 /** A count on a tab, button or rail icon. */
 export function Count({ value, tone = 'neutral', label }: { value: number; tone?: 'neutral' | 'danger'; label: string }) {
   return (
-    <span aria-label={label} className={cx('inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums leading-none', tone === 'danger' ? 'bg-red-600 text-white' : 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900')}>
+    <span aria-label={label} className={cx('inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold tabular-nums leading-none', tone === 'danger' ? 'bg-red-600 text-white' : 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900')}>
       {value > 99 ? '99+' : value}
     </span>
   );
@@ -109,7 +109,7 @@ export function Count({ value, tone = 'neutral', label }: { value: number; tone?
 
 /** A key on the keyboard, in shortcut hints. */
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-neutral-300 bg-white px-1 font-mono text-[11px] text-neutral-600 shadow-[0_1px_0_rgb(0_0_0/0.08)] dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{children}</kbd>;
+  return <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-neutral-300 bg-white px-1 font-mono text-2xs text-neutral-600 shadow-[0_1px_0_rgb(0_0_0/0.08)] dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{children}</kbd>;
 }
 
 /** Progress around a circle, for a share that matters at a glance (context used). */
@@ -125,7 +125,7 @@ export function ProgressRing({ value, label, size = 36, tone = 'neutral', showVa
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-neutral-900/[0.08] dark:stroke-white/[0.1]" />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} strokeLinecap="round" stroke="currentColor" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - clamped / 100)} className={cx('transition-[stroke-dashoffset]', color)} />
       </svg>
-      {showValue && <span className="absolute font-mono text-[10px] font-semibold tabular-nums">{Math.round(clamped)}</span>}
+      {showValue && <span className="absolute font-mono text-2xs font-semibold tabular-nums">{Math.round(clamped)}</span>}
     </span>
   );
 }

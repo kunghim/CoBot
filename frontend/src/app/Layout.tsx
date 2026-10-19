@@ -53,7 +53,7 @@ export default function Layout() {
     <div className="flex h-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       {/* Primary icon rail: the mark and home on top, settings at the bottom. */}
       <nav aria-label={t('app.title')} className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-neutral-100 py-3 dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-900 text-[13px] font-bold tracking-tight text-white dark:bg-neutral-100 dark:text-neutral-900" title="CoBot" aria-hidden="true">
+        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold tracking-tight text-white dark:bg-neutral-100 dark:text-neutral-900" title="CoBot" aria-hidden="true">
           Co
         </div>
         <RailItem icon={Icons.home} label={t('nav.home')} current={location.pathname === '/'} onClick={() => navigate('/')} />

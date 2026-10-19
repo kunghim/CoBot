@@ -52,7 +52,7 @@ export default function NativeApprovalBody({ summary, fallback }: { summary: str
           {t('approvals.native.network')}
         </p>
       )}
-      {request.cwd && <p className="break-all text-[11px] text-neutral-500 dark:text-neutral-400">{t('approvals.native.cwd', { cwd: request.cwd })}</p>}
+      {request.cwd && <p className="break-all text-2xs text-neutral-500 dark:text-neutral-400">{t('approvals.native.cwd', { cwd: request.cwd })}</p>}
     </div>
   );
 }
@@ -70,7 +70,7 @@ function FileRow({ path, kind, diff }: { path: string; kind: string; diff: strin
         className="flex min-w-0 items-center gap-1.5 text-left text-neutral-800 enabled:hover:text-neutral-950 dark:text-neutral-200"
       >
         {diff ? open ? <Icons.expand size={12} aria-hidden /> : <Icons.next size={12} aria-hidden /> : <span className="w-3" />}
-        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-[10px] dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
+        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-2xs dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
         <span className="min-w-0 break-all font-mono">{path}</span>
       </button>
       {open && diff && <div className="mt-1"><DiffView diff={diff} className="max-h-60" /></div>}
@@ -87,7 +87,7 @@ function PermissionList({ permissions }: { permissions: NonNullable<NativeReques
         {permissions.network && <li>{t('approvals.native.permissionNetwork')}</li>}
         {permissions.read.length > 0 && <li className="break-all">{t('approvals.native.permissionRead', { paths: permissions.read.join('、') })}</li>}
         {permissions.write.length > 0 && <li className="break-all">{t('approvals.native.permissionWrite', { paths: permissions.write.join('、') })}</li>}
-        {permissions.other && <li><pre className="whitespace-pre-wrap break-all font-mono text-[11px]">{permissions.other}</pre></li>}
+        {permissions.other && <li><pre className="whitespace-pre-wrap break-all font-mono text-2xs">{permissions.other}</pre></li>}
       </ul>
     </div>
   );

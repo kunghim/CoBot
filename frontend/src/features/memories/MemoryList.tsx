@@ -29,7 +29,7 @@ export default function MemoryList({ botId }: { botId: string }) {
 
   return (
     <div>
-      <p className="px-3 pb-2 pt-3 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{t('memories.readOnlyHint')}</p>
+      <p className="px-3 pb-2 pt-3 text-2xs leading-4 text-neutral-500 dark:text-neutral-400">{t('memories.readOnlyHint')}</p>
       {errorText && (
         <div className="px-3 pb-2"><Alert tone="danger">{errorText}</Alert></div>
       )}
@@ -37,7 +37,7 @@ export default function MemoryList({ botId }: { botId: string }) {
         {items.map((memory) => (
           <li key={memory.id} className="rounded-xl border border-neutral-200 bg-white p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900">
             <p className="whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">{memory.body}</p>
-            <div className="mt-1.5 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+            <div className="mt-1.5 flex items-center justify-between text-2xs text-neutral-500 dark:text-neutral-400">
               <span>{formatTime(memory.createdAt)}</span>
               <Button
                 size="sm"

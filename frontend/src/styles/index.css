@@ -34,6 +34,22 @@
   --color-signal-600: #3346d3;
   --color-on-signal: #ffffff;
 
+  /* Type scale: 11 (2xs: meta, badges, captions), 12 (xs), 14 (sm: body),
+     16 (base), 18 (lg), 20 (xl), 24 (2xl). No sizes in between. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 16px;
+
+  /* Shadows take the theme's darkest neutral, so a shadow on warm paper is
+     warm and one on blue-slate is cool. raised: the composer; floating:
+     cards that wait above it. */
+  --shadow-sm: 0 1px 3px 0 color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 1px 2px -1px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-md: 0 4px 6px -1px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 2px 4px -2px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-lg: 0 10px 15px -3px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-xl: 0 20px 25px -5px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 8px 10px -6px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
+  --shadow-2xl: 0 25px 50px -12px color-mix(in srgb, var(--color-neutral-950) 25%, transparent);
+  --shadow-raised: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--color-neutral-900) 18%, transparent);
+  --shadow-floating: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 12px 32px -16px color-mix(in srgb, var(--color-neutral-900) 25%, transparent);
+
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
 
@@ -89,7 +105,8 @@
   --color-signal-600: #0e7a6f;
 }
 
-/* dusk: plum-tinted warm gray, coral signal. */
+/* dusk: plum-tinted warm gray, plum-blossom signal (kept apart from the
+   error red and the warning amber). */
 :root[data-theme="dusk"] {
   --color-neutral-50: #f7f4f5;
   --color-neutral-100: #efe9ec;
@@ -103,9 +120,9 @@
   --color-neutral-900: #1f171c;
   --color-neutral-950: #140e12;
 
-  --color-signal-400: #ff9a85;
-  --color-signal-500: #e5654b;
-  --color-signal-600: #c44a31;
+  --color-signal-400: #e48bbd;
+  --color-signal-500: #b04f86;
+  --color-signal-600: #923c6c;
 }
 
 /* classic: CoBot's own classic, rice paper and ink. Black, white and gray,
