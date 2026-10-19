@@ -115,9 +115,9 @@ const MODE_ICONS = { system: Icons.system, light: Icons.light, dark: Icons.dark 
 
 // What each theme swatch draws: its rail, paper, a card and its signal color.
 const THEMES: Array<{ id: Theme; rail: string; paper: string; card: string; line: string; signal: string }> = [
+  { id: 'classic', rail: '#1a1a1a', paper: '#f7f7f7', card: '#ffffff', line: '#e2e2e2', signal: '#1a1a1a' },
   { id: 'graphite', rail: '#171e1b', paper: '#f4f6f3', card: '#ffffff', line: '#dbe0da', signal: '#5568f0' },
   { id: 'harbor', rail: '#141c24', paper: '#f2f5f8', card: '#ffffff', line: '#d5dee6', signal: '#1c9f92' },
-  { id: 'classic', rail: '#1a1a1a', paper: '#f7f7f7', card: '#ffffff', line: '#e2e2e2', signal: '#1a1a1a' },
   { id: 'dusk', rail: '#1f171c', paper: '#f7f4f5', card: '#ffffff', line: '#e1d7dc', signal: '#e5654b' },
 ];
 

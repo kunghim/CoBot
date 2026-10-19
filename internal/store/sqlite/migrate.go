@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/pressly/goose/v3"
 )
 
@@ -87,7 +88,8 @@ func (m *Migrator) Guard(ctx context.Context) error {
 
 // MigrateToLatest applies pending migrations. When the database already has
 // business tables, a consistent snapshot is saved into backupsDir first and
-// only the most recent keep backups remain.
+// only the most recent keep backups remain. A brand-new database then gets
+// today's first-run settings (see applyFirstRunDefaults).
 func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error {
 	if err := m.Guard(ctx); err != nil {
 		return err
@@ -96,6 +98,7 @@ func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error
 	if err != nil {
 		return err
 	}
+	fresh := false
 	if version < targetVersion(m.provider) {
 		// Any pre-existing business table (old library seed or earlier
 		// version) earns a consistent snapshot before schema changes.
@@ -108,11 +111,38 @@ func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error
 				return fmt.Errorf("backup before migration: %w", err)
 			}
 		}
+		fresh = version == 0 && tables == 0
 	}
 	if _, err := m.provider.Up(ctx); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
+	if fresh {
+		if err := applyFirstRunDefaults(ctx, m.db); err != nil {
+			return err
+		}
+	}
 	pruneBackups(backupsDir, 3)
+	return nil
+}
+
+// applyFirstRunDefaults sets the settings a new profile starts with where
+// they differ from the column defaults. Migrations stay append-only and an
+// upgraded profile keeps what it has, so a default that changed after its
+// column was added (the theme) is applied here, to new databases only.
+func applyFirstRunDefaults(ctx context.Context, db *sql.DB) error {
+	defaults := domain.DefaultSettings()
+	// A migrator built from an older migration set (tests) may stop before
+	// the column exists.
+	var hasTheme int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('settings') WHERE name = 'theme'`).Scan(&hasTheme); err != nil {
+		return fmt.Errorf("inspect settings: %w", err)
+	}
+	if hasTheme == 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE settings SET theme = ? WHERE id = 1`, defaults.Theme); err != nil {
+		return fmt.Errorf("apply first-run settings: %w", err)
+	}
 	return nil
 }
 

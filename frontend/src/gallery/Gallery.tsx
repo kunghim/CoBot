@@ -25,7 +25,7 @@ const TOC: Array<[string, string, Array<[string, string]>]> = [
 ];
 
 export default function Gallery({ generatedAt }: { generatedAt: string }) {
-  const [theme, setTheme] = useState<Theme>('graphite');
+  const [theme, setTheme] = useState<Theme>('classic');
   const [mode, setMode] = useState<ColorMode>('light');
   useEffect(() => applyAppearance({ theme, colorMode: mode }), [theme, mode]);
   // The table of contents follows the entry being read.
@@ -59,7 +59,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
               size="sm"
               value={theme}
               onChange={setTheme}
-              options={[{ value: 'graphite', label: '石墨' }, { value: 'harbor', label: '港湾' }, { value: 'dusk', label: '暮梅' }, { value: 'classic', label: '经典' }]}
+              options={[{ value: 'classic', label: '经典' }, { value: 'graphite', label: '石墨' }, { value: 'harbor', label: '港湾' }, { value: 'dusk', label: '暮梅' }]}
             />
             <SegmentedControl
               label="明暗"

@@ -13,7 +13,8 @@
  * Text and icons drawn on a signal fill use on-signal, which is white
  * except where a theme's signal turns light (classic in dark mode).
  *
- * graphite (default): sage-tinted graphite, cobalt signal.
+ * The @theme values are graphite: sage-tinted graphite, cobalt signal. New
+ * profiles start on classic (below); graphite stays for earlier profiles.
  */
 @theme {
   --color-neutral-50: #f4f6f3;
