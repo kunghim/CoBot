@@ -19,8 +19,8 @@ when a Chinese discussion leads to a decision affecting other contributors.
 There is no requirement to join a chat group or use a separate community
 account to participate.
 
-Use [Issues](https://github.com/kunghim/CoBot/issues) for reproducible bugs
-and feature requests, [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
+Use [Issues](https://github.com/kunghim/CoBot/issues) for bugs with reproduction
+or code evidence and feature requests, [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
 for setup and usage questions, and
 [Show and tell](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)
 to share projects and workflows. Maintainer announcements appear in
@@ -32,10 +32,11 @@ response deadline.
 For a first contribution, look for `good first issue` (a bounded task with
 starting points and acceptance criteria) or `help wanted` (work ready for
 contributions). Comment before starting a substantial task to avoid duplicate
-work. Maintainers use `status: needs-triage` for new reports,
-`status: needs-info` when a report needs clarification, and `status: accepted`
-for work agreed in scope. These states are updated manually; an accepted
-request is not a release-date commitment. Dependency PRs follow their existing
+work using the comment commands below. Maintainers use `status: needs-triage`
+for new reports, `status: needs-info` when clarification is needed, and
+`status: accepted` for work agreed in scope. A claim sets `status: in-progress`
+automatically; acceptance and release dates remain maintainer decisions.
+Dependency PRs follow their existing
 bot labels. Do not label a task newcomer-friendly until it has enough guidance.
 
 Contributors normally work in a fork on a short-lived topic branch based
@@ -78,8 +79,100 @@ and only contribute material you have the right to submit.
 无需另发英文副本。影响其他贡献者的重要中文讨论，由维护者尽量补充英文决策摘要。
 Bug 与功能建议进入 Issues，安装和使用问题进入 Discussions 的 Q&A，成果进入
 Show and tell；无需加入聊天群。维护者跨时区尽力回复，不承诺固定响应时限。
-首次贡献可找 `good first issue` 或 `help wanted`，较大任务开始前先留言协调。
-状态标签由维护者手动调整：待分诊、待补充信息、已接受；已接受不代表承诺发布日期。
+首次贡献可找 `good first issue` 或 `help wanted`，使用下方评论命令认领，较大改动先讨论。
+待分诊、待补充信息、已接受由维护者判断；认领自动标记正在处理，不代表需求获批或承诺发布日期。
+
+## Reporting and claiming issues / 报告与认领 Issue
+
+Use one issue per problem or proposal. Include the CoBot version/commit,
+OS/architecture, Web or desktop, installation method (MSI, ZIP, source or
+unknown), and Codex version where relevant. Unknown information is acceptable.
+For bugs, provide reproduction steps or a concrete commit and file/line
+references with the code path explaining the concern. Identify whether your
+evidence is a runtime reproduction, automated test, static analysis only, or
+not yet verified. Do not describe a suspected failure as observed behavior.
+Feature requests need a use case, not a mandatory solution or reproduction.
+
+`ai-discovered` means AI found the problem or need, regardless of who submits
+it. AI translation or rewriting alone does not qualify. It describes provenance,
+not verification or acceptance. The optional discovery-source field adds this
+label automatically when **AI-discovered / AI 发现** is selected. If that
+declaration is removed or corrected, the workflow removes its label. Other
+cases can be labeled by maintainers; do not guess provenance from writing style.
+Do not upload private prompts, credentials or model transcripts.
+
+CLI/API submissions can bypass the form. Include the same evidence and declare
+the source explicitly; to use automatic source labeling, add this exact section
+to the issue body:
+
+```markdown
+### Discovery source / 发现来源
+
+AI-discovered / AI 发现
+```
+
+Comment one command by itself on an issue; commands have no arguments:
+
+| Command | Result |
+| --- | --- |
+| `/claim` | Assign yourself on an open, unassigned issue and set `status: in-progress` |
+| `/unclaim` | Release only your own assignment and restore the status before claiming |
+| `/help` | Show the command instructions |
+
+No maintainer approval is required to claim an unassigned issue. An existing
+assignee is never replaced; maintainers can still adjust assignments in GitHub.
+An AI-assisted contributor uses the GitHub account responsible for delivering
+the work. `ai-discovered` does not claim an issue or start an AI coding service.
+Claiming does not approve the proposal, close the issue, merge a PR or schedule
+a release. Describe substantial changes before implementing them.
+
+Before `/unclaim`, leave a short handoff with progress and any branch/PR link.
+The issue stays open. Other assignees and maintainer status changes are preserved.
+For a manual assignment with no recorded previous status, cancellation returns
+an otherwise unowned in-progress issue to `status: needs-triage`. If maintainers
+changed the status meanwhile, that decision is retained.
+
+Commands are processed in comment order and the bot replies with the result.
+Write a new comment to issue a command; editing an old comment does not execute
+it. PR comments are excluded. If a workflow fails after a partial update, a
+maintainer can rerun it or dispatch **issue management** with the issue number.
+Do not delete the bot's command replies: their metadata stores the previous
+status and processed-command cursor for safe retries.
+
+For triage, use one type label (`bug`, `enhancement`, `documentation`, or
+`dependencies`), the relevant area labels (`area: installation`, `area: codex`,
+`area: collaboration`, `area: ui`), and a single current status. Reserve
+`priority: high` for serious impact such as data loss or broadly blocked core
+functionality; ordinary reports do not need a priority label. `good first issue`
+requires a bounded task with guidance and acceptance criteria. Explain why
+duplicates or out-of-scope reports are closed and link the original where relevant.
+
+Topic PRs targeting `dev` should reference the issue (`Refs #123`). A merge into
+`dev` is not a released fix; the `dev -> main` promotion can use `Closes #123`
+for issues actually resolved on the default branch. On release, add the released
+version when useful. Merging an ordinary PR does not automatically publish it.
+
+中文说明：每个 Issue 聚焦一个问题或建议。填写已知的版本、系统与架构、Web/桌面、
+MSI/ZIP/源码安装方式及相关 Codex 版本；不清楚可标未知。Bug 可提供运行复现，
+也可提供提交、文件位置和代码路径，但要区分运行复现、自动化测试、仅静态分析、尚未验证。
+功能建议只需说明使用场景，不强制解决方案或复现。
+
+`ai-discovered` 表示由 AI 发现问题或需求，不取决于提交者是谁；仅翻译、润色不算。
+它不代表经过验证或维护者已接受。表单选“AI 发现”会自动加标，修改或移除这项声明
+会自动去标；其他情况由维护者核实，不根据文风猜测。CLI/API 报告也应遵守上述结构，
+可使用上面的同名来源段落触发标记；不要提交私人提示词、凭据或完整模型对话。
+
+在开放且无人负责的 Issue 单独评论 `/claim` 即可自动认领并标记正在处理，无需等待批准；
+已有负责人时不会抢占。取消前留言交代进度和分支/PR，再单独评论 `/unclaim`，只取消
+自己的认领并恢复原状态，Issue 保持开放。手工分配而没有历史状态的，取消后若仍是
+无人负责的正在处理状态，则回到待分诊；其他负责人和维护者期间修改的状态会保留。
+`/help` 查看说明。命令不带参数，需发新评论，编辑旧评论不会执行；PR 评论不执行。
+机器人回复保留重跑所需的状态，请勿删除；中途失败由维护者重跑或手动触发同名工作流。
+
+负责人是承担交付责任的 GitHub 账号，来源标签不代表认领，也不会启动 AI 编码服务。
+认领不代表需求获批，PR、关闭 Issue 和发版仍由维护者决定。正常问题无需优先级标签，
+严重影响才标 `priority: high`。PR 合入 `dev` 先说明进展，晋级 `main` 后再关闭对应问题，
+发布时补充修复版本。
 
 ## Working locally
 
