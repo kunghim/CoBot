@@ -7,7 +7,7 @@
 import { ShellToggle } from '../../app/shell';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCancelMessage, useConversation, useInterruptRun, useSendMessage } from '../../api/queries';
+import { useCancelMessage, useConversation, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
 import { forgetLiveRuns, useLiveRuns } from '../../api/live';
 import { api } from '../../api/client';
@@ -35,6 +35,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const send = useSendMessage(bot.id);
   const cancel = useCancelMessage(bot.id);
   const interrupt = useInterruptRun(bot.id);
+  const retryRun = useRetryRun(bot.id);
 
   const { drafts, setDraft, clearSentDraft } = useSelectedBot();
   const draft = drafts[bot.id] ?? '';
@@ -73,6 +74,8 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const liveRuns = useLiveRuns();
   const runs = conv.data?.runs ?? [];
   const timeline = buildTimeline(messages, runs, activeRun, bot.id);
+  // Only the member's latest turn can be retried.
+  const latestRunId = [...timeline].reverse().find((entry) => entry.kind === 'run')?.run.id;
   const activeLive = activeRun ? liveRuns[activeRun.id] : undefined;
 
   // "Stopping" is only honest while the run still exists.
@@ -191,7 +194,15 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           {timeline.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
-                <RunProcess run={entry.run} active={entry.run.id === activeRun?.id} live={liveRuns[entry.run.id]} teamId={team.id} nameOf={nameOf} />
+                <RunProcess
+                  run={entry.run}
+                  active={entry.run.id === activeRun?.id}
+                  live={liveRuns[entry.run.id]}
+                  teamId={team.id}
+                  nameOf={nameOf}
+                  onRetry={!activeRun && entry.run.id === latestRunId ? () => retryRun.mutate(entry.run.id) : undefined}
+                  retrying={retryRun.isPending}
+                />
               </li>
             ) : (
               <li key={entry.message.id}>

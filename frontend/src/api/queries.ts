@@ -254,6 +254,17 @@ export function useCancelMessage(botId: string) {
   });
 }
 
+export function useRetryRun(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.retryRun(runId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
 export function useInterruptRun(botId: string) {
   const qc = useQueryClient();
   return useMutation({

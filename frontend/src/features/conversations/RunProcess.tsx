@@ -31,14 +31,24 @@ export default function RunProcess({
   live,
   teamId,
   nameOf,
+  onRetry,
+  retrying = false,
 }: {
   run: RunWithSteps;
   active: boolean;
   live: LiveRun | undefined;
   teamId: string;
   nameOf: (botId: string) => string;
+  /** Given for the member's latest failed turn while it is idle: run the work again. */
+  onRetry?: () => void;
+  retrying?: boolean;
 }) {
   const { t } = useTranslation();
+  const retry = onRetry && run.status === 'failed' && (
+    <Button size="sm" variant="secondary" loading={retrying} onClick={onRetry} icon={Icons.retry}>
+      {t('conversation.process.retry')}
+    </Button>
+  );
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const now = useNow(active);
   const [open, setOpen] = useState<boolean | null>(null);
@@ -49,7 +59,12 @@ export default function RunProcess({
 
   if (!active && shown.length === 0) {
     if (run.status === 'failed' || run.status === 'interrupted') {
-      return <p className="text-xs text-neutral-500 dark:text-neutral-400">{t(`conversation.process.${run.status}`)}</p>;
+      return (
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{t(`conversation.process.${run.status}`)}</p>
+          {retry}
+        </div>
+      );
     }
     return null;
   }
@@ -81,6 +96,7 @@ export default function RunProcess({
           ))}
         </ol>
       )}
+      {retry}
       {active && live?.reply && (
         <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
           <Markdown text={live.reply} teamId={teamId} />

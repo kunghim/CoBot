@@ -219,6 +219,7 @@ export const api = {
     request<import('./types').SendMessageResult>('POST', `/api/v1/bots/${botId}/messages`, { text }),
   cancelMessage: (messageId: string) =>
     request<import('./types').Message>('POST', `/api/v1/messages/${messageId}/cancel`, {}),
+  retryRun: (runId: string) => request<{ runId: string; requeued: number }>('POST', `/api/v1/runs/${runId}/retry`, {}),
   interruptRun: (runId: string) =>
     request<import('./types').InterruptRunResult>('POST', `/api/v1/runs/${runId}/interrupt`, {}),
 

@@ -742,11 +742,13 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		return domain.Requirement{}, err
 	}
 	var effect relayEffect
+	var cancelled []string
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	for _, card := range cards {
 		if card.IsTerminal() {
 			continue
 		}
+		cancelled = append(cancelled, card.ID)
 		if _, err := sqlite.UpdateTaskStatusTx(ctx, tx, card.ID, domain.TaskCancelled, 0); err != nil {
 			return domain.Requirement{}, err
 		}
@@ -776,7 +778,81 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 	a.publishRelay(ctx, effect)
+	a.interruptCancelledWork(ctx, cancelled)
 	return req, nil
+}
+
+// interruptCancelledWork stops the turns members are spending on cards that
+// were just cancelled, so cancelling takes effect now rather than when the
+// member next hands something off. A turn that also carries other work (a
+// message from the user, another requirement's card) is left running: only
+// work that is entirely for the cancelled cards is stopped. It is best
+// effort; a turn that cannot be interrupted simply finishes, and its handoff
+// finds the card gone.
+func (a *App) interruptCancelledWork(ctx context.Context, cardIDs []string) {
+	if a.Scheduler == nil || len(cardIDs) == 0 {
+		return
+	}
+	cancelled := make(map[string]bool, len(cardIDs))
+	for _, id := range cardIDs {
+		cancelled[id] = true
+	}
+	// The runs the cancelled cards' deliveries started, and what else each
+	// of those runs was started for.
+	rows, err := a.DB.QueryContext(ctx, `SELECT run_id, task_id FROM deliveries
+		WHERE run_id IN (SELECT run_id FROM deliveries WHERE run_id != '' AND task_id IN (`+placeholders(len(cardIDs))+`))`, anyStrings(cardIDs)...)
+	if err != nil {
+		a.logWarn("list runs of cancelled cards", err)
+		return
+	}
+	runs := map[string]bool{} // run id -> wholly for cancelled cards
+	for rows.Next() {
+		var runID, taskID string
+		if err := rows.Scan(&runID, &taskID); err != nil {
+			rows.Close()
+			a.logWarn("read runs of cancelled cards", err)
+			return
+		}
+		whole, seen := runs[runID]
+		if !seen {
+			whole = true
+		}
+		runs[runID] = whole && cancelled[taskID]
+	}
+	rows.Close()
+	for runID, whole := range runs {
+		if !whole {
+			continue
+		}
+		if _, err := a.InterruptRun(ctx, runID); err != nil {
+			// Not active any more, or not interruptible: nothing to stop.
+			var de *domain.Error
+			if !errors.As(err, &de) || de.Code != domain.CodeConflict {
+				a.logWarn("interrupt run of cancelled card", err)
+			}
+		}
+	}
+}
+
+func (a *App) logWarn(what string, err error) {
+	if a.Logger != nil {
+		a.Logger.Warn(what, "error", err)
+	}
+}
+
+func placeholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+func anyStrings(values []string) []any {
+	out := make([]any, len(values))
+	for i, v := range values {
+		out[i] = v
+	}
+	return out
 }
 
 // ListRequirements is the user's view of a team's requirements.
