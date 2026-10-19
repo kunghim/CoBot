@@ -1205,6 +1205,11 @@ type InterruptRunJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// RetryRunJSONBody defines parameters for RetryRun.
+type RetryRunJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // ExchangeBootstrapJSONBody defines parameters for ExchangeBootstrap.
 type ExchangeBootstrapJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -1372,6 +1377,9 @@ type SetRoleAvatarJSONRequestBody SetRoleAvatarJSONBody
 
 // InterruptRunJSONRequestBody defines body for InterruptRun for application/json ContentType.
 type InterruptRunJSONRequestBody InterruptRunJSONBody
+
+// RetryRunJSONRequestBody defines body for RetryRun for application/json ContentType.
+type RetryRunJSONRequestBody RetryRunJSONBody
 
 // ExchangeBootstrapJSONRequestBody defines body for ExchangeBootstrap for application/json ContentType.
 type ExchangeBootstrapJSONRequestBody ExchangeBootstrapJSONBody

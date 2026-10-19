@@ -171,8 +171,8 @@ func ensureRecoveryCardLocked(ctx context.Context, tx *sql.Tx, run domain.Run, d
 	card := domain.Approval{ID: domain.NewID(), TeamID: run.TeamID, RequesterBotID: run.BotID, EngineRequestID: binding,
 		Type: domain.ApprovalRecovery, Summary: "approval.card.recovery", Reason: "unresolved_run", RequestState: domain.ApprovalStatePending,
 		Options: []domain.ApprovalOption{
-			{ID: domain.RecoveryOptionContinue, MessageKey: "approval.option.recovery_continue", Text: "继续"},
-			{ID: domain.RecoveryOptionRerun, MessageKey: "approval.option.recovery_rerun", Text: "重跑当前工作"},
+			{ID: domain.RecoveryOptionContinue, MessageKey: "approval.option.recovery_continue", Text: "只释放成员"},
+			{ID: domain.RecoveryOptionRerun, MessageKey: "approval.option.recovery_rerun", Text: "重跑"},
 			{ID: domain.RecoveryOptionAbandon, MessageKey: "approval.option.recovery_abandon", Text: "放弃"},
 		},
 	}
