@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 echo "==> public file policy"
 node scripts/check-public-files.mjs
-node --test scripts/repository-policy.test.mjs
+node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs
 
 echo "==> gofmt"
 bad=$(gofmt -l cmd internal tests || true)

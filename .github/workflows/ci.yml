@@ -4,6 +4,7 @@ name: ci
 # acceptance categories (real Codex, native installs) run separately and are
 # never implied by this workflow.
 on:
+  workflow_call:
   push:
     branches: [main, dev]
   pull_request:
@@ -26,7 +27,9 @@ jobs:
       - name: Check pull request routing
         run: node scripts/check-pr-route.mjs
       - name: Test repository policy enforcement
-        run: node --test scripts/repository-policy.test.mjs
+        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs
+      - name: Test release input and artifact validation
+        run: node --test scripts/release.test.mjs
 
   web-core:
     name: web/shared core (ubuntu)

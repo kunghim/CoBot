@@ -4,8 +4,8 @@
 
 [English](README.md) · 简体中文
 
-> **状态：早期预览。** Windows 本机 Web 版已经可以试用；桌面壳和 macOS 版可以编译，
-> 原生运行与安装尚未实机验证。详见[当前状态](#当前状态)。
+> **状态：早期预览。** Windows 已提供 beta 下载；macOS ARM64 桌面包已通过使用真实 Codex 的本机原生冒烟测试。
+> 详见[当前状态](#当前状态)。
 
 CoBot 是一个本地运行的应用，让多个 AI Agent 像团队一样协作。名字里的 **Co 是“合作”**：
 CoBot 不想当一个更聪明的 Agent，而是 Agent 周围的团队组织。它管角色、任务、沟通和审批；
@@ -86,7 +86,8 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | Windows 10/11 x64 · 本机 Web | **可以试用**，已用真实 Codex 端到端验证 |
 | Windows 独立服务构建 | 可构建、可运行 |
 | Windows 桌面壳（Wails/WebView2） | **已提供测试版下载**；已在 Windows 沙盒检查桌面启动与安装生命周期，验证限制见发布说明 |
-| macOS（Web / 桌面） | 可交叉编译；`.app` 打包仅做过静态核对；原生运行、安装、签名与公证尚未验证 |
+| macOS ARM64 桌面 | 本机应用已在 macOS 26.6.2、Codex 0.146.0 上通过冒烟测试：登录、消息、任务交接/交付/验收、文件工具、命令审批允许/拒绝及重启。DMG 挂载、Finder 复制到应用程序、弹出映像后启动及团队数据恢复也已通过。下载后首次打开与公证发行尚未验证 |
+| macOS Intel（x86_64）桌面 | 暂不纳入 beta 发布。已交叉构建主程序和助手；在 Apple Silicon 的 Rosetta 下通过界面启动、原生目录对话框、创建团队/重启及共享核心测试。Intel 真机及 Intel Codex 端到端使用尚未验证 |
 | Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
 
 在 Windows 上用真实 Codex 验证过的内容：登录、多成员并行、任务交接与提问、原生文件审批与拒绝、
@@ -126,12 +127,12 @@ CoBot 使用自己的私有 Codex 环境，需要独立登录。
 
 ### 从源码构建
 
-以下命令构建**本机 Web 版**。macOS 命令仅供源码试用，原生运行尚未验证，本次发布不包含 macOS 应用下载。
+以下命令构建**本机 Web 版**。已发布的 beta 目前仅提供 Windows 下载；macOS 桌面包可按下文在本机构建。
 
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
 让 Agent 工作还需在 `PATH` 上安装 [Codex CLI](https://github.com/openai/codex)
-（最低及已验证版本为 0.161.0），具备可使用 Codex 的账号和访问其服务的网络。
+（Windows/Linux 最低 0.161.0，macOS 最低 0.146.0），具备可使用 Codex 的账号和访问其服务的网络。
 Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
 
 #### Windows（PowerShell）
@@ -144,7 +145,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-#### macOS（Bash；原生运行未验证）
+#### macOS（Bash）
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
@@ -153,6 +154,23 @@ npm ci --prefix frontend
 ./scripts/build.sh --target server
 ./.tmp/dist/cobot serve
 ```
+
+构建 macOS 桌面包还需 Wails CLI v2.15.0 和 Apple 命令行构建工具，然后运行
+`./scripts/build.sh --target desktop --version 0.1.0-beta.2-dev --arch arm64`。
+产物为 `.tmp/dist/CoBot-0.1.0-beta.2-dev-macos-arm64.dmg`，另附 ZIP 和 SHA-256 校验文件。
+打开 DMG，将 `CoBot.app` 复制到其中的 Applications 入口，再弹出映像，从「应用程序」打开 CoBot。
+计划以 DMG 提供 macOS beta 下载，目前尚未发布。
+可用 `--arch arm64` 指定 Apple Silicon，或用 `--arch amd64` 构建实验性的 Intel 包；
+文件名包含目标架构，主程序与助手保持一致。
+Apple Silicon 可通过已安装的 Rosetta 做 Intel 包冒烟测试，但不能代替 Intel 真机验收。
+使用 ZIP 时，解压后保持整个 `CoBot.app` 完整。桌面包默认使用 production profile；隔离试用时，
+为包内可执行文件传入 `--data-root <空目录>`，该临时目录仍按 production 规则运行。
+包使用本地 ad-hoc 签名，没有 Developer ID 签名或公证；本机 DMG 安装和重启已通过，
+但 Gatekeeper 评估会拒绝该包，浏览器下载后的首次打开及手动允许流程尚未验收。
+
+macOS 的 Codex 0.146.0 冒烟测试使用隔离数据目录和真实模型，不代表已完成 Windows 全部验收项。
+图形启动的 `PATH` 精简时，还会检查常见 standalone、Cargo 和 Homebrew 安装目录。
+未显式提供代理环境变量时，Codex 会继承 macOS 的静态系统代理；不会修改系统设置，也不会执行自动代理（PAC）脚本。
 
 请在浏览器和团队文件所在的同一台电脑运行这些命令。这启动的是本机 Web 应用，
 不是桌面壳或远程服务器。Windows 产物为 `.tmp/dist/cobot.exe`，macOS 为 `.tmp/dist/cobot`，

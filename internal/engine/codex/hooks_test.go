@@ -125,12 +125,18 @@ func TestTrustNativeHookWritesOnlyCoBotsEntry(t *testing.T) {
 }
 
 func TestVersionSupported(t *testing.T) {
-	for version, want := range map[string]bool{
-		"0.161.0": true, "0.162.0-alpha.17.2": true, "1.0.0": true, "0.161.1": true,
-		"0.160.9": false, "0.99.0": false, "": false, "dev": false, "0.161": false,
-	} {
-		if got := VersionSupported(version); got != want {
-			t.Errorf("VersionSupported(%q) = %v, want %v", version, got, want)
+	for _, minimum := range []string{"0.146.0", "0.161.0"} {
+		for version, want := range map[string]bool{
+			minimum: true, "0.162.0-alpha.17.2": true, "1.0.0": true, "0.161.1": true,
+			"0.146.0": minimum == "0.146.0", "0.160.9": minimum == "0.146.0",
+			"0.145.9": false, "0.99.0": false, "": false, "dev": false, "0.161": false,
+		} {
+			if got := versionSupported(version, minimum); got != want {
+				t.Errorf("versionSupported(%q, %q) = %v, want %v", version, minimum, got, want)
+			}
 		}
+	}
+	if !VersionSupported(MinSupportedVersion) || VersionSupported("0.145.9") {
+		t.Fatal("platform baseline must be supported and older versions rejected")
 	}
 }

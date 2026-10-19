@@ -12,7 +12,7 @@ Set-Location $root
 Write-Host "==> public file policy"
 node scripts/check-public-files.mjs
 if ($LASTEXITCODE -ne 0) { throw "public file policy failed" }
-node --test scripts/repository-policy.test.mjs
+node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs
 if ($LASTEXITCODE -ne 0) { throw "repository policy tests failed" }
 
 Write-Host "==> gofmt"
