@@ -4,7 +4,7 @@
 // cannot read stays visible as the stored text.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Globe } from 'lucide-react';
+import { Icons } from '../../components/ui';
 import DiffView from '../../components/DiffView';
 import { displayCommand } from '../conversations/steps';
 import { parseNativeRequest, type NativeRequest } from './nativeRequest';
@@ -14,7 +14,7 @@ export default function NativeApprovalBody({ summary, fallback }: { summary: str
   const request = parseNativeRequest(summary);
   if (!request) {
     return (
-      <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
+      <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-xl bg-neutral-900/[0.04] px-3 py-2 font-mono text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">
         {fallback}
       </pre>
     );
@@ -23,15 +23,15 @@ export default function NativeApprovalBody({ summary, fallback }: { summary: str
     <div className="space-y-1.5" data-testid="native-approval">
       {request.command !== undefined && (
         <>
-          <p className="text-xs font-medium text-amber-900 dark:text-amber-100">{t('approvals.native.command')}</p>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-neutral-900 px-2 py-1.5 font-mono text-xs text-neutral-100" title={request.command}>
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('approvals.native.command')}</p>
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-neutral-900/[0.04] px-3 py-2 font-mono text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100" title={request.command}>
             {displayCommand(request.command)}
           </pre>
         </>
       )}
       {request.changes.length > 0 && (
         <>
-          <p className="text-xs font-medium text-amber-900 dark:text-amber-100">{t('approvals.native.files', { count: request.changes.length })}</p>
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('approvals.native.files', { count: request.changes.length })}</p>
           <ul className="space-y-1">
             {request.changes.map((change, index) => (
               <FileRow key={index} path={change.path} kind={change.kind} diff={change.diff} />
@@ -41,14 +41,14 @@ export default function NativeApprovalBody({ summary, fallback }: { summary: str
       )}
       {request.changes.length === 0 && request.paths.length > 0 && (
         <>
-          <p className="text-xs font-medium text-amber-900 dark:text-amber-100">{t('approvals.native.files', { count: request.paths.length })}</p>
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('approvals.native.files', { count: request.paths.length })}</p>
           <ul className="space-y-0.5 font-mono text-xs">{request.paths.map((path) => <li key={path} className="break-all">{path}</li>)}</ul>
         </>
       )}
       {request.permissions && <PermissionList permissions={request.permissions} />}
       {request.network && (
-        <p className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-200">
-          <Globe size={12} aria-hidden="true" />
+        <p className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-300">
+          <Icons.webSearch size={12} aria-hidden />
           {t('approvals.native.network')}
         </p>
       )}
@@ -69,8 +69,8 @@ function FileRow({ path, kind, diff }: { path: string; kind: string; diff: strin
         disabled={!diff}
         className="flex min-w-0 items-center gap-1.5 text-left text-neutral-800 enabled:hover:text-neutral-950 dark:text-neutral-200"
       >
-        {diff ? open ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" /> : <span className="w-3" />}
-        <span className="shrink-0 rounded bg-white px-1 text-[10px] dark:bg-neutral-800">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
+        {diff ? open ? <Icons.expand size={12} aria-hidden /> : <Icons.next size={12} aria-hidden /> : <span className="w-3" />}
+        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-[10px] dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
         <span className="min-w-0 break-all font-mono">{path}</span>
       </button>
       {open && diff && <div className="mt-1"><DiffView diff={diff} className="max-h-60" /></div>}
@@ -82,7 +82,7 @@ function PermissionList({ permissions }: { permissions: NonNullable<NativeReques
   const { t } = useTranslation();
   return (
     <div className="space-y-1 text-xs">
-      <p className="font-medium text-amber-900 dark:text-amber-100">{t('approvals.native.permissions')}</p>
+      <p className="font-medium text-neutral-500 dark:text-neutral-400">{t('approvals.native.permissions')}</p>
       <ul className="list-disc space-y-0.5 pl-5 text-neutral-800 dark:text-neutral-200">
         {permissions.network && <li>{t('approvals.native.permissionNetwork')}</li>}
         {permissions.read.length > 0 && <li className="break-all">{t('approvals.native.permissionRead', { paths: permissions.read.join('、') })}</li>}

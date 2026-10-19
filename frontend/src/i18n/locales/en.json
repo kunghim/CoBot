@@ -154,6 +154,11 @@
     "default": "Default",
     "modelDefault": "Left to the model (its default: {{level}})",
     "note": "Applies from each member's next turn. Higher effort thinks more, takes longer and uses more.",
+    "modelNote": "The model is the default model all teams share.",
+    "reset": "Reset to default",
+    "chooseModel": "Choose model",
+    "back": "Back",
+    "saveFailed": "Thinking effort was not changed",
     "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" }
   },
   "permission": {
@@ -306,6 +311,7 @@
       "chain": "Chain confirmation"
     },
     "requester": "Requested by: {{name}}",
+    "requesterAsks": "asks for your approval",
     "reason": "Reason",
     "prev": "Previous approval card",
     "next": "Next approval card",

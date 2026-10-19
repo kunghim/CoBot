@@ -139,7 +139,7 @@ export function ModelEffortPanel({ models, model, onModel, levels, effort, onEff
 }
 
 /** The composer's trigger and the floating panel it opens. */
-export function ModelEffortPicker({ placement = 'top-start', triggerLabel, ...panel }: Parameters<typeof ModelEffortPanel>[0] & { placement?: Placement; triggerLabel: string }) {
+export function ModelEffortPicker({ placement = 'top-start', triggerLabel, disabled = false, note, ...panel }: Parameters<typeof ModelEffortPanel>[0] & { placement?: Placement; triggerLabel: string; disabled?: boolean; note?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const floating = useRef<HTMLDivElement>(null);
@@ -152,10 +152,12 @@ export function ModelEffortPicker({ placement = 'top-start', triggerLabel, ...pa
       <button
         type="button"
         aria-expanded={open}
+        aria-haspopup="dialog"
+        disabled={disabled}
         aria-label={triggerLabel}
         title={triggerLabel}
         onClick={() => setOpen(!open)}
-        className={cx('inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100', interactive.hover, open && interactive.selected)}
+        className={cx('inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100', interactive.hover, open && interactive.selected, 'disabled:pointer-events-none disabled:opacity-50')}
       >
         <Brain size={14} aria-hidden />
         <span className="text-signal-600 dark:text-signal-400">{level?.label}</span>
@@ -164,6 +166,7 @@ export function ModelEffortPicker({ placement = 'top-start', triggerLabel, ...pa
       {open && (
         <div ref={floating} role="dialog" aria-label={triggerLabel} className={cx('absolute w-72 animate-pop-in rounded-2xl p-3', surface.overlay, layer.dropdown, placementClass[placed])}>
           <ModelEffortPanel {...panel} />
+          {note && <p className="mt-3 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
         </div>
       )}
     </div>

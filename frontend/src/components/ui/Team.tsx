@@ -1,8 +1,8 @@
 // CoBot's own pieces: members and their work. A member is its avatar and its
 // name, shown together wherever a member is named. State is shown by
 // the avatar (moving, wide eyes) and said in words for screen readers.
-import { useId, useRef, type ReactNode } from 'react';
-import { ArrowUp, Bot, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, CircleX, FileDiff, FilePen, Globe, ListChecks, Loader2, MessageSquareText, ShieldCheck, Square, Terminal, Wrench, X } from 'lucide-react';
+import { forwardRef, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { ArrowUp, Bot, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, CircleX, FileDiff, FilePen, Globe, ListChecks, Loader2, MessageSquareText, ShieldCheck, Square, Terminal, Wrench, X } from 'lucide-react';
 import { roleChip } from './roleChip';
 import { Button, IconButton } from './Button';
 import { cx, interactive } from './foundation';
@@ -230,10 +230,21 @@ export function QuestionCard({ asker, question, answer, onAnswer, placeholder, o
     </WaitingCard>
   );
 }
-/** Where the user writes to a member: the text, its options, send or stop. */
-export function Composer({ value, onChange, onSend, placeholder, running = false, onStop, sendLabel, stopLabel, options, disabled = false }: { value: string; onChange: (value: string) => void; onSend: () => void; placeholder: string; running?: boolean; onStop?: () => void; sendLabel: string; stopLabel: string; options?: ReactNode; disabled?: boolean }) {
+/**
+ * Where the user writes to a member: the text, its options, send or stop.
+ * Enter sends, Shift+Enter breaks the line, and an IME composition never
+ * sends. The box grows with its text up to its max height. While a turn
+ * runs and nothing is typed, the button stops it; stopping shows a spinner.
+ */
+export function Composer({ value, onChange, onSend, placeholder, running = false, stopping = false, onStop, sendLabel, stopLabel, options, disabled = false, sending = false }: { value: string; onChange: (value: string) => void; onSend: () => void; placeholder: string; running?: boolean; stopping?: boolean; onStop?: () => void; sendLabel: string; stopLabel: string; options?: ReactNode; disabled?: boolean; sending?: boolean }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const empty = value.trim() === '';
+  useLayoutEffect(() => {
+    const element = area.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  }, [value]);
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgb(23_30_27/0.06),0_8px_24px_-12px_rgb(23_30_27/0.18)] transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
       <textarea
@@ -243,36 +254,51 @@ export function Composer({ value, onChange, onSend, placeholder, running = false
         disabled={disabled}
         aria-label={placeholder}
         placeholder={placeholder}
-        onChange={(event) => {
-          onChange(event.target.value);
-          const element = event.target;
-          element.style.height = 'auto';
-          element.style.height = `${Math.min(element.scrollHeight, 240)}px`;
-        }}
+        onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
           event.preventDefault();
-          if (!empty) onSend();
+          if (!empty && !disabled && !sending) onSend();
         }}
         className="block max-h-60 min-h-[44px] w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm leading-6 placeholder:text-neutral-400 focus:outline-none disabled:opacity-60"
       />
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
         <div className="flex min-w-0 items-center gap-1">{options}</div>
         {running && empty ? (
-          <IconButton icon={(props) => <Square {...props} size={11} fill="currentColor" />} label={stopLabel} variant="primary" size="sm" shape="circle" onClick={onStop} />
+          <IconButton
+            icon={stopping ? (props) => <Loader2 {...props} size={14} className="animate-spin" /> : (props) => <Square {...props} size={11} fill="currentColor" />}
+            label={stopLabel}
+            variant="primary"
+            size="sm"
+            shape="circle"
+            disabled={stopping}
+            onClick={onStop}
+          />
         ) : (
-          <IconButton icon={ArrowUp} label={sendLabel} variant="primary" size="sm" shape="circle" disabled={disabled || empty} onClick={onSend} className="disabled:opacity-30" />
+          <IconButton icon={ArrowUp} label={sendLabel} variant="primary" size="sm" shape="circle" disabled={disabled || empty || sending} onClick={onSend} className="disabled:opacity-30" />
         )}
       </div>
     </div>
   );
 }
-
-/** A compact option inside the composer (permission mode, reasoning effort). */
-export function ComposerOption({ icon: Icon, children, onClick }: { icon: (props: { size?: number; 'aria-hidden'?: boolean }) => ReactNode; children: ReactNode; onClick?: () => void }) {
+/**
+ * A compact option inside the composer (permission mode): its icon and the
+ * current value, with a chevron because it opens a menu. A danger tone marks
+ * a risky current value (full access).
+ */
+export const ComposerOption = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { icon: (props: { size?: number; 'aria-hidden'?: boolean }) => ReactNode; tone?: 'neutral' | 'danger' }>(function ComposerOption({ icon, tone = 'neutral', children, className, ...rest }, ref) {
   return (
-    <Button variant="ghost" size="sm" icon={Icon} onClick={onClick} className="text-neutral-500 dark:text-neutral-400">
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="sm"
+      shape="pill"
+      icon={icon}
+      trailingIcon={ChevronDown}
+      className={cx(tone === 'danger' ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50' : 'text-neutral-600 dark:text-neutral-300', className)}
+      {...rest}
+    >
       {children}
     </Button>
   );
-}
+});

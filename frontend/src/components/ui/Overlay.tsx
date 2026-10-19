@@ -4,7 +4,7 @@
 // a task that needs the page to wait. AlertDialog: confirm something that
 // cannot be undone. Sheet: a side panel over the page on narrow screens.
 import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useDialogFocus } from '../useDialogFocus';
 import { Button } from './Button';
 import { cx, layer, surface } from './foundation';
@@ -20,11 +20,15 @@ export interface MenuItem {
   shortcut?: string;
   danger?: boolean;
   disabled?: boolean;
+  /** A line under the label saying what the choice means. */
+  description?: ReactNode;
+  /** Set on every item of a one-of menu (a mode): marks the current one. */
+  checked?: boolean;
   onSelect: () => void;
 }
 
 /** A trigger button and the list of actions it opens. */
-export function Menu({ trigger, items, placement = 'bottom-end', label }: { trigger: ReactElement; items: Array<MenuItem | 'separator'>; placement?: Placement; label: string }) {
+export function Menu({ trigger, items, placement = 'bottom-end', label, note }: { trigger: ReactElement; items: Array<MenuItem | 'separator'>; placement?: Placement; label: string; note?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -77,7 +81,7 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
         },
       } as Record<string, unknown>)}
       {open && (
-        <div ref={panel} id={menuId} role="menu" aria-label={label} onKeyDown={onKeyDown} className={cx('absolute min-w-52 animate-pop-in rounded-xl p-1', surface.overlay, layer.dropdown, placementClass[placed])}>
+        <div ref={panel} id={menuId} role="menu" aria-label={label} onKeyDown={onKeyDown} className={cx('absolute min-w-52 animate-pop-in rounded-xl p-1', actions.some((item) => item.description) && 'w-72', surface.overlay, layer.dropdown, placementClass[placed])}>
           {items.map((item, index) =>
             item === 'separator' ? (
               <div key={`separator-${index}`} role="separator" className="my-1 h-px bg-neutral-200 dark:bg-neutral-700" />
@@ -88,7 +92,8 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
                   refs.current[actions.indexOf(item)] = element;
                 }}
                 type="button"
-                role="menuitem"
+                role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+                aria-checked={item.checked}
                 tabIndex={-1}
                 disabled={item.disabled}
                 onClick={() => {
@@ -97,16 +102,26 @@ export function Menu({ trigger, items, placement = 'bottom-end', label }: { trig
                   item.onSelect();
                 }}
                 className={cx(
-                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none transition-colors disabled:opacity-40 focus-visible:outline-none',
+                  'flex w-full gap-2.5 rounded-lg px-2.5 text-left text-sm outline-none transition-colors disabled:opacity-40 focus-visible:outline-none',
+                  item.description ? 'items-start py-2' : 'items-center py-1.5',
                   item.danger ? 'text-red-600 hover:bg-red-50 focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-950 dark:focus:bg-red-950' : 'text-neutral-800 hover:bg-neutral-900/[0.06] focus:bg-neutral-900/[0.06] dark:text-neutral-100 dark:hover:bg-white/[0.08] dark:focus:bg-white/[0.08]',
                 )}
               >
-                {item.icon && <item.icon size={15} aria-hidden />}
-                <span className="flex-1 whitespace-nowrap">{item.label}</span>
+                {item.icon && (
+                  <span className={cx('shrink-0', !!item.description && 'mt-0.5')}>
+                    <item.icon size={15} aria-hidden />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block', item.description ? 'font-medium' : 'whitespace-nowrap')}>{item.label}</span>
+                  {item.description && <span className="mt-0.5 block text-xs font-normal leading-5 text-neutral-500 dark:text-neutral-400">{item.description}</span>}
+                </span>
                 {item.shortcut && <kbd className="ml-4 whitespace-nowrap font-mono text-[11px] text-neutral-400">{item.shortcut}</kbd>}
+                {item.checked !== undefined && <Check size={14} aria-hidden className={cx('shrink-0 text-signal-500', !!item.description && 'mt-1', !item.checked && 'opacity-0')} />}
               </button>
             ),
           )}
+          {note && <p className="px-2.5 pb-1.5 pt-1 text-[11px] leading-4 text-neutral-500 dark:text-neutral-400">{note}</p>}
         </div>
       )}
     </div>

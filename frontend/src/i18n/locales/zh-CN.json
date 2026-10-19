@@ -154,6 +154,11 @@
     "default": "默认",
     "modelDefault": "由模型决定（当前模型默认：{{level}}）",
     "note": "从每个成员的下一轮开始生效。强度越高，想得越多，也越慢、越费用量。",
+    "modelNote": "模型是所有团队共用的默认模型。",
+    "reset": "恢复默认",
+    "chooseModel": "选择模型",
+    "back": "返回",
+    "saveFailed": "思考强度没有改成",
     "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高" }
   },
   "permission": {
@@ -304,6 +309,7 @@
       "chain": "协作链确认"
     },
     "requester": "发起者：{{name}}",
+    "requesterAsks": "请求你批准",
     "reason": "理由",
     "prev": "上一张审批卡",
     "next": "下一张审批卡",

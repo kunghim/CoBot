@@ -5,9 +5,8 @@
 // User text is shown verbatim; member replies render as Markdown without
 // raw HTML.
 import { ShellToggle } from '../../app/shell';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUp, Loader2, Square, X } from 'lucide-react';
 import { useCancelMessage, useConversation, useInterruptRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
 import { forgetLiveRuns, useLiveRuns } from '../../api/live';
@@ -20,7 +19,8 @@ import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
-import { ExchangeLine, RoleBadge, TeamMembersContext, isExchange } from './ExchangeLine';
+import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
+import { Alert, Composer, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
 import Avatar from '../avatars/Avatar';
 import { MemberAvatarButton } from '../avatars/AvatarEditors';
 import ExchangeOverlay from './ExchangeOverlay';
@@ -48,14 +48,6 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const [exchange, setExchange] = useState<{ peerId: string; anchorId: string } | null>(null);
   useEffect(() => setExchange(null), [bot.id]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-  // The composer grows with its text up to its max height, like Codex's.
-  useLayoutEffect(() => {
-    const element = composerRef.current;
-    if (!element) return;
-    element.style.height = 'auto';
-    element.style.height = `${element.scrollHeight}px`;
-  }, [draft, bot.id]);
   const loadingOlder = useRef(false);
   const loadEarlier = async () => {
     const element = scrollRef.current;
@@ -119,7 +111,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     [...messages].reverse().find((message) => message.kind === 'user' && message.deliveryStatus === 'queued') ?? null;
 
   const botNameById = new Map(item.bots.map((entry) => [entry.id, entry.name]));
-  const membersByName = new Map(item.bots.map((entry) => [entry.name, entry]));
+  const membersById = new Map(item.bots.map((entry) => [entry.id, entry]));
   const nameOf = (botId: string) => botNameById.get(botId) ?? botId;
   // Between sending and the member's turn starting (engine start, thread
   // creation) the flow still says something is happening.
@@ -139,7 +131,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const headerTitle = bot.name;
 
   return (
-    <TeamMembersContext.Provider value={membersByName}>
+    <TeamMembersContext.Provider value={membersById}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
         <ShellToggle side="left" />
@@ -181,9 +173,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
-          <p className="text-center text-sm text-red-600" role="alert">
-            {t('status.error')}
-          </p>
+          <div className="mx-auto max-w-3xl">
+            <Alert tone="danger">{t('status.error')}</Alert>
+          </div>
         )}
         <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
         {conv.isSuccess && timeline.length === 0 && !preparing && (
@@ -226,7 +218,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           {preparing && (
             <li>
               <p role="status" className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                <Spinner size={13} />
                 {t('conversation.phase.preparing')}
               </p>
             </li>
@@ -249,78 +241,59 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
         <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
           <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
 
-          <div className="rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgb(23_30_27/0.06),0_8px_24px_-12px_rgb(23_30_27/0.18)] transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
-            <textarea
-              ref={composerRef}
-              aria-label={t('conversation.placeholder', { name: headerTitle })}
-              placeholder={t('conversation.placeholder', { name: headerTitle })}
-              value={draft}
-              disabled={blockReasonKey !== null}
-              rows={1}
-              onChange={(event) => setDraft(bot.id, event.target.value)}
-              onKeyDown={(event) => {
-                // Enter sends, Shift+Enter inserts a newline; IME composition
-                // must never submit mid-composition.
-                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
-                event.preventDefault();
-                sendNow();
-              }}
-              className="block max-h-60 min-h-[44px] w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm leading-6 placeholder:text-neutral-400 focus:outline-none disabled:opacity-60"
-            />
-            <div className="flex items-center justify-between gap-2 px-2 pb-2">
-              <div className="flex min-w-0 items-center gap-1">
+          <Composer
+            value={draft}
+            onChange={(value) => setDraft(bot.id, value)}
+            onSend={sendNow}
+            placeholder={t('conversation.placeholder', { name: headerTitle })}
+            disabled={blockReasonKey !== null}
+            sending={send.isPending}
+            sendLabel={t('conversation.send')}
+            running={!!activeRun}
+            stopping={stopping || interrupt.isPending}
+            stopLabel={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
+            onStop={() => {
+              if (!activeRun?.id) return;
+              setStopping(true);
+              interrupt.mutate(activeRun.id, {
+                onSuccess: (result) => {
+                  if (result.responseState === 'unknown') {
+                    setStopping(false);
+                    setActionError(t('errors.error.engine.interrupt_unconfirmed'));
+                  }
+                },
+                onError: (error) => {
+                  setStopping(false);
+                  setActionError(apiErrorMessage(t, error));
+                },
+              });
+            }}
+            options={
+              <>
                 <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
                 <ReasoningEffortSelect team={team} disabled={readOnly || blockReasonKey !== null} />
-              </div>
-              {activeRun && draft.trim() === '' ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!activeRun.id) return;
-                    setStopping(true);
-                    interrupt.mutate(activeRun.id, {
-                      onSuccess: (result) => {
-                        if (result.responseState === 'unknown') { setStopping(false); setActionError(t('errors.error.engine.interrupt_unconfirmed')); }
-                      },
-                      onError: (error) => {
-                        setStopping(false);
-                        setActionError(apiErrorMessage(t, error));
-                      },
-                    });
-                  }}
-                  disabled={stopping || interrupt.isPending}
-                  title={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-                  aria-label={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-                >
-                  {stopping ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Square size={11} fill="currentColor" aria-hidden="true" />}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={sendNow}
-                  disabled={blockReasonKey !== null || draft.trim() === '' || send.isPending}
-                  title={t('conversation.send')}
-                  aria-label={t('conversation.send')}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-200 disabled:text-neutral-400 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-500"
-                >
-                  <ArrowUp size={16} aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          </div>
+              </>
+            }
+          />
         </fieldset>
 
         <SessionStatsBar botId={bot.id} />
         {blockReasonKey && (
-          <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">
+          <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t(blockReasonKey, { status: team.status })}
           </p>
         )}
         {(sendError || actionError) && (
-          <p className="text-xs text-red-600" role="alert">
+          <Alert
+            tone="danger"
+            onClose={() => {
+              setSendError('');
+              setActionError('');
+            }}
+            closeLabel={t('common.close')}
+          >
             {sendError || actionError}
-          </p>
+          </Alert>
         )}
       </div>
     </div>
@@ -396,6 +369,7 @@ function MessageRow({
   onCancelQueued: () => void;
 }) {
   const { t } = useTranslation();
+  const membersById = useContext(TeamMembersContext);
   const text = messageText(message);
 
   if (isExchange(message)) {
@@ -413,46 +387,26 @@ function MessageRow({
     );
   }
 
-  if (message.kind === 'system') {
-    return (
-      <div className="flex justify-center">
-        <span className="max-w-[85%] whitespace-pre-wrap text-center text-xs text-neutral-500 dark:text-neutral-400">{text}</span>
-      </div>
-    );
-  }
+  if (message.kind === 'system') return <SystemNote>{text}</SystemNote>;
 
   const isUser = message.kind === 'user';
+  const delivery = isLastUser && message.deliveryStatus ? t(deliveryLabelKey(message.deliveryStatus)) : '';
+  const meta =
+    delivery || showCancel ? (
+      <>
+        {delivery && <span>{delivery}</span>}
+        {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
+      </>
+    ) : undefined;
+  const author = membersById.get(message.botId);
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className="max-w-[85%] space-y-1">
-        {!isUser && <RoleBadge name={nameOf(message.botId)} />}
-        <div
-          className={`break-words text-sm leading-6 ${
-            isUser
-              ? 'whitespace-pre-wrap rounded-2xl rounded-br-md bg-neutral-900 px-3.5 py-2 text-white dark:bg-neutral-100 dark:text-neutral-900'
-              : 'rounded-2xl rounded-tl-md bg-white px-4 py-2.5 text-neutral-900 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-800'
-          }`}
-        >
-          {isUser ? text : <Markdown text={text} teamId={teamId} />}
-        </div>
-        <div className={`flex items-center gap-2 text-[11px] text-neutral-400 ${isUser ? 'justify-end' : 'justify-start'}`}>
-          {isLastUser && message.deliveryStatus && (
-            <span>{t(deliveryLabelKey(message.deliveryStatus))}</span>
-          )}
-          {showCancel && (
-            <button
-              type="button"
-              onClick={onCancelQueued}
-              disabled={cancelPending}
-              aria-label={t('conversation.cancelQueued')}
-              title={t('conversation.cancelQueued')}
-              className="flex items-center gap-1 rounded px-1 text-neutral-400 underline-offset-2 hover:text-red-600 disabled:opacity-50"
-            >
-              <X size={11} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    <MessageBubble
+      from={isUser ? 'user' : 'member'}
+      avatar={author ? <Avatar bot={author} size="md" /> : undefined}
+      author={isUser ? undefined : nameOf(message.botId)}
+      meta={meta}
+    >
+      {isUser ? text : <Markdown text={text} teamId={teamId} />}
+    </MessageBubble>
   );
 }
