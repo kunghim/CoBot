@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { authorize, setEngineMode } from './helpers';
+import { authorize, seedRequirement, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
 });
 
-// The five work-panel pages are all real in M5: tasks create, activity
-// records and memories show honest empty states, and the
+// The work-panel pages are all real: the requirement board shows a route
+// with its cards, memories show an honest empty state, and the
 // team's archive/restore verbs really pause and resume dispatch.
 test('work panel pages show real data and team lifecycle verbs work', async ({ page }) => {
   const teamDir = join(process.env.COBOT_E2E_ROOT!, 'm5-' + Date.now());
@@ -26,29 +26,30 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   await expect(page.getByText('m5团队').first()).toBeVisible({ timeout: 15000 });
 
-  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  const leaders = page.getByRole('button', { name: /项目经理/ }).filter({ visible: true });
   await expect(leaders).toHaveCount(1, { timeout: 15000 });
   await leaders.first().click();
 
-  // Tasks tab: create a task owned by the leader. The panel is the
-  // complementary landmark; its header button shares the same accessible
-  // name, so the role keeps the two apart.
+  // Tasks tab: a requirement with the route the user confirmed and the
+  // card its engineer holds. Cards only come from the relay, so the spec
+  // seeds one. The panel is the complementary landmark; its header button
+  // shares the same accessible name, so the role keeps the two apart.
+  const teams = (await (await page.request.get('/api/v1/teams')).json()).data.items as { team: { id: string; name: string }; bots: { id: string; isLeader: boolean }[] }[];
+  const { team, bots } = teams.find((item) => item.team.name === 'm5团队')!;
+  const leader = bots.find((bot) => bot.isLeader)!;
+  seedRequirement(team.id, 'e2e需求', [
+    { name: '用户确认', kind: 'confirm' },
+    { name: 'e2e实现', kind: 'implement', ownerId: leader.id },
+    { name: '验收汇报', kind: 'accept' },
+  ], [{ title: 'e2e实现', ownerId: leader.id, stageIndex: 1 }]);
+  await page.reload();
   const panel = page.getByRole('complementary', { name: /工作面板|work panel/i });
   await expect(panel).toBeVisible();
   await panel.getByRole('tab', { name: /^任务$|^Tasks$/ }).click();
-  await panel.getByRole('button', { name: /新建任务|new task/i }).click();
-  await panel.getByLabel(/任务标题|title/i).fill('e2e任务');
-  await panel.getByLabel(/负责人|owner/i).selectOption({ index: 1 });
-  await panel.getByRole('button', { name: /^创建$|^Create$/ }).click();
-  await expect(panel.getByText('e2e任务')).toBeVisible({ timeout: 15000 });
-
-  // Activity tab: the new task reads as a sentence and leads back to it.
-  await panel.getByRole('tab', { name: /动态|Activity/ }).click();
-  const created = panel.getByRole('button', { name: /创建任务「e2e任务」/ }).first();
-  await expect(created).toBeVisible({ timeout: 15000 });
-  await created.click();
-  await expect(panel.getByRole('tab', { name: /^任务$|^Tasks$/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(panel.locator('li[id^="task-"]').filter({ hasText: 'e2e任务' }).getByRole('button').first()).toHaveAttribute('aria-expanded', 'true');
+  await panel.getByRole('button', { name: /e2e需求/ }).click();
+  await expect(panel.getByRole('list').getByText(/e2e实现 · 实现/)).toBeVisible({ timeout: 15000 });
+  await expect(panel.locator('li[id^="task-"]').filter({ hasText: 'e2e实现' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: '取消需求' })).toBeVisible();
 
   // The memory tab shows an honest empty state; member-to-member messages
   // live in conversations and activity, so there is no collaboration tab.
@@ -56,7 +57,7 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
   await expect(panel.getByText(/暂无记忆|No memories yet/)).toBeVisible();
   await expect(panel.getByRole('tab', { name: /协作/ })).toHaveCount(0);
 
-  // Team lifecycle: a team with an unfinished task cannot be archived; the
+  // Team lifecycle: a team with an open card cannot be archived; the
   // refusal names what is left.
   // Archiving asks first; the refusal shows inside the dialog.
   await page.getByRole('button', { name: /团队操作|Actions for/ }).first().click();

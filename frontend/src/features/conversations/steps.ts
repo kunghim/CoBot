@@ -28,7 +28,7 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
 }
 
 // CoBot's own collaboration tools, described as what the member did.
-const collaborationTools = new Set(['deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'ask_user']);
+const collaborationTools = new Set(['start_requirement', 'handoff', 'view_tasks', 'send_message', 'ask_user']);
 
 // Codex sub-agent tools and activity kinds with their own wording; anything
 // newer reads as the generic sub-agent line instead of a raw key.
@@ -87,9 +87,9 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
         const recipients = Array.isArray(args.targetBotIds) ? args.targetBotIds.filter((id): id is string => typeof id === 'string') : [];
         const target = text(args.targetBotId) || text(args.ownerId) || text(args.toBotId);
         const names = (recipients.length ? recipients : target ? [target] : []).map(nameOf).join('、');
+        const outcome = text(args.outcome);
         const key =
-          tool === 'send_message' && args.notifyOnly === true ? 'conversation.step.cobot.notify'
-          : tool === 'review_task' ? (args.decision === 'reject' ? 'conversation.step.cobot.review_reject' : 'conversation.step.cobot.review_accept')
+          tool === 'handoff' ? `conversation.step.cobot.handoff_${['back', 'escalate', 'resume'].includes(outcome) ? outcome : 'done'}`
           : `conversation.step.cobot.${tool}`;
         return {
           key: collaborationTools.has(tool) ? key : 'conversation.step.tool',

@@ -57,39 +57,9 @@ func (a *App) rosterText(ctx context.Context, teamID string) string {
 	for _, m := range members {
 		role := "成员"
 		if m.IsLeader {
-			role = "队长"
+			role = "项目经理"
 		}
 		fmt.Fprintf(&b, "- %s（%s，id=%s）\n", m.Name, role, m.ID)
-	}
-	return b.String()
-}
-
-var taskStatusNames = map[string]string{
-	domain.TaskTodo: "待办", domain.TaskDoing: "进行中", domain.TaskReview: "待验收",
-	domain.TaskDone: "已完成", domain.TaskCancelled: "已取消",
-}
-
-// ownTasksText lists a member's unfinished tasks, saying which still wait
-// for another task, so a member woken early knows its work has not started.
-func (a *App) ownTasksText(ctx context.Context, teamID, botID string) string {
-	lines, err := a.taskLines(ctx, teamID, botID)
-	if err != nil {
-		return ""
-	}
-	var b strings.Builder
-	for _, line := range lines {
-		if line.Status == domain.TaskDone || line.Status == domain.TaskCancelled {
-			continue
-		}
-		status := taskStatusNames[line.Status]
-		if line.Status == domain.TaskTodo && len(line.WaitingOn) == 0 {
-			status = "刚交给你" // it turns to doing as this turn starts
-		}
-		fmt.Fprintf(&b, "- 「%s」（id=%s）%s", line.Title, line.ID, status)
-		if len(line.WaitingOn) > 0 {
-			fmt.Fprintf(&b, "，要等「%s」完成后才会送到你手上，现在不要开工", strings.Join(line.WaitingOn, "」「"))
-		}
-		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -107,29 +77,47 @@ func (a *App) memoriesText(ctx context.Context, teamID, botID string) string {
 // (in Codex's code mode the tool schemas are not part of the prompt).
 func toolGuide(role string) string {
 	var b strings.Builder
-	b.WriteString("\n# 协作工具\n你通过 CoBot 的工具和团队协作。工具名是 mcp__cobot__<名字>，在代码里调用时写作 tools.mcp__cobot__<名字>(参数)，不需要先搜索工具列表。\n")
-	switch role {
-	case "leader":
-		b.WriteString("- create_task({title, description, acceptanceCriteria, ownerId, dependencyIds?, reviewType?})：派活。用户确认方案后再用。需要专业评审时 reviewType 填 requirements（需求）、design（PRD/原型/方案）、test_plan（测试用例）、code（代码）或 general（其他）。\n")
-		b.WriteString("- review_task({taskId, decision: \"accept\" 或 \"reject\", comment?})：验收交付；打回时 comment 写明缺什么。\n")
-	case "reviewer":
-		b.WriteString("- review_task({taskId, decision: \"accept\" 或 \"reject\", comment?})：评审送到你手上的任务；打回时 comment 写明缺什么、怎样算改好。\n")
-		b.WriteString("- deliver_task({taskId, summary, artifactRefs?})：交付你自己负责的任务。\n")
-	default:
-		b.WriteString("- deliver_task({taskId, summary, artifactRefs?})：交付你负责的任务；summary 写清做了什么、怎么运行或查看、实际验证和结果。\n")
+	b.WriteString("\n# 协作工具\n你通过 CoBot 的工具协作。工具名是 mcp__cobot__<名字>，在代码里调用时写作 tools.mcp__cobot__<名字>(参数)，不需要先搜索工具列表。\n")
+	if role == "leader" {
+		b.WriteString("- start_requirement({title, document, stages})：提交需求文档和链路。stages 按顺序列出每一环：{name, kind, ownerId?, reviewType?, criteria}。" +
+			"kind 取值：confirm（用户确认，不填 ownerId）、design（产品设计）、review（评审，必须填 reviewType：requirements、design、test_plan、code 或 general）、" +
+			"test_cases（测试用例）、implement（实现）、test（测试执行）、accept（你的验收汇报，固定为最后一环，不填 ownerId）。" +
+			"第一环必须是 confirm，前面最多只能有一环需求评审；除 confirm 和 accept 外每一环都要指定一名成员。\n")
 	}
-	b.WriteString("- send_message({targetBotIds, text, notifyOnly?})：给同事发消息。\n")
-	b.WriteString("- view_tasks({taskId?})：查看任务；不传 taskId 列出全部任务。\n")
-	b.WriteString("- ask_user({question, options?})：向用户提问，然后结束这一轮。\n")
+	b.WriteString("- handoff({cardId, outcome, summary, artifactRefs?, mode?, suggestions?, document?})：交出手上的卡片。\n")
+	b.WriteString("  - outcome=\"done\"：完成，系统按链路交给下一环；评审或测试通过但有可选建议时写在 suggestions 里（带建议通过）。\n")
+	b.WriteString("  - outcome=\"back\"：退回（只有评审和测试环节可用），系统交给产出这项工作的那一环；mode 填 \"rerun\"（改完重新往下走）或 \"return_to_me\"（改完直接回到你）；summary 写清缺什么、在哪里、怎样算改好。\n")
+	if role == "leader" {
+		b.WriteString("  - outcome=\"resume\"：处理完上报卡后交回原环节继续，summary 写处理意见。\n")
+		b.WriteString("  - 需求文档的返工卡完成时，document 填修改后的完整需求文档。验收汇报卡完成时，summary 就是给用户的验收汇报。\n")
+	} else {
+		b.WriteString("  - outcome=\"escalate\"：上报项目经理，summary 写明卡在哪里。\n")
+	}
+	b.WriteString("- view_tasks({requirementId?, cardId?})：查看需求和卡片；不传参数列出进行中的需求。\n")
+	b.WriteString("- send_message({targetBotIds, text})：给同事留言，只用于反馈和告知，对方不会被唤醒；不要用它派活、催人或代替交接。\n")
+	if role == "leader" {
+		b.WriteString("- ask_user({question, options?})：向用户提问，然后结束这一轮，用户回答后你会被唤醒。\n")
+	} else {
+		b.WriteString("- ask_user({question, options?})：只用于只有用户能决定的问题，然后结束这一轮，用户的回答会送回给你。需求范围的变化不要用它，用 handoff 上报项目经理。\n")
+	}
 	return b.String()
 }
 
 // threadInstructions is a member's developer instructions for a new thread,
-// with the digest of what they told it.
+// with the digest of what they told it. The order goes from the most shared
+// to the most personal: the platform layer every member reads, the tools of
+// its place in the team, its role, its team, and its memories.
 func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot domain.Bot, role roles.Role) (string, contextDigest) {
 	roster := a.rosterText(ctx, team.ID)
 	memories := a.memoriesText(ctx, team.ID, bot.ID)
+	place := bridgeRole(team, bot)
 	var b strings.Builder
+	b.WriteString(platformLayer)
+	if place != "leader" {
+		b.WriteString(directRequestLayer)
+	}
+	b.WriteString(toolGuide(place))
+	b.WriteString("\n# 你的角色\n")
 	b.WriteString(role.Instructions)
 	b.WriteString("\n\n# 团队\n")
 	fmt.Fprintf(&b, "团队名称：%s\n", team.Name)
@@ -142,13 +130,11 @@ func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot doma
 		b.WriteString("\n# 你的记忆（工作方法与偏好）\n")
 		b.WriteString(memories)
 	}
-	b.WriteString(toolGuide(bridgeRole(team, bot)))
-	b.WriteString(collaborationEtiquette)
 	return b.String(), contextDigest{Roster: digestOf(roster), Memories: digestOf(memories)}
 }
 
 // turnContext is what a turn adds before the incoming messages: only what
-// changed since the thread last heard (the team, the member's own tasks, its
+// changed since the thread last heard (the team, the member's own cards, its
 // memories) and the notes colleagues left without waking it since its last
 // turn. It returns the digest to store once the turn is accepted.
 func (a *App) turnContext(ctx context.Context, bot domain.Bot, runID string, seen contextDigest) (string, contextDigest) {
@@ -159,17 +145,14 @@ func (a *App) turnContext(ctx context.Context, bot domain.Bot, runID string, see
 		b.WriteString(roster)
 		next.Roster = digestOf(roster)
 	}
-	if !bot.IsLeader {
-		tasks := a.ownTasksText(ctx, bot.TeamID, bot.ID)
-		if digestOf(tasks) != seen.Tasks {
-			if tasks == "" {
-				b.WriteString("# 你名下的任务都已结束\n")
-			} else {
-				b.WriteString("# 你名下的任务\n")
-				b.WriteString(tasks)
-			}
-			next.Tasks = digestOf(tasks)
+	if cards := a.ownCardsText(ctx, bot.TeamID, bot.ID); digestOf(cards) != seen.Tasks {
+		if cards == "" {
+			b.WriteString("# 你手上的卡片都已交接\n")
+		} else {
+			b.WriteString("# 你手上的卡片\n")
+			b.WriteString(cards)
 		}
+		next.Tasks = digestOf(cards)
 	}
 	if memories := a.memoriesText(ctx, bot.TeamID, bot.ID); digestOf(memories) != seen.Memories {
 		b.WriteString("# 你的记忆有更新\n")

@@ -20,11 +20,12 @@ const TONES: Record<string, RoleTone> = {
     solid: 'bg-[#8c3fa3] text-white dark:bg-[#c58ad6] dark:text-[#2a1131]',
     chip: 'bg-[#f3e6f7] text-[#6b2c7d] dark:bg-[#3a2242] dark:text-[#e3c4ec]',
   },
-  'frontend-dev': {
+  'fullstack-engineer': {
     solid: 'bg-[#2463c9] text-white dark:bg-[#7fa9f0] dark:text-[#0d1f3d]',
     chip: 'bg-[#e3ecfb] text-[#1b4c9b] dark:bg-[#1c2a45] dark:text-[#bcd2f7]',
   },
-  'backend-dev': {
+  // Unused by built-in roles; it keeps custom roles in five distinct colors.
+  teal: {
     solid: 'bg-[#0f7f72] text-white dark:bg-[#5cc4b6] dark:text-[#082a26]',
     chip: 'bg-[#dcf1ee] text-[#0b5e54] dark:bg-[#15332f] dark:text-[#a6e3da]',
   },
@@ -38,7 +39,7 @@ const TONES: Record<string, RoleTone> = {
   },
 };
 
-const EXTRA = ['product-manager', 'frontend-dev', 'backend-dev', 'qa-engineer', 'code-reviewer'];
+const EXTRA = ['product-manager', 'fullstack-engineer', 'teal', 'qa-engineer', 'code-reviewer'];
 
 export function roleTone(roleId: string | undefined, isLeader = false): RoleTone {
   if (isLeader) return TONES.leader;

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -34,6 +35,10 @@ type ServerSpec struct {
 type teamRuntime struct {
 	server engine.Server
 	cwd    string
+
+	// lastActive is when the engine last did or was asked for anything
+	// (unix nanoseconds); an engine idle long enough is shut down.
+	lastActive atomic.Int64
 
 	mu     sync.Mutex
 	buffer map[string]*runBuffer // runID -> accumulated agent text
@@ -73,7 +78,15 @@ type Scheduler struct {
 
 	// leaseDone is closed when the lease loop exits, so Stop joins it.
 	leaseDone chan struct{}
+
+	// IdleEngineTimeout is how long a team's engine may sit with nothing to
+	// do before it is shut down; the next turn starts it again and resumes
+	// the members' threads. Zero keeps engines running.
+	IdleEngineTimeout time.Duration
 }
+
+// defaultIdleEngineTimeout frees an unused team's engine process.
+const defaultIdleEngineTimeout = 15 * time.Minute
 
 // NewScheduler creates a scheduler bound to one app.
 func NewScheduler(a *App, factory ServerFactory) *Scheduler {
@@ -86,8 +99,10 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 		teams:     map[string]*teamRuntime{},
 		leaseDone: make(chan struct{}),
 		wake:      make(chan string, 256),
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+
+		IdleEngineTimeout: defaultIdleEngineTimeout,
+		stop:              make(chan struct{}),
+		done:              make(chan struct{}),
 	}
 }
 
@@ -118,6 +133,7 @@ func (s *Scheduler) Start() {
 				return
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(s.ctx)
+				s.stopIdleEngines(s.ctx)
 			}
 		}
 	}()
@@ -131,17 +147,19 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+	// Both loops must be gone before the caller closes the database: a late
+	// lease write racing DB.Close would be swallowed or worse (review B). The
+	// lease loop goes first: it may still hand an idle engine's shutdown to a
+	// worker, which the wait below then joins.
+	select {
+	case <-s.leaseDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	joined := make(chan struct{})
 	go func() { s.workers.Wait(); close(joined) }()
 	select {
 	case <-joined:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	// Both loops must be gone before the caller closes the database: a late
-	// lease write racing DB.Close would be swallowed or worse (review B).
-	select {
-	case <-s.leaseDone:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -388,7 +406,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 			tx.Rollback()
 			return err
 		}
-		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
+		// A card is stale once it was handed off in another turn (the member
+		// saw it among its cards and did it) or its requirement was
+		// cancelled: the turn it would cost would hear nothing new.
+		if errors.Is(err, sqlite.ErrNotFound) || task.IsTerminal() {
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				tx.Rollback()
 				return err
@@ -501,7 +522,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// since (see turnContext), then the incoming messages.
 	text := message.RenderText()
 	if len(batch) > 0 {
-		text = s.batchInput(ctx, append([]domain.Message{message}, batch...))
+		text = s.batchInput(ctx, delivery.Kind, append([]domain.Message{message}, batch...))
 	}
 	update, told := s.app.turnContext(ctx, bot, run.ID, parseDigest(sqlite.SessionContextDigest(ctx, s.app.DB, bot.ID)))
 	input := text
@@ -665,11 +686,13 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.mu.Lock()
 	if rt, ok := s.teams[teamID]; ok {
 		s.mu.Unlock()
+		rt.touch()
 		return rt.server, nil
 	}
 	s.mu.Unlock()
 
 	rt := &teamRuntime{cwd: cwd, buffer: map[string]*runBuffer{}}
+	rt.touch()
 	var err error
 	rt.server, err = s.factory(ServerSpec{
 		Context: ctx,
@@ -677,11 +700,13 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 		Cwd:     cwd,
 		Callbacks: engine.Callbacks{
 			OnApproval: func(req engine.ApprovalRequest) {
+				rt.touch()
 				if s.runtime(teamID) == rt {
 					s.onApproval(teamID, rt, req)
 				}
 			},
 			OnNotification: func(n engine.Notification) {
+				rt.touch()
 				if s.runtime(teamID) == rt {
 					s.onNotification(teamID, rt, n)
 				}
@@ -703,6 +728,66 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.teams[teamID] = rt
 	s.mu.Unlock()
 	return rt.server, nil
+}
+
+func (rt *teamRuntime) touch() { rt.lastActive.Store(time.Now().UnixNano()) }
+
+// stopIdleEngines shuts down the engines of teams that have had nothing to do
+// for IdleEngineTimeout: no turn running, starting, waiting or unverified.
+// Holding the team lock keeps a dispatch from claiming a turn between the
+// check and the shutdown; a later turn simply starts a fresh engine.
+func (s *Scheduler) stopIdleEngines(ctx context.Context) {
+	if s.IdleEngineTimeout <= 0 || ctx.Err() != nil {
+		return
+	}
+	cutoff := time.Now().Add(-s.IdleEngineTimeout).UnixNano()
+	s.mu.Lock()
+	var idle []string
+	for teamID, rt := range s.teams {
+		if rt.lastActive.Load() < cutoff {
+			idle = append(idle, teamID)
+		}
+	}
+	s.mu.Unlock()
+	for _, teamID := range idle {
+		s.stopIfIdle(ctx, teamID, cutoff)
+	}
+}
+
+func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64) {
+	lock := s.teamLock(teamID)
+	lock.Lock()
+	s.mu.Lock()
+	rt := s.teams[teamID]
+	if rt == nil || rt.lastActive.Load() >= cutoff {
+		s.mu.Unlock()
+		lock.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	runs, err := sqlite.ListActiveRunsByTeam(ctx, s.app.DB, teamID)
+	if err != nil || len(runs) > 0 {
+		lock.Unlock()
+		return
+	}
+	s.mu.Lock()
+	if s.teams[teamID] == rt {
+		delete(s.teams, teamID)
+	}
+	s.mu.Unlock()
+	lock.Unlock()
+	s.logger.Info("idle team engine stopped", "teamId", teamID, "idleFor", s.IdleEngineTimeout.String())
+	// The shutdown waits for the process; off the lease loop, so leases keep
+	// their 2-second refresh (H06). Stop joins it like any worker.
+	s.workers.Add(1)
+	go func() {
+		defer s.workers.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		if err := rt.server.Shutdown(shutdownCtx); err != nil {
+			s.logger.Warn("idle team engine shutdown", "teamId", teamID, "error", err)
+		}
+	}()
 }
 
 func (s *Scheduler) teamLock(teamID string) *sync.Mutex {
@@ -931,14 +1016,11 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 }
 
 // bridgeRole is the tool set a member's bridge offers: "leader" for the
-// team's leader, "reviewer" for a reviewer member, "member" for everyone
-// else.
+// team's leader, "member" for everyone else. A reviewer is a member like
+// any other: what it reviews comes to it on cards.
 func bridgeRole(team domain.Team, bot domain.Bot) string {
 	if bot.IsLeader || team.LeaderID == bot.ID {
 		return "leader"
-	}
-	if bot.RoleID == roles.ReviewerRoleID {
-		return "reviewer"
 	}
 	return "member"
 }

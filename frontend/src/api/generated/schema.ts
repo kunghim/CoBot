@@ -461,11 +461,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Project a team's task board */
+        /** Project a team's cards */
         get: operations["listTasks"];
         put?: never;
-        /** Create a task with a unique owner */
-        post: operations["createTask"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -479,35 +478,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One task with its evidence and transfer history */
+        /** One card with its handoff records */
         get: operations["getTask"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Change status, or change owner through the transfer safety rules */
-        patch: operations["patchTask"];
+        patch?: never;
         trace?: never;
     };
-    "/api/v1/tasks/{id}/evidence": {
+    "/api/v1/teams/{id}/requirements": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** A team's requirements with their documents and routes, newest first */
+        get: operations["listRequirements"];
         put?: never;
-        /** Record a proof reference for a task */
-        post: operations["submitTaskEvidence"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tasks/{id}/confirm": {
+    "/api/v1/requirements/{id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -516,59 +514,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm a review task as done against evidence */
-        post: operations["confirmTask"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tasks/{id}/transfers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Offer a two-phase hand-over; the owner is unchanged until accepted */
-        post: operations["offerTaskTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/transfers/{id}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Accept and swap the owner atomically */
-        post: operations["acceptTaskTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/transfers/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Withdraw a live offer */
-        post: operations["cancelTaskTransfer"];
+        /** Cancel a requirement; its open cards and confirmations end */
+        post: operations["cancelRequirement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -857,29 +804,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A card, one stage of a requirement's route held by one member. */
         Task: {
             id: string;
             teamId: string;
             ownerId: string;
-            parentId?: string;
             title: string;
             description?: string;
             acceptanceCriteria?: string;
             /** @enum {string} */
-            status: "todo" | "doing" | "review" | "done" | "cancelled";
-            blockedReason?: string;
-            dependencyIds: string[];
+            status: "todo" | "doing" | "done" | "cancelled";
             /**
-             * @description The checklist a reviewer member applies; absent when the leader accepts the delivery.
+             * @description The checklist of a review stage's card.
              * @enum {string}
              */
             reviewType?: "requirements" | "design" | "test_plan" | "code" | "general";
-            /** @description The reviewer member whose verdict decides the task. */
-            reviewerId?: string;
-            /** @description The reviewer's send-backs since the leader last decided. */
-            rejectCount: number;
-            /** @description Groups the tasks one confirmed plan created. */
             requirementId?: string;
+            /** @description The card's stage on the route; -1 for a requirement-document card. */
+            stageIndex: number;
+            /** @enum {string} */
+            stageKind?: "confirm" | "design" | "review" | "test_cases" | "implement" | "test" | "accept" | "draft" | "escalation";
+            /** @description The stage a return-to-me rework card goes back to; -1 runs the route on. */
+            returnTo: number;
             /** Format: int64 */
             revision: number;
             createdBy: string;
@@ -888,28 +834,51 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @description A handoff record. */
         Evidence: {
             id: string;
             taskId: string;
             authorId: string;
             summary: string;
             artifactRefs: string[];
-            candidateRef?: string;
-            testResult?: string;
-            reviewResult?: string;
+            /** @enum {string} */
+            outcome?: "done" | "back" | "escalate" | "resume";
+            /** @enum {string} */
+            mode?: "rerun" | "return_to_me";
+            suggestions?: string;
+            execution?: components["schemas"]["Execution"];
             /** Format: date-time */
             createdAt: string;
         };
-        Transfer: {
-            id: string;
-            taskId: string;
-            fromBotId: string;
-            toBotId: string;
-            /** Format: int64 */
-            taskRevision: number;
-            note?: string;
+        /** @description What the engine reported a member ran and changed while it held the card. */
+        Execution: {
+            commands: {
+                command: string;
+                exitCode?: number;
+            }[];
+            files: string[];
+        };
+        Stage: {
+            name: string;
             /** @enum {string} */
-            status: "offered" | "accepted" | "cancelled" | "stale";
+            kind: "confirm" | "design" | "review" | "test_cases" | "implement" | "test" | "accept";
+            ownerId?: string;
+            /** @enum {string} */
+            reviewType?: "requirements" | "design" | "test_plan" | "code" | "general";
+            criteria?: string;
+        };
+        Requirement: {
+            id: string;
+            teamId: string;
+            title: string;
+            /** @description The project manager's requirement document (Markdown). */
+            document: string;
+            stages: components["schemas"]["Stage"][];
+            /** @enum {string} */
+            status: "active" | "accepting" | "done" | "cancelled";
+            createdBy: string;
+            /** Format: int64 */
+            revision: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -918,11 +887,12 @@ export interface components {
         Question: {
             id: string;
             /**
-             * @description acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
              * @enum {string}
              */
-            kind: "" | "acceptance";
+            kind: "" | "confirm" | "acceptance";
             requirementId?: string;
+            stageIndex?: number;
             teamId: string;
             requesterBotId: string;
             taskId?: string;
@@ -1008,51 +978,21 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        CreateTaskRequest: {
-            /** Format: uuid */
-            requestId: string;
-            title: string;
-            description?: string;
-            acceptanceCriteria?: string;
-            ownerId: string;
-            parentId?: string;
-            dependencyIds?: string[];
-        };
-        PatchTaskRequest: {
-            /** Format: uuid */
-            requestId: string;
-            /** @enum {string} */
-            status?: "todo" | "doing" | "review" | "cancelled";
-            blockedReason?: string;
-            ownerId?: string;
-            /** Format: int64 */
-            expectedRevision: number;
-        };
-        SubmitEvidenceRequest: {
-            /** Format: uuid */
-            requestId: string;
-            summary: string;
-            artifactRefs?: string[];
-            candidateRef?: string;
-            testResult?: string;
-            reviewResult?: string;
-        };
-        OfferTransferRequest: {
-            /** Format: uuid */
-            requestId: string;
-            toBotId: string;
-            note?: string;
-        };
         AnswerQuestionRequest: {
             /** Format: uuid */
             requestId: string;
-            /** @description The answer; for an acceptance question */
+            /** @description The answer; for a confirmation or acceptance */
             answerText: string;
             /**
-             * @description Required for an acceptance question, refused for any other.
+             * @description Required for a confirmation or acceptance question, refused for any other.
              * @enum {string}
              */
             decision?: "accept" | "revise";
+            /**
+             * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+             * @enum {string}
+             */
+            mode?: "rerun" | "return_to_me";
             /** Format: int64 */
             expectedRevision: number;
         };
@@ -1060,7 +1000,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "deliver_task" | "review_task" | "send_message" | "create_task" | "ask_user";
+            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user";
             arguments?: {
                 [key: string]: unknown;
             };
@@ -1344,7 +1284,6 @@ export interface components {
         TaskDetail: {
             task: components["schemas"]["Task"];
             evidence: components["schemas"]["Evidence"][];
-            transfers: components["schemas"]["Transfer"][];
         };
         /** @description One engine model, reduced to non-secret identifier fields. */
         Model: {
@@ -2327,36 +2266,6 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
-    createTask: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateTaskRequest"];
-            };
-        };
-        responses: {
-            /** @description Created task */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Task"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
     getTask: {
         parameters: {
             query?: never;
@@ -2382,7 +2291,7 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
-    patchTask: {
+    listRequirements: {
         parameters: {
             query?: never;
             header?: never;
@@ -2391,147 +2300,25 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchTaskRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Updated task */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    submitTaskEvidence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubmitEvidenceRequest"];
-            };
-        };
-        responses: {
-            /** @description Evidence recorded */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Evidence"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            404: components["responses"]["Error"];
-        };
-    };
-    confirmTask: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    evidenceIds?: string[];
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Confirmed task */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    offerTaskTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OfferTransferRequest"];
-            };
-        };
-        responses: {
-            /** @description Offered transfer */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Transfer"];
-                    };
-                };
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    acceptTaskTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Transferred task */
+            /** @description Requirements */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Task"];
+                        data?: {
+                            items: components["schemas"]["Requirement"][];
+                        };
                     };
                 };
             };
-            409: components["responses"]["Error"];
+            401: components["responses"]["Error"];
         };
     };
-    cancelTaskTransfer: {
+    cancelRequirement: {
         parameters: {
             query?: never;
             header?: never;
@@ -2549,14 +2336,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Cancelled transfer */
+            /** @description Cancelled requirement */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Transfer"];
+                        data?: components["schemas"]["Requirement"];
                     };
                 };
             };

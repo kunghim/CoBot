@@ -5,16 +5,12 @@ import (
 	"strings"
 )
 
-// ReviewerRoleID is the role whose members review the deliveries of tasks the
-// leader marks for review; their verdict decides the task.
-const ReviewerRoleID = "code-reviewer"
-
 //go:embed checklists/*.md
 var checklistsFS embed.FS
 
-// ReviewTypes lists the kinds of review a task can ask for, each with its
-// official checklist. The reviewer reads the checklist with the review
-// request, so its own instructions stay short.
+// ReviewTypes lists the kinds of review a stage can be, each with its
+// official checklist. The reviewer reads the checklist on the review
+// card, so its own instructions stay short.
 var ReviewTypes = []string{"requirements", "design", "test_plan", "code", "general"}
 
 // ValidReviewType reports whether a review type has a checklist.

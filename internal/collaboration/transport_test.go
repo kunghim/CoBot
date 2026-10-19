@@ -14,7 +14,7 @@ func TestMCPRequestIdentityIsStableAndTurnScoped(t *testing.T) {
 		if modern != "" {
 			meta["callId"] = modern
 		}
-		params, _ := json.Marshal(map[string]any{"name": "create_task", "arguments": map[string]any{}, "_meta": meta})
+		params, _ := json.Marshal(map[string]any{"name": "handoff", "arguments": map[string]any{}, "_meta": meta})
 		requestID, err := jsonrpc.MakeID(id)
 		if err != nil {
 			t.Fatal(err)

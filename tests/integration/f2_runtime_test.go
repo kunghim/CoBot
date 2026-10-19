@@ -45,7 +45,7 @@ func TestRecoveryRequiresExactTerminalFactBeforeDecision(t *testing.T) {
 		t.Run("provider_"+providerStatus, func(t *testing.T) {
 			h := newM2Harness(t)
 			ctx := context.Background()
-			team, bots := h.createTeam(t, []string{"backend-dev"})
+			team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 			runID, _ := seedUnresolvedRun(t, h, team, bots[1], "no duplicate", "old-turn", "dead-epoch")
 			if providerStatus != "" {
 				proveSeededRunEnded(t, h, runID, providerStatus)
@@ -74,7 +74,7 @@ func TestRecoveryRequiresExactTerminalFactBeforeDecision(t *testing.T) {
 func TestIdleUnknownAndPredecessorBridgeCannotWrite(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	readToken := h.botToken(t, bots[1])
 	args := map[string]any{"targetBotId": bots[0].ID, "text": "unauthorized message", "idempotencyKey": "idle-write"}
 	assertRejected := func(token string) {
@@ -112,7 +112,7 @@ func TestIdleUnknownAndPredecessorBridgeCannotWrite(t *testing.T) {
 func TestDuplicatePredecessorCompletionCannotFinishStartingSuccessor(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	fake := h.ensureFake(t, team.ID)
 	send := func(key string) {
 		t.Helper()
@@ -171,7 +171,7 @@ func TestApprovalFactSurvivesLateStartReply(t *testing.T) {
 	h.app.Scheduler = s
 	s.Start()
 	defer s.Stop(ctx)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	sent, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: "please approve"})
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +209,7 @@ func TestCompletedFactSurvivesLateStartReply(t *testing.T) {
 	h.app.Scheduler = s
 	s.Start()
 	defer s.Stop(ctx)
-	_, bots := h.createTeam(t, []string{"backend-dev"})
+	_, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	result, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: "quick", RequestID: "early-result"})
 	if err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestSlowEngineReplyDoesNotBlockOtherMemberOrStop(t *testing.T) {
 		defer cancel()
 		s.Stop(c)
 	})
-	_, bots := h.createTeam(t, []string{"backend-dev"})
+	_, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[0].ID, Text: "slow", RequestID: "slow"})
 	select {
 	case <-entered:

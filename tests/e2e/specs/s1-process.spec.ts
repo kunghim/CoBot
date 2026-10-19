@@ -23,7 +23,7 @@ test('a turn shows its process live and keeps it afterwards', async ({ page }) =
   await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   await expect(page.getByText('过程团队').first()).toBeVisible({ timeout: 15000 });
-  const leaders = page.getByRole('button', { name: /队长/ }).filter({ visible: true });
+  const leaders = page.getByRole('button', { name: /项目经理/ }).filter({ visible: true });
   await expect(leaders).toHaveCount(1, { timeout: 15000 });
   await leaders.first().click();
 
@@ -64,7 +64,7 @@ test('a turn shows its process live and keeps it afterwards', async ({ page }) =
   const toggle = teamRow.getByRole('button', { name: /过程团队/ }).first();
   await expect(toggle).toBeVisible({ timeout: 15000 });
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await teamRow.getByRole('button', { name: /队长/ }).first().click();
+  await teamRow.getByRole('button', { name: /项目经理/ }).first().click();
   await expect(page.getByRole('heading', { name: '已完成' })).toBeVisible({ timeout: 15000 });
   await page.getByTestId('run-process').last().getByRole('button', { name: /已处理/ }).click();
   await expect(page.getByTestId('run-process').last().getByText('运行了命令')).toBeVisible();

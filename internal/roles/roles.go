@@ -32,12 +32,15 @@ type Role struct {
 // LeaderRoleID is the coordination role every team receives at creation.
 const LeaderRoleID = "leader"
 
+// FullstackRoleID builds the whole change, interface and server alike; it
+// replaced the separate frontend and backend roles (migration 00022).
+const FullstackRoleID = "fullstack-engineer"
+
 // DefaultIDs lists the embedded library in creation order.
 var DefaultIDs = []string{
 	LeaderRoleID,
 	"product-manager",
-	"frontend-dev",
-	"backend-dev",
+	FullstackRoleID,
 	"qa-engineer",
 	"code-reviewer",
 }
@@ -87,12 +90,11 @@ func Digest(instructions string) string {
 // profile copy still carrying one of them was never edited by the user, so it
 // is upgraded to the current default instead of pinning the old text forever.
 var retiredDigests = map[string][]string{
-	LeaderRoleID:      {"d4ff9b5d42b58330", "47096f47252a1cbe", "3b5aa00ad45e47af", "ae14e84830ebad5d"},
-	"backend-dev":     {"8129f84c3283bf85", "e69e851fb70c76e1"},
-	"code-reviewer":   {"356c52217a6c921b", "db1b0c37c4b47538"},
-	"frontend-dev":    {"9efc19173ce35554", "b59da549ae7946b0"},
-	"product-manager": {"04df35093d7484bc"},
-	"qa-engineer":     {"8d36dda792696699", "29b8207cd15a0e6e"},
+	LeaderRoleID:      {"d4ff9b5d42b58330", "47096f47252a1cbe", "3b5aa00ad45e47af", "ae14e84830ebad5d", "38bc6f07efd942c9", "92a6bd4169037e83"},
+	"code-reviewer":   {"356c52217a6c921b", "db1b0c37c4b47538", "032439ba35ed412c", "4289268f7df53b82"},
+	"product-manager": {"04df35093d7484bc", "d7b88a88385bccf8"},
+	"qa-engineer":     {"8d36dda792696699", "29b8207cd15a0e6e", "9670ddfd14423239"},
+	FullstackRoleID:   {"91426b923693aba4"},
 }
 
 // EnsureProfileCopy materializes the editable role files on first use.
@@ -182,10 +184,8 @@ func fileNameFor(id string) string {
 		return "leader"
 	case "product-manager":
 		return "product_manager"
-	case "frontend-dev":
-		return "frontend_dev"
-	case "backend-dev":
-		return "backend_dev"
+	case FullstackRoleID:
+		return "fullstack_engineer"
 	case "qa-engineer":
 		return "qa_engineer"
 	case "code-reviewer":

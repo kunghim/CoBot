@@ -21,7 +21,7 @@ async function openLeader(page: Page, name: string) {
   const toggle = page.getByRole('button', { name: new RegExp(name) }).first();
   await expect(toggle).toBeVisible({ timeout: 15000 });
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await page.locator('li').filter({ has: toggle }).first().getByRole('button', { name: /队长/ }).first().click();
+  await page.locator('li').filter({ has: toggle }).first().getByRole('button', { name: /项目经理/ }).first().click();
 }
 
 // The composer's permission switch belongs to the team: it starts at the

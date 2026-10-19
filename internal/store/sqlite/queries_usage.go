@@ -94,6 +94,23 @@ func SumUsage(ctx context.Context, q Queryer, teamID, botID string) (billable in
 	return billable, unknown, nil
 }
 
+// AverageTurnUsage is the mean billable spend (input + output) of a bot's
+// last n recorded turns, and how many turns it averaged; 0, 0 for a bot with
+// no recorded turn yet.
+func AverageTurnUsage(ctx context.Context, q Queryer, botID string, n int) (int64, int, error) {
+	var avg sql.NullFloat64
+	var count int
+	err := q.QueryRowContext(ctx, `SELECT AVG(spend), COUNT(*) FROM (
+		SELECT input_tokens + output_tokens AS spend FROM usage_ledger
+		WHERE bot_id = ? AND purpose = ? AND status = ?
+		ORDER BY created_at DESC LIMIT ?)`,
+		botID, domain.UsagePurposeRun, domain.UsageStatusRecorded, n).Scan(&avg, &count)
+	if err != nil {
+		return 0, 0, err
+	}
+	return int64(avg.Float64), count, nil
+}
+
 // GetUsage reads one ledger row by its natural key, for tests and tooling.
 func GetUsage(ctx context.Context, q Queryer, epoch, threadID, turnID string) (domain.UsageEntry, error) {
 	var e domain.UsageEntry

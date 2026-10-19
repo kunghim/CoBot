@@ -19,7 +19,7 @@ func TestPausedChainDoesNotBlockNewUserChain(t *testing.T) {
 		t.Run(held, func(t *testing.T) {
 			h := newM2Harness(t)
 			ctx := context.Background()
-			team, bots := h.createTeam(t, []string{"backend-dev"})
+			team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 			if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[0].ID, Text: "old root"}); err != nil {
 				t.Fatal(err)
 			}

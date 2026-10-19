@@ -325,17 +325,8 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
 		return err
 	}
-	// A leader's turn that reported a finished requirement hands its reply
-	// to the user for acceptance.
-	acceptances, err := s.app.createAcceptanceLocked(ctx, tx, run, st.text)
-	if err != nil {
-		return err
-	}
 	if err := tx.Commit(); err != nil {
 		return err
-	}
-	for _, id := range acceptances {
-		s.app.recordEvent(ctx, domain.Event{Type: domain.EventQuestionCreated, TeamID: teamID, BotID: botID, ResourceID: id})
 	}
 	if s.app.CollaborationTokens != nil {
 		s.app.CollaborationTokens.RevokeRun(run.ID)
