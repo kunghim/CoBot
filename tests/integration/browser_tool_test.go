@@ -60,6 +60,22 @@ func TestMemberBrowserToolThroughTheCore(t *testing.T) {
 		t.Fatalf("second call = %d %s", status, raw)
 	}
 
+	// The user sees the member's tab in the live view and can drive it.
+	team := leader.TeamID
+	status, panel := h.userGet(t, "/api/v1/teams/"+team+"/browser")
+	raw, _ = json.Marshal(panel)
+	if status != http.StatusOK || !strings.Contains(string(raw), `"running":true`) || !strings.Contains(string(raw), member.ID) {
+		t.Fatalf("panel = %d %s", status, raw)
+	}
+	status, out = h.userPost(t, "/api/v1/teams/"+team+"/browser/input", map[string]any{"tab": "t1", "kind": "nav", "to": "reload"})
+	if status != http.StatusOK {
+		t.Fatalf("input = %d %v", status, out)
+	}
+	status, _ = h.userPost(t, "/api/v1/teams/"+team+"/browser/input", map[string]any{"tab": "t1", "kind": "nav", "to": "chrome://settings"})
+	if status != http.StatusBadRequest {
+		t.Fatalf("a browser-internal address from the live view = %d", status)
+	}
+
 	// The project manager plans and reports; it has no browser.
 	status, out = h.callTool(t, h.botToken(t, leader), "browser", map[string]any{"url": site.URL})
 	raw, _ = json.Marshal(out)

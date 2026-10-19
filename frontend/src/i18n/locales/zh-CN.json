@@ -448,8 +448,24 @@
       "tasks": "任务",
       "approvals": "审批",
       "activity": "动态",
-      "memory": "记忆"
+      "memory": "记忆",
+      "browser": "浏览器"
     }
+  },
+  "browser": {
+    "loading": "正在连接浏览器……",
+    "notInstalled": "这台电脑上没有可用的浏览器",
+    "notInstalledHint": "需要安装 Chrome、Edge、Brave、Chromium 或 Vivaldi 之一，成员才能使用浏览器。",
+    "idle": "团队还没有打开浏览器",
+    "idleHint": "成员需要看网页时会自动打开，这里能实时看到并直接操作。",
+    "tabs": "标签页",
+    "blank": "空白页",
+    "back": "后退",
+    "forward": "前进",
+    "reload": "刷新",
+    "address": "地址",
+    "view": "团队浏览器画面，可直接点击和输入",
+    "sharedHint": "这是和成员共用的浏览器：你的操作会直接作用在页面上，成员下次操作时会知道你动过。登录一次，团队里所有成员共用登录状态。"
   },
   "tasks": {
     "ownerUser": "你",

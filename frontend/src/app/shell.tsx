@@ -17,6 +17,9 @@ interface Shell {
   narrow: boolean;
   setListOpen: (open: boolean) => void;
   setPanelOpen: (open: boolean) => void;
+  /** A page of the work panel (the browser) asks for more room. */
+  panelWide: boolean;
+  setPanelWide: (wide: boolean) => void;
   /** The app draws its own title bar (desktop), which holds the toggles. */
   titleBar: boolean;
 }
@@ -35,6 +38,7 @@ export function ShellProvider({ children, titleBar = false }: { children: ReactN
   // list only, so the conversation is not squeezed on the first load.
   const [listOpen, setList] = useState(true);
   const [panelOpen, setPanel] = useState(isWide);
+  const [panelWide, setPanelWide] = useState(false);
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia(WIDE);
@@ -57,7 +61,7 @@ export function ShellProvider({ children, titleBar = false }: { children: ReactN
   }, []);
   // Showing something in the work panel opens it first.
   useWorkPanelRequests(useCallback(() => setPanelOpen(true), [setPanelOpen]));
-  return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen, titleBar }}>{children}</ShellContext.Provider>;
+  return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen, panelWide, setPanelWide, titleBar }}>{children}</ShellContext.Provider>;
 }
 
 export function useShell(): Shell {

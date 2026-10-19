@@ -450,8 +450,24 @@
       "tasks": "Tasks",
       "approvals": "Approvals",
       "activity": "Activity",
-      "memory": "Memories"
+      "memory": "Memories",
+      "browser": "Browser"
     }
+  },
+  "browser": {
+    "loading": "Connecting to the browser…",
+    "notInstalled": "No browser is available on this computer",
+    "notInstalledHint": "Install Chrome, Edge, Brave, Chromium or Vivaldi so members can use a browser.",
+    "idle": "The team has not opened a browser yet",
+    "idleHint": "It opens by itself when a member needs a web page; you can watch and use it here.",
+    "tabs": "Tabs",
+    "blank": "Blank page",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "address": "Address",
+    "view": "The team's browser; click and type to use it",
+    "sharedHint": "This browser is shared with the members: what you do acts on the page, and a member is told when you touched its tab. Sign in once and every member shares the login."
   },
   "tasks": {
     "ownerUser": "You",

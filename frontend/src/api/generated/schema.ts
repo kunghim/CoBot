@@ -437,6 +437,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tabs of the team's browser, for the live view; never starts a browser */
+        get: operations["getTeamBrowser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pictures of one tab as server-sent events (event frame, data {tab, width, height, data}); width and height are the page's CSS pixels, data a base64 JPEG */
+        get: operations["streamTeamBrowserTab"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply one thing the user did in the live view (mouse, wheel, key, text or navigation) to a tab */
+        post: operations["sendTeamBrowserInput"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/open-path": {
         parameters: {
             query?: never;
@@ -2327,6 +2378,114 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["Error"];
+        };
+    };
+    getTeamBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether a browser is installed and running, and its tabs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @description A Chromium-based browser is installed on this computer. */
+                            available: boolean;
+                            running: boolean;
+                            tabs: {
+                                id: string;
+                                memberId: string;
+                                url: string;
+                                title: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    streamTeamBrowserTab: {
+        parameters: {
+            query: {
+                tab: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    sendTeamBrowserInput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    tab: string;
+                    /** @enum {string} */
+                    kind: "mouse" | "wheel" | "key" | "text" | "nav";
+                    /** @description mouse: move, down, up. key: down, up. */
+                    action?: string;
+                    x?: number;
+                    y?: number;
+                    /** @enum {string} */
+                    button?: "left" | "middle" | "right";
+                    clickCount?: number;
+                    dx?: number;
+                    dy?: number;
+                    key?: string;
+                    code?: string;
+                    vk?: number;
+                    text?: string;
+                    /** @description Bit mask: 1 alt, 2 control, 4 meta, 8 shift. */
+                    modifiers?: number;
+                    /** @description nav: back, forward, reload or an address. */
+                    to?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
         };
     };
     openTeamPath: {

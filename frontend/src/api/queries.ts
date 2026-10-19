@@ -192,6 +192,11 @@ export function useTeams(enabled = true) {
   return usePagedItems(queryKeys.teams, (cursor) => api.listTeams(cursor), enabled);
 }
 
+/** The tabs of a team's browser; polled, because tabs open and close as members work. */
+export function useTeamBrowser(teamId: string, enabled = true) {
+  return useQuery({ queryKey: ['teamBrowser', teamId], queryFn: () => api.getTeamBrowser(teamId), enabled, refetchInterval: 2000 });
+}
+
 export function useCreateTeam() {
   const qc = useQueryClient();
   return useMutation({

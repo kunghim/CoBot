@@ -34,6 +34,13 @@ type tab struct {
 	crashed      bool
 	lastURL      string
 	lastTitle    string
+
+	// The live view: receivers of the screencast, and when the user last
+	// touched the tab against when the member's last call began.
+	watchers      map[int]func(Frame)
+	nextWatcher   int
+	userAt        time.Time
+	lastCallStart time.Time
 }
 
 const maxConsoleLines = 30
@@ -122,6 +129,8 @@ var loadingKinds = map[string]bool{
 
 func (t *tab) onEvent(method string, params json.RawMessage) {
 	switch method {
+	case "Page.screencastFrame":
+		t.onScreencastFrame(params)
 	case "Page.loadEventFired":
 		t.mu.Lock()
 		t.loads++
@@ -412,6 +421,11 @@ func (tb *teamBrowser) run(ctx context.Context, env Env, req Request, steps []St
 	cur.callMu.Lock()
 	defer func() { cur.callMu.Unlock() }()
 	cur.resetCall()
+	// The user shares this tab; say so when they touched it since the last call.
+	cur.mu.Lock()
+	userTouched := cur.userAt.After(cur.lastCallStart) && !cur.userAt.IsZero()
+	cur.lastCallStart = time.Now()
+	cur.mu.Unlock()
 	tb.ensureDownloadDir(ctx, env.TeamDir)
 	tb.mu.Lock()
 	downloadsBefore := len(tb.downloads)
@@ -419,6 +433,9 @@ func (tb *teamBrowser) run(ctx context.Context, env Env, req Request, steps []St
 
 	run := &callRun{tb: tb, env: env, cur: cur}
 	result := Result{Steps: make([]StepResult, 0, len(steps))}
+	if userTouched {
+		result.Note = "用户刚在这个标签页里操作过，页面可能已经变了（比如填过表单、登录过、换了页面）；以这次返回的快照为准，别沿用旧的编号。"
+	}
 	for _, step := range steps {
 		if result.Failed {
 			result.Steps = append(result.Steps, StepResult{Action: step.Action, Skipped: true})

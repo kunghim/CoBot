@@ -916,6 +916,107 @@ paths:
           description: Warm-up started (or not needed)
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser:
+    get:
+      operationId: getTeamBrowser
+      security:
+        - SessionCookie: []
+      summary: The tabs of the team's browser, for the live view; never starts a browser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Whether a browser is installed and running, and its tabs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [available, running, tabs]
+                    properties:
+                      available: { type: boolean, description: A Chromium-based browser is installed on this computer. }
+                      running: { type: boolean }
+                      tabs:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, memberId, url, title]
+                          properties:
+                            id: { type: string }
+                            memberId: { type: string }
+                            url: { type: string }
+                            title: { type: string }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser/stream:
+    get:
+      operationId: streamTeamBrowserTab
+      security:
+        - SessionCookie: []
+      summary: Pictures of one tab as server-sent events (event frame, data {tab, width, height, data}); width and height are the page's CSS pixels, data a base64 JPEG
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tab
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser/input:
+    post:
+      operationId: sendTeamBrowserInput
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Apply one thing the user did in the live view (mouse, wheel, key, text or navigation) to a tab
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tab, kind]
+              properties:
+                requestId: { type: string, format: uuid }
+                tab: { type: string }
+                kind: { type: string, enum: [mouse, wheel, key, text, nav] }
+                action: { type: string, description: "mouse: move, down, up. key: down, up." }
+                x: { type: number }
+                y: { type: number }
+                button: { type: string, enum: [left, middle, right] }
+                clickCount: { type: integer }
+                dx: { type: number }
+                dy: { type: number }
+                key: { type: string }
+                code: { type: string }
+                vk: { type: integer }
+                text: { type: string }
+                modifiers: { type: integer, description: "Bit mask: 1 alt, 2 control, 4 meta, 8 shift." }
+                to: { type: string, description: "nav: back, forward, reload or an address." }
+      responses:
+        "200":
+          description: Applied
+        "400":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/open-path:
     post:
       operationId: openTeamPath
