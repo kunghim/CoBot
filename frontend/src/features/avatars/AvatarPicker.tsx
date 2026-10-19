@@ -12,6 +12,7 @@ import type { AvatarRef } from '../../api/types';
 import { Alert, Button, cx, Dialog, EmptyState, Fieldset, Icons, interactive, Skeleton } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
 import { AvatarImage } from './Avatar';
+import { unchangedChoice } from './choice';
 import { AVATAR_PICTURE_TYPES, AvatarPictureError, cropToAvatar, type CroppedPicture } from './crop';
 import { FALLBACK_AVATAR, avatarRef, drawAvatar, seriesParts, type Composed, type ComposedAvatar } from './render';
 
@@ -82,8 +83,14 @@ export default function AvatarPicker({
     }
   };
 
+  // Whether anything differs from what the picker opened with. Saving an
+  // unchanged choice only closes: it must never turn the shown avatar (which
+  // may be the role's) into the member's own.
+  const unchanged = unchangedChoice(picture, currentPicture, draft, start?.avatar ?? null);
+
   const save = async () => {
     setLocalError('');
+    if (unchanged) return onClose();
     if (picture?.kind === 'stored') return onSave({ kind: 'upload', file: picture.file });
     if (picture?.kind === 'new') {
       setUploading(true);

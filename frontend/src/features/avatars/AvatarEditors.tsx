@@ -8,6 +8,7 @@ import { apiErrorMessage } from '../../i18n/errors';
 import { Button, ListRow } from '../../components/ui';
 import Avatar from './Avatar';
 import AvatarPicker from './AvatarPicker';
+import { memberStartPicture, pictureOf } from './choice';
 import { composedStart } from './render';
 
 /** A member's avatar that opens the picker for the member's own avatar. */
@@ -39,7 +40,9 @@ export function MemberAvatarButton({ bot, disabled = false }: { bot: Bot; disabl
         open={open}
         title={t('avatar.memberTitle', { name: bot.name })}
         start={composedStart(catalog.data, roleId, bot.avatar, roleChoice)}
-        currentPicture={pictureOf(bot.avatar) ?? pictureOf(roleChoice)}
+        // The role's picture shows only while the member has no avatar of its
+        // own; a member's own composed avatar must never open as the role's.
+        currentPicture={memberStartPicture(bot.avatar, roleChoice)}
         hasOwn={!!bot.avatar}
         pending={setAvatar.isPending}
         errorText={setAvatar.isError ? apiErrorMessage(t, setAvatar.error) : ''}
@@ -92,6 +95,3 @@ export function RoleAvatarRow({ role }: { role: Role }) {
   );
 }
 
-function pictureOf(ref: AvatarRef | null | undefined): string | undefined {
-  return ref?.kind === 'upload' ? ref.file : undefined;
-}
