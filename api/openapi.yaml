@@ -2475,6 +2475,15 @@ components:
         avatar: { $ref: "#/components/schemas/AvatarRef" }
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
+        lastMessage: { $ref: "#/components/schemas/MessagePreview" }
+    MessagePreview:
+      type: object
+      description: The start of the latest message between the user and a member, for the team list.
+      required: [kind, text, createdAt]
+      properties:
+        kind: { type: string, enum: [user, assistant] }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
     TeamWithBots:
       type: object
       required: [team, bots]

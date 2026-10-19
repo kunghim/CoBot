@@ -116,6 +116,12 @@ const (
 	MessageKindUser          MessageKind = "user"
 )
 
+// Defines values for MessagePreviewKind.
+const (
+	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
+	MessagePreviewKindUser      MessagePreviewKind = "user"
+)
+
 // Defines values for PatchTaskRequestStatus.
 const (
 	PatchTaskRequestStatusCancelled PatchTaskRequestStatus = "cancelled"
@@ -221,9 +227,9 @@ const (
 
 // Defines values for SettingsPatchColorMode.
 const (
-	Dark   SettingsPatchColorMode = "dark"
-	Light  SettingsPatchColorMode = "light"
-	System SettingsPatchColorMode = "system"
+	SettingsPatchColorModeDark   SettingsPatchColorMode = "dark"
+	SettingsPatchColorModeLight  SettingsPatchColorMode = "light"
+	SettingsPatchColorModeSystem SettingsPatchColorMode = "system"
 )
 
 // Defines values for SettingsPatchLanguage.
@@ -433,12 +439,15 @@ type Bot struct {
 	CurrentRunId *string    `json:"currentRunId,omitempty"`
 	Id           string     `json:"id"`
 	IsLeader     bool       `json:"isLeader"`
-	Name         string     `json:"name"`
-	Revision     int64      `json:"revision"`
-	RoleId       string     `json:"roleId"`
-	RoleVersion  *string    `json:"roleVersion,omitempty"`
-	Status       BotStatus  `json:"status"`
-	TeamId       string     `json:"teamId"`
+
+	// LastMessage The start of the latest message between the user and a member, for the team list.
+	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+	Name        string          `json:"name"`
+	Revision    int64           `json:"revision"`
+	RoleId      string          `json:"roleId"`
+	RoleVersion *string         `json:"roleVersion,omitempty"`
+	Status      BotStatus       `json:"status"`
+	TeamId      string          `json:"teamId"`
 }
 
 // BotStatus defines model for Bot.Status.
@@ -588,6 +597,16 @@ type MessageDeliveryStatus string
 
 // MessageKind defines model for Message.Kind.
 type MessageKind string
+
+// MessagePreview The start of the latest message between the user and a member, for the team list.
+type MessagePreview struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Kind      MessagePreviewKind `json:"kind"`
+	Text      string             `json:"text"`
+}
+
+// MessagePreviewKind defines model for MessagePreview.Kind.
+type MessagePreviewKind string
 
 // Model One engine model, reduced to non-secret identifier fields.
 type Model struct {

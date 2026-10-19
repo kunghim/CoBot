@@ -1348,6 +1348,15 @@ export interface components {
             revision: number;
             /** Format: date-time */
             createdAt: string;
+            lastMessage?: components["schemas"]["MessagePreview"];
+        };
+        /** @description The start of the latest message between the user and a member, for the team list. */
+        MessagePreview: {
+            /** @enum {string} */
+            kind: "user" | "assistant";
+            text: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];

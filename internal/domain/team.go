@@ -75,6 +75,17 @@ type Bot struct {
 	Avatar    *AvatarRef `json:"avatar,omitempty"`
 	Revision  int64      `json:"revision"`
 	CreatedAt time.Time  `json:"createdAt"`
+	// LastMessage previews the latest message between the user and this
+	// member; only team listings fill it.
+	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+}
+
+// MessagePreview is the start of a conversation's latest message, for the
+// team list.
+type MessagePreview struct {
+	Kind      string    `json:"kind"` // user|assistant
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // ProviderSession maps a bot onto its engine thread.
