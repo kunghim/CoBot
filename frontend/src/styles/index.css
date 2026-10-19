@@ -108,32 +108,38 @@
   --color-signal-600: #c44a31;
 }
 
-/* classic: CoBot at its plainest. Pure gray with no tint, and ink as the
-   signal: near black in light mode, near white in dark mode. The only color
-   left is the members' own and the status colors. */
+/* classic: CoBot's own classic, rice paper and ink. Black, white and gray,
+   but neither end is pure: the page is warm paper, the cards a lighter
+   sheet of it, the text and the signal soft ink; dark mode is warm
+   charcoal with paper-white text. The warmth is kept so low (a few percent
+   of saturation) that it still reads as gray, only softer. Layers part by
+   tone more than by lines. The only color left is the members' own and the
+   status colors. */
 :root[data-theme="classic"] {
-  --color-neutral-50: #f7f7f7;
-  --color-neutral-100: #efefef;
-  --color-neutral-200: #e2e2e2;
-  --color-neutral-300: #c8c8c8;
-  --color-neutral-400: #9c9c9c;
-  --color-neutral-500: #707070;
-  --color-neutral-600: #565656;
-  --color-neutral-700: #3e3e3e;
-  --color-neutral-800: #282828;
-  --color-neutral-900: #1a1a1a;
-  --color-neutral-950: #111111;
+  --color-white: #fbfaf7;
+  --color-black: #141311;
 
-  --color-signal-400: #f2f2f2;
-  --color-signal-500: #1a1a1a;
-  --color-signal-600: #111111;
-  --color-on-signal: #ffffff;
+  --color-neutral-50: #f4f3ef;
+  --color-neutral-100: #ecebe6;
+  --color-neutral-200: #e1dfd9;
+  --color-neutral-300: #cac7c0;
+  --color-neutral-400: #a19e96;
+  --color-neutral-500: #6f6c65;
+  --color-neutral-600: #57544e;
+  --color-neutral-700: #403e3a;
+  --color-neutral-800: #2c2a27;
+  --color-neutral-900: #22211e;
+  --color-neutral-950: #1b1a18;
+
+  --color-signal-400: #e6e3dc;
+  --color-signal-500: #34322e;
+  --color-signal-600: #2a2825;
+  --color-on-signal: #fbfaf7;
 }
 :root[data-theme="classic"][data-mode="dark"] {
-  --color-signal-500: #ececec;
-  --color-on-signal: #111111;
+  --color-signal-500: #dedad2;
+  --color-on-signal: #22211e;
 }
-
 html,
 body,
 #root {
