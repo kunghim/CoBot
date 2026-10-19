@@ -38,6 +38,7 @@ try {
     $properties = @{}
     Read-MsiTable "Property" @("Property", "Value") | ForEach-Object { $properties[$_.Property] = $_.Value }
     Assert-Msi ($properties.ProductName -eq "CoBot") "Product name is CoBot"
+    Assert-Msi ($properties.ARPPRODUCTICON -eq "CoBotIcon") "Installed Apps uses the CoBot brand icon"
     Assert-Msi ($properties.ProductVersion -eq $MsiVersion) "Numeric MSI version matches"
     Assert-Msi ($properties.UpgradeCode -eq "{D159E043-D132-4929-BD91-423E8B2769E9}") "Upgrade identity is stable"
     Assert-Msi (-not $properties.ALLUSERS) "Installation scope is per-user"
@@ -54,8 +55,9 @@ try {
     Assert-Msi ($names.Count -eq 5 -and @($names | Where-Object { $_ -notin $allowed }).Count -eq 0) "Payload contains only the five approved program/license files"
     $registry = @(Read-MsiTable "Registry" @("Root", "Key"))
     Assert-Msi (@($registry | Where-Object { $_.Root -ne "1" -or $_.Key -ne "Software\CoBot\Installer" }).Count -eq 0) "Registry writes are confined to HKCU installer markers"
-    $shortcuts = @(Read-MsiTable "Shortcut" @("Name", "Target"))
+    $shortcuts = @(Read-MsiTable "Shortcut" @("Name", "Target", "Icon_", "IconIndex"))
     Assert-Msi ($shortcuts.Count -eq 1 -and $shortcuts[0].Target -eq "[#DesktopExe]") "Only one application shortcut is installed"
+    Assert-Msi ($shortcuts[0].Icon_ -eq "CoBotIcon" -and $shortcuts[0].IconIndex -eq "0") "Start menu shortcut uses the CoBot brand icon"
     $remove = @(Read-MsiTable "RemoveFile" @("FileName", "DirProperty", "InstallMode"))
     Assert-Msi (@($remove | Where-Object { $_.FileName -or $_.DirProperty -notin @("CoBotMenuFolder", "INSTALLFOLDER") -or $_.InstallMode -ne "2" }).Count -eq 0) "Uninstall cleanup owns only empty CoBot program/menu folders"
     Assert-Msi (@($directories | Where-Object { $_.DefaultDir -match '\.cobot|engines|credentials' }).Count -eq 0) "Runtime profiles and credentials are not installer resources"

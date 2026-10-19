@@ -71,6 +71,7 @@
       <Directory Id="CoBotMenuFolder" Name="CoBot">
         <Component Id="StartMenuEntry" Guid="190946B8-BCE6-5F35-B55B-3963272EC9CC">
           <Shortcut Id="CoBotShortcut" Name="CoBot" Target="[#DesktopExe]"
+                    Icon="CoBotIcon" IconIndex="0"
                     Description="Local multi-agent collaboration"
                     WorkingDirectory="INSTALLFOLDER" />
           <RemoveFolder Id="RemoveCoBotMenu" On="uninstall" />

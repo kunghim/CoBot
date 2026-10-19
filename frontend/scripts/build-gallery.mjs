@@ -8,7 +8,7 @@
 // bundle and the CSS are inlined so the demos respond when it is opened.
 // Default output: docs/design/组件画廊.html at the repository root.
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -59,6 +59,16 @@ try {
   const React = await import('react');
   const { default: Gallery } = await server.ssrLoadModule('/src/gallery/Gallery.tsx');
   markup = renderToString(React.createElement(Gallery, { generatedAt }));
+  // Vite's SSR imports keep /src URLs, while the client bundle inlines them.
+  // Inline the server-rendered images too: hydration keeps existing src attrs,
+  // and the standalone gallery has no /src server to load pictures from.
+  const imageTypes = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+  markup = markup.replace(/(<img\b[^>]*\bsrc=")(\/src\/[^"?]+)(")/g, (match, before, url, after) => {
+    const mime = imageTypes[extname(url)];
+    if (!mime) return match;
+    const data = readFileSync(resolve(frontend, '.' + url)).toString('base64');
+    return `${before}data:${mime};base64,${data}${after}`;
+  });
 } finally {
   await server.close();
   console.error = quiet;

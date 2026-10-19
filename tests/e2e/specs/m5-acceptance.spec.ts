@@ -105,8 +105,11 @@ test('dangerous markup renders as inert text', async ({ page }) => {
   await sendCurrent(page, '<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>请原样显示');
 
   await expect(page.getByText('请原样显示').first()).toBeVisible({ timeout: 15000 });
-  // Member avatars are the only images; the injected one never renders.
-  expect(await page.locator('img:not([data-avatar])').count()).toBe(0);
+  // The navigation has a bundled brand image; messages may only show avatars.
+  // Keep the injection check in the conversation and reject handlers everywhere.
+  await expect(page.getByRole('navigation', { name: 'CoBot', exact: true }).locator('img')).toHaveCount(1);
+  await expect(page.getByRole('main').locator('img:not([data-avatar])')).toHaveCount(0);
+  await expect(page.locator('img[src="x"], img[onerror]')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 

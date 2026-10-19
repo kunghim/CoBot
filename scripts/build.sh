@@ -60,6 +60,7 @@ case "$TARGET" in
       echo "wails CLI not found; install Wails v2.15.0 to build the desktop shell" >&2
       exit 1
     }
+    node scripts/prepare-branding.mjs
     echo "==> wails build (desktop, production, $VERSION, darwin/$BUILD_ARCH)"
     # -skipbindings mirrors build.ps1: the bindings phase builds
     # cmd/cobot-desktop with only the "bindings" tag while internal/desktop is
