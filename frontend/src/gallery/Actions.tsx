@@ -1,7 +1,7 @@
 // Gallery: actions and form controls.
 import { useState } from 'react';
 import { ChevronDown, Filter, FolderOpen, Moon, Monitor, Plus, Save, Sun, Trash2 } from 'lucide-react';
-import { Button, ButtonGroup, Checkbox, Combobox, Field, Fieldset, FileDrop, IconButton, Icons, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle, iconMeaning, shownState } from '../components/ui';
+import { Button, ButtonGroup, Checkbox, CheckboxCards, Combobox, Field, Fieldset, FileDrop, IconButton, Icons, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle, iconMeaning, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 export default function Actions() {
@@ -9,6 +9,7 @@ export default function Actions() {
   const [switchOn, setSwitchOn] = useState(true);
   const [radio, setRadio] = useState('default');
   const [card, setCard] = useState('graphite');
+  const [members, setMembers] = useState<ReadonlySet<string>>(() => new Set(['frontend']));
   const [mode, setMode] = useState('system');
   const [toggle, setToggle] = useState(true);
   const [search, setSearch] = useState('');
@@ -223,6 +224,24 @@ export default function Actions() {
               ]}
             />
           </div>
+        </Demo>
+      </Doc>
+
+      <Doc id="checkbox-cards" name="CheckboxCards 多选卡片" file="components/ui/Choice.tsx" use="从几个带图片或说明的选项里选几个（新建团队选成员）。必选的一项锁定并标出原因。" a11y="每张卡片是 checkbox；锁定的卡片 aria-disabled，仍可读到。">
+        <Demo surface="raised">
+          <CheckboxCards
+            label="成员"
+            values={members}
+            onToggle={(value) => setMembers((prev) => { const next = new Set(prev); if (next.has(value)) next.delete(value); else next.add(value); return next; })}
+            locked={['leader']}
+            lockedLabel="必选"
+            options={[
+              { value: 'leader', label: '队长', description: '理解目标、拆分任务、协调成员。' },
+              { value: 'frontend', label: '前端开发', description: '实现界面与交互。' },
+              { value: 'backend', label: '后端开发', description: '实现服务端逻辑与接口。' },
+              { value: 'qa', label: '测试工程师', description: '编写和执行测试。' },
+            ]}
+          />
         </Demo>
       </Doc>
 

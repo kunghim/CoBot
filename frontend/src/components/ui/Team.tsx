@@ -1,7 +1,7 @@
 // CoBot's own pieces: members and their work. A member is its avatar and its
 // name, shown together wherever a member is named. State is shown by
 // the avatar (moving, wide eyes) and said in words for screen readers.
-import { useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { ArrowUp, Bot, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, CircleX, FileDiff, FilePen, Globe, ListChecks, Loader2, MessageSquareText, ShieldCheck, Square, Terminal, Wrench, X } from 'lucide-react';
 import { roleChip } from './roleChip';
 import { Button, IconButton } from './Button';
@@ -15,30 +15,36 @@ export function RoleChip({ name, roleId, isLeader = false }: { name: ReactNode; 
 /**
  * A member in a list: avatar, name, what it is doing, and the last thing
  * said in its conversation — one line, cut with an ellipsis, never wider
- * than the row.
+ * than the row. Its accessible name is the state and the name; the
+ * status or time and the preview describe it.
  */
 export function MemberRow({ avatar, name, status, statusLabel, preview, time, current = false, attention = false, onSelect }: { avatar: ReactNode; name: ReactNode; status?: ReactNode; statusLabel: string; preview?: ReactNode; time?: ReactNode; current?: boolean; attention?: boolean; onSelect: () => void }) {
+  const id = useId();
+  const meta = status ?? time;
+  const describedBy = [meta && `${id}-meta`, preview && `${id}-preview`].filter(Boolean).join(' ') || undefined;
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-current={current || undefined}
+      aria-labelledby={`${id}-state ${id}-name`}
+      aria-describedby={describedBy}
       className={cx(
         'flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors',
         preview ? 'py-2' : 'py-1.5',
         current ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-50 dark:ring-neutral-700' : cx('text-neutral-600 dark:text-neutral-300', interactive.hover),
       )}
     >
-      <span className="relative shrink-0" role="img" aria-label={statusLabel} title={statusLabel}>
+      <span id={`${id}-state`} className="relative shrink-0" role="img" aria-label={statusLabel} title={statusLabel}>
         {avatar}
         {attention && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-neutral-100 dark:ring-neutral-900" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className={cx('min-w-0 flex-1 truncate', current ? 'font-semibold' : 'font-medium text-neutral-800 dark:text-neutral-100')}>{name}</span>
-          {(status || time) && <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{status ?? time}</span>}
+          <span id={`${id}-name`} className={cx('min-w-0 flex-1 truncate', current ? 'font-semibold' : 'font-medium text-neutral-800 dark:text-neutral-100')}>{name}</span>
+          {meta && <span id={`${id}-meta`} className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400">{meta}</span>}
         </span>
-        {preview && <span className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">{preview}</span>}
+        {preview && <span id={`${id}-preview`} className="mt-0.5 block truncate text-xs text-neutral-500 dark:text-neutral-400">{preview}</span>}
       </span>
     </button>
   );

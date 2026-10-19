@@ -96,6 +96,7 @@
     "expand": "Expand team",
     "collapse": "Collapse team",
     "leader": "Leader",
+    "previewYou": "You: ",
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {

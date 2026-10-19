@@ -1,8 +1,8 @@
 // Choosing: checkbox (independent yes/no that applies on save), switch
 // (a setting that applies at once), radios and radio cards (one of a few,
-// all visible), segmented control (one of 2–4 short options) and toggle.
+// all visible), checkbox cards (several of a few, with pictures), segmented control (one of 2–4 short options) and toggle.
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
-import { Check, Minus } from 'lucide-react';
+import { Check, Lock, Minus } from 'lucide-react';
 import { controlHeight, cx, interactive, type ControlSize } from './foundation';
 
 export function Checkbox({
@@ -125,7 +125,7 @@ export function RadioGroup<T extends string>({ label, options, value, onChange, 
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (index === 0 && !options.some((entry) => entry.value === value)) ? 0 : -1}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className="group flex items-start gap-2.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -161,7 +161,7 @@ export function RadioCards<T extends string>({ label, options, value, onChange, 
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (index === 0 && !options.some((entry) => entry.value === value)) ? 0 : -1}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cx(
@@ -172,6 +172,51 @@ export function RadioCards<T extends string>({ label, options, value, onChange, 
             {option.media}
             <span className="min-w-0">
               <span className="block text-sm font-medium text-neutral-900 dark:text-neutral-50">{option.label}</span>
+              {option.description && <span className="mt-0.5 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{option.description}</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Checkboxes as cards: several choices that each need a picture or a
+ * description (the members of a new team). A locked option is part of the
+ * choice and cannot be removed; lockedLabel says why.
+ */
+export function CheckboxCards<T extends string>({ label, options, values, onToggle, locked = [], lockedLabel, columns = 2 }: { label: string; options: ChoiceOption<T>[]; values: ReadonlySet<T>; onToggle: (value: T) => void; locked?: T[]; lockedLabel?: ReactNode; columns?: 2 | 3 }) {
+  const grid = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3' }[columns];
+  return (
+    <div role="group" aria-label={label} className={cx('grid gap-2.5', grid)}>
+      {options.map((option) => {
+        const isLocked = locked.includes(option.value);
+        const checked = isLocked || values.has(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            aria-disabled={isLocked || option.disabled || undefined}
+            disabled={option.disabled}
+            onClick={() => !isLocked && onToggle(option.value)}
+            className={cx(
+              'flex items-start gap-2.5 rounded-xl border-2 p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              checked ? 'border-signal-500 bg-signal-500/[0.04]' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-700 dark:hover:border-neutral-600',
+              isLocked && 'cursor-default',
+            )}
+          >
+            <span aria-hidden className={cx('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors', checked ? 'border-signal-500 bg-signal-500 text-white' : 'border-neutral-300 dark:border-neutral-600')}>
+              {isLocked ? <Lock size={10} /> : checked && <Check size={12} strokeWidth={3} />}
+            </span>
+            {option.media}
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                {option.label}
+                {isLocked && lockedLabel && <span className="rounded bg-neutral-900/[0.06] px-1 text-[10px] font-normal text-neutral-600 dark:bg-white/[0.08] dark:text-neutral-300">{lockedLabel}</span>}
+              </span>
               {option.description && <span className="mt-0.5 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{option.description}</span>}
             </span>
           </button>
@@ -198,7 +243,7 @@ export function SegmentedControl<T extends string>({ label, options, value, onCh
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (index === 0 && !options.some((entry) => entry.value === value)) ? 0 : -1}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cx(
