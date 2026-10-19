@@ -23,7 +23,7 @@ import (
 func openWorkError(scope string, c sqlite.OpenWorkCounts) error {
 	return domain.Conflict("error."+scope+".open_work", map[string]any{
 		"activeRuns": c.ActiveRuns, "pendingApprovals": c.PendingApprovals,
-		"offeredTransfers": c.OfferedTransfers, "openTasks": c.OpenTasks,
+		"openTasks":        c.OpenTasks,
 		"queuedDeliveries": c.QueuedDeliveries, "openQuestions": c.OpenQuestions,
 	})
 }
@@ -152,7 +152,7 @@ func (a *App) PatchTeamReasoningEffort(ctx context.Context, principal auth.Princ
 // task. Passing it is what makes an archived team safe to delete outright.
 func archiveBlockers(c sqlite.OpenWorkCounts) bool {
 	return c.ActiveRuns > 0 || c.QueuedDeliveries > 0 || c.PendingApprovals > 0 ||
-		c.OpenQuestions > 0 || c.OfferedTransfers > 0 || c.OpenTasks > 0
+		c.OpenQuestions > 0 || c.OpenTasks > 0
 }
 
 // ArchiveTeam sets an idle team aside. It leaves the sidebar for the

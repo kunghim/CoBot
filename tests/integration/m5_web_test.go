@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
@@ -53,11 +52,7 @@ func TestWebSurfaceActivityMemoriesAuthorizations(t *testing.T) {
 	captain, member := bots[0], bots[1]
 
 	// Activity: a real action produces real events for the team feed.
-	if _, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{
-		TeamID: team.ID, OwnerID: member.ID, Title: "活动任务", AcceptanceCriteria: "出现在动态",
-	}); err != nil {
-		t.Fatalf("create task: %v", err)
-	}
+	h.handCard(t, team, captain, member, "活动卡片", "出现在动态")
 	status, payload := h.userGet(t, "/api/v1/teams/"+team.ID+"/activity")
 	if status != http.StatusOK {
 		t.Fatalf("activity status = %d body=%v", status, payload)

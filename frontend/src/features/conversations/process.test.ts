@@ -32,8 +32,8 @@ describe('describeStep', () => {
   it('describes collaboration tools in plain words', () => {
     const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotId: 'qa', text: 'hi' } } }), nameOf);
     expect(phrase).toEqual(expect.objectContaining({ key: 'conversation.step.cobot.send_message', params: expect.objectContaining({ name: '测试工程师' }) }));
-    const fromString = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'create_task', arguments: '{"title":"做页面","ownerId":"qa"}' } }), nameOf);
-    expect(fromString.params).toEqual(expect.objectContaining({ title: '做页面', name: '测试工程师' }));
+    const fromString = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'start_requirement', arguments: '{"title":"做页面"}' } }), nameOf);
+    expect(fromString).toEqual(expect.objectContaining({ key: 'conversation.step.cobot.start_requirement', params: expect.objectContaining({ title: '做页面' }) }));
   });
   it('describes a member working with its sub-agents', () => {
     expect(describeStep(step({ kind: 'agent', detail: { tool: 'spawnAgent', agents: 2, prompt: 'x' } }), nameOf)).toEqual({ key: 'conversation.step.agent.spawnAgent', params: { count: 2 } });
@@ -41,16 +41,17 @@ describe('describeStep', () => {
     expect(describeStep(step({ kind: 'agent', detail: { tool: 'newAgentTool', agents: 1 } }), nameOf).key).toBe('conversation.step.agent.other');
     expect(describeStep(step({ kind: 'agent', detail: { activity: 'paused', agent: '/root/tester' } }), nameOf).key).toBe('conversation.step.agent.other');
   });
-  it('tells a delivery, an accepted review and a sent-back task apart', () => {
+  it('tells the handoffs of a card apart', () => {
     const tool = (name: string, args: Record<string, unknown>) => describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: name, arguments: args } }), nameOf).key;
-    expect(tool('deliver_task', { taskId: 't', summary: 's' })).toBe('conversation.step.cobot.deliver_task');
-    expect(tool('review_task', { taskId: 't', decision: 'accept' })).toBe('conversation.step.cobot.review_accept');
-    expect(tool('review_task', { taskId: 't', decision: 'reject', comment: 'x' })).toBe('conversation.step.cobot.review_reject');
+    expect(tool('handoff', { cardId: 't', outcome: 'done', summary: 's' })).toBe('conversation.step.cobot.handoff_done');
+    expect(tool('handoff', { cardId: 't', outcome: 'back', mode: 'rerun', summary: 'x' })).toBe('conversation.step.cobot.handoff_back');
+    expect(tool('handoff', { cardId: 't', outcome: 'escalate', summary: 'x' })).toBe('conversation.step.cobot.handoff_escalate');
+    expect(tool('handoff', { cardId: 't', outcome: 'resume', summary: 'x' })).toBe('conversation.step.cobot.handoff_resume');
     expect(tool('view_tasks', {})).toBe('conversation.step.cobot.view_tasks');
   });
-  it('names every recipient of a broadcast and tells a note from a message', () => {
-    const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotIds: ['qa', 'fe'], text: 'x', notifyOnly: true } } }), nameOf);
-    expect(phrase.key).toBe('conversation.step.cobot.notify');
+  it('names every recipient of a broadcast note', () => {
+    const phrase = describeStep(step({ kind: 'tool', detail: { server: 'cobot', tool: 'send_message', arguments: { targetBotIds: ['qa', 'fe'], text: 'x' } } }), nameOf);
+    expect(phrase.key).toBe('conversation.step.cobot.send_message');
     expect(phrase.params?.name).toBe('测试工程师、fe');
   });
   it('explains known engine errors in plain words', () => {

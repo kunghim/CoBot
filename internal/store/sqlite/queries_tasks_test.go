@@ -72,70 +72,62 @@ func seedTask(t *testing.T, db *sql.DB, teamID, botID, title string) string {
 	return id
 }
 
-// addEdge records one dependency edge in its own transaction.
-func addEdge(t *testing.T, db *sql.DB, taskID, dependsOn string) {
-	t.Helper()
-	tx, err := db.Begin()
+// A requirement keeps its route, and its cards and handoff records keep the
+// stage they belong to and what the engine reported was run.
+func TestRequirementCardsAndHandoffsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	db := openMigrated(t)
+	teamID, botID := seedTeam(t, db)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if err := AddDependency(context.Background(), tx, taskID, dependsOn); err != nil {
+	req := domain.Requirement{
+		ID: domain.NewID(), TeamID: teamID, Title: "待办页面", Document: "能添加和删除",
+		Stages: []domain.Stage{
+			{Name: "确认", Kind: domain.StageConfirm},
+			{Name: "实现", Kind: domain.StageImplement, OwnerID: botID, Criteria: "能打开"},
+			{Name: "评审", Kind: domain.StageReview, OwnerID: botID, ReviewType: "code"},
+			{Name: "验收", Kind: domain.StageAccept, OwnerID: botID},
+		},
+		Status: domain.RequirementActive, CreatedBy: botID, Revision: 1,
+	}
+	if err := InsertRequirement(ctx, tx, req); err != nil {
+		t.Fatal(err)
+	}
+	card := domain.Task{
+		ID: domain.NewID(), TeamID: teamID, OwnerID: botID, Title: "实现", Status: domain.TaskTodo,
+		RequirementID: req.ID, StageIndex: 1, StageKind: domain.StageImplement, ReturnTo: 2, Revision: 1, CreatedBy: botID,
+	}
+	if err := InsertTask(ctx, tx, card); err != nil {
+		t.Fatal(err)
+	}
+	exit := 0
+	if err := InsertEvidence(ctx, tx, domain.Evidence{
+		ID: domain.NewID(), TaskID: card.ID, AuthorID: botID, Summary: "做好了", ArtifactRefs: []string{"index.html"},
+		Outcome: domain.HandoffBack, Mode: domain.ReworkRerun,
+		Execution: &domain.Execution{Commands: []domain.ExecutedCommand{{Command: "npm test", ExitCode: &exit}}, Files: []string{"index.html"}},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// TestHasCycleFromDetectsBackEdge pins the direction the product relies on:
-// once A depends on B, offering B a dependency on A must be seen as a cycle.
-func TestHasCycleFromDetectsBackEdge(t *testing.T) {
-	ctx := context.Background()
-	db := openMigrated(t)
-	teamID, botID := seedTeam(t, db)
-	a := seedTask(t, db, teamID, botID, "A")
-	b := seedTask(t, db, teamID, botID, "B")
-
-	addEdge(t, db, a, b)
-	got, err := HasCycleFrom(ctx, db, b, a)
-	if err != nil {
-		t.Fatal(err)
+	got, err := GetRequirement(ctx, db, req.ID)
+	if err != nil || len(got.Stages) != 4 || got.Stages[2].ReviewType != "code" || got.Status != domain.RequirementActive {
+		t.Fatalf("requirement = %+v, %v", got, err)
 	}
-	if !got {
-		t.Fatal("B -> A must be a cycle once A -> B exists")
+	cards, err := ListRequirementTasks(ctx, db, req.ID)
+	if err != nil || len(cards) != 1 || cards[0].StageIndex != 1 || cards[0].ReturnTo != 2 || cards[0].StageKind != domain.StageImplement {
+		t.Fatalf("cards = %+v, %v", cards, err)
 	}
-
-	// A fresh pair is not a cycle, so ordinary dependencies still work.
-	c := seedTask(t, db, teamID, botID, "C")
-	addEdge(t, db, c, a)
-	d := seedTask(t, db, teamID, botID, "D")
-	got, err = HasCycleFrom(ctx, db, d, c)
-	if err != nil {
-		t.Fatal(err)
+	records, err := ListEvidence(ctx, db, card.ID)
+	if err != nil || len(records) != 1 || records[0].Execution == nil || *records[0].Execution.Commands[0].ExitCode != 0 {
+		t.Fatalf("records = %+v, %v", records, err)
 	}
-	if got {
-		t.Fatal("D -> C must not be a cycle")
-	}
-}
-
-// TestHasCycleFromIndirect covers the longer path: A -> B -> C, so C -> A
-// closes a three-node loop.
-func TestHasCycleFromIndirect(t *testing.T) {
-	ctx := context.Background()
-	db := openMigrated(t)
-	teamID, botID := seedTeam(t, db)
-	a := seedTask(t, db, teamID, botID, "A")
-	b := seedTask(t, db, teamID, botID, "B")
-	c := seedTask(t, db, teamID, botID, "C")
-
-	addEdge(t, db, a, b)
-	addEdge(t, db, b, c)
-	got, err := HasCycleFrom(ctx, db, c, a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !got {
-		t.Fatal("C -> A must close the A -> B -> C loop")
+	backs, err := CountSendBacks(ctx, db, req.ID, 1)
+	if err != nil || backs != 1 {
+		t.Fatalf("send-backs = %d, %v", backs, err)
 	}
 }

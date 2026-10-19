@@ -45,15 +45,22 @@ func (f reviewFlow) turnsOf(bot domain.Bot) []fakeengine.StartedTurn {
 // returns it.
 func (f reviewFlow) waitTurn(bot domain.Bot, parts ...string) fakeengine.StartedTurn {
 	f.t.Helper()
+	return f.waitTurnAfter(bot, 0, parts...)
+}
+
+// waitTurnAfter is waitTurn among the member's turns after the first skip.
+func (f reviewFlow) waitTurnAfter(bot domain.Bot, skip int, parts ...string) fakeengine.StartedTurn {
+	f.t.Helper()
 	var found fakeengine.StartedTurn
 	waitUntil(f.t, 5*time.Second, bot.Name+" turn with "+strings.Join(parts, " / "), func() bool {
-		for _, turn := range f.turnsOf(bot) {
+		turns := f.turnsOf(bot)
+		for i := skip; i < len(turns); i++ {
 			all := true
 			for _, part := range parts {
-				all = all && strings.Contains(turn.Text, part)
+				all = all && strings.Contains(turns[i].Text, part)
 			}
 			if all {
-				found = turn
+				found = turns[i]
 				return true
 			}
 		}
@@ -100,24 +107,73 @@ func (f reviewFlow) call(bot domain.Bot, tool string, args map[string]any) map[s
 	return data
 }
 
-// createdTaskID reads the id of the task a create_task call returned.
-func createdTaskID(t *testing.T, data map[string]any) string {
-	t.Helper()
-	payload, _ := data["data"].(map[string]any)
-	task, _ := payload["task"].(map[string]any)
-	id, _ := task["id"].(string)
-	if id == "" {
-		t.Fatalf("no task in %v", data)
+// refused calls a tool expecting a refusal with the given message key.
+func (f reviewFlow) refused(bot domain.Bot, tool string, args map[string]any, key string) {
+	f.t.Helper()
+	status, body := f.h.callTool(f.t, f.h.botToken(f.t, bot), tool, args)
+	data, _ := body["data"].(map[string]any)
+	refusal, _ := data["error"].(map[string]any)
+	if status != 200 || data["status"] != "rejected" || refusal["messageKey"] != key {
+		f.t.Fatalf("%s %s = %d %v, want refusal %s", bot.Name, tool, status, body, key)
 	}
-	return id
 }
 
-// A task marked for review goes to the reviewer on delivery, with the
-// checklist of its type; the reviewer's verdict decides it, the leader is
-// only woken once the reviewer sent it back more often than allowed, and the
-// finished requirement goes to the user for acceptance with the leader's
-// report.
-func TestReviewerDecidesAndTheUserAcceptsTheRequirement(t *testing.T) {
+// card is the open card a member holds.
+func (f reviewFlow) card(bot domain.Bot) domain.Task {
+	f.t.Helper()
+	var found domain.Task
+	waitUntil(f.t, 5*time.Second, bot.Name+" holds a card", func() bool {
+		cards, err := sqlite.ListTasks(context.Background(), f.h.app.DB, bot.TeamID, bot.ID, 50)
+		if err != nil {
+			return false
+		}
+		for _, card := range cards {
+			if !card.IsTerminal() {
+				found = card
+				return true
+			}
+		}
+		return false
+	})
+	return found
+}
+
+// openQuestion is the team's one open question of a kind.
+func (f reviewFlow) openQuestion(teamID, kind string) domain.Question {
+	f.t.Helper()
+	var found domain.Question
+	waitUntil(f.t, 5*time.Second, "open "+kind+" question", func() bool {
+		questions, err := sqlite.ListQuestions(context.Background(), f.h.app.DB, teamID, domain.QuestionOpen, 10)
+		if err != nil {
+			return false
+		}
+		for _, q := range questions {
+			if q.Kind == kind {
+				found = q
+				return true
+			}
+		}
+		return false
+	})
+	return found
+}
+
+func relayRoute(reviewer, dev domain.Bot) []map[string]any {
+	return []map[string]any{
+		{"name": "需求评审", "kind": "review", "ownerId": reviewer.ID, "reviewType": "requirements", "criteria": "需求可验证"},
+		{"name": "用户确认需求", "kind": "confirm", "criteria": "需求和链路"},
+		{"name": "实现登录接口", "kind": "implement", "ownerId": dev.ID, "criteria": "返回 200"},
+		{"name": "代码评审", "kind": "review", "ownerId": reviewer.ID, "reviewType": "code"},
+		{"name": "验收汇报", "kind": "accept"},
+	}
+}
+
+// A requirement runs its route: the requirement review, the user's
+// confirmation (whose changes go back to the project manager's document),
+// the implementation, a code review that sends work back until the limit
+// escalates it to the project manager, who resumes it, and the final
+// acceptance carrying the reviewer's suggestions.
+func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 	settings, err := h.app.GetSettings(ctx)
@@ -129,157 +185,188 @@ func TestReviewerDecidesAndTheUserAcceptsTheRequirement(t *testing.T) {
 		t.Fatal(err)
 	}
 	team, bots := h.createTeam(t, []string{"fullstack-engineer", "code-reviewer"})
-	captain, dev, reviewer := bots[0], bots[1], bots[2]
-	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "方案确认，开始吧"}); err != nil {
+	pm, dev, reviewer := bots[0], bots[1], bots[2]
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: pm.ID, Text: "做一个登录接口"}); err != nil {
 		t.Fatal(err)
 	}
 	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
-	plan := f.waitTurn(captain, "方案确认")
-
-	created := f.call(captain, "create_task", map[string]any{
-		"title": "实现登录接口", "ownerId": dev.ID, "acceptanceCriteria": "返回 200", "reviewType": "code", "idempotencyKey": "s7-task",
+	talk := f.waitTurn(pm, "做一个登录接口")
+	f.call(pm, "start_requirement", map[string]any{
+		"title": "登录接口", "document": "# 目标\n提供登录接口，成功返回 200。", "stages": relayRoute(reviewer, dev), "idempotencyKey": "s7-start",
 	})
-	taskID := createdTaskID(t, created)
-	task := f.task(taskID)
-	if task.ReviewerID != reviewer.ID || task.ReviewType != "code" || task.RequirementID == "" {
-		t.Fatalf("task = %+v", task)
-	}
-	f.finish(captain, plan, "已派活")
-	captainTurns := len(f.turnsOf(captain))
+	f.finish(pm, talk, "已提交需求")
+	pmTurns := len(f.turnsOf(pm))
 
-	deliver := func(round int) {
-		turn := f.waitTurn(dev, "实现登录接口")
-		if round > 0 {
-			turn = f.waitTurn(dev, "评审未通过")
-		}
-		f.call(dev, "deliver_task", map[string]any{"taskId": taskID, "summary": "实现了接口，curl 返回 200", "idempotencyKey": "s7-deliver-" + string(rune('a'+round))})
-		f.finish(dev, turn, "")
+	// The requirement review reaches the reviewer with the document, the
+	// route and the requirements checklist.
+	review := f.waitTurn(reviewer, "【接力卡片】需求评审", "提供登录接口", "▶ 1. 需求评审", "评审清单")
+	card := f.card(reviewer)
+	if card.StageIndex != 0 || card.StageKind != domain.StageReview || card.ReviewType != "requirements" {
+		t.Fatalf("review card = %+v", card)
 	}
-	review := func(text string) fakeengine.StartedTurn {
-		var turn fakeengine.StartedTurn
-		waitUntil(t, 5*time.Second, "review request", func() bool {
-			turns := f.turnsOf(reviewer)
-			if len(turns) == 0 || !strings.Contains(turns[len(turns)-1].Text, text) {
-				return false
-			}
-			turn = turns[len(turns)-1]
-			return true
-		})
-		waitRunning(t, h, reviewer.ID)
-		return turn
-	}
+	waitUntil(t, 5*time.Second, "card started", func() bool { return f.task(card.ID).Status == domain.TaskDoing })
+	f.call(reviewer, "handoff", map[string]any{"cardId": card.ID, "outcome": "done", "summary": "需求清楚", "idempotencyKey": "s7-rr1"})
+	f.finish(reviewer, review, "")
 
-	// First delivery: the reviewer gets it with the code checklist.
-	deliver(0)
-	first := review("请评审")
-	if !strings.Contains(first.Text, "代码评审检查") || !strings.Contains(first.Text, "返回 200") {
-		t.Fatalf("review request lacks checklist or criteria: %q", first.Text)
+	// The user asks for changes: the document goes back to the project
+	// manager, and the revised one is reviewed again.
+	confirm := f.openQuestion(team.ID, domain.QuestionKindConfirm)
+	if confirm.StageIndex != 1 || !strings.Contains(confirm.Question, "提供登录接口") {
+		t.Fatalf("confirm = %+v", confirm)
 	}
-	f.call(reviewer, "review_task", map[string]any{"taskId": taskID, "decision": "reject", "comment": "缺少错误处理", "idempotencyKey": "s7-r1"})
-	f.finish(reviewer, first, "")
-	if got := f.task(taskID); got.Status != domain.TaskDoing || got.RejectCount != 1 {
-		t.Fatalf("after first send-back: %+v", got)
+	if _, err := h.app.AnswerQuestion(ctx, h.user, confirm.ID, "随便答", confirm.Revision); err == nil {
+		t.Fatal("a confirmation answered as a plain question")
 	}
-
-	// Second delivery and send-back: past the limit, the leader decides.
-	deliver(1)
-	second := review("第 1 次打回后的重新交付")
-	f.call(reviewer, "review_task", map[string]any{"taskId": taskID, "decision": "reject", "comment": "还是没有处理超时", "idempotencyKey": "s7-r2"})
-	f.finish(reviewer, second, "")
-	if got := f.task(taskID); got.Status != domain.TaskReview || got.RejectCount != 2 {
-		t.Fatalf("after escalation: %+v", got)
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceRevise, "失败时要返回原因", confirm.Revision); err != nil {
+		t.Fatal(err)
 	}
-	if len(f.turnsOf(captain)) != captainTurns {
-		// Nothing so far may have woken the leader.
-		t.Fatalf("leader woken before the escalation: %d turns", len(f.turnsOf(captain)))
+	draft := f.waitTurnAfter(pm, pmTurns, "修改需求文档", "失败时要返回原因")
+	draftCard := f.card(pm)
+	if draftCard.StageKind != domain.CardDraft {
+		t.Fatalf("draft card = %+v", draftCard)
 	}
-	escalation := f.waitTurn(captain, "超过 1 次", "缺少错误处理", "还是没有处理超时")
-	status, body := h.callTool(t, h.botToken(t, reviewer), "review_task", map[string]any{"taskId": taskID, "decision": "accept", "idempotencyKey": "s7-r3"})
-	if data, _ := body["data"].(map[string]any); status != 200 || data["status"] != "rejected" {
-		t.Fatalf("the reviewer decided an escalated task: %d %v", status, body)
+	f.refused(pm, "handoff", map[string]any{"cardId": draftCard.ID, "outcome": "done", "summary": "改好了", "idempotencyKey": "s7-d0"}, "error.card.document_required")
+	f.call(pm, "handoff", map[string]any{"cardId": draftCard.ID, "outcome": "done", "summary": "加了失败原因",
+		"document": "# 目标\n提供登录接口，成功返回 200，失败返回原因。", "idempotencyKey": "s7-d1"})
+	f.finish(pm, draft, "")
+	reviewerTurns := len(f.turnsOf(reviewer))
+	again := f.waitTurnAfter(reviewer, 1, "失败返回原因")
+	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "done", "summary": "可以", "idempotencyKey": "s7-rr2"})
+	f.finish(reviewer, again, "")
+	confirm = f.openQuestion(team.ID, domain.QuestionKindConfirm)
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", confirm.Revision); err != nil {
+		t.Fatal(err)
 	}
 
-	// The leader accepts; the requirement is finished and reported.
-	f.call(captain, "review_task", map[string]any{"taskId": taskID, "decision": "accept", "idempotencyKey": "s7-lead"})
-	f.finish(captain, escalation, "")
-	report := f.waitTurn(captain, "这次需求的任务都已结束", "实现登录接口")
-	f.finish(captain, report, "登录接口已完成并通过验收：curl 返回 200。")
+	// Implementation, then a code review that sends it back once.
+	work := f.waitTurn(dev, "【接力卡片】实现登录接口", "返回 200")
+	devCard := f.card(dev)
+	f.refused(dev, "handoff", map[string]any{"cardId": devCard.ID, "outcome": "back", "summary": "x", "mode": "rerun", "idempotencyKey": "s7-x"}, "error.card.back_not_allowed")
+	f.call(dev, "handoff", map[string]any{"cardId": devCard.ID, "outcome": "done", "summary": "实现了，curl 返回 200", "idempotencyKey": "s7-i1"})
+	f.finish(dev, work, "")
+	codeReview := f.waitTurnAfter(reviewer, reviewerTurns, "【接力卡片】代码评审", "实现了，curl 返回 200")
+	codeCard := f.card(reviewer)
+	f.refused(reviewer, "handoff", map[string]any{"cardId": codeCard.ID, "outcome": "back", "summary": "缺少错误处理", "idempotencyKey": "s7-c0"}, "error.card.back_mode")
+	f.call(reviewer, "handoff", map[string]any{"cardId": codeCard.ID, "outcome": "back", "summary": "缺少错误处理", "mode": "rerun", "idempotencyKey": "s7-c1"})
+	f.finish(reviewer, codeReview, "")
+	rework := f.waitTurn(dev, "返工：实现登录接口", "缺少错误处理")
+	f.call(dev, "handoff", map[string]any{"cardId": f.card(dev).ID, "outcome": "done", "summary": "补了错误处理", "idempotencyKey": "s7-i2"})
+	f.finish(dev, rework, "")
 
-	questions, err := sqlite.ListQuestions(ctx, h.app.DB, team.ID, domain.QuestionOpen, 10)
-	if err != nil || len(questions) != 1 {
-		t.Fatalf("questions = %+v, %v", questions, err)
-	}
-	acceptance := questions[0]
-	if acceptance.Kind != domain.QuestionKindAcceptance || !strings.Contains(acceptance.Question, "登录接口已完成") || acceptance.RequirementID != task.RequirementID {
+	// The second send-back is past the limit: the project manager decides.
+	secondReview := f.waitTurn(reviewer, "补了错误处理")
+	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "back", "summary": "还是没有处理超时", "mode": "rerun", "idempotencyKey": "s7-c2"})
+	f.finish(reviewer, secondReview, "")
+	escalation := f.waitTurn(pm, "处理上报：代码评审", "超过上限 1 次", "缺少错误处理", "还是没有处理超时")
+	escalationCard := f.card(pm)
+	f.refused(pm, "handoff", map[string]any{"cardId": escalationCard.ID, "outcome": "done", "summary": "x", "idempotencyKey": "s7-e0"}, "error.card.resume_escalation")
+	f.call(pm, "handoff", map[string]any{"cardId": escalationCard.ID, "outcome": "resume", "summary": "超时不在本次范围，评审通过即可", "idempotencyKey": "s7-e1"})
+	f.finish(pm, escalation, "")
+
+	// The reviewer passes with a suggestion; the acceptance stage reaches the
+	// project manager, whose report goes to the user with the suggestion.
+	resumed := f.waitTurn(reviewer, "项目经理的处理意见：超时不在本次范围")
+	f.call(reviewer, "handoff", map[string]any{"cardId": f.card(reviewer).ID, "outcome": "done", "summary": "通过", "suggestions": "以后补超时处理", "idempotencyKey": "s7-c3"})
+	f.finish(reviewer, resumed, "")
+	accept := f.waitTurn(pm, "【接力卡片】验收汇报", "以后补超时处理")
+	f.call(pm, "handoff", map[string]any{"cardId": f.card(pm).ID, "outcome": "done", "summary": "登录接口已完成：curl 返回 200。", "idempotencyKey": "s7-a"})
+	f.finish(pm, accept, "")
+
+	acceptance := f.openQuestion(team.ID, domain.QuestionKindAcceptance)
+	if !strings.Contains(acceptance.Question, "登录接口已完成") || !strings.Contains(acceptance.Question, "以后补超时处理") {
 		t.Fatalf("acceptance = %+v", acceptance)
 	}
-	// An acceptance never holds the leader back.
-	if blocked, err := sqlite.HasBlockingQuestion(ctx, h.app.DB, captain.ID, ""); err != nil || blocked {
-		t.Fatalf("acceptance blocks the leader: %v %v", blocked, err)
+	req, err := sqlite.GetRequirement(ctx, h.app.DB, acceptance.RequirementID)
+	if err != nil || req.Status != domain.RequirementAccepting || !strings.Contains(req.Document, "失败返回原因") {
+		t.Fatalf("requirement = %+v, %v", req, err)
 	}
-
-	// Asking for changes needs the changes, and wakes the leader with them.
-	_, err = h.app.AnswerAcceptance(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "  ", acceptance.Revision)
+	// An acceptance never holds the project manager back.
+	if blocked, err := sqlite.HasBlockingQuestion(ctx, h.app.DB, pm.ID, ""); err != nil || blocked {
+		t.Fatalf("acceptance blocks the project manager: %v %v", blocked, err)
+	}
+	_, err = h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "  ", acceptance.Revision)
 	var de *domain.Error
 	if !errors.As(err, &de) || de.MessageKey != "error.question.revise_reason_required" {
 		t.Fatalf("revise without changes = %v", err)
 	}
-	if _, err := h.app.AnswerQuestion(ctx, h.user, acceptance.ID, "随便答", acceptance.Revision); err == nil {
-		t.Fatal("an acceptance answered as a plain question")
-	}
-	if _, err := h.app.AnswerAcceptance(ctx, h.user, acceptance.ID, domain.AcceptanceRevise, "登录失败时要提示原因", acceptance.Revision); err != nil {
-		t.Fatal(err)
-	}
-	f.waitTurn(captain, "验收未通过，需要修改：登录失败时要提示原因")
-}
-
-// Without a reviewer the leader accepts the delivery as before, and the
-// user's acceptance closes the requirement without waking anyone.
-func TestUserAcceptanceClosesARequirement(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
-	captain, dev := bots[0], bots[1]
-	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "做吧"}); err != nil {
-		t.Fatal(err)
-	}
-	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
-	plan := f.waitTurn(captain, "做吧")
-	// A review type with no reviewer in the team leaves acceptance to the leader.
-	taskID := createdTaskID(t, f.call(captain, "create_task", map[string]any{
-		"title": "改文案", "ownerId": dev.ID, "acceptanceCriteria": "文案已更新", "reviewType": "general", "idempotencyKey": "s7b-task",
-	}))
-	if got := f.task(taskID); got.ReviewerID != "" {
-		t.Fatalf("a reviewer was assigned in a team without one: %+v", got)
-	}
-	status, body := h.callTool(t, h.botToken(t, captain), "create_task", map[string]any{
-		"title": "x", "ownerId": dev.ID, "acceptanceCriteria": "y", "reviewType": "poetry", "idempotencyKey": "s7b-bad",
-	})
-	if data, _ := body["data"].(map[string]any); status != 200 || data["status"] != "rejected" {
-		t.Fatalf("unknown review type accepted: %d %v", status, body)
-	}
-	f.finish(captain, plan, "")
-
-	work := f.waitTurn(dev, "改文案")
-	f.call(dev, "deliver_task", map[string]any{"taskId": taskID, "summary": "改好了", "idempotencyKey": "s7b-deliver"})
-	f.finish(dev, work, "")
-	notice := f.waitTurn(captain, "交付了任务「改文案」")
-	f.call(captain, "review_task", map[string]any{"taskId": taskID, "decision": "accept", "idempotencyKey": "s7b-accept"})
-	f.finish(captain, notice, "")
-	report := f.waitTurn(captain, "这次需求的任务都已结束")
-	f.finish(captain, report, "文案已更新。")
-
-	questions, err := sqlite.ListQuestions(ctx, h.app.DB, team.ID, domain.QuestionOpen, 10)
-	if err != nil || len(questions) != 1 || questions[0].Kind != domain.QuestionKindAcceptance {
-		t.Fatalf("questions = %+v, %v", questions, err)
-	}
 	turns := len(f.fake.Turns())
-	answered, err := h.app.AnswerAcceptance(ctx, h.user, questions[0].ID, domain.AcceptanceAccept, "", questions[0].Revision)
-	if err != nil || answered.Status != domain.QuestionAnswered || answered.AnswerText != "验收通过" {
-		t.Fatalf("accept = %+v, %v", answered, err)
+	if _, err := h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceAccept, "", acceptance.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if req, _ := sqlite.GetRequirement(ctx, h.app.DB, acceptance.RequirementID); req.Status != domain.RequirementDone {
+		t.Fatalf("requirement after acceptance = %s", req.Status)
 	}
 	time.Sleep(200 * time.Millisecond)
 	if len(f.fake.Turns()) != turns {
 		t.Fatal("accepting woke a member")
+	}
+
+	// Each handoff left its record, and picking a card up was recorded for
+	// the activity page.
+	var started int
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM events WHERE type = ?`, domain.EventCardStarted).Scan(&started); err != nil || started < 8 {
+		t.Fatalf("card.started events = %d, %v", started, err)
+	}
+}
+
+// CoBot keeps only a few rules for a route, a member may not start one,
+// a note never wakes anyone, and the user may cancel a requirement.
+func TestRouteRulesNotesAndCancel(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "code-reviewer"})
+	pm, dev, reviewer := bots[0], bots[1], bots[2]
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: pm.ID, Text: "改个文案"}); err != nil {
+		t.Fatal(err)
+	}
+	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
+	talk := f.waitTurn(pm, "改个文案")
+	start := func(key string, stages []map[string]any) map[string]any {
+		return map[string]any{"title": "改文案", "document": "把按钮文案改成登录", "stages": stages, "idempotencyKey": key}
+	}
+	bad := map[string][]map[string]any{
+		"no-confirm": {{"kind": "implement", "ownerId": dev.ID}, {"kind": "accept"}},
+		"no-accept":  {{"kind": "confirm"}, {"kind": "implement", "ownerId": dev.ID}},
+		"leader":     {{"kind": "confirm"}, {"kind": "implement", "ownerId": pm.ID}, {"kind": "accept"}},
+		"stranger":   {{"kind": "confirm"}, {"kind": "implement", "ownerId": "nobody"}, {"kind": "accept"}},
+		"no-type":    {{"kind": "confirm"}, {"kind": "review", "ownerId": reviewer.ID}, {"kind": "accept"}},
+	}
+	for key, stages := range bad {
+		f.refused(pm, "start_requirement", start("s7b-"+key, stages), "error.requirement.route_invalid")
+	}
+	f.refused(dev, "start_requirement", start("s7b-dev", []map[string]any{{"kind": "confirm"}, {"kind": "accept"}}), "error.requirement.leader_only")
+	f.call(pm, "start_requirement", start("s7b-ok", []map[string]any{{"kind": "confirm"}, {"name": "改文案", "kind": "implement", "ownerId": dev.ID}, {"kind": "accept"}}))
+	f.finish(pm, talk, "")
+
+	confirm := f.openQuestion(team.ID, domain.QuestionKindConfirm)
+	if _, err := h.app.AnswerDecision(ctx, h.user, confirm.ID, domain.AcceptanceAccept, "", confirm.Revision); err != nil {
+		t.Fatal(err)
+	}
+	work := f.waitTurn(dev, "【接力卡片】改文案")
+	card := f.card(dev)
+
+	// A note is stored for the recipient's next turn and wakes nobody.
+	reviewerTurns := len(f.turnsOf(reviewer))
+	f.call(dev, "send_message", map[string]any{"targetBotIds": []string{reviewer.ID}, "text": "顺便说一下，文案在 header 里", "idempotencyKey": "s7b-note"})
+	time.Sleep(200 * time.Millisecond)
+	if len(f.turnsOf(reviewer)) != reviewerTurns {
+		t.Fatal("a note woke its recipient")
+	}
+
+	// The user cancels: the card ends, and its handoff is refused.
+	reqs, err := h.app.ListRequirements(ctx, h.user, team.ID)
+	if err != nil || len(reqs) != 1 {
+		t.Fatalf("requirements = %+v, %v", reqs, err)
+	}
+	if _, err := h.app.CancelRequirement(ctx, h.user, reqs[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.task(card.ID); got.Status != domain.TaskCancelled {
+		t.Fatalf("card after cancel = %s", got.Status)
+	}
+	f.refused(dev, "handoff", map[string]any{"cardId": card.ID, "outcome": "done", "summary": "改好了", "idempotencyKey": "s7b-late"}, "error.card.finished")
+	f.finish(dev, work, "")
+	if _, err := h.app.CancelRequirement(ctx, h.user, reqs[0].ID); err == nil {
+		t.Fatal("a cancelled requirement cancelled again")
 	}
 }

@@ -15,7 +15,7 @@ import (
 // out; a member-to-member message is the only message shown.
 var activityTypes = []string{
 	domain.EventTaskCreated, domain.EventTaskUpdated,
-	domain.EventTransferOffered, domain.EventTransferAccepted,
+	domain.EventCardStarted, domain.EventRequirementUpdated,
 	domain.EventQuestionCreated, domain.EventQuestionAnswered,
 	domain.EventApprovalCreated,
 	domain.EventBotAdded, domain.EventBotDeleted,
@@ -57,9 +57,10 @@ func (a *App) describeActivity(ctx context.Context, q sqlite.Queryer, event doma
 		_ = json.Unmarshal(event.Payload, &detail)
 	}
 	switch event.Type {
-	case domain.EventTaskCreated, domain.EventTaskUpdated:
+	case domain.EventTaskCreated, domain.EventTaskUpdated, domain.EventCardStarted:
 		if task, err := sqlite.GetTask(ctx, q, event.ResourceID); err == nil {
 			detail["title"] = task.Title
+			detail["requirementId"] = task.RequirementID
 			if _, ok := detail["ownerId"]; !ok {
 				detail["ownerId"] = task.OwnerID
 			}
@@ -67,13 +68,10 @@ func (a *App) describeActivity(ctx context.Context, q sqlite.Queryer, event doma
 				detail["status"] = task.Status
 			}
 		}
-	case domain.EventTransferOffered, domain.EventTransferAccepted:
-		var taskID, from, to string
-		if err := q.QueryRowContext(ctx, `SELECT task_id, from_bot_id, to_bot_id FROM transfers WHERE id = ?`, event.ResourceID).Scan(&taskID, &from, &to); err == nil {
-			detail["fromBotId"], detail["toBotId"] = from, to
-			if task, err := sqlite.GetTask(ctx, q, taskID); err == nil {
-				detail["title"] = task.Title
-			}
+	case domain.EventRequirementUpdated:
+		if req, err := sqlite.GetRequirement(ctx, q, event.ResourceID); err == nil {
+			detail["title"] = req.Title
+			detail["status"] = req.Status
 		}
 	case domain.EventQuestionCreated, domain.EventQuestionAnswered:
 		if question, err := sqlite.GetQuestion(ctx, q, event.ResourceID); err == nil {

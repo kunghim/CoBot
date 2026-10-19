@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -215,52 +214,4 @@ func TestRefusedTurnFailsWithoutARecoveryCard(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitUntil(t, 5*time.Second, "member takes the next turn", func() bool { return len(fake.Turns()) == 2 })
-}
-
-// Cancelling a task releases the tasks that waited on it and tells the
-// leader, instead of parking them for good.
-func TestCancelledDependencyReleasesDependentsAndTellsTheLeader(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
-	captain, dev, qa := bots[0], bots[1], bots[2]
-	token := h.botToken(t, captain)
-	taskID := func(title string) string {
-		var id string
-		if err := h.app.DB.QueryRowContext(ctx, `SELECT id FROM tasks WHERE team_id = ? AND title = ?`, team.ID, title).Scan(&id); err != nil {
-			t.Fatalf("task %s: %v", title, err)
-		}
-		return id
-	}
-	if status, body := h.callTool(t, token, "create_task", map[string]any{"title": "实现接口", "ownerId": dev.ID, "acceptanceCriteria": "返回 200", "idempotencyKey": "s6-dev"}); status != 200 {
-		t.Fatalf("create dev task = %d %v", status, body)
-	}
-	devTask := taskID("实现接口")
-	if status, body := h.callTool(t, token, "create_task", map[string]any{"title": "测试接口", "ownerId": qa.ID, "acceptanceCriteria": "用例通过", "dependencyIds": []string{devTask}, "idempotencyKey": "s6-qa"}); status != 200 {
-		t.Fatalf("create qa task = %d %v", status, body)
-	}
-	qaTask := taskID("测试接口")
-	fake := h.fakeFor(t, team.ID)
-	waitUntil(t, 5*time.Second, "dev woken", func() bool { return len(fake.Turns()) == 1 })
-	fake.EmitTurnCompleted(fake.Turns()[0].ThreadID, fake.Turns()[0].TurnID, "completed", "")
-
-	task, err := sqlite.GetTask(ctx, h.app.DB, devTask)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.UpdateTaskStatus(ctx, h.user, devTask, domain.TaskCancelled, "", task.Revision); err != nil {
-		t.Fatalf("cancel: %v", err)
-	}
-	var qaTurn, leaderTurn bool
-	waitUntil(t, 5*time.Second, "qa and leader woken", func() bool {
-		for _, turn := range fake.Turns() {
-			if strings.Contains(turn.Text, "你被指派了任务：测试接口") {
-				qaTurn = true
-			}
-			if strings.Contains(turn.Text, "已被取消") && strings.Contains(turn.Text, qaTask) {
-				leaderTurn = true
-			}
-		}
-		return qaTurn && leaderTurn
-	})
 }

@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -84,7 +85,7 @@ func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	current, err := NewMigrator(db)
+	current, err := migratorBefore(t, db, "00023")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +429,7 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	current, err := NewMigrator(db)
+	current, err := migratorBefore(t, db, "00023")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,4 +543,27 @@ func TestFullstackMigrationRenamesDefaultMembers(t *testing.T) {
 			t.Errorf("%s = %s/%s/%q, want %v", id, name, role, version, w)
 		}
 	}
+}
+
+// migratorBefore migrates with the shipped migrations older than one, for
+// upgrade tests whose data a later migration (here the relay's removal of the
+// earlier task model) would legitimately discard.
+func migratorBefore(t *testing.T, db *sql.DB, first string) (*Migrator, error) {
+	t.Helper()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		return nil, err
+	}
+	source := map[string]string{}
+	for _, path := range files {
+		name := strings.TrimPrefix(path, "migrations/")
+		if name < first {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				return nil, err
+			}
+			source[name] = string(raw)
+		}
+	}
+	return NewMigratorWithFS(db, testutil.NewMapFS(source))
 }

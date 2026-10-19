@@ -95,7 +95,7 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 			if saved.ColorMode != dark || saved.Theme != harbor || saved.ReviewRejectLimit != newLimit {
 				t.Fatalf("review update overwrote appearance: %+v", saved)
 			}
-			rows, err := db.QueryContext(ctx, `SELECT review_type, reviewer_id, reject_count, requirement_id FROM tasks LIMIT 0`)
+			rows, err := db.QueryContext(ctx, `SELECT review_type, requirement_id, stage_index, stage_kind, return_to FROM tasks LIMIT 0`)
 			if err != nil {
 				t.Fatal(err)
 			}

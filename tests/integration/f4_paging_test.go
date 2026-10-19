@@ -12,20 +12,17 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-func TestAssignmentCarriesFullTaskRequirementsAndIdentity(t *testing.T) {
+func TestCardCarriesItsRequirementAndIdentity(t *testing.T) {
 	h := newM2Harness(t)
 	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
-	task, err := h.app.CreateTask(context.Background(), h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "scoped file", Description: "Use only the selected directory. Write EXACT_CONTENT. Do not run Git.", AcceptanceCriteria: "Read the exact file back"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	task, req := h.handCard(t, team, bots[0], bots[1], "scoped file", "Read the exact file back")
 	fake := h.fakeFor(t, team.ID)
-	waitUntil(t, 5*time.Second, "task requirements dispatched", func() bool { return len(fake.Turns()) == 1 })
+	waitUntil(t, 5*time.Second, "card dispatched", func() bool { return len(fake.Turns()) == 1 })
 	text := fake.Turns()[0].Text
 	// The member is the recipient; the revision is CoBot's business, not the model's.
-	for _, required := range []string{task.ID, task.Description, task.AcceptanceCriteria} {
+	for _, required := range []string{task.ID, req.ID, req.Document, task.AcceptanceCriteria, "▶ 2. scoped file"} {
 		if !strings.Contains(text, required) {
-			t.Fatalf("missing task requirement: %s", required)
+			t.Fatalf("card lacks %q: %s", required, text)
 		}
 	}
 }

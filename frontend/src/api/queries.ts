@@ -17,6 +17,7 @@ export const queryKeys = {
   approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
   tasks: (teamId: string) => ['tasks', teamId] as const,
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
+  requirements: (teamId: string) => ['requirements', teamId] as const,
   questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
 };
 
@@ -332,17 +333,17 @@ export function useEngineModels(enabled: boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// M3: tasks, transfers, questions
+// Requirements, cards, questions
 // ---------------------------------------------------------------------------
 
-/** GET /teams/{id}/tasks: the team board; the server narrows a member's
+/** GET /teams/{id}/tasks: the team's cards; the server narrows a member's
  * scope, the page never decides who sees what. */
 export function useTasks(teamId: string | null, enabled = true, viewBotId?: string) {
   return usePagedItems([...queryKeys.tasks(teamId ?? ''), viewBotId ?? ''], (cursor) => api.listTasks({ teamId: teamId as string, viewBotId, cursor }), teamId !== null && enabled);
 }
 
-/** GET /tasks/{id}: one task with evidence and transfer history, loaded only
- * while the row is expanded. */
+/** GET /tasks/{id}: one card with its handoff records, loaded only while the
+ * row is expanded. */
 export function useTaskDetail(taskId: string | null, enabled = true) {
   return useQuery({
     queryKey: queryKeys.taskDetail(taskId ?? ''),
@@ -351,73 +352,27 @@ export function useTaskDetail(taskId: string | null, enabled = true) {
   });
 }
 
-function useInvalidateTasks() {
+/** GET /teams/{id}/requirements: the team's requirements with their routes. */
+export function useRequirements(teamId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.requirements(teamId ?? ''),
+    queryFn: () => api.listRequirements(teamId as string),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+/** POST /requirements/{id}/cancel: the user stops a requirement. */
+export function useCancelRequirement() {
   const qc = useQueryClient();
-  return () => {
-    void qc.invalidateQueries({ queryKey: ['tasks'] });
-    void qc.invalidateQueries({ queryKey: ['taskDetail'] });
-    void qc.invalidateQueries({ queryKey: queryKeys.teams });
-  };
-}
-
-export function useCreateTask(teamId: string) {
-  const invalidate = useInvalidateTasks();
   return useMutation({
-    mutationFn: (input: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; dependencyIds?: string[] }) =>
-      api.createTask(teamId, input),
-    onSuccess: invalidate,
-  });
-}
-
-export function usePatchTask() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, ...body }: { taskId: string; status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number }) =>
-      api.patchTask(taskId, body),
-    onSuccess: invalidate,
-  });
-}
-
-export function useSubmitEvidence() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, ...body }: { taskId: string; summary: string; artifactRefs?: string[]; testResult?: string; reviewResult?: string }) =>
-      api.submitEvidence(taskId, body),
-    onSuccess: invalidate,
-  });
-}
-
-export function useConfirmTask() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, evidenceIds, expectedRevision }: { taskId: string; evidenceIds?: string[]; expectedRevision: number }) =>
-      api.confirmTask(taskId, { evidenceIds, expectedRevision }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useOfferTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, toBotId, note }: { taskId: string; toBotId: string; note?: string }) =>
-      api.offerTransfer(taskId, { toBotId, note }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useAcceptTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ transferId, expectedRevision }: { transferId: string; expectedRevision: number }) => api.acceptTransfer(transferId, expectedRevision),
-    onSuccess: invalidate,
-  });
-}
-
-export function useCancelTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: (transferId: string) => api.cancelTransfer(transferId),
-    onSuccess: invalidate,
+    mutationFn: (requirementId: string) => api.cancelRequirement(requirementId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['requirements'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['taskDetail'] });
+      void qc.invalidateQueries({ queryKey: ['questions'] });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
   });
 }
 

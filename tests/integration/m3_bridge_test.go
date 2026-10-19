@@ -14,7 +14,7 @@ import (
 
 // memberTools is the surface a member's bridge advertises; keeping it in one
 // place makes a missing or extra tool a test failure rather than a drift.
-var memberTools = []string{"send_message", "ask_user", "deliver_task", "view_tasks"}
+var memberTools = []string{"handoff", "view_tasks", "send_message", "ask_user"}
 
 // TestMCPBridgeProtocol drives the real stdio bridge over an in-memory MCP
 // transport pair against the live HTTP collaboration route. The bridge holds

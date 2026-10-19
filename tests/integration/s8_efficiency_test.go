@@ -11,84 +11,47 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Tasks handed to a busy member reach it together in one turn, and the
-// assignment of a task it already delivered costs no turn at all.
-func TestAssignmentsShareATurnAndDeliveredOnesAreDropped(t *testing.T) {
+// Cards handed to a busy member reach it together in one turn, even from
+// different requirements, and a card it already handed off costs no turn.
+func TestCardsShareATurnAndHandedOffOnesAreDropped(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
-	captain, dev := bots[0], bots[1]
+	pm, dev := bots[0], bots[1]
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: dev.ID, Text: "先看看项目"}); err != nil {
 		t.Fatal(err)
 	}
 	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
 	busy := f.waitTurn(dev, "先看看项目")
 
-	// Three tasks arrive while the member works.
+	// Three cards of three requirements arrive while the member works.
 	ids := map[string]string{}
-	for _, title := range []string{"任务甲", "任务乙", "任务丙"} {
-		ids[title] = createdTaskID(t, f.call(captain, "create_task", map[string]any{
-			"title": title, "ownerId": dev.ID, "acceptanceCriteria": "完成", "idempotencyKey": "s8-" + title,
-		}))
+	for _, title := range []string{"卡片甲", "卡片乙", "卡片丙"} {
+		card, _ := h.handCard(t, team, pm, dev, title, "完成")
+		ids[title] = card.ID
 	}
-	// It sees them among its tasks and delivers the first one right away.
-	f.call(dev, "deliver_task", map[string]any{"taskId": ids["任务甲"], "summary": "顺手做完了", "idempotencyKey": "s8-deliver"})
+	// It sees one among its cards and hands it off right away.
+	f.call(dev, "handoff", map[string]any{"cardId": ids["卡片甲"], "outcome": "done", "summary": "顺手做完了", "idempotencyKey": "s8-handoff"})
 	f.finish(dev, busy, "")
 
-	// The other two arrive in one turn; the delivered one in none.
-	both := f.waitTurn(dev, "你被指派了 2 个任务", "任务乙", "任务丙")
-	if strings.Contains(both.Text, "你被指派了任务：任务甲") {
-		t.Fatalf("the delivered task was handed over again: %q", both.Text)
+	// The other two arrive in one turn; the handed-off one in none.
+	both := f.waitTurn(dev, "你收到了 2 张接力卡片", "卡片乙", "卡片丙")
+	if strings.Contains(both.Text, "【接力卡片】卡片甲") {
+		t.Fatalf("the handed-off card was handed over again: %q", both.Text)
 	}
 	f.finish(dev, both, "")
 	time.Sleep(300 * time.Millisecond)
 	if n := len(f.turnsOf(dev)); n != 2 {
 		t.Fatalf("member turns = %d, want 2", n)
 	}
-	for _, title := range []string{"任务乙", "任务丙"} {
+	for _, title := range []string{"卡片乙", "卡片丙"} {
 		if got := f.task(ids[title]); got.Status != domain.TaskDoing {
 			t.Fatalf("%s = %s, want doing once its turn started", title, got.Status)
 		}
 	}
 	var stale string
-	if err := h.app.DB.QueryRowContext(ctx, `SELECT status FROM deliveries WHERE task_id = ? AND kind = 'task_assignment'`, ids["任务甲"]).Scan(&stale); err != nil || stale != domain.DeliveryCancelled {
-		t.Fatalf("stale assignment = %q, %v", stale, err)
-	}
-}
-
-// Deliveries that reach a busy leader are accepted in one turn.
-func TestDeliveryNoticesShareTheLeadersTurn(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
-	captain, back, front := bots[0], bots[1], bots[2]
-	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "开工"}); err != nil {
-		t.Fatal(err)
-	}
-	f := reviewFlow{t: t, h: h, fake: h.fakeFor(t, team.ID)}
-	plan := f.waitTurn(captain, "开工")
-	backTask := createdTaskID(t, f.call(captain, "create_task", map[string]any{"title": "后端接口", "ownerId": back.ID, "acceptanceCriteria": "返回 200", "idempotencyKey": "s8b-back"}))
-	frontTask := createdTaskID(t, f.call(captain, "create_task", map[string]any{"title": "前端页面", "ownerId": front.ID, "acceptanceCriteria": "能打开", "idempotencyKey": "s8b-front"}))
-
-	// Both members deliver while the leader is still in its planning turn.
-	for _, m := range []struct {
-		bot   domain.Bot
-		task  string
-		title string
-	}{{back, backTask, "后端接口"}, {front, frontTask, "前端页面"}} {
-		turn := f.waitTurn(m.bot, m.title)
-		f.call(m.bot, "deliver_task", map[string]any{"taskId": m.task, "summary": "做好了", "idempotencyKey": "s8b-" + m.title})
-		f.finish(m.bot, turn, "")
-	}
-	f.finish(captain, plan, "")
-	review := f.waitTurn(captain, "有 2 个任务交付了", "后端接口", "前端页面")
-	f.call(captain, "review_task", map[string]any{"taskId": backTask, "decision": "accept", "idempotencyKey": "s8b-a1"})
-	f.call(captain, "review_task", map[string]any{"taskId": frontTask, "decision": "accept", "idempotencyKey": "s8b-a2"})
-	f.finish(captain, review, "")
-	// The next leader turn is the requirement report, not another notice.
-	report := f.waitTurn(captain, "这次需求的任务都已结束")
-	if strings.Contains(report.Text, "交付了任务") {
-		t.Fatalf("a delivery notice took its own turn: %q", report.Text)
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT status FROM deliveries WHERE task_id = ? AND kind = 'card'`, ids["卡片甲"]).Scan(&stale); err != nil || stale != domain.DeliveryCancelled {
+		t.Fatalf("stale card delivery = %q, %v", stale, err)
 	}
 }
 

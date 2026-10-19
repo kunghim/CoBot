@@ -14,9 +14,19 @@ describe('describeActivity', () => {
     expect(created.text).toContain('activity.line.taskCreated');
     expect(created.text).toContain('前端开发');
     expect(created.taskId).toBe('r');
-    const moved = describeActivity(item('task.updated', { title: '登录页', change: 'status', status: 'review' }, { botId: 'fe' }), nameOf, t);
+    const moved = describeActivity(item('task.updated', { title: '登录页', change: 'status', status: 'doing' }, { botId: 'fe' }), nameOf, t);
     expect(moved.text).toContain('activity.line.taskStatusBy');
-    expect(moved.text).toContain('tasks.status.review');
+    expect(moved.text).toContain('tasks.status.doing');
+  });
+  it('says who took up a card and how it was handed off', () => {
+    const started = describeActivity(item('card.started', { title: '登录页' }, { botId: 'fe' }), nameOf, t);
+    expect(started.text).toContain('activity.line.cardStarted');
+    expect(started.taskId).toBe('r');
+    const back = describeActivity(item('task.updated', { title: '代码评审', change: 'handoff', outcome: 'back' }, { botId: 'qa' }), nameOf, t);
+    expect(back.text).toContain('activity.line.cardHandoff');
+    expect(back.text).toContain('tasks.outcome.back');
+    const requirement = describeActivity(item('requirement.updated', { title: '登录', status: 'accepting' }), nameOf, t);
+    expect(requirement.text).toContain('tasks.requirementStatus.accepting');
   });
   it('shows who told whom what and opens the recipient', () => {
     const line = describeActivity(item('message.created', { fromBotId: 'lead', toBotId: 'qa', text: '请验收' }), nameOf, t);

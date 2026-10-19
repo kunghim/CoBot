@@ -14,21 +14,20 @@ import (
 const maxBatch = 10
 
 // batchedKinds are the deliveries that may share a turn with others of their
-// kind: plain messages, task assignments, delivery notices to the leader and
-// review requests to a reviewer. Each item still gets its own answer (a
-// delivery per task, a verdict per review); merging only saves the turn.
-// Approval and question results, rejections, escalations, requirement
-// reports and cancellation notices keep their own turns.
-var batchedKinds = map[string]bool{"message": true, "task_assignment": true, "review_notice": true, "review_request": true}
+// kind: plain messages and cards. Each card still gets its own handoff;
+// merging only saves the turn. Approval and question results keep their own
+// turns.
+var batchedKinds = map[string]bool{"message": true, "card": true}
 
 // claimBatchLocked takes the deliveries that queued up behind the head while
 // the member was busy into the same turn, so a member answers five pings
-// once, starts three assigned tasks together, or reviews two deliveries in
-// one turn instead of starting a turn for each. Only deliveries of the head's
-// kind join: user messages with user messages (across chains, each user
-// message opens its own), everything else only within the head's causal
-// chain. A merged turn is one wake: companions are recorded on the chain
-// without spending more.
+// once or takes up three cards together instead of starting a turn for each.
+// Only deliveries of the head's kind join: user messages with user messages
+// (across chains, each user message opens its own), cards with cards (across
+// chains too, since each requirement has its own; each card still counts on
+// its chain), everything else only within the head's causal chain. A merged
+// turn is one wake: companions are recorded on the chain without spending
+// more.
 func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID string, head sqlite.DeliveryRecord, headMessage domain.Message, runID string) ([]domain.Message, error) {
 	if !batchedKinds[head.Kind] {
 		return nil, nil
@@ -40,7 +39,9 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 	if err != nil {
 		return nil, err
 	}
-	acrossChains := head.Kind == "message" && headMessage.Kind == domain.MessageKindUser
+	// User messages each open their own chain, and so does each
+	// requirement: cards of several requirements still share one turn.
+	acrossChains := (head.Kind == "message" && headMessage.Kind == domain.MessageKindUser) || head.Kind == "card"
 	var batch []domain.Message
 	for _, record := range queue {
 		if len(batch) >= maxBatch-1 {
@@ -58,14 +59,11 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 		}
 		if record.TaskID != "" {
 			task, err := sqlite.GetTask(ctx, tx, record.TaskID)
-			if err != nil || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone {
+			if err != nil || task.IsTerminal() {
 				continue // its own dispatch will settle it
 			}
-			if record.Kind == "task_assignment" && (task.OwnerID != botID || task.Status == domain.TaskReview) {
-				continue // stale: its own dispatch cancels it
-			}
 		}
-		if !acrossChains && record.ChainID != "" {
+		if (!acrossChains || head.Kind == "card") && record.ChainID != "" {
 			key := record.DispatchKey
 			if key == "" {
 				key = record.ID
@@ -87,10 +85,8 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 
 // batchHeaders open a merged turn by what it holds.
 var batchHeaders = map[string]string{
-	"message":         "你在上一轮工作期间收到了 %d 条消息，请一起处理：\n",
-	"task_assignment": "你被指派了 %d 个任务，请一起处理，每个任务分别用 deliver_task 交付：\n",
-	"review_notice":   "有 %d 个任务交付了，等你验收，请对每个任务分别用 review_task 给出结论：\n",
-	"review_request":  "有 %d 个交付等你评审，请对每个任务分别用 review_task 给出结论：\n",
+	"message": "你在上一轮工作期间收到了 %d 条消息，请一起处理：\n",
+	"card":    "你收到了 %d 张接力卡片，按顺序处理，每张卡片分别用 handoff 交接：\n",
 }
 
 // batchInput renders a merged turn's messages, each under its sender, so the

@@ -406,11 +406,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 			tx.Rollback()
 			return err
 		}
-		// An assignment is stale once its task was delivered in another turn
-		// (the member saw it among its tasks and did it): the turn it would
-		// cost would only hear what the member already finished.
-		staleAssignment := delivery.Kind == "task_assignment" && (task.OwnerID != bot.ID || task.Status == domain.TaskReview)
-		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || staleAssignment {
+		// A card is stale once it was handed off in another turn (the member
+		// saw it among its cards and did it) or its requirement was
+		// cancelled: the turn it would cost would hear nothing new.
+		if errors.Is(err, sqlite.ErrNotFound) || task.IsTerminal() {
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				tx.Rollback()
 				return err
@@ -1017,14 +1016,11 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 }
 
 // bridgeRole is the tool set a member's bridge offers: "leader" for the
-// team's leader, "reviewer" for a reviewer member, "member" for everyone
-// else.
+// team's leader, "member" for everyone else. A reviewer is a member like
+// any other: what it reviews comes to it on cards.
 func bridgeRole(team domain.Team, bot domain.Bot) string {
 	if bot.IsLeader || team.LeaderID == bot.ID {
 		return "leader"
-	}
-	if bot.RoleID == roles.ReviewerRoleID {
-		return "reviewer"
 	}
 	return "member"
 }

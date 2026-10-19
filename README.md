@@ -27,8 +27,9 @@ A single coding agent works well. Several of them on the same project quickly tu
 - Agents wake each other up in endless loops and burn your budget.
 - When something crashes, you can't tell what actually ran.
 
-CoBot handles this the way a well-run team does: a lead who breaks down work, members with
-clear roles, a task board, written deliveries that get reviewed, and a human who signs off on
+CoBot handles this the way a well-run team does: a project manager who writes the requirement
+and plans the route, members who pass the work along that route, handoffs that are written down
+with what actually ran, reviews and tests that can send work back, and a human who signs off on
 what matters.
 
 ## How it works
@@ -36,41 +37,43 @@ what matters.
 ```mermaid
 flowchart LR
     U([You]) -->|goal| L[Project manager]
-    L -->|create_task / send_message| M1[Member bot]
-    L -->|create_task / send_message| M2[Member bot]
-    M1 & M2 -->|deliver_task / send_message / ask_user| C[(CoBot core<br/>tasks · messages · approvals)]
-    L -->|review_task / ask_user| C
-    C -->|deliveries wake the right member| L & M1 & M2
-    C -->|approval cards · questions| U
+    L -->|start_requirement: document + route| C[(CoBot core<br/>requirements · cards · approvals)]
+    C -->|hands each stage's card on| M1[Member bot] & M2[Member bot]
+    M1 & M2 -->|handoff: done / back / escalate| C
+    C -->|escalations · acceptance report| L
+    C -->|confirmations · acceptance · approvals · questions| U
     M1 & M2 -. execute in team directory .-> E[[Codex]]
 ```
 
 1. **Create a team** on a working directory. A project manager and members with built-in roles
    (product manager, full-stack engineer, QA engineer, reviewer) get their own agent sessions.
    You can add or remove members later from the team's settings.
-2. **Give the project manager a goal.** It agrees the plan with you, then breaks it into tasks with
-   owners, dependencies and acceptance criteria.
-3. **Members collaborate through structured tools** (MCP), not by parsing chat. Every
-   action they take becomes a fact in CoBot's database, and that fact wakes up whoever needs
-   to act next.
-4. **You stay in charge.** Native command and file approvals, questions from agents, and
-   collaboration chains that hit their limit all come to you.
+2. **Give the project manager a goal.** Once the need is clear it writes a requirement document and
+   picks this requirement's route from the full process (requirements review, product design, test
+   cases, implementation, testing, code review…), and you confirm both.
+3. **Members pass the work along the route.** Each stage is a card handed to its owner; the owner
+   hands it off with `handoff`, and CoBot moves it to the next stage, so no model decides who is next.
+   Reviews and tests can send work back to the stage that produced it; past the limit, or when
+   stuck, the card goes to the project manager.
+4. **You stay in charge.** Confirmations, the final acceptance, native command and file approvals and
+   questions from agents all come to you, and you can cancel a requirement at any time.
 
 ## Features
 
-- **Role-based collaboration.** Each bot sees only the tools its role needs. The project manager has
-  `send_message`, `ask_user`, `create_task`, `review_task` and `view_tasks`; members have
-  `send_message`, `ask_user`, `deliver_task` and `view_tasks`; a reviewer also has
-  `review_task`. The host binds each call to the member's identity, so a model can't act as
-  someone else.
-- **Delivery and review.** A member delivers a task with what it did, how to check it and
-  what it verified. A task the project manager marks for review (requirements, design, test cases,
-  code…) goes to a reviewer member with the matching checklist, and the reviewer's verdict
-  decides it; after too many send-backs (3 by default, adjustable in settings) the project manager
-  decides instead. Other tasks the project manager (or you) accepts. Accepting completes the task and
-  releases the tasks waiting on it; sending back needs a reason. When every task of a confirmed
-  plan has ended, the project manager reports the result and you accept it or ask for changes. CoBot
-  moves the task status itself; the model never drives the state machine.
+- **Role-based collaboration.** The project manager has `start_requirement`, `handoff`,
+  `view_tasks`, `send_message` and `ask_user`; members have `handoff`, `view_tasks`,
+  `send_message` and `ask_user` (only for what only you can decide). `send_message` leaves a note
+  and wakes nobody: work moves only on cards. The host binds each call to the member's identity, so
+  a model can't act as someone else, and a sub-agent can't hand off a card, start a requirement or
+  ask you.
+- **Relay and acceptance.** Each card opens with the requirement, the route and where it stands,
+  then the requirement document and earlier handoffs; a review card also carries its checklist. On
+  handoff CoBot attaches the commands, exit codes and changed files the engine reported. Reviews and
+  tests can send work back (rerun the route, or straight back to the reviewer); past the limit (3
+  by default, adjustable in settings) the project manager decides. Optional improvements pass with
+  suggestions, collected for the final report. The route ends with the project manager's acceptance
+  report, which becomes your acceptance card. CoBot moves the cards itself; the model never drives
+  the state machine.
 - **Human in the loop.** Native Codex approvals show the full command or diff, with Codex's
   own choices: allow, allow for this session, decline, or decline and stop (requests for extra
   access: allow for this turn or this session, or deny). Each team has a permission mode

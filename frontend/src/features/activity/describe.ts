@@ -33,7 +33,7 @@ export function describeActivity(item: ActivityItem, nameOf: (id: unknown) => st
   const d = (item.detail ?? {}) as Record<string, unknown>;
   const actor = item.botId ? nameOf(item.botId) : '';
   const title = str(d.title) || t('activity.untitledTask');
-  const taskId = item.type.startsWith('task.') ? item.resourceId : undefined;
+  const taskId = item.type.startsWith('task.') || item.type === 'card.started' ? item.resourceId : undefined;
   switch (item.type) {
     case 'task.created':
       return { text: t('activity.line.taskCreated', { title, owner: nameOf(d.ownerId) }), taskId };
@@ -41,17 +41,15 @@ export function describeActivity(item: ActivityItem, nameOf: (id: unknown) => st
       switch (d.change) {
         case 'status':
           return { text: t(actor ? 'activity.line.taskStatusBy' : 'activity.line.taskStatus', { title, actor, status: t(`tasks.status.${str(d.status)}`, { defaultValue: str(d.status) }) }), taskId };
-        case 'assigned':
-          return { text: t('activity.line.taskAssigned', { title, owner: nameOf(d.ownerId) }), taskId };
-        case 'evidence':
-          return { text: t('activity.line.taskEvidence', { title, actor: actor || t('activity.someone') }), taskId };
+        case 'handoff':
+          return { text: t('activity.line.cardHandoff', { title, actor: actor || t('activity.someone'), outcome: t(`tasks.outcome.${str(d.outcome)}`, { defaultValue: str(d.outcome) }) }), taskId };
         default:
           return { text: t('activity.line.taskUpdated', { title }), taskId };
       }
-    case 'transfer.offered':
-      return { text: t('activity.line.transferOffered', { from: nameOf(d.fromBotId), to: nameOf(d.toBotId), title }) };
-    case 'transfer.accepted':
-      return { text: t('activity.line.transferAccepted', { to: nameOf(d.toBotId), title }) };
+    case 'card.started':
+      return { text: t('activity.line.cardStarted', { title, actor: actor || t('activity.someone') }), taskId };
+    case 'requirement.updated':
+      return { text: t('activity.line.requirementUpdated', { title, status: t(`tasks.requirementStatus.${str(d.status)}`, { defaultValue: str(d.status) }) }) };
     case 'question.created':
       return { text: t('activity.line.questionCreated', { actor: actor || t('activity.someone') }), quote: str(d.question), conversationBotId: item.botId || undefined };
     case 'question.answered':

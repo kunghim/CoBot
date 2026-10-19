@@ -243,7 +243,7 @@ export const api = {
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
-  // Tasks, transfers and questions (M3).
+  // Requirements, cards and questions.
   listTasks: (params: { teamId: string; ownerId?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.ownerId) query.set('ownerId', params.ownerId);
@@ -252,27 +252,11 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').TaskListResult>('GET', `/api/v1/teams/${params.teamId}/tasks?${query.toString()}`);
   },
-  createTask: (
-    teamId: string,
-    body: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; parentId?: string; dependencyIds?: string[] },
-  ) => request<import('./types').Task>('POST', `/api/v1/teams/${teamId}/tasks`, body),
   getTask: (taskId: string) => request<import('./types').TaskDetailResult>('GET', `/api/v1/tasks/${taskId}`),
-  patchTask: (
-    taskId: string,
-    body: { status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number },
-  ) => request<import('./types').Task>('PATCH', `/api/v1/tasks/${taskId}`, body),
-  submitEvidence: (
-    taskId: string,
-    body: { summary: string; artifactRefs?: string[]; candidateRef?: string; testResult?: string; reviewResult?: string },
-  ) => request<import('./types').Evidence>('POST', `/api/v1/tasks/${taskId}/evidence`, body),
-  confirmTask: (taskId: string, body: { evidenceIds?: string[]; expectedRevision: number }) =>
-    request<import('./types').Task>('POST', `/api/v1/tasks/${taskId}/confirm`, body),
-  offerTransfer: (taskId: string, body: { toBotId: string; note?: string }) =>
-    request<import('./types').Transfer>('POST', `/api/v1/tasks/${taskId}/transfers`, body),
-  acceptTransfer: (transferId: string, expectedRevision: number) =>
-    request<import('./types').Task>('POST', `/api/v1/transfers/${transferId}/accept`, { expectedRevision }),
-  cancelTransfer: (transferId: string) =>
-    request<import('./types').Transfer>('POST', `/api/v1/transfers/${transferId}/cancel`, {}),
+  listRequirements: (teamId: string) =>
+    request<import('./types').RequirementListResult>('GET', `/api/v1/teams/${teamId}/requirements`),
+  cancelRequirement: (requirementId: string) =>
+    request<import('./types').Requirement>('POST', `/api/v1/requirements/${requirementId}/cancel`, {}),
   listQuestions: (params: { teamId: string; status?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.status) query.set('status', params.status);
