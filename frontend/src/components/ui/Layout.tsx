@@ -36,7 +36,7 @@ export function Section({ title, description, children, className }: { title: Re
 /** The header row of a panel or column: what it shows, and its controls. */
 export function PanelHeader({ leading, title, subtitle, actions }: { leading?: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex min-h-14 items-center gap-2.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+    <div className="flex min-h-14 items-center gap-2.5 px-3 py-2">
       {leading}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold leading-5 text-neutral-900 dark:text-neutral-50">{title}</p>
@@ -91,7 +91,7 @@ export function AppTitleBar({ platform, title, left, right, windowControls }: { 
   return (
     <div
       style={{ ['--wails-draggable' as string]: 'drag' }}
-      className="flex h-10 shrink-0 select-none items-center border-b border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900"
+      className="flex h-10 shrink-0 select-none items-center bg-side"
       onDoubleClick={windowControls?.onToggleMaximize}
     >
       {platform === 'mac' && <span className="w-[76px] shrink-0" aria-hidden />}

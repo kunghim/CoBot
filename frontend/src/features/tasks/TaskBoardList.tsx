@@ -84,14 +84,14 @@ export default function TaskBoardList({
   return (
     <div>
       <div className="px-3 py-3">
-        <Button block icon={Icons.add} aria-expanded={createOpen} onClick={() => setCreateOpen((open) => !open)}>
+        <Button block variant="ghost" icon={Icons.add} aria-expanded={createOpen} onClick={() => setCreateOpen((open) => !open)} className="justify-start text-neutral-500 dark:text-neutral-400">
           {t('tasks.new')}
         </Button>
       </div>
 
       {createOpen && (
         <form
-          className="mx-3 mb-3 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
+          className="mx-3 mb-3 space-y-3 rounded-xl bg-card p-3 shadow-sm ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]"
           onSubmit={(event) => {
             event.preventDefault();
             submitCreate();
@@ -124,7 +124,7 @@ export default function TaskBoardList({
 
       {items.length === 0 && <EmptyState icon={<Icons.tasks size={20} aria-hidden />} title={t('tasks.empty')} />}
 
-      <ul className="space-y-1.5 px-3 pb-3">
+      <ul className="space-y-0.5 px-2 pb-3">
         {items.map((task) => (
           <TaskRow
             key={task.id}
@@ -160,7 +160,7 @@ function TaskRow({
   const { t } = useTranslation();
   const Chevron = expanded ? Icons.expand : Icons.next;
   return (
-    <li id={`task-${task.id}`} className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <li id={`task-${task.id}`} className={cx('overflow-hidden rounded-xl transition-colors', expanded && 'bg-card shadow-sm ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]')}>
       <button
         type="button"
         onClick={onToggle}

@@ -9,7 +9,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link
 
 const variantClass: Record<ButtonVariant, string> = {
   primary: 'bg-neutral-900 text-white shadow-sm hover:bg-neutral-700 active:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300',
-  secondary: `bg-white text-neutral-800 shadow-sm ring-1 ring-inset ring-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800`,
+  secondary: `bg-card text-neutral-800 shadow-sm ring-1 ring-inset ring-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800`,
   ghost: `text-neutral-700 dark:text-neutral-200 ${interactive.hover} ${interactive.pressed}`,
   danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800',
   link: 'h-auto px-0 text-signal-600 underline-offset-4 hover:underline dark:text-signal-400',

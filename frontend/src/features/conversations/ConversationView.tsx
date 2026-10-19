@@ -133,7 +133,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   return (
     <TeamMembersContext.Provider value={membersById}>
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+      <header className="flex min-h-14 items-center gap-3 px-4 py-2">
         <ShellToggle side="left" />
         <MemberAvatarButton bot={bot} disabled={readOnly} />
         <div className="min-w-0 flex-1">
@@ -169,7 +169,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-5 py-5"
+        className="min-h-0 flex-1 overflow-y-auto px-8 py-4"
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
@@ -187,7 +187,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             </p>
           </div>
         )}
-        <ul className="mx-auto max-w-3xl space-y-4">
+        <ul className="mx-auto max-w-3xl space-y-6">
           {timeline.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
@@ -231,7 +231,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
       {/* The exchange between two members is read-only: while it is open the
           composer and approval cards step aside (kept mounted, so nothing
           typed or pending is lost). */}
-      <div className={`mx-auto w-full max-w-3xl space-y-2 px-5 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
+      <div className={`mx-auto w-full max-w-3xl space-y-2.5 px-8 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
         {queuedCount > 0 && (
           <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
             {t('conversation.queuedBanner', { count: queuedCount })}

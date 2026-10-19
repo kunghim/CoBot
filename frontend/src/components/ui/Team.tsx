@@ -32,12 +32,10 @@ export function MemberRow({ avatar, name, status, statusLabel, preview, time, cu
       className={cx(
         'relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-sm transition-colors',
         preview ? 'py-2' : 'py-1.5',
-        // The same current state as every navigation row: an ink layer and
-        // the signal bar on the left.
+        // The same current state as every navigation row: a plain ink layer.
         current ? interactive.selected : cx('text-neutral-600 dark:text-neutral-300', interactive.hover),
       )}
     >
-      {current && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-signal-500" />}
       <span id={`${id}-state`} className="relative shrink-0" role="img" aria-label={statusLabel} title={statusLabel}>
         {avatar}
         {attention && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-neutral-100 dark:ring-neutral-900" />}
@@ -58,7 +56,7 @@ export function AvatarStack({ avatars, more }: { avatars: ReactNode[]; more?: st
   return (
     <span className="flex items-center">
       {avatars.map((avatar, index) => (
-        <span key={index} className="-ml-1.5 first:ml-0 rounded-[30%] bg-white ring-2 ring-white dark:bg-neutral-900 dark:ring-neutral-900">
+        <span key={index} className="-ml-1.5 first:ml-0 rounded-[30%] bg-canvas ring-2 ring-canvas">
           {avatar}
         </span>
       ))}
@@ -72,22 +70,29 @@ export function AvatarStack({ avatars, more }: { avatars: ReactNode[]; more?: st
  * its avatar and name (plain text, no badge); the user's sits on the right.
  */
 export function MessageBubble({ from, avatar, author, children, meta }: { from: 'user' | 'member'; avatar?: ReactNode; author?: ReactNode; children: ReactNode; meta?: ReactNode }) {
-  const user = from === 'user';
-  return (
-    <div className={cx('flex gap-2.5', user ? 'justify-end' : 'justify-start')}>
-      {!user && avatar && <div className="mt-0.5 shrink-0">{avatar}</div>}
-      <div className="min-w-0 max-w-[85%] space-y-1">
-        {author && !user && <div className="text-xs font-medium text-neutral-600 dark:text-neutral-300">{author}</div>}
-        <div
-          className={cx(
-            'break-words text-sm leading-6',
-            user ? 'whitespace-pre-wrap rounded-2xl rounded-br-md bg-neutral-900 px-3.5 py-2 text-white dark:bg-neutral-100 dark:text-neutral-900' : 'rounded-2xl rounded-tl-md bg-white px-4 py-2.5 text-neutral-900 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-800',
-          )}
-        >
-          {children}
+  if (from === 'user') {
+    // The user's words: a soft sunk bubble on the right.
+    return (
+      <div className="flex justify-end">
+        <div className="min-w-0 max-w-[78%] space-y-1">
+          <div className="whitespace-pre-wrap break-words rounded-2xl bg-sunk px-4 py-2 text-sm leading-relaxed text-neutral-900 dark:text-neutral-50">{children}</div>
+          {meta && <div className="flex items-center justify-end gap-2 text-2xs text-neutral-500 dark:text-neutral-400">{meta}</div>}
         </div>
-        {meta && <div className={cx('flex items-center gap-2 text-2xs text-neutral-500 dark:text-neutral-400', user ? 'justify-end' : 'justify-start')}>{meta}</div>}
       </div>
+    );
+  }
+  // A member's reply reads like a document: a small line with its avatar and
+  // name, then the text straight on the canvas, no bubble.
+  return (
+    <div className="min-w-0">
+      {(avatar || author) && (
+        <div className="mb-1.5 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {avatar}
+          {author && <span className="font-medium text-neutral-600 dark:text-neutral-300">{author}</span>}
+        </div>
+      )}
+      <div className="break-words text-sm leading-7 text-neutral-900 dark:text-neutral-100">{children}</div>
+      {meta && <div className="mt-1 flex items-center gap-2 text-2xs text-neutral-500 dark:text-neutral-400">{meta}</div>}
     </div>
   );
 }
@@ -178,7 +183,7 @@ export function ProcessStep({ kind, status, title, detail, duration, badge }: { 
 export function WaitingCard({ icon, title, position, onPrevious, onNext, previousLabel, nextLabel, onClose, closeLabel, children, actions }: { icon: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; children: ReactNode; actions: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-floating dark:border-neutral-700 dark:bg-neutral-800 dark:shadow-none">
+    <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-900/[0.12] bg-card p-4 shadow-floating dark:border-white/[0.12]">
       <header className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span className="flex shrink-0 items-center" aria-hidden>{icon}</span>
         <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate">{title}</h3>
@@ -250,7 +255,7 @@ export function Composer({ value, onChange, onSend, placeholder, running = false
     element.style.height = `${element.scrollHeight}px`;
   }, [value]);
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white shadow-raised transition-colors focus-within:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-none dark:focus-within:border-neutral-500">
+    <div className="rounded-2xl border border-neutral-900/[0.12] bg-card shadow-raised transition-colors focus-within:border-neutral-900/25 dark:border-white/[0.12] dark:focus-within:border-white/25">
       <textarea
         ref={area}
         rows={1}

@@ -87,7 +87,7 @@ export function ToastCard({ toast, dismiss, closeLabel }: { toast: ToastEntry; d
     <div
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="pointer-events-auto flex animate-drop-in items-start gap-3 rounded-xl bg-white p-3.5 shadow-xl ring-1 ring-neutral-900/10 dark:bg-neutral-800 dark:ring-white/10"
+      className="pointer-events-auto flex animate-drop-in items-start gap-3 rounded-xl bg-card p-3.5 shadow-xl ring-1 ring-neutral-900/10 dark:ring-white/10"
     >
       <Icon size={18} aria-hidden className={cx('mt-px shrink-0', iconTone[tone])} />
       <div className="min-w-0 flex-1 text-sm">

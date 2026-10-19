@@ -45,12 +45,18 @@ export const layer = {
   tooltip: 'z-[70]',
 } as const;
 
-/** Surfaces, from the page up. */
+/**
+ * Surfaces of the window, from back to front (values per theme in
+ * styles/index.css): rail, side columns, the conversation canvas, cards
+ * floating on it, and sunk wells such as the user's bubble.
+ */
 export const surface = {
-  page: 'bg-neutral-50 dark:bg-neutral-950',
-  sunken: 'bg-neutral-100 dark:bg-neutral-900',
-  raised: 'bg-white dark:bg-neutral-900',
-  overlay: 'bg-white shadow-xl ring-1 ring-neutral-900/10 dark:bg-neutral-800 dark:ring-white/10',
+  rail: 'bg-rail',
+  page: 'bg-side',
+  canvas: 'bg-canvas',
+  sunken: 'bg-sunk',
+  raised: 'bg-card',
+  overlay: 'bg-card shadow-xl ring-1 ring-neutral-900/10 dark:ring-white/10',
 } as const;
 
 /** Tones shared by alerts, badges, toasts and status dots. */

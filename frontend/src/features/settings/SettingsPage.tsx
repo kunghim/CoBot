@@ -79,10 +79,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 md:flex-row">
+    <div className="flex h-full flex-col bg-side text-neutral-900 dark:text-neutral-100 md:flex-row">
       <nav
         aria-label={t('settings.title')}
-        className="shrink-0 space-y-4 border-b border-neutral-200 bg-neutral-100 px-3 py-3 dark:border-neutral-800 dark:bg-neutral-900 md:w-56 md:border-b-0 md:border-r"
+        className="shrink-0 space-y-4 px-3 py-3 md:w-56"
       >
         <Button variant="ghost" size="sm" icon={Icons.back} onClick={back}>
           {t('settings.back')}
@@ -103,7 +103,7 @@ export default function SettingsPage() {
           </ul>
         </NavSection>
       </nav>
-      <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-10 md:py-8">
+      <main className="min-w-0 flex-1 overflow-y-auto rounded-t-2xl bg-canvas px-4 py-6 shadow-sheet md:mt-2 md:px-10 md:py-8">
         <div className="mx-auto max-w-2xl space-y-6">
           <PageHeader eyebrow={t('settings.title')} title={t(`settings.sections.${current.id}`)} description={t(`settings.sectionHints.${current.id}`)} />
           {body}

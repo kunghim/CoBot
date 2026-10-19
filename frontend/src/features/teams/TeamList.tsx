@@ -65,7 +65,7 @@ export default function TeamList({ onClose }: { onClose?: () => void }) {
       </div>
 
       <div className="px-3 pb-2">
-        <Button block icon={Icons.add} onClick={() => setCreateOpen(true)}>
+        <Button block variant="ghost" icon={Icons.add} onClick={() => setCreateOpen(true)} className="justify-start text-neutral-600 dark:text-neutral-300">
           {t('team.new')}
         </Button>
       </div>

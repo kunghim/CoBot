@@ -82,7 +82,7 @@ export default function RunProcess({
         </ol>
       )}
       {active && live?.reply && (
-        <div className="rounded-2xl rounded-tl-md bg-white px-4 py-2.5 text-sm leading-6 text-neutral-900 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-800" data-testid="streaming-reply">
+        <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
           <Markdown text={live.reply} teamId={teamId} />
         </div>
       )}

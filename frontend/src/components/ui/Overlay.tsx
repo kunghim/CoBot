@@ -204,7 +204,7 @@ function Modal({ open, onClose, busy = false, children, position, labelledBy, de
         aria-describedby={describedBy}
         onMouseDown={(event) => event.stopPropagation()}
         className={cx(
-          'bg-white shadow-2xl outline-none dark:bg-neutral-900',
+          'bg-card shadow-2xl outline-none',
           position === 'center' && cx('w-full animate-pop-in rounded-2xl border border-neutral-200 dark:border-neutral-700', width),
           position === 'right' && 'flex h-full w-80 max-w-[90vw] animate-slide-in-right flex-col border-l border-neutral-200 dark:border-neutral-700',
           position === 'left' && 'flex h-full w-72 max-w-[90vw] animate-slide-in-left flex-col border-r border-neutral-200 dark:border-neutral-700',

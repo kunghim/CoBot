@@ -52,7 +52,7 @@ export default function QuestionList({ teamId, viewBotId }: { teamId: string; vi
   );
 }
 
-const cardClass = 'rounded-xl border border-neutral-200 bg-white p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900';
+const cardClass = 'rounded-xl bg-card p-3 text-sm shadow-sm ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]';
 
 function QuestionCard({ question }: { question: Question }) {
   const { t } = useTranslation();

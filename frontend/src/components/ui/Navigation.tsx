@@ -44,7 +44,6 @@ export function NavItem({ icon: Icon, label, current = false, onClick, href, tra
   );
   const content = (
     <>
-      {current && <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-signal-500" />}
       {leading ?? (Icon && <Icon size={16} aria-hidden />)}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{label}</span>

@@ -34,6 +34,16 @@
   --color-signal-600: #3346d3;
   --color-on-signal: #ffffff;
 
+  /* Surfaces of the window, from back to front: the rail (deepest), the
+     side columns (team list, work panel), the canvas (the conversation, the
+     one raised sheet), cards floating on it, and sunk wells (the user's
+     bubble, commands). Values per theme and mode are below. */
+  --color-rail: var(--surface-rail);
+  --color-side: var(--surface-side);
+  --color-canvas: var(--surface-canvas);
+  --color-card: var(--surface-card);
+  --color-sunk: var(--surface-sunk);
+
   /* Type scale: 11 (2xs: meta, badges, captions), 12 (xs), 14 (sm: body),
      16 (base), 18 (lg), 20 (xl), 24 (2xl). No sizes in between. */
   --text-2xs: 11px;
@@ -47,6 +57,7 @@
   --shadow-lg: 0 10px 15px -3px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
   --shadow-xl: 0 20px 25px -5px color-mix(in srgb, var(--color-neutral-950) 10%, transparent), 0 8px 10px -6px color-mix(in srgb, var(--color-neutral-950) 10%, transparent);
   --shadow-2xl: 0 25px 50px -12px color-mix(in srgb, var(--color-neutral-950) 25%, transparent);
+  --shadow-sheet: 0 0 0 1px color-mix(in srgb, var(--color-neutral-900) 5%, transparent), 0 2px 12px -6px color-mix(in srgb, var(--color-neutral-900) 10%, transparent);
   --shadow-raised: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--color-neutral-900) 18%, transparent);
   --shadow-floating: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 6%, transparent), 0 12px 32px -16px color-mix(in srgb, var(--color-neutral-900) 25%, transparent);
 
@@ -126,14 +137,13 @@
 }
 
 /* classic: CoBot's own classic, rice paper and ink. Black, white and gray,
-   but neither end is pure: the page is warm paper, the cards a lighter
-   sheet of it, the text and the signal soft ink; dark mode is warm
+   but neither end is pure: the side columns are warm off-white, the
+   conversation a brighter sheet, the text and the signal soft ink; dark mode is warm
    charcoal with paper-white text. The warmth is kept so low (a few percent
    of saturation) that it still reads as gray, only softer. Layers part by
    tone more than by lines. The only color left is the members' own and the
    status colors. */
 :root[data-theme="classic"] {
-  --color-white: #fbfaf7;
   --color-black: #141311;
 
   --color-neutral-50: #f4f3ef;
@@ -157,6 +167,36 @@
   --color-signal-500: #dedad2;
   --color-on-signal: #22211e;
 }
+/* Surfaces, derived from each theme's neutrals; classic sets its own. */
+:root {
+  --surface-rail: var(--color-neutral-100);
+  --surface-side: var(--color-neutral-50);
+  --surface-canvas: color-mix(in srgb, var(--color-neutral-50) 35%, #ffffff);
+  --surface-card: #ffffff;
+  --surface-sunk: var(--color-neutral-100);
+}
+:root[data-mode="dark"] {
+  --surface-rail: color-mix(in srgb, var(--color-neutral-950) 75%, #000000);
+  --surface-side: var(--color-neutral-950);
+  --surface-canvas: color-mix(in srgb, var(--color-neutral-900) 70%, var(--color-neutral-950));
+  --surface-card: var(--color-neutral-800);
+  --surface-sunk: var(--color-neutral-800);
+}
+:root[data-theme="classic"] {
+  --surface-rail: #efede8;
+  --surface-side: #f7f6f3;
+  --surface-canvas: #fdfcfa;
+  --surface-card: #ffffff;
+  --surface-sunk: #efede7;
+}
+:root[data-theme="classic"][data-mode="dark"] {
+  --surface-rail: #121110;
+  --surface-side: #181715;
+  --surface-canvas: #211f1d;
+  --surface-card: #2b2a27;
+  --surface-sunk: #302e2b;
+}
+
 html,
 body,
 #root {

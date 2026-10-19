@@ -104,7 +104,7 @@ export default function TeamConversation() {
           </div>
         </Demo>
       </Doc>
-      <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧深色气泡；成员的回复在左侧，带头像和名字（纯文字，不加底色）；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字。">
+      <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧凹下去的浅色气泡；成员的回复不用气泡：一行头像和名字，下面是正文，像读文档；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字。">
         <Demo>
           <div className="mx-auto max-w-2xl space-y-4">
             <MessageBubble from="user" meta="已送达">做一个本地待办页面，能添加和删除</MessageBubble>

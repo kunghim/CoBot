@@ -35,7 +35,7 @@ export default function MemoryList({ botId }: { botId: string }) {
       )}
       <ul className="space-y-2 px-3 pb-3">
         {items.map((memory) => (
-          <li key={memory.id} className="rounded-xl border border-neutral-200 bg-white p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <li key={memory.id} className="rounded-xl bg-card p-3 text-sm shadow-sm ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]">
             <p className="whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">{memory.body}</p>
             <div className="mt-1.5 flex items-center justify-between text-2xs text-neutral-500 dark:text-neutral-400">
               <span>{formatTime(memory.createdAt)}</span>

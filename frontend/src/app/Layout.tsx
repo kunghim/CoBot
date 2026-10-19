@@ -39,20 +39,23 @@ export default function Layout() {
   }, [teams.data, botId, setBotId]);
 
   const teamList = (
-    <aside aria-label={t('nav.teamList')} className="flex h-full w-full flex-col bg-neutral-100 dark:bg-neutral-900">
+    <aside aria-label={t('nav.teamList')} className="flex h-full w-full flex-col bg-side">
       <TeamList onClose={shell.narrow ? () => shell.setListOpen(false) : undefined} />
     </aside>
   );
   const workPanel = (
-    <aside aria-label={t('nav.workPanel')} className="flex h-full w-full flex-col bg-white dark:bg-neutral-900">
+    <aside aria-label={t('nav.workPanel')} className="flex h-full w-full flex-col bg-side">
       <WorkPanel onClose={shell.narrow ? () => shell.setPanelOpen(false) : undefined} />
     </aside>
   );
 
   return (
-    <div className="flex h-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    // Two sides recede and the middle comes forward: the rail is the deepest
+    // surface, the team list and the work panel sit on the side surface, and
+    // the conversation is the one raised sheet between them.
+    <div className="flex h-full bg-side text-neutral-900 dark:text-neutral-100">
       {/* Primary icon rail: the mark and home on top, settings at the bottom. */}
-      <nav aria-label={t('app.title')} className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-neutral-100 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <nav aria-label={t('app.title')} className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3">
         <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold tracking-tight text-white dark:bg-neutral-100 dark:text-neutral-900" title="CoBot" aria-hidden="true">
           Co
         </div>
@@ -71,7 +74,7 @@ export default function Layout() {
       )}
 
       {/* Conversation area: the routed page. */}
-      <main className="relative flex min-w-0 flex-1 flex-col">
+      <main className="relative mt-2 flex min-w-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet">
         <Outlet />
       </main>
 
@@ -87,5 +90,5 @@ export default function Layout() {
 }
 
 function Column({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
-  return <div className={side === 'left' ? 'w-64 shrink-0 border-r border-neutral-200 dark:border-neutral-800' : 'w-72 shrink-0 border-l border-neutral-200 dark:border-neutral-800'}>{children}</div>;
+  return <div className={side === 'left' ? 'w-64 shrink-0' : 'w-72 shrink-0'}>{children}</div>;
 }

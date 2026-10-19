@@ -4,7 +4,7 @@
 // entries can ask it to show a tab or open a task.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Icons, PanelHeader, PanelToggle, TabPanel, Tabs } from './ui';
+import { EmptyState, Icons, PanelToggle, TabPanel, Tabs } from './ui';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
@@ -13,7 +13,6 @@ import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
-import Avatar from '../features/avatars/Avatar';
 import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
 
 type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
@@ -40,18 +39,18 @@ export default function WorkPanel({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <PanelHeader
-        leading={context ? <Avatar bot={context.bot} /> : undefined}
-        title={context ? context.bot.name : t('nav.workPanel')}
-        subtitle={context?.team.name}
-        actions={onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
-      />
-
-      {context && (
-        <div className="px-3">
-          <Tabs idPrefix="workpanel" label={t('panel.tablist')} value={tab} onChange={setTab} tabs={TABS.map((id) => ({ id, label: t(`panel.tabs.${id}`) }))} />
+      {/* The conversation header already names the member and the team, so
+          the panel opens straight on its tabs. */}
+      <div className="flex min-h-14 items-center gap-2 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          {context ? (
+            <Tabs variant="pill" idPrefix="workpanel" label={t('panel.tablist')} value={tab} onChange={setTab} tabs={TABS.map((id) => ({ id, label: t(`panel.tabs.${id}`) }))} />
+          ) : (
+            <span className="px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">{t('nav.workPanel')}</span>
+          )}
         </div>
-      )}
+        {onClose && <PanelToggle side="right" open onToggle={onClose} openLabel={t('nav.openWorkPanel')} closeLabel={t('nav.closeWorkPanel')} />}
+      </div>
 
       <TabPanel idPrefix="workpanel" value={tab} className="min-h-0 flex-1 overflow-y-auto">
         {!context && <EmptyState icon={<Icons.member size={20} aria-hidden />} title={t('panel.noSelection')} />}

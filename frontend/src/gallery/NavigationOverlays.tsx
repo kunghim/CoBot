@@ -35,7 +35,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="nav-item" name="NavItem 侧边导航项 · NavSection 分组" file="components/ui/Navigation.tsx" use="侧栏里的导航（设置菜单、列表）。当前项：底色加左侧强调色竖条；悬停：一层墨色。" avoid="不要用和侧栏底色相同的颜色做悬停色——这就是设置页现在“没有悬停反馈”的原因。">
+      <Doc id="nav-item" name="NavItem 侧边导航项 · NavSection 分组" file="components/ui/Navigation.tsx" use="侧栏里的导航（设置菜单、列表）。当前项：一块淡墨色底；悬停：更淡的一层墨色。" avoid="不要用和侧栏底色相同的颜色做悬停色——这就是设置页现在“没有悬停反馈”的原因。">
         <Demo surface="sunken">
           <div className="w-56 space-y-4">
             <NavItem icon={Settings2} label="返回工作区" onClick={() => undefined} />
