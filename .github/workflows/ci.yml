@@ -26,7 +26,7 @@ jobs:
       - name: Check pull request routing
         run: node scripts/check-pr-route.mjs
       - name: Test repository policy enforcement
-        run: node --test scripts/repository-policy.test.mjs
+        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs
 
   web-core:
     name: web/shared core (ubuntu)

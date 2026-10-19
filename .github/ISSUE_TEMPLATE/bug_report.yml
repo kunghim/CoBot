@@ -1,5 +1,5 @@
 name: Bug report / 问题反馈
-description: Report a reproducible problem / 提交可复现的问题
+description: Report a problem with reproduction or code evidence / 提交带复现或代码证据的问题
 labels: [bug, "status: needs-triage"]
 body:
   - type: markdown
@@ -7,21 +7,57 @@ body:
       value: |
         English and Chinese are welcome; one report is enough. Search existing issues first.
         欢迎使用中文或英文，无需重复提交双语副本；请先搜索已有 Issue。
+        AI-discovered reports are welcome. Distinguish observed behavior from an unverified hypothesis.
+        欢迎 AI 发现的问题，请区分已观察的事实与尚未验证的推测。
         Do not post vulnerabilities, credentials, startup links, databases or raw traces.
         不要公开漏洞细节、凭据、启动链接、数据库或原始 trace；安全问题见 SECURITY.md。
+  - type: dropdown
+    id: discovery_source
+    attributes:
+      label: Discovery source / 发现来源
+      description: Who discovered the problem? AI translation or editing alone does not count. / 谁发现了问题？仅由 AI 翻译或润色不算 AI 发现。
+      options:
+        - Human-discovered / 人工发现
+        - AI-discovered / AI 发现
+        - Unsure / 不确定
+    validations:
+      required: false
+  - type: dropdown
+    id: verification
+    attributes:
+      label: Verification / 验证情况
+      description: Choose the strongest evidence you actually have; explain details below. / 选择实际具备的最强证据，并在下方说明。
+      options:
+        - Runtime reproduction / 运行复现
+        - Automated test / 自动化测试
+        - Static analysis only / 仅静态分析
+        - Not yet verified / 尚未验证
+    validations:
+      required: false
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method / 安装方式
+      options:
+        - MSI installer / MSI 安装包
+        - ZIP archive / ZIP 压缩包
+        - Source build / 源码构建
+        - Other or unknown / 其他或不清楚
+    validations:
+      required: false
   - type: textarea
     id: environment
     attributes:
       label: Environment / 环境
-      description: Include what you know; unknown versions are OK. CoBot version/commit, OS/architecture, Web/desktop, Codex version. Source builds may include Go/Node. / 填写已知信息即可，不清楚的版本可标记未知。
+      description: CoBot version/commit, OS/architecture, Web/desktop and Codex version; unknown is OK. Source builds may include Go/Node. / 请填 CoBot 版本或提交、系统与架构、Web 或桌面、Codex 版本；不清楚可标未知。源码构建可补充 Go/Node。
       placeholder: "CoBot: ...\nOS / architecture: ...\nWeb or desktop: ...\nCodex: ..."
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Reproduction steps / 复现步骤
-      description: Include the smallest reproduction and how often it happens. / 提供最小复现步骤和发生频率。
+      label: Reproduction steps or code evidence / 复现步骤或代码证据
+      description: Give steps and frequency, or a commit, file/line references and the code path explaining the concern. State what was not run. / 提供步骤和频率，或提交、文件位置及相关代码路径；未运行验证请明确说明。
     validations:
       required: true
   - type: textarea
@@ -34,13 +70,14 @@ body:
     id: actual
     attributes:
       label: Actual behavior / 实际行为
+      description: State what you observed. For static analysis, describe the suspected behavior and mark it unverified. / 描述实际观察；仅静态分析时说明怀疑的行为，并标记尚未验证。
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
       label: Sanitized evidence / 脱敏证据
-      description: Optional screenshots or a short log excerpt. Remove tokens, cookies, private content and startup links. Never attach raw cobot trace recordings.
+      description: Optional screenshots, test results or short logs. Remove secrets and private data; never attach raw traces. / 可选截图、测试结果或简短日志，请脱敏；不要上传原始 trace。
   - type: checkboxes
     id: privacy
     attributes:

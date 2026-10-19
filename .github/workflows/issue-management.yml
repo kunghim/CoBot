@@ -1,0 +1,41 @@
+name: issue management
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to resume after a failed command
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-management-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  manage:
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # issue_comment runs with write permission: use only the trusted default
+      # branch, never a PR head, and never interpolate a comment into a shell.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Process issue declarations and comment commands
+        run: node scripts/issue-commands.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

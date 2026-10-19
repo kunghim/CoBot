@@ -9,6 +9,17 @@ body:
         欢迎中文和英文，无需重复提交双语副本；没有解决方案也可以提出问题。
         Discuss substantial changes here before opening a large PR.
         较大改动请先在 Issue 中讨论，再提交大型 PR。
+  - type: dropdown
+    id: discovery_source
+    attributes:
+      label: Discovery source / 发现来源
+      description: Who identified the need? AI translation or editing alone does not count. / 谁发现了这个需求？仅由 AI 翻译或润色不算 AI 发现。
+      options:
+        - Human-discovered / 人工发现
+        - AI-discovered / AI 发现
+        - Unsure / 不确定
+    validations:
+      required: false
   - type: textarea
     id: problem
     attributes:
