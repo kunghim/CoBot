@@ -237,3 +237,91 @@ actual behavior, and sanitized logs. Remove private paths/content when
 unnecessary, and always remove tokens. Public releases, signing, and the
 release timing require a separate maintainer decision. Report security
 vulnerabilities through [SECURITY.md](SECURITY.md), rather than public issues.
+
+## Pull request review / PR 审查规范
+
+Work on a short-lived branch based on `dev`, normally in your own fork, and
+target `dev`. Only this repository's `dev` branch promotes changes to `main`.
+Keep one logical change per PR without an arbitrary line-count limit. Discuss
+substantial features or architecture changes first; a small fix may go straight
+to a PR without creating an issue. Titles should describe the resulting change;
+English is recommended, and descriptions may be English or Chinese. Maintainers
+aim to add an English summary of substantial Chinese discussions.
+
+The PR template asks for four things:
+
+| Section | What to provide |
+| --- | --- |
+| Problem and related issue | The problem, trigger, and `Refs #123` if an issue exists |
+| Resulting behavior | What changes for users or developers, before and after |
+| Validation | Commands actually run, results, and limitations; distinguish automated, real Codex and native-platform checks |
+| Compatibility and data impact | API/CLI/configuration, database, upgrade and rollback effects; write None if unaffected |
+
+Include sanitized screenshots for visible UI changes. Small documentation fixes
+can use concise answers. Explain changes to locks, generated contracts or
+migrations when relevant; preserve third-party attribution and provide both UI
+languages for UI text changes. AI assistance does not change the contributor's
+responsibility for the code, sources and validation. Mention it when useful for
+review; do not submit private prompts or transcripts as evidence.
+
+Use a type label (`bug`, `enhancement`, `documentation`, `dependencies`) and
+relevant area labels (`area: installation`, `area: codex`, `area: collaboration`,
+`area: ui`); not every PR needs an area. Dependency bots retain their existing
+ecosystem labels. Track PR progress with GitHub's Draft, review and merged/closed
+states rather than issue-status labels. `ai-discovered` describes the linked
+issue's discovery source, not PR quality or whether AI wrote the code.
+
+Add `breaking-change`, or ask a maintainer to add it, when existing users or
+callers must change how they use CoBot after upgrading. Examples include removed
+configuration, incompatible API/CLI changes, or data changes that invalidate
+existing use or rollback. Explain required user actions and migration/rollback
+limits in the PR so they can be included in release notes. An additive optional
+feature, internal refactor or ordinary database migration is not automatically
+a breaking change. This label does not itself choose the next version number.
+
+Use Draft for unfinished work; mark Ready for review when the change and its
+evidence are ready. Before merging, CI must pass and material review feedback
+must be addressed or explicitly resolved by a maintainer. New commits require
+checking the resulting diff and current CI again. The maintainer makes the
+final merge decision; passing CI does not automatically approve or merge a PR.
+There is no additional mandatory approval-count gate while one maintainer runs
+the project. Issue claim commands do not operate on PRs.
+
+| Merge route | Method |
+| --- | --- |
+| Topic branch into `dev` | Squash and merge: one PR becomes one commit |
+| `dev` into `main` | Merge commit: retain shared history between long-lived branches |
+
+Squashing a topic PR combines its individual development commits; they do not
+all appear separately on the mainline. This applies to new PRs and does not
+rewrite existing published history. Start the next task on a new topic branch.
+After promotion, synchronize `main` back into `dev` without rewriting history,
+using a fast-forward when possible. Keep both long-lived branches; only remove
+a finished topic branch after confirming its work is integrated and it is no
+longer used by a worktree or another task.
+
+Ordinary PRs use `Refs #123`; a merge into `dev` is not a released fix. The
+`dev -> main` promotion may use `Closes #123` for issues actually resolved on
+the default branch. Release timing and assets require a separate maintainer
+decision; merging a PR does not publish a release. See GitHub's documentation
+on [issue closing keywords](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
+and [merge methods](https://docs.github.com/en/pull-requests/reference/pull-request-merges).
+
+中文说明：从 `dev` 建短期功能分支，普通 PR 向 `dev` 提交；本仓库 `dev` 才能晋级
+`main`。每个 PR 聚焦一项改动，不设机械行数上限；大改动先讨论，小修复无需先建
+Issue。标题建议英文，描述中英文均可。模板说明问题与关联、改动后的行为、实际验证、
+兼容与数据影响；界面变化附脱敏截图。AI 辅助贡献接受同样的代码、来源与验证审查。
+
+PR 复用类型和模块标签，进度用 Draft、审查、合并或关闭状态；`ai-discovered` 保留为
+Issue 来源标识。只有升级后用户或调用方需要调整用法的实际不兼容变更才标
+`breaking-change`，并提供迁移措施和回滚限制。普通迁移、内部重构、增加可选能力
+不自动算破坏性变更，标签本身也不决定下次版本号。
+
+未完成用 Draft，完成后请求审查。CI 通过、重要审查意见解决后，由维护者决定合并；
+追加提交后重新核对差异与当前检查。暂不增加强制审批人数，也不自动批准或合并。
+普通 PR 默认 Squash 成一条提交，开发中的各条 commit 不逐条进入主线；`dev` 晋级
+`main` 使用 Merge commit。这不改写既有历史。晋级后将 `main` 同步回 `dev`，有条件
+时快进；确认无 worktree 或其他任务继续使用后再清理已完成的功能分支。
+
+普通 PR 用 `Refs #编号` 关联，合入 `dev` 先说明进展，真正解决的问题在晋级 `main`
+时再关闭。合并不等于发布，新版本和发布时间仍另行决定。
