@@ -100,6 +100,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/bots/{id}/messages", s.handleSendMessage)
 	mux.HandleFunc("POST /api/v1/messages/{id}/cancel", s.handleCancelMessage)
 	mux.HandleFunc("POST /api/v1/runs/{id}/interrupt", s.handleInterruptRun)
+	mux.HandleFunc("POST /api/v1/runs/{id}/retry", s.handleRetryRun)
 
 	// Approvals.
 	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)

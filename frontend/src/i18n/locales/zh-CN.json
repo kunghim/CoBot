@@ -220,6 +220,7 @@
     },
     "process": {
       "done": "已处理 {{duration}} · {{count}} 个步骤",      "failedAfter": "执行失败 · {{duration}}",
+      "retry": "重试这一轮",
       "interruptedAfter": "已停止 · {{duration}}",
       "failed": "执行失败",
       "interrupted": "已停止"
@@ -342,7 +343,7 @@
     "card": {
       "chain_risk": "下一步将继续推进当前任务，请确认是否按当前方向继续",
       "chain_over_limit": "成员之间已经互相唤醒了很多次。继续的话，会再给他们一轮同样多的次数",
-      "recovery": "上次执行在进程退出后状态未知，请选择处理方式"
+      "recovery": "上次执行在进程退出后状态未知。选「重跑」会让成员把这件事重新做一遍；选「只释放成员」不会再做它，成员回到空闲，这件事仍未完成，需要你再给成员发消息；选「放弃」会取消这件事。"
     },
     "option": {
       "allow_once": "允许",
@@ -353,8 +354,8 @@
       "decline": "拒绝",
       "permissions.deny": "拒绝",
       "chain_continue": "继续推进",
-      "recovery_continue": "继续",
-      "recovery_rerun": "重跑当前工作",
+      "recovery_continue": "只释放成员",
+      "recovery_rerun": "重跑",
       "recovery_abandon": "放弃",
       "chain_stop": "停止该链",
       "unknown": "未知选项"
@@ -675,6 +676,10 @@
     "error.approval.revision_conflict": "审批已被其他入口处理，请刷新",
     "error.approval.unknown_option": "未知的审批选项",
     "error.run.not_active": "该任务已不在执行中",
+    "error.run.not_retryable": "只有执行失败的这一轮可以重试",
+    "error.run.bot_busy": "成员正在执行，等它结束后再重试",
+    "error.run.not_latest": "这一轮之后成员已经有了新的执行，不能再重试它",
+    "error.run.nothing_to_retry": "这一轮要做的事已经没有可重新执行的了（卡片已交接或取消）",
     "error.engine.not_found": "未找到 Codex 可执行文件",
     "error.engine.version_unsupported": "Codex 版本过旧，需要 0.161.0 或更新版本",
     "error.engine.version_unsupported_macos": "Codex 版本过旧，macOS 需要 0.146.0 或更新版本",

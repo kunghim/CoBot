@@ -220,6 +220,7 @@
     },
     "process": {
       "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
+      "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",
       "interrupted": "Stopped"
@@ -344,7 +345,7 @@
     "card": {
       "chain_risk": "The work will continue in this direction — please confirm",
       "chain_over_limit": "Members have woken each other many times. Continuing grants them another budget of the same size",
-      "recovery": "A previous execution is unresolved after the process exited — choose how to handle it"
+      "recovery": "A previous execution is unresolved after the process exited. Rerun makes the member do the work again; Only release the member does not redo it — the member goes idle, the work stays unfinished and you need to message the member again; Abandon cancels the work."
     },
     "option": {
       "allow_once": "Allow",
@@ -355,8 +356,8 @@
       "decline": "Decline",
       "permissions.deny": "Deny",
       "chain_continue": "Continue",
-      "recovery_continue": "Continue",
-      "recovery_rerun": "Rerun current work",
+      "recovery_continue": "Only release the member",
+      "recovery_rerun": "Rerun",
       "recovery_abandon": "Abandon",
       "chain_stop": "Stop this chain",
       "unknown": "Unknown option"
@@ -683,6 +684,10 @@
     "error.approval.revision_conflict": "Approval changed elsewhere; refresh",
     "error.approval.unknown_option": "Unknown approval option",
     "error.run.not_active": "This run is no longer active",
+    "error.run.not_retryable": "Only a failed turn can be retried",
+    "error.run.bot_busy": "The member is working; retry when it is done",
+    "error.run.not_latest": "The member has run again since; this turn can no longer be retried",
+    "error.run.nothing_to_retry": "Nothing is left to run again for this turn (its card was handed off or cancelled)",
     "error.engine.not_found": "Codex executable not found",
     "error.engine.version_unsupported": "Codex is too old; version 0.161.0 or newer is required",
     "error.engine.version_unsupported_macos": "Codex is too old; macOS requires version 0.146.0 or newer",

@@ -1071,6 +1071,34 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/runs/{id}/retry:
+    post:
+      operationId: retryRun
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Run again what a failed turn was started for (the member's latest turn, while the member is idle)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "202":
+          description: The work is queued again
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/approvals:
     get:
       operationId: listApprovals
