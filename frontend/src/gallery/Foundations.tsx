@@ -1,7 +1,7 @@
 // Gallery: the rules everything is built from — principles, color, type,
 // space, shape, depth, motion, focus and icons.
 import { Chapter, Demo, Doc, Rules } from './parts';
-import { Icons, cx, iconMeaning, toneSoft, toneSolid, type IconName } from '../components/ui';
+import { BrandMark, Icons, cx, iconMeaning, toneSoft, toneSolid, type IconName } from '../components/ui';
 
 // Written out in full so the class names exist in the built CSS.
 const NEUTRALS: Array<[string, string]> = [
@@ -20,6 +20,18 @@ const ROLE_COLORS: Array<[string, string, string]> = [
 export default function Foundations() {
   return (
     <Chapter id="foundations" title="基础规范" intro="颜色、字体、间距、圆角、阴影、层级、动效和焦点。组件只从这里取值；用了规范之外的值，要在代码注释里写清原因。">
+      <Doc id="brand-mark" name="BrandMark 品牌标志" file="components/ui/BrandMark.tsx · assets/branding" use="固定的石墨银灰金属飞鸟：侧栏、登录入口、应用图标和 favicon 使用同一视觉。" avoid="不改成单色，不随主题染色，不拉伸鸟形。浅色底板是品牌图片的一部分，在深色主题下也保留。" a11y="独立出现时提供 label；旁边已有名称或外层已标注时省略，避免重复朗读。">
+        <Demo title="金属版 · 实际显示尺寸">
+          <div className="flex items-end gap-6">
+            {[16, 24, 32, 36, 48, 64].map((size) => (
+              <div key={size} className="space-y-2">
+                <BrandMark size={size} label="CoBot" />
+                <p className="font-mono text-2xs text-neutral-500 dark:text-neutral-400">{size}px</p>
+              </div>
+            ))}
+          </div>
+        </Demo>
+      </Doc>
       <Doc id="principles" name="设计原则" file="frontend/src/styles/index.css" use="判断一个界面“对不对”时的依据。">
         <Rules
           items={[

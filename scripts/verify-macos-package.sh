@@ -31,6 +31,8 @@ APP="$WORK/CoBot.app"
 /usr/bin/codesign --verify --deep --strict "$APP"
 test "$(/usr/bin/plutil -extract CoBotVersion raw -o - "$APP/Contents/Info.plist")" = "$VERSION"
 test "$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = com.kunghim.cobot
+test "$(/usr/bin/plutil -extract CFBundleIconFile raw -o - "$APP/Contents/Info.plist")" = iconfile
+test -s "$APP/Contents/Resources/iconfile.icns"
 for BINARY in cobot-desktop cobot; do
   test -x "$APP/Contents/MacOS/$BINARY"
   test "$(/usr/bin/lipo -archs "$APP/Contents/MacOS/$BINARY")" = arm64

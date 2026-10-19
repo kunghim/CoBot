@@ -2,6 +2,7 @@
 // (npm run gallery, see src/gallery) shows and documents each one. Add a
 // component here and to the gallery before using it in a view.
 export * from './foundation';
+export * from './BrandMark';
 export * from './Button';
 export * from './Field';
 export * from './Input';

@@ -32,6 +32,8 @@ jobs:
         run: node --test scripts/release.test.mjs
       - name: Check the avatar catalog is built from its sources
         run: node assets/avatars/build.mjs --check
+      - name: Validate and stage application icons
+        run: node scripts/prepare-branding.mjs
 
   web-core:
     name: web/shared core (ubuntu)

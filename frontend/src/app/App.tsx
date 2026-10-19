@@ -7,7 +7,7 @@ import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/querie
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
-import { AppTitleBar, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
 import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
 import { ShellProvider, ShellToggle } from './shell';
 import HomePage from '../features/home/HomePage';
@@ -150,7 +150,7 @@ function Screens() {
       <div className="flex h-full items-center justify-center bg-neutral-50 p-6 dark:bg-neutral-950">
         <Card className="w-full max-w-md">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 text-neutral-400"><Icons.locked size={20} aria-hidden /></span>
+            <BrandMark size={40} label={t('app.title')} />
             <div className="min-w-0 flex-1">
               <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('auth.unauthorizedTitle')}</h1>
               <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('auth.unauthorizedBody')}</p>
