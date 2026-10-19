@@ -1,6 +1,7 @@
 // The workspace shell's state: whether the team list and the work panel are
 // open, and whether the window is narrow (panels then slide over the
-// conversation). The toggles live at the two ends of the page header —
+// conversation). The toggles live at the two ends of the desktop title bar
+// when the app draws one, otherwise at the two ends of the page header —
 // the conversation header, or the home page's top row — so they never move.
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,8 @@ interface Shell {
   narrow: boolean;
   setListOpen: (open: boolean) => void;
   setPanelOpen: (open: boolean) => void;
+  /** The app draws its own title bar (desktop), which holds the toggles. */
+  titleBar: boolean;
 }
 
 const ShellContext = createContext<Shell | null>(null);
@@ -23,7 +26,7 @@ function isWide(): boolean {
   return typeof window === 'undefined' || typeof window.matchMedia !== 'function' || window.matchMedia(WIDE).matches;
 }
 
-export function ShellProvider({ children }: { children: ReactNode }) {
+export function ShellProvider({ children, titleBar = false }: { children: ReactNode; titleBar?: boolean }) {
   const [narrow, setNarrow] = useState(() => !isWide());
   // Narrow windows start with both panels closed: a first load shows the
   // conversation, not a panel covering it.
@@ -44,7 +47,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   }, []);
   // Showing something in the work panel opens it first.
   useWorkPanelRequests(useCallback(() => setPanelOpen(true), []));
-  return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen }}>{children}</ShellContext.Provider>;
+  return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen, titleBar }}>{children}</ShellContext.Provider>;
 }
 
 export function useShell(): Shell {
@@ -53,10 +56,14 @@ export function useShell(): Shell {
   return shell;
 }
 
-/** The toggle for one side panel, for the two ends of a page header. */
-export function ShellToggle({ side }: { side: 'left' | 'right' }) {
+/**
+ * The toggle for one side panel. A page header places it with place
+ * 'header'; it then steps aside when the title bar holds the toggles.
+ */
+export function ShellToggle({ side, place = 'header' }: { side: 'left' | 'right'; place?: 'header' | 'titlebar' }) {
   const { t } = useTranslation();
   const shell = useShell();
+  if (place === 'header' && shell.titleBar) return null;
   const open = side === 'left' ? shell.listOpen : shell.panelOpen;
   return (
     <PanelToggle

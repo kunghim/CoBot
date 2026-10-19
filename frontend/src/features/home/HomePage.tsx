@@ -9,7 +9,7 @@ import ConversationView from '../conversations/ConversationView';
 import CreateTeamDialog from '../teams/CreateTeamDialog';
 import Avatar from '../avatars/Avatar';
 import { findBotContext } from '../teams/teamUtils';
-import { ShellToggle } from '../../app/shell';
+import { ShellToggle, useShell } from '../../app/shell';
 import { Button, Card, Icons, List, ListRow } from '../../components/ui';
 
 // The built-in lineup a new team starts from, in the order a request flows.
@@ -27,6 +27,7 @@ export default function HomePage() {
   const { botId, setBotId } = useSelectedBot();
   const teams = useTeams(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const shell = useShell();
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
 
@@ -42,10 +43,12 @@ export default function HomePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-14 items-center justify-between px-3 py-2">
-        <ShellToggle side="left" />
-        <ShellToggle side="right" />
-      </div>
+      {!shell.titleBar && (
+        <div className="flex min-h-14 items-center justify-between px-3 py-2">
+          <ShellToggle side="left" />
+          <ShellToggle side="right" />
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-8 pb-14">
       <div className="w-full max-w-lg">
         {teams.isSuccess && leaders.length === 0 ? (

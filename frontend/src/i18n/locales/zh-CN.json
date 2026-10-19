@@ -1,5 +1,6 @@
 {
   "app": { "title": "CoBot" },
+  "window": { "minimize": "最小化", "maximize": "最大化", "restore": "还原", "close": "关闭" },
   "common": { "close": "关闭", "cancel": "取消", "clearSearch": "清除搜索", "decrease": "减少", "increase": "增加" },
   "nav": {
     "home": "首页",

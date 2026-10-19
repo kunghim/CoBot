@@ -1,5 +1,6 @@
 {
   "app": { "title": "CoBot" },
+  "window": { "minimize": "Minimize", "maximize": "Maximize", "restore": "Restore", "close": "Close" },
   "common": { "close": "Close", "cancel": "Cancel", "clearSearch": "Clear search", "decrease": "Decrease", "increase": "Increase" },
   "nav": {
     "home": "Home",

@@ -6,24 +6,17 @@ import WorkPanel from '../components/WorkPanel';
 import { Icons, RailItem, Sheet } from '../components/ui';
 import TeamList from '../features/teams/TeamList';
 import { useSelectedBot } from './SelectedBotContext';
-import { ShellProvider, useShell } from './shell';
+import { useShell } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
 
 /**
  * Layout implements the product shell: the icon rail, the team list, the
  * conversation (the routed page) and the work panel. On wide windows the
  * panels sit beside the conversation; on narrow ones they slide over it.
- * Their toggles are at the two ends of the page header (see shell.tsx).
+ * Their toggles are at the two ends of the title bar or the page header
+ * (see shell.tsx); the shell state lives above, in App.
  */
 export default function Layout() {
-  return (
-    <ShellProvider>
-      <Workspace />
-    </ShellProvider>
-  );
-}
-
-function Workspace() {
   const { t } = useTranslation();
   const shell = useShell();
   const navigate = useNavigate();

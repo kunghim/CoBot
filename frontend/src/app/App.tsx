@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client';
 import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
-import { Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { AppTitleBar, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
+import { ShellProvider, ShellToggle } from './shell';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
@@ -34,6 +36,46 @@ async function obtainAndExchangeSecret(): Promise<boolean> {
 }
 
 export default function App() {
+  const desktop = useDesktopWindow();
+  // The desktop shell hides the system title bar; the app draws its own,
+  // in CoBot's theme, above every screen.
+  return (
+    <ShellProvider titleBar={desktop !== null}>
+      <div className="flex h-full flex-col">
+        {desktop && <TitleBar desktop={desktop} />}
+        <div className="min-h-0 flex-1">
+          <Screens />
+        </div>
+      </div>
+    </ShellProvider>
+  );
+}
+
+function TitleBar({ desktop }: { desktop: DesktopWindow }) {
+  const { t } = useTranslation();
+  // The panel toggles belong to the workspace; Settings has no side panels.
+  const workspace = !useLocation().pathname.startsWith('/settings');
+  return (
+    <AppTitleBar
+      platform={desktop.platform}
+      title="CoBot"
+      left={workspace ? <ShellToggle side="left" place="titlebar" /> : undefined}
+      right={workspace ? <ShellToggle side="right" place="titlebar" /> : undefined}
+      windowControls={{
+        minimizeLabel: t('window.minimize'),
+        maximizeLabel: t('window.maximize'),
+        restoreLabel: t('window.restore'),
+        closeLabel: t('window.close'),
+        maximized: desktop.maximized,
+        onMinimize: desktop.minimize,
+        onToggleMaximize: desktop.toggleMaximize,
+        onClose: desktop.close,
+      }}
+    />
+  );
+}
+
+function Screens() {
   const { t, i18n } = useTranslation();
   const status = useStatus();
   const queryClient = useQueryClient();
