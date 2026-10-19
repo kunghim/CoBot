@@ -75,7 +75,7 @@ export function Switch({ checked, onChange, label, description, disabled = false
           checked ? 'bg-signal-600 dark:bg-signal-500' : 'bg-neutral-300 dark:bg-neutral-700',
         )}
       >
-        <span className={cx('inline-block h-4 w-4 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+        <span className={cx('inline-block h-4 w-4 rounded-full shadow transition-transform', checked ? 'translate-x-[18px] bg-on-signal' : 'translate-x-0.5 bg-white')} />
       </button>
     </div>
   );
@@ -208,7 +208,7 @@ export function CheckboxCards<T extends string>({ label, options, values, onTogg
               isLocked && 'cursor-default',
             )}
           >
-            <span aria-hidden className={cx('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors', checked ? 'border-signal-500 bg-signal-500 text-white' : 'border-neutral-300 dark:border-neutral-600')}>
+            <span aria-hidden className={cx('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors', checked ? 'border-signal-500 bg-signal-500 text-on-signal' : 'border-neutral-300 dark:border-neutral-600')}>
               {isLocked ? <Lock size={10} /> : checked && <Check size={12} strokeWidth={3} />}
             </span>
             {option.media}

@@ -1272,7 +1272,7 @@ export interface components {
             /** @enum {string} */
             colorMode: "system" | "light" | "dark";
             /** @enum {string} */
-            theme: "graphite" | "harbor" | "dusk";
+            theme: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel: string;
             memberLimit: number;
             chainLimit: number;
@@ -1289,7 +1289,7 @@ export interface components {
             /** @enum {string} */
             colorMode?: "system" | "light" | "dark";
             /** @enum {string} */
-            theme?: "graphite" | "harbor" | "dusk";
+            theme?: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel?: string;
             memberLimit?: number;
             chainLimit?: number;

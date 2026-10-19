@@ -10,6 +10,9 @@
  * takes the theme's tint; the members' role colors (features/teams/roleTone)
  * and the status colors stay the same in every theme.
  *
+ * Text and icons drawn on a signal fill use on-signal, which is white
+ * except where a theme's signal turns light (classic in dark mode).
+ *
  * graphite (default): sage-tinted graphite, cobalt signal.
  */
 @theme {
@@ -28,6 +31,7 @@
   --color-signal-400: #8c98ff;
   --color-signal-500: #5568f0;
   --color-signal-600: #3346d3;
+  --color-on-signal: #ffffff;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
@@ -101,6 +105,32 @@
   --color-signal-400: #ff9a85;
   --color-signal-500: #e5654b;
   --color-signal-600: #c44a31;
+}
+
+/* classic: CoBot at its plainest. Pure gray with no tint, and ink as the
+   signal: near black in light mode, near white in dark mode. The only color
+   left is the members' own and the status colors. */
+:root[data-theme="classic"] {
+  --color-neutral-50: #f7f7f7;
+  --color-neutral-100: #efefef;
+  --color-neutral-200: #e2e2e2;
+  --color-neutral-300: #c8c8c8;
+  --color-neutral-400: #9c9c9c;
+  --color-neutral-500: #707070;
+  --color-neutral-600: #565656;
+  --color-neutral-700: #3e3e3e;
+  --color-neutral-800: #282828;
+  --color-neutral-900: #1a1a1a;
+  --color-neutral-950: #111111;
+
+  --color-signal-400: #f2f2f2;
+  --color-signal-500: #1a1a1a;
+  --color-signal-600: #111111;
+  --color-on-signal: #ffffff;
+}
+:root[data-theme="classic"][data-mode="dark"] {
+  --color-signal-500: #ececec;
+  --color-on-signal: #111111;
 }
 
 html,

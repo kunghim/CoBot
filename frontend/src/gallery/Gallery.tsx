@@ -59,7 +59,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
               size="sm"
               value={theme}
               onChange={setTheme}
-              options={[{ value: 'graphite', label: '石墨' }, { value: 'harbor', label: '港湾' }, { value: 'dusk', label: '暮梅' }]}
+              options={[{ value: 'graphite', label: '石墨' }, { value: 'harbor', label: '港湾' }, { value: 'dusk', label: '暮梅' }, { value: 'classic', label: '经典' }]}
             />
             <SegmentedControl
               label="明暗"
@@ -93,7 +93,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
                 <Rules
                   items={[
                     '只用 frontend/src/components/ui 里的组件拼界面（从 "../components/ui" 引入）。需要的东西这里没有，先把组件和它的画廊条目加上，再在界面里用。',
-                    '颜色只用中性色阶 neutral-*、强调色 signal-*、状态色（emerald/sky/amber/red）和角色色；不写死十六进制，不用 gray/slate/zinc。',
+                    '颜色只用中性色阶 neutral-*、强调色 signal-*、状态色（emerald/sky/amber/red）和角色色；不写死十六进制，不用 gray/slate/zinc。画在强调色上的字和图标用 on-signal，不写 white（经典主题深色模式下强调色是近白）。',
                     '悬停、按下、选中用 interactive.hover / pressed / selected（半透明墨色叠层），不要用某个固定灰色。',
                     '每个可点的元素都要有可分辨的静止、悬停、选中、键盘焦点、禁用状态。焦点框由全局样式提供，不要写 outline-none 又不给替代。',
                     '一个视图只有一个 primary 按钮；不可撤销的操作用 danger 按钮并先弹 AlertDialog。',
@@ -104,7 +104,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
                     '侧栏开合用 PanelToggle：同一个按钮、同一个位置、同一对图标；桌面端放在 AppTitleBar 两端，网页端放在会话标题行两端。',
                     '只有图标的按钮必须有 label；所有文字走 i18n，两个语言包键名一致。',
                     '机器的值（路径、ID、数字、命令）用等宽字体（mono）。',
-                    '改完界面后：重新生成本画廊（npm run gallery），并在三个主题、深浅两种模式下看一遍。',
+                    '改完界面后：重新生成本画廊（npm run gallery），并在四个主题、深浅两种模式下看一遍。',
                   ]}
                 />
               </div>

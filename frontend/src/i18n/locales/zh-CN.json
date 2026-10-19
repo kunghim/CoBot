@@ -580,6 +580,7 @@
     "themes": {
       "graphite": { "name": "石墨", "summary": "带一点绿意的石墨灰，钴蓝强调" },
       "harbor": { "name": "港湾", "summary": "偏冷的蓝灰，青绿强调" },
+      "classic": { "name": "经典", "summary": "纯黑白灰，墨色强调" },
       "dusk": { "name": "暮梅", "summary": "带紫调的暖灰，珊瑚红强调" }
     },
     "engineNotConfigured": "未检测到已配置的引擎",

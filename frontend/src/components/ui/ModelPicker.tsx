@@ -58,7 +58,7 @@ export function SteppedSlider({ levels, value, onChange, label }: { levels: Effo
       {/* Step marks. */}
       <div className="absolute inset-x-4 inset-y-0">
         {levels.map((level, i) => (
-          <span key={level.value} aria-hidden className={cx('absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full', i <= index ? 'bg-white/70' : 'bg-neutral-900/25 dark:bg-white/25')} style={{ left: `${at(i)}%` }} />
+          <span key={level.value} aria-hidden className={cx('absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full', i <= index ? 'bg-on-signal/70' : 'bg-neutral-900/25 dark:bg-white/25')} style={{ left: `${at(i)}%` }} />
         ))}
         <span
           role="slider"
@@ -69,7 +69,7 @@ export function SteppedSlider({ levels, value, onChange, label }: { levels: Effo
           aria-valuenow={index}
           aria-valuetext={levels[index]?.label}
           onKeyDown={onKeyDown}
-          className="absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md ring-1 ring-neutral-900/10 transition-[left] duration-150"
+          className="absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-on-signal shadow-md ring-1 ring-neutral-900/10 transition-[left] duration-150"
           style={{ left: `${at(index)}%` }}
         />
       </div>

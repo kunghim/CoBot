@@ -183,7 +183,7 @@ export function Steps({ label, steps, current }: { label: string; steps: ReactNo
         const active = index === current;
         return (
           <li key={index} aria-current={active ? 'step' : undefined} className="flex items-center gap-2">
-            <span className={cx('flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold', done && 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900', active && 'bg-signal-600 text-white', !done && !active && 'bg-neutral-900/[0.07] text-neutral-500 dark:bg-white/[0.1]')}>
+            <span className={cx('flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold', done && 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900', active && 'bg-signal-600 text-on-signal dark:bg-signal-500', !done && !active && 'bg-neutral-900/[0.07] text-neutral-500 dark:bg-white/[0.1]')}>
               {done ? <Check size={13} strokeWidth={3} aria-hidden /> : index + 1}
             </span>
             <span className={cx(active ? 'font-medium text-neutral-900 dark:text-neutral-50' : 'text-neutral-500 dark:text-neutral-400')}>{step}</span>

@@ -585,6 +585,7 @@
     "themes": {
       "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
       "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
+      "classic": { "name": "Classic", "summary": "Pure black, white and gray, with ink as the accent" },
       "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a coral accent" }
     },
     "engineNotConfigured": "No configured engine detected",

@@ -12,7 +12,7 @@ var SupportedLanguages = []string{"zh-CN", "en"}
 var ColorModes = []string{"system", "light", "dark"}
 
 // Themes are the interface's palettes; graphite is the default.
-var Themes = []string{"graphite", "harbor", "dusk"}
+var Themes = []string{"graphite", "harbor", "dusk", "classic"}
 
 // BudgetScopes select which entity a token budget applies to.
 const (

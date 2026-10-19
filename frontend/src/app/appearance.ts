@@ -63,6 +63,6 @@ export function applyStoredAppearance(): void {
     stored = {};
   }
   const colorMode: ColorMode = stored.colorMode === 'light' || stored.colorMode === 'dark' ? stored.colorMode : 'system';
-  const theme: Theme = stored.theme === 'harbor' || stored.theme === 'dusk' ? stored.theme : 'graphite';
+  const theme: Theme = stored.theme === 'harbor' || stored.theme === 'dusk' || stored.theme === 'classic' ? stored.theme : 'graphite';
   applyAppearance({ colorMode, theme });
 }

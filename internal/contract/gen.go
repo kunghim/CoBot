@@ -213,6 +213,7 @@ const (
 
 // Defines values for SettingsTheme.
 const (
+	SettingsThemeClassic  SettingsTheme = "classic"
 	SettingsThemeDusk     SettingsTheme = "dusk"
 	SettingsThemeGraphite SettingsTheme = "graphite"
 	SettingsThemeHarbor   SettingsTheme = "harbor"
@@ -240,6 +241,7 @@ const (
 
 // Defines values for SettingsPatchTheme.
 const (
+	SettingsPatchThemeClassic  SettingsPatchTheme = "classic"
 	SettingsPatchThemeDusk     SettingsPatchTheme = "dusk"
 	SettingsPatchThemeGraphite SettingsPatchTheme = "graphite"
 	SettingsPatchThemeHarbor   SettingsPatchTheme = "harbor"
