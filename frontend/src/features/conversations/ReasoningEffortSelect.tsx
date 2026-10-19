@@ -60,7 +60,10 @@ export default function ReasoningEffortSelect({ team, disabled }: { team: Team; 
       }
     });
   }
-  useEffect(() => () => saver.current?.dispose(), []);
+  // Leaving the conversation must submit its last choice, including one
+  // queued behind an in-flight save. Flushing also keeps the same saver
+  // usable when StrictMode replays effect cleanup during development.
+  useEffect(() => () => saver.current?.flush(), []);
 
   // Without a model list there is nothing to choose from.
   if (!model || options.length === 0) return null;
