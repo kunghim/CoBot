@@ -87,6 +87,8 @@ type App struct {
 	// Browser runs the teams' browsers for the members' browser tool; nil
 	// answers the tool as unavailable.
 	Browser *browser.Manager
+	// browserGuideRead remembers the runs that have read the browser guide.
+	browserGuideRead sync.Map
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.

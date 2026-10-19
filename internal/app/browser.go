@@ -32,6 +32,16 @@ func (a *App) UseBrowser(ctx context.Context, principal auth.Principal, req brow
 	if bridgeRole(team, bot) == "leader" {
 		return browser.Result{}, domain.Forbidden("error.browser.leader", nil)
 	}
+	// The guide is read on demand, not carried in every instruction: it is
+	// returned on request, and before a run's first real call.
+	if req.Help {
+		a.browserGuideRead.Store(principal.RunID, true)
+		return browser.Result{Guide: browser.Guide()}, nil
+	}
+	if _, read := a.browserGuideRead.LoadOrStore(principal.RunID, true); !read {
+		return browser.Result{Guide: browser.Guide(),
+			Note: "这是第一次使用浏览器，先读上面的使用说明（含安全和确认规则），然后按说明重新发起刚才的调用。这次没有执行任何动作。"}, nil
+	}
 	result, err := a.Browser.Run(ctx, browser.Env{TeamID: team.ID, MemberID: bot.ID, TeamDir: directory}, req)
 	switch {
 	case err == nil:

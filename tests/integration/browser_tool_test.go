@@ -34,14 +34,26 @@ func TestMemberBrowserToolThroughTheCore(t *testing.T) {
 	_, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	leader, member := bots[0], bots[1]
 
-	status, out := h.callTool(t, h.botToken(t, member), "browser", map[string]any{"url": site.URL})
+	// The first real call of a run gets the guide back and runs nothing.
+	// One execution (one run) for the member's calls; callTool would start a
+	// fresh run for each.
+	binding, _ := h.tokens.Resolve(h.botToken(t, member))
+	token, finish := h.scriptExecution(t, binding)
+	defer finish()
+	status, out := h.callToolRaw(t, token, "browser", map[string]any{"url": site.URL})
 	raw, _ := json.Marshal(out)
+	if status != http.StatusOK || !strings.Contains(string(raw), "团队浏览器使用说明") || strings.Contains(string(raw), "演示页") {
+		t.Fatalf("first call should return the guide only: %d %s", status, raw)
+	}
+
+	status, out = h.callToolRaw(t, token, "browser", map[string]any{"url": site.URL})
+	raw, _ = json.Marshal(out)
 	if status != http.StatusOK || !strings.Contains(string(raw), "演示页") || !strings.Contains(string(raw), `button \"点我\"`) {
 		t.Fatalf("member's browser call = %d %s", status, raw)
 	}
 
 	// A second call reuses the member's tab and the refs of the last snapshot.
-	status, out = h.callTool(t, h.botToken(t, member), "browser", map[string]any{
+	status, out = h.callToolRaw(t, token, "browser", map[string]any{
 		"steps": []map[string]any{{"action": "click", "text": "点我"}}, "snapshot": false})
 	raw, _ = json.Marshal(out)
 	if status != http.StatusOK || !strings.Contains(string(raw), "已点击") {

@@ -108,6 +108,7 @@ func toolSchema(name string) json.RawMessage {
 			"required":             []string{"action"},
 			"additionalProperties": false,
 		}
+		add("help", flag("Return the usage, safety and confirmation guide instead of running anything. Read it before first use."), false)
 		add("url", str("Open this address first (same as a leading goto step)."), false)
 		add("tab", str("One of your tabs, from an earlier result; omit for your current tab."), false)
 		add("steps", map[string]any{"type": "array", "items": step, "maxItems": 30,

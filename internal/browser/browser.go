@@ -9,6 +9,7 @@ package browser
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,16 @@ type Request struct {
 	Snapshot *bool `json:"snapshot,omitempty"`
 	// Screenshot saves a screenshot at the end.
 	Screenshot bool `json:"screenshot,omitempty"`
+	// Help asks for the usage and safety guide instead of running anything.
+	Help bool `json:"help,omitempty"`
 }
+
+//go:embed guide.md
+var guideText string
+
+// Guide is the browser's usage, safety and confirmation guide. A member reads
+// it on demand instead of carrying it in every instruction.
+func Guide() string { return guideText }
 
 // Step is one action. Which fields matter depends on the action.
 type Step struct {
@@ -85,6 +95,10 @@ type Result struct {
 	Console     []string     `json:"console,omitempty"`
 	Downloads   []string     `json:"downloads,omitempty"`
 	Tabs        []TabInfo    `json:"tabs,omitempty"`
+	// Guide and Note answer a help request, or a first call made before the
+	// guide was read: nothing was run.
+	Guide string `json:"guide,omitempty"`
+	Note  string `json:"note,omitempty"`
 }
 
 // StepResult is how one step went. The first failing step ends the call;
