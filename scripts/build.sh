@@ -32,9 +32,9 @@ npm run build --prefix frontend
 
 checksum() {
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | tee "$1.sha256"
+    (cd "$(dirname "$1")" && shasum -a 256 "$(basename "$1")") | tee "$1.sha256"
   else
-    sha256sum "$1" | tee "$1.sha256"
+    (cd "$(dirname "$1")" && sha256sum "$(basename "$1")") | tee "$1.sha256"
   fi
 }
 
@@ -71,12 +71,28 @@ case "$TARGET" in
     cp "$DIST/cobot" "$APP/Contents/MacOS/cobot"
     # macOS has no console-subsystem equivalent, so there is no separate
     # windowless helper to ship; cmd/cobot-helper exists for Windows only.
+    echo "==> bundle metadata and license notices"
+    PLIST="$APP/Contents/Info.plist"
+    BUNDLE_VERSION="${VERSION#v}"
+    BUNDLE_VERSION="${BUNDLE_VERSION%%-*}"
+    BUNDLE_VERSION="${BUNDLE_VERSION%%+*}"
+    if [[ ! "$BUNDLE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "version must contain a numeric major.minor.patch: $VERSION" >&2
+      exit 2
+    fi
+    /usr/bin/plutil -replace CFBundleIdentifier -string com.kunghim.cobot "$PLIST"
+    /usr/bin/plutil -replace CFBundleShortVersionString -string "$BUNDLE_VERSION" "$PLIST"
+    /usr/bin/plutil -replace CFBundleVersion -string "$BUNDLE_VERSION" "$PLIST"
+    /usr/bin/plutil -replace CoBotVersion -string "$VERSION" "$PLIST"
+    /usr/bin/plutil -replace NSHumanReadableCopyright -string 'Copyright 2026 CoBot contributors' "$PLIST"
+    cp LICENSE "$APP/Contents/Resources/LICENSE.txt"
+    node scripts/third-party-notices.mjs "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
     # Adding the helper changes the bundle after Wails' ad-hoc signature.
     # This remains a local trial signature, not Developer ID / notarization.
     /usr/bin/codesign --force --sign - "$APP/Contents/MacOS/cobot"
     /usr/bin/codesign --force --deep --sign - "$APP"
     /usr/bin/codesign --verify --deep --strict "$APP"
-    ARCHIVE="$DIST/CoBot-macos-$(go env GOARCH).zip"
+    ARCHIVE="$DIST/CoBot-${VERSION#v}-macos-$(go env GOARCH).zip"
     /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
     checksum "$ARCHIVE"
     ;;

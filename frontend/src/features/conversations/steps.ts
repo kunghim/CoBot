@@ -59,6 +59,7 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: `conversation.step.agent.${agentTools.has(tool) ? tool : 'other'}`, params: { count: Number(d.agents) || 1 } };
     }
     case 'command':
+      if (step.status === 'declined') return { key: 'conversation.step.commandDeclined' };
       return { key: step.status === 'in_progress' ? 'conversation.step.commandRunning' : 'conversation.step.command' };
     case 'file_change': {
       const changes = Array.isArray(d.changes) ? d.changes : [];

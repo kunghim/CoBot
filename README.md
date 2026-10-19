@@ -4,8 +4,8 @@
 
 English · [简体中文](README.zh-CN.md)
 
-> **Status: early preview.** The Windows local Web version is ready to try. The desktop shell
-> and macOS compile, but native runtime and installation are not yet verified. See [Status](#status).
+> **Status: early preview.** Windows beta downloads are available. The macOS ARM64 desktop
+> package has passed a local native smoke test with real Codex. See [Status](#status).
 
 CoBot is a local-first app where AI agents work together as a team. The *Co* stands for
 **cooperation**: CoBot doesn't try to be a smarter agent. It is the team structure around your
@@ -109,7 +109,7 @@ the agent you already trust.
 | Windows 10/11 x64, local Web | **Ready to try.** Verified with real Codex end to end |
 | Windows standalone server build | Builds and runs |
 | Windows desktop shell (Wails/WebView2) | **Beta downloads available.** Desktop startup and installer lifecycle checked in Windows Sandbox; see the release notes for limitations |
-| macOS (Web / desktop) | Cross-compiles; `.app` packaging reviewed statically only; native runtime, installation, signing and notarization not yet verified |
+| macOS ARM64 desktop | Local ZIP smoke test passed on macOS 26.6.2 with Codex 0.146.0: sign-in, messages, task handoff/delivery/acceptance, file tools, command approval/rejection and restart. Intel Macs and notarized distribution remain unverified |
 | Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
 
 With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
@@ -157,13 +157,13 @@ from program files. Uninstalling the MSI or deleting an extracted ZIP folder ret
 
 ### Build from source
 
-The commands below build the **local Web** version. macOS instructions are for unverified
-source trials; no macOS application download is included in this release.
+The commands below build the **local Web** version. The published beta currently provides
+Windows downloads only; a macOS desktop package can also be built locally as described below.
 
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
 For agent work, install the [Codex CLI](https://github.com/openai/codex) on `PATH`
-(minimum and verified version: 0.161.0), with an account that can use Codex and
+(Windows/Linux minimum: 0.161.0; macOS minimum: 0.146.0), with an account that can use Codex and
 network access to its service. Go and Node are build tools; the resulting CoBot
 executable still needs Codex for agent work. Local-first does not mean offline
 model execution.
@@ -178,7 +178,7 @@ powershell -NoProfile -File scripts/build.ps1 -Target server
 .\.tmp\dist\cobot.exe serve
 ```
 
-#### macOS (Bash; native runtime unverified)
+#### macOS (Bash)
 
 ```bash
 git clone https://github.com/kunghim/CoBot.git
@@ -187,6 +187,22 @@ npm ci --prefix frontend
 ./scripts/build.sh --target server
 ./.tmp/dist/cobot serve
 ```
+
+For the macOS desktop package, also provide Wails CLI v2.15.0 and the Apple
+command-line build tools, then run `./scripts/build.sh --target desktop --version 0.1.0-beta.1`.
+On Apple Silicon this writes `.tmp/dist/CoBot-0.1.0-beta.1-macos-arm64.zip`.
+Extract it and keep the entire `CoBot.app` bundle together. It uses the production
+profile by default. For an isolated trial, launch its executable with an explicit
+`--data-root <empty-directory>`; the temporary root still uses production semantics.
+The bundle has an ad-hoc signature for local testing, without Developer ID signing
+or notarization. Gatekeeper assessment rejects this local build; downloaded-package
+installation has not been accepted.
+
+The macOS Codex 0.146.0 smoke test uses an isolated data root and real model turns;
+it is not the full Windows acceptance suite. With a minimal GUI `PATH`, CoBot also
+checks common standalone, Cargo and Homebrew installation directories. Codex inherits
+static macOS system proxies when no proxy environment variable was supplied; this
+does not change system settings or evaluate automatic proxy (PAC) scripts.
 
 Run these commands in a terminal on the same computer as your browser and team
 files. This starts the local Web app, not the desktop shell or a remote server.

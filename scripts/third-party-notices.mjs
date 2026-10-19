@@ -26,11 +26,13 @@ if (!existsSync(join(goroot, 'LICENSE')) && goVersion !== 'go1.25.12') {
 }
 append('Go standard library and runtime ' + goVersion + ' (https://go.dev/LICENSE)',
   existsSync(join(goroot, 'LICENSE')) ? goroot : 'packaging/licenses/go');
-append('WiX UI templates and resources 6.0.2 (unmodified upstream source: https://github.com/wixtoolset/wix/tree/v6.0.2/src/ext/UI)',
-  'packaging/licenses/wix');
+if (process.platform === 'win32') {
+  append('WiX UI templates and resources 6.0.2 (unmodified upstream source: https://github.com/wixtoolset/wix/tree/v6.0.2/src/ext/UI)',
+    'packaging/licenses/wix');
+}
 const modules = execFileSync('go', ['list', '-deps', '-tags', 'desktop', '-f',
   '{{if .Module}}{{.Module.Path}}|{{.Module.Version}}|{{.Module.Dir}}{{end}}',
-  './cmd/cobot', './cmd/cobot-helper', './cmd/cobot-desktop'], { encoding: 'utf8' })
+  './cmd/cobot', './cmd/cobot-desktop', ...(process.platform === 'win32' ? ['./cmd/cobot-helper'] : [])], { encoding: 'utf8' })
   .split(/\r?\n/).filter(Boolean);
 for (const line of [...new Set(modules)].sort()) {
   const [name, version, directory] = line.split('|');

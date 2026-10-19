@@ -121,6 +121,11 @@ version (`MinSupportedVersion`), and reports the result in Settings, which
 only displays it. The settings API still accepts `enginePath`; tests use it
 to point at a fake engine, and the UI does not expose it.
 
+The minimum Codex version is platform-specific: macOS uses 0.146.0 after an
+ARM64 native smoke test covering sign-in, model turns, task delivery, file tools,
+command approval/rejection and restart; Windows and Linux retain the 0.161.0
+baseline. This is a compatibility floor, not full acceptance of every platform.
+
 Codex skips hooks that are untrusted or have changed. CoBot registers its
 native lease hook only in its private Codex environment and then records
 trust itself through the app-server (`hooks/list`, then `config/batchWrite`
@@ -191,6 +196,10 @@ npm ci
 npx playwright install chromium
 npx playwright test
 ```
+
+If Chrome is already installed, `COBOT_E2E_CHANNEL=chrome npx playwright test`
+uses that browser without downloading another one. Record the channel and version
+with results; CI defaults to Playwright's pinned Chromium.
 
 Install browser system dependencies only where appropriate for your
 machine or CI environment. Real Codex acceptance is an explicit separate
