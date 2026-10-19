@@ -19,8 +19,8 @@ when a Chinese discussion leads to a decision affecting other contributors.
 There is no requirement to join a chat group or use a separate community
 account to participate.
 
-Use [Issues](https://github.com/kunghim/CoBot/issues) for reproducible bugs
-and feature requests, [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
+Use [Issues](https://github.com/kunghim/CoBot/issues) for bugs with reproduction
+or code evidence and feature requests, [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
 for setup and usage questions, and
 [Show and tell](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)
 to share projects and workflows. Maintainer announcements appear in
@@ -32,10 +32,11 @@ response deadline.
 For a first contribution, look for `good first issue` (a bounded task with
 starting points and acceptance criteria) or `help wanted` (work ready for
 contributions). Comment before starting a substantial task to avoid duplicate
-work. Maintainers use `status: needs-triage` for new reports,
-`status: needs-info` when a report needs clarification, and `status: accepted`
-for work agreed in scope. These states are updated manually; an accepted
-request is not a release-date commitment. Dependency PRs follow their existing
+work using the comment commands below. Maintainers use `status: needs-triage`
+for new reports, `status: needs-info` when clarification is needed, and
+`status: accepted` for work agreed in scope. A claim sets `status: in-progress`
+automatically; acceptance and release dates remain maintainer decisions.
+Dependency PRs follow their existing
 bot labels. Do not label a task newcomer-friendly until it has enough guidance.
 
 Contributors normally work in a fork on a short-lived topic branch based
@@ -78,8 +79,100 @@ and only contribute material you have the right to submit.
 无需另发英文副本。影响其他贡献者的重要中文讨论，由维护者尽量补充英文决策摘要。
 Bug 与功能建议进入 Issues，安装和使用问题进入 Discussions 的 Q&A，成果进入
 Show and tell；无需加入聊天群。维护者跨时区尽力回复，不承诺固定响应时限。
-首次贡献可找 `good first issue` 或 `help wanted`，较大任务开始前先留言协调。
-状态标签由维护者手动调整：待分诊、待补充信息、已接受；已接受不代表承诺发布日期。
+首次贡献可找 `good first issue` 或 `help wanted`，使用下方评论命令认领，较大改动先讨论。
+待分诊、待补充信息、已接受由维护者判断；认领自动标记正在处理，不代表需求获批或承诺发布日期。
+
+## Reporting and claiming issues / 报告与认领 Issue
+
+Use one issue per problem or proposal. Include the CoBot version/commit,
+OS/architecture, Web or desktop, installation method (MSI, ZIP, source or
+unknown), and Codex version where relevant. Unknown information is acceptable.
+For bugs, provide reproduction steps or a concrete commit and file/line
+references with the code path explaining the concern. Identify whether your
+evidence is a runtime reproduction, automated test, static analysis only, or
+not yet verified. Do not describe a suspected failure as observed behavior.
+Feature requests need a use case, not a mandatory solution or reproduction.
+
+`ai-discovered` means AI found the problem or need, regardless of who submits
+it. AI translation or rewriting alone does not qualify. It describes provenance,
+not verification or acceptance. The optional discovery-source field adds this
+label automatically when **AI-discovered / AI 发现** is selected. If that
+declaration is removed or corrected, the workflow removes its label. Other
+cases can be labeled by maintainers; do not guess provenance from writing style.
+Do not upload private prompts, credentials or model transcripts.
+
+CLI/API submissions can bypass the form. Include the same evidence and declare
+the source explicitly; to use automatic source labeling, add this exact section
+to the issue body:
+
+```markdown
+### Discovery source / 发现来源
+
+AI-discovered / AI 发现
+```
+
+Comment one command by itself on an issue; commands have no arguments:
+
+| Command | Result |
+| --- | --- |
+| `/claim` | Assign yourself on an open, unassigned issue and set `status: in-progress` |
+| `/unclaim` | Release only your own assignment and restore the status before claiming |
+| `/help` | Show the command instructions |
+
+No maintainer approval is required to claim an unassigned issue. An existing
+assignee is never replaced; maintainers can still adjust assignments in GitHub.
+An AI-assisted contributor uses the GitHub account responsible for delivering
+the work. `ai-discovered` does not claim an issue or start an AI coding service.
+Claiming does not approve the proposal, close the issue, merge a PR or schedule
+a release. Describe substantial changes before implementing them.
+
+Before `/unclaim`, leave a short handoff with progress and any branch/PR link.
+The issue stays open. Other assignees and maintainer status changes are preserved.
+For a manual assignment with no recorded previous status, cancellation returns
+an otherwise unowned in-progress issue to `status: needs-triage`. If maintainers
+changed the status meanwhile, that decision is retained.
+
+Commands are processed in comment order and the bot replies with the result.
+Write a new comment to issue a command; editing an old comment does not execute
+it. PR comments are excluded. If a workflow fails after a partial update, a
+maintainer can rerun it or dispatch **issue management** with the issue number.
+Do not delete the bot's command replies: their metadata stores the previous
+status and processed-command cursor for safe retries.
+
+For triage, use one type label (`bug`, `enhancement`, `documentation`, or
+`dependencies`), the relevant area labels (`area: installation`, `area: codex`,
+`area: collaboration`, `area: ui`), and a single current status. Reserve
+`priority: high` for serious impact such as data loss or broadly blocked core
+functionality; ordinary reports do not need a priority label. `good first issue`
+requires a bounded task with guidance and acceptance criteria. Explain why
+duplicates or out-of-scope reports are closed and link the original where relevant.
+
+Topic PRs targeting `dev` should reference the issue (`Refs #123`). A merge into
+`dev` is not a released fix; the `dev -> main` promotion can use `Closes #123`
+for issues actually resolved on the default branch. On release, add the released
+version when useful. Merging an ordinary PR does not automatically publish it.
+
+中文说明：每个 Issue 聚焦一个问题或建议。填写已知的版本、系统与架构、Web/桌面、
+MSI/ZIP/源码安装方式及相关 Codex 版本；不清楚可标未知。Bug 可提供运行复现，
+也可提供提交、文件位置和代码路径，但要区分运行复现、自动化测试、仅静态分析、尚未验证。
+功能建议只需说明使用场景，不强制解决方案或复现。
+
+`ai-discovered` 表示由 AI 发现问题或需求，不取决于提交者是谁；仅翻译、润色不算。
+它不代表经过验证或维护者已接受。表单选“AI 发现”会自动加标，修改或移除这项声明
+会自动去标；其他情况由维护者核实，不根据文风猜测。CLI/API 报告也应遵守上述结构，
+可使用上面的同名来源段落触发标记；不要提交私人提示词、凭据或完整模型对话。
+
+在开放且无人负责的 Issue 单独评论 `/claim` 即可自动认领并标记正在处理，无需等待批准；
+已有负责人时不会抢占。取消前留言交代进度和分支/PR，再单独评论 `/unclaim`，只取消
+自己的认领并恢复原状态，Issue 保持开放。手工分配而没有历史状态的，取消后若仍是
+无人负责的正在处理状态，则回到待分诊；其他负责人和维护者期间修改的状态会保留。
+`/help` 查看说明。命令不带参数，需发新评论，编辑旧评论不会执行；PR 评论不执行。
+机器人回复保留重跑所需的状态，请勿删除；中途失败由维护者重跑或手动触发同名工作流。
+
+负责人是承担交付责任的 GitHub 账号，来源标签不代表认领，也不会启动 AI 编码服务。
+认领不代表需求获批，PR、关闭 Issue 和发版仍由维护者决定。正常问题无需优先级标签，
+严重影响才标 `priority: high`。PR 合入 `dev` 先说明进展，晋级 `main` 后再关闭对应问题，
+发布时补充修复版本。
 
 ## Working locally
 
@@ -246,3 +339,91 @@ actual behavior, and sanitized logs. Remove private paths/content when
 unnecessary, and always remove tokens. Public releases, signing, and the
 release timing require a separate maintainer decision. Report security
 vulnerabilities through [SECURITY.md](SECURITY.md), rather than public issues.
+
+## Pull request review / PR 审查规范
+
+Work on a short-lived branch based on `dev`, normally in your own fork, and
+target `dev`. Only this repository's `dev` branch promotes changes to `main`.
+Keep one logical change per PR without an arbitrary line-count limit. Discuss
+substantial features or architecture changes first; a small fix may go straight
+to a PR without creating an issue. Titles should describe the resulting change;
+English is recommended, and descriptions may be English or Chinese. Maintainers
+aim to add an English summary of substantial Chinese discussions.
+
+The PR template asks for four things:
+
+| Section | What to provide |
+| --- | --- |
+| Problem and related issue | The problem, trigger, and `Refs #123` if an issue exists |
+| Resulting behavior | What changes for users or developers, before and after |
+| Validation | Commands actually run, results, and limitations; distinguish automated, real Codex and native-platform checks |
+| Compatibility and data impact | API/CLI/configuration, database, upgrade and rollback effects; write None if unaffected |
+
+Include sanitized screenshots for visible UI changes. Small documentation fixes
+can use concise answers. Explain changes to locks, generated contracts or
+migrations when relevant; preserve third-party attribution and provide both UI
+languages for UI text changes. AI assistance does not change the contributor's
+responsibility for the code, sources and validation. Mention it when useful for
+review; do not submit private prompts or transcripts as evidence.
+
+Use a type label (`bug`, `enhancement`, `documentation`, `dependencies`) and
+relevant area labels (`area: installation`, `area: codex`, `area: collaboration`,
+`area: ui`); not every PR needs an area. Dependency bots retain their existing
+ecosystem labels. Track PR progress with GitHub's Draft, review and merged/closed
+states rather than issue-status labels. `ai-discovered` describes the linked
+issue's discovery source, not PR quality or whether AI wrote the code.
+
+Add `breaking-change`, or ask a maintainer to add it, when existing users or
+callers must change how they use CoBot after upgrading. Examples include removed
+configuration, incompatible API/CLI changes, or data changes that invalidate
+existing use or rollback. Explain required user actions and migration/rollback
+limits in the PR so they can be included in release notes. An additive optional
+feature, internal refactor or ordinary database migration is not automatically
+a breaking change. This label does not itself choose the next version number.
+
+Use Draft for unfinished work; mark Ready for review when the change and its
+evidence are ready. Before merging, CI must pass and material review feedback
+must be addressed or explicitly resolved by a maintainer. New commits require
+checking the resulting diff and current CI again. The maintainer makes the
+final merge decision; passing CI does not automatically approve or merge a PR.
+There is no additional mandatory approval-count gate while one maintainer runs
+the project. Issue claim commands do not operate on PRs.
+
+| Merge route | Method |
+| --- | --- |
+| Topic branch into `dev` | Squash and merge: one PR becomes one commit |
+| `dev` into `main` | Merge commit: retain shared history between long-lived branches |
+
+Squashing a topic PR combines its individual development commits; they do not
+all appear separately on the mainline. This applies to new PRs and does not
+rewrite existing published history. Start the next task on a new topic branch.
+After promotion, synchronize `main` back into `dev` without rewriting history,
+using a fast-forward when possible. Keep both long-lived branches; only remove
+a finished topic branch after confirming its work is integrated and it is no
+longer used by a worktree or another task.
+
+Ordinary PRs use `Refs #123`; a merge into `dev` is not a released fix. The
+`dev -> main` promotion may use `Closes #123` for issues actually resolved on
+the default branch. Release timing and assets require a separate maintainer
+decision; merging a PR does not publish a release. See GitHub's documentation
+on [issue closing keywords](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
+and [merge methods](https://docs.github.com/en/pull-requests/reference/pull-request-merges).
+
+中文说明：从 `dev` 建短期功能分支，普通 PR 向 `dev` 提交；本仓库 `dev` 才能晋级
+`main`。每个 PR 聚焦一项改动，不设机械行数上限；大改动先讨论，小修复无需先建
+Issue。标题建议英文，描述中英文均可。模板说明问题与关联、改动后的行为、实际验证、
+兼容与数据影响；界面变化附脱敏截图。AI 辅助贡献接受同样的代码、来源与验证审查。
+
+PR 复用类型和模块标签，进度用 Draft、审查、合并或关闭状态；`ai-discovered` 保留为
+Issue 来源标识。只有升级后用户或调用方需要调整用法的实际不兼容变更才标
+`breaking-change`，并提供迁移措施和回滚限制。普通迁移、内部重构、增加可选能力
+不自动算破坏性变更，标签本身也不决定下次版本号。
+
+未完成用 Draft，完成后请求审查。CI 通过、重要审查意见解决后，由维护者决定合并；
+追加提交后重新核对差异与当前检查。暂不增加强制审批人数，也不自动批准或合并。
+普通 PR 默认 Squash 成一条提交，开发中的各条 commit 不逐条进入主线；`dev` 晋级
+`main` 使用 Merge commit。这不改写既有历史。晋级后将 `main` 同步回 `dev`，有条件
+时快进；确认无 worktree 或其他任务继续使用后再清理已完成的功能分支。
+
+普通 PR 用 `Refs #编号` 关联，合入 `dev` 先说明进展，真正解决的问题在晋级 `main`
+时再关闭。合并不等于发布，新版本和发布时间仍另行决定。
