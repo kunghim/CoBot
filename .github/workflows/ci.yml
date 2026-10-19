@@ -69,29 +69,6 @@ jobs:
         run: |
           go vet ./...
           go build ./...
-      - name: Probe Chrome debugging port (temporary CI diagnosis, remove before merge)
-        run: |
-          google-chrome --version
-          env | grep -iE '^(http|https|all|no)_proxy=|^DBUS' || true
-          PROF=$(mktemp -d)
-          google-chrome --headless=new --remote-debugging-port=0 --user-data-dir="$PROF" \
-            --no-first-run --no-default-browser-check --disable-gpu --mute-audio \
-            --no-sandbox --disable-dev-shm-usage about:blank >/tmp/chrome-probe.log 2>&1 &
-          CPID=$!
-          for i in $(seq 1 30); do
-            [ -f "$PROF/DevToolsActivePort" ] && break
-            sleep 0.5
-          done
-          echo "--- port file ---"
-          cat "$PROF/DevToolsActivePort" 2>/dev/null || echo "ABSENT after 15s"
-          PORT=$(head -1 "$PROF/DevToolsActivePort" 2>/dev/null)
-          if [ -n "$PORT" ]; then
-            echo "--- /json/version ---"
-            curl -sS -m 5 "http://127.0.0.1:$PORT/json/version" || echo "curl exit $?"
-          fi
-          echo "--- chrome stderr ---"
-          cat /tmp/chrome-probe.log
-          kill $CPID 2>/dev/null || true
       - name: Go tests (unit + integration, temp data roots only)
         run: go test ./internal/... ./tests/...
       - name: Frontend typecheck and unit tests
