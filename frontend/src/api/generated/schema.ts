@@ -479,8 +479,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change exactly one of a team's name, permission mode or reasoning effort
-         * @description The body carries exactly one of name, permissionMode or reasoningEffort (otherwise 400 error.team.patch_one_field). Permission mode and reasoning effort apply from each member's next turn.
+         * Change exactly one of a team's name, permission mode, reasoning effort or model provider
+         * @description The body carries exactly one of name, permissionMode, reasoningEffort or providerId (otherwise 400 error.team.patch_one_field). Permission mode and reasoning effort apply from each member's next turn.
          */
         patch: operations["patchTeam"];
         trace?: never;
@@ -1567,6 +1567,8 @@ export interface components {
             permissionMode?: "read_only" | "default" | "full";
             /** @description How hard members think each turn; absent follows the model's default. */
             reasoningEffort?: string;
+            /** @description The model provider this team runs with; absent follows the profile's default. */
+            providerId?: string;
         };
         Bot: {
             id: string;
@@ -2704,6 +2706,8 @@ export interface operations {
                     permissionMode?: "read_only" | "default" | "full";
                     /** @description How hard members think from their next turn (an effort the model lists); empty follows the model's default. */
                     reasoningEffort?: string;
+                    /** @description The model provider this team runs with; empty follows the profile's default. Applies from the team's next turn. */
+                    providerId?: string;
                     /** Format: int64 */
                     expectedRevision: number;
                 };

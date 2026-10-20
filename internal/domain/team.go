@@ -35,6 +35,12 @@ type Team struct {
 	// ReasoningEffort is how hard members think each turn (an effort the
 	// model supports, as Codex names it); empty follows the model's default.
 	ReasoningEffort string `json:"reasoningEffort,omitempty"`
+	// ProviderID is the model provider this team runs with. Empty means the
+	// team follows the profile's default.
+	//
+	// It is named here rather than read from the team's threads: a thread
+	// records the provider it had, not the one it should have.
+	ProviderID string `json:"providerId,omitempty"`
 }
 
 // Team permission modes. CoBot only knows these three; each engine adapter

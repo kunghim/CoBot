@@ -237,6 +237,10 @@ func (a *App) unbindProvider(ctx context.Context, id string) error {
 // ThreadProvider returns the provider a thread should run with, and the model
 // that belongs to it.
 //
+// A team that names its own provider wins; a team that does not follows the
+// profile's default. The thread's own record is not consulted: it says which
+// provider the thread had, not the one it should have.
+//
 // The engine refuses a provider id it does not know — "Model provider `x` not
 // found" is a hard error, not a fallback — so an id is only handed over when
 // it names a provider that is actually configured. The official provider is
@@ -248,12 +252,21 @@ func (a *App) unbindProvider(ctx context.Context, id string) error {
 // belongs to a vendor the profile may no longer be using, and asking for it
 // against a third-party gateway is how a turn ends in a 400 about a model
 // that vendor never had.
-func (a *App) ThreadProvider(ctx context.Context) (providerID string, model string, err error) {
+func (a *App) ThreadProvider(ctx context.Context, teamID string) (providerID string, model string, err error) {
 	settings, err := a.GetSettings(ctx)
 	if err != nil {
 		return "", "", err
 	}
 	id := settings.DefaultProvider
+	if teamID != "" {
+		team, err := sqlite.GetTeamByID(ctx, a.DB, teamID)
+		if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
+			return "", "", err
+		}
+		if team.ProviderID != "" {
+			id = team.ProviderID
+		}
+	}
 	if id == "" {
 		return "", settings.DefaultModel, nil
 	}

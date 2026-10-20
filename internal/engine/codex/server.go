@@ -583,6 +583,27 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider}, nil
 }
 
+// ArchiveThread sets a thread aside in the engine.
+//
+// This is how a thread lets go of the provider it was started with: the
+// engine ignores a provider for a thread it already holds, so a thread that
+// has to run with another one is archived and then loaded again.
+func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/archive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/archive: %w", err)
+	}
+	return nil
+}
+
+// UnarchiveThread takes a thread back out of the engine's archive, so it can
+// be loaded again.
+func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/unarchive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/unarchive: %w", err)
+	}
+	return nil
+}
+
 // ThreadLoaded reports whether this app-server has the thread loaded: it
 // was started or resumed here and Codex has not closed or unloaded it since.
 // A loaded thread takes a new turn directly, with no resume first.

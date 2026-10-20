@@ -1160,6 +1160,9 @@ type Team struct {
 	PermissionMode    *TeamPermissionMode `json:"permissionMode,omitempty"`
 	ProfileInstanceId string              `json:"profileInstanceId"`
 
+	// ProviderId The model provider this team runs with; absent follows the profile's default.
+	ProviderId *string `json:"providerId,omitempty"`
+
 	// ReasoningEffort How hard members think each turn; absent follows the model's default.
 	ReasoningEffort *string    `json:"reasoningEffort,omitempty"`
 	Revision        int64      `json:"revision"`
@@ -1457,6 +1460,9 @@ type PatchTeamJSONBody struct {
 
 	// PermissionMode Applies from each member's next turn.
 	PermissionMode *PatchTeamJSONBodyPermissionMode `json:"permissionMode,omitempty"`
+
+	// ProviderId The model provider this team runs with; empty follows the profile's default. Applies from the team's next turn.
+	ProviderId *string `json:"providerId,omitempty"`
 
 	// ReasoningEffort How hard members think from their next turn (an effort the model lists); empty follows the model's default.
 	ReasoningEffort *string            `json:"reasoningEffort,omitempty"`

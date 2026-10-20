@@ -45,6 +45,7 @@ type Server struct {
 	// ThreadProviders records the provider each thread was started or
 	// resumed with, so a test can see which one CoBot asked for.
 	ThreadProviders []string
+	archived        []string
 }
 
 func (s *Server) SetTurnFact(threadID, turnID, status string) {
@@ -167,6 +168,30 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	s.loaded[threadID] = true
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
 	return engine.ThreadInfo{ThreadID: threadID, Model: "fake-model", ModelProvider: spec.ModelProvider}, nil
+}
+
+// ArchiveThread plays the engine setting a thread aside, so it can be loaded
+// again with another provider.
+func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.archived = append(s.archived, threadID)
+	delete(s.loaded, threadID)
+	return nil
+}
+
+// UnarchiveThread plays the engine taking a thread back out of its archive.
+func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil
+}
+
+// Archived lists the threads the engine was asked to set aside.
+func (s *Server) Archived() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.archived...)
 }
 
 func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engine.TurnOptions) (string, error) {
