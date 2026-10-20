@@ -122,6 +122,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		// restarts, so a bookmarked page and its session keep working.
 		listen = net.JoinHostPort("127.0.0.1", strconv.Itoa(preferredPort(paths)))
 	}
+	if err := loopbackOnly(listen); err != nil {
+		return nil, err
+	}
 
 	lock, err := platform.AcquireLock(paths, 2*time.Second)
 	if err != nil {
