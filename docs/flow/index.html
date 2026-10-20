@@ -1,0 +1,713 @@
+<!doctype html>
+<!-- CoBot 接力链路 · 交互式演示
+     按 CoBot 实际的 relay 模型重写（v3）。
+
+     与 v2 的关键差异 —— v2 画的是「审查专家作为质量枢纽，四个角色都向它送审」，
+     那不是 CoBot 的协作形态。CoBot 实际是：
+       · 一条由用户确认过的链路，每一环是一张卡片，只有一个负责人
+       · 卡片沿链路直接交给下一环，中间环节不经人转手
+       · 检查环节（评审 / 测试）可以 handoff(outcome=back) 退回产出它的那一环，
+         退回后重跑该环，再继续往下走
+       · 消息只留言、不唤醒（send_message）；唤醒与确认走卡片
+       · 链路以项目经理解收汇报结束，最后是你的验收卡
+
+     所以这里的节点是「链路环节」而不是「角色」——同一角色可以在链路里出现两次
+     （产品经理负责需求评审与产品设计，测试工程师负责测试用例与测试执行），
+     这样卡片前进与向左退回的方向才和实现一致。
+
+     线型：实线 = 卡片交接（handoff）  点线 = 留言（send_message，不唤醒）
+           上拱虚线 = 退回重跑（back / rerun）
+
+     零依赖：inline CSS + SVG 连线 + rAF 时钟 + getPointAtLength + async/await 剧本。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoBot 接力链路 · 交互式演示</title>
+<style>
+  :root {
+    --bg: #faf9f6; --bg2: #f1efe9; --card: #ffffff; --line: #e6e3db;
+    --ink: #1d1c19; --ink2: #57544e; --ink3: #918d84;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 30px 24px 44px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  header .hint { font-size: 12.5px; color: var(--ink3); }
+  header label { margin-left: auto; font-size: 12.5px; color: var(--ink2); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  header label + label { margin-left: 0; }
+  header input[type="range"] { width: 120px; accent-color: var(--ink2); cursor: pointer; }
+  .speedlbl b { font-size: 12.5px; font-weight: 600; color: var(--ink); min-width: 3.4em; font-variant-numeric: tabular-nums; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px 14px; }
+
+  .rt-top { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .stages { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; max-width: 100%; overflow-x: auto; }
+  .stages span { font-size: 12.5px; padding: 5px 11px; border-radius: 7px; color: var(--ink3); cursor: default; white-space: nowrap; transition: color .3s, background .3s; }
+  .stages span.cur { background: var(--card); color: var(--ink); font-weight: 560; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / .08); }
+  .stages span.done { color: var(--ink2); }
+
+  .stage-scroll { overflow-x: auto; }
+  .stagebox { position: relative; height: 660px; min-width: 900px; }
+  .wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .wires path { fill: none; stroke: var(--line); stroke-width: 1.5; transition: opacity .3s, stroke .25s; }
+  .wires path.chat { stroke-dasharray: 2 6; opacity: .28; }
+  .wires path.back { stroke-dasharray: 6 5; opacity: .5; }
+  .wires path.on { stroke: var(--ink3); stroke-dasharray: 4 7; animation: dash .55s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -11; } }
+
+  .wires .ring { fill: none; stroke: var(--ink3); stroke-width: 2; opacity: 0; transition: opacity .2s; }
+  .wires .ring.show { opacity: .95; }
+  .wires .pkt { fill: var(--ink); filter: drop-shadow(0 0 3px var(--ink3)); }
+  .wires .pkt.rev { fill: var(--card); stroke: var(--ink); stroke-width: 2; }
+  .wires .pkt.chatdot { fill: none; stroke: var(--ink2); stroke-width: 1.6; filter: none; }
+  .wires .pkt.backdot { fill: var(--card); stroke: var(--ink2); stroke-width: 2; }
+
+  /* 标签默认全部隐藏，只在包裹经过时亮起 —— 环节名已经在卡片上，
+     常显的连线标签只会互相压住。 */
+  .elabel {
+    position: absolute; transform: translate(-50%, calc(-50% - 20px));
+    font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 6px;
+    background: var(--card); border: 1px solid var(--line); color: var(--ink2);
+    white-space: nowrap; pointer-events: none; opacity: 0; z-index: 3;
+    transition: opacity .3s;
+  }
+  .stagebox[data-focus] .elabel { opacity: 0; }
+  .stagebox[data-focus] .elabel.show { opacity: 1; }
+
+  .node {
+    position: absolute; transform: translateX(-50%);
+    width: 122px; padding: 14px 8px 10px; text-align: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    cursor: pointer; user-select: none;
+    transition: opacity .35s, border-color .25s, box-shadow .25s;
+    z-index: 2;
+  }
+  .node:hover { border-color: var(--ink3); }
+  .node .ic { width: 24px; height: 24px; color: var(--ink2); }
+  .node b { display: block; font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .node small { display: block; font-size: 11px; color: var(--ink3); }
+  .node em { display: block; font-style: normal; font-size: 11px; color: var(--ink3); min-height: 1.5em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .node.busy { border-color: var(--ink3); }
+  .node .sdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--ink3); margin-right: 5px; vertical-align: 1px; }
+  .node.busy .sdot { background: var(--ink); border-color: var(--ink); animation: live 1.8s infinite; }
+  @keyframes live { 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+  .node .pill {
+    position: absolute; right: 8px; top: -10px;
+    padding: 2px 8px; border-radius: 6px; background: var(--ink); color: var(--card);
+    font: 600 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    opacity: 0; transform: translateY(4px) scale(.9);
+    transition: opacity .25s, transform .25s; pointer-events: none;
+  }
+  .node .pill.show { opacity: 1; transform: none; }
+  .node.bad { animation: shake .45s; }
+  @keyframes shake { 20% { transform: translateX(calc(-50% - 5px)); } 40% { transform: translateX(calc(-50% + 4px)); } 60% { transform: translateX(calc(-50% - 2px)); } 80% { transform: translateX(calc(-50% + 1px)); } }
+
+  /* 项目经理：链路的起点（需求与链路）和收尾（验收汇报） */
+  .n-pm { left: 50%; top: 12px; width: 190px; }
+  .n-pm .chip {
+    display: inline-block; margin-top: 6px; padding: 2px 9px; border-radius: 999px;
+    background: var(--bg2); border: 1px solid var(--line); color: var(--ink2);
+    font-size: 11.5px; font-weight: 560;
+  }
+  /* 链路：六个环节，自左向右 */
+  .n-s1 { left: 8.3%;  top: 300px; }
+  .n-s2 { left: 25%;   top: 300px; }
+  .n-s3 { left: 41.7%; top: 300px; }
+  .n-s4 { left: 58.3%; top: 300px; }
+  .n-s5 { left: 75%;   top: 300px; }
+  .n-s6 { left: 91.7%; top: 300px; }
+  .n-user {
+    left: 50%; top: 570px; width: min(620px, 78%);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px 16px; border-style: dashed; border-color: var(--ink2);
+    box-shadow: 0 0 0 4px var(--bg2);
+  }
+  .n-user .ic { width: 20px; height: 20px; color: var(--ink); }
+  .n-user b { margin: 0; display: inline; }
+  .n-user small { display: inline; margin-right: 4px; }
+  .n-user em { display: inline; margin: 0; min-height: 0; }
+  .node.n-user.busy { border-color: var(--ink); }
+  .node.n-user .pill { background: var(--ink); color: var(--card); }
+
+  .stagebox[data-focus] .node { opacity: .16; }
+  .stagebox[data-focus] .node.hot { opacity: 1; }
+  .stagebox[data-focus] .wires path { opacity: .06; }
+  .stagebox[data-focus] .wires path.chat { opacity: .1; }
+  .stagebox[data-focus] .wires path.back { opacity: .16; }
+  .stagebox[data-focus] .wires path.hot { opacity: 1; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink2); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend i { display: block; width: 26px; height: 0; border-top: 1.5px solid var(--ink3); }
+  .legend i.chat { border-top-style: dotted; opacity: .5; }
+  .legend i.back { border-top-style: dashed; opacity: .7; }
+
+  .foot { display: flex; align-items: center; gap: 14px 26px; flex-wrap: wrap; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .cap { flex: 1 1 26em; min-height: 2.6em; display: flex; align-items: center; font-size: 14.5px; margin: 0; }
+  .cap.in { animation: capin .4s ease-out; }
+  @keyframes capin { from { opacity: 0; transform: translateY(4px); } }
+  .stats { display: flex; gap: 22px; font-size: 12px; color: var(--ink3); }
+  .stats span { display: flex; flex-direction: column; }
+  .stats b { font-size: 22px; line-height: 1.2; font-weight: 650; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wires path.on, .node.busy .sdot, .node.bad, .cap.in { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CoBot 接力链路</h1>
+    <span class="hint">点击环节卡聚焦，再点一次返回全景</span>
+    <label><input type="checkbox" id="vig" checked> 插播留言片段</label>
+    <label class="speedlbl">速度
+      <input type="range" id="speed" min="0.25" max="2" step="0.25" value="1">
+      <b id="speedVal">1×</b>
+    </label>
+  </header>
+
+  <div class="panel">
+    <div class="rt-top">
+      <div class="stages" id="stages">
+        <span>需求与链路</span><span>需求评审</span><span>产品设计</span>
+        <span>测试用例</span><span>实现</span><span>测试</span><span>评审与验收</span>
+      </div>
+    </div>
+
+    <div class="stage-scroll">
+      <div class="stagebox" id="stage">
+        <svg class="wires" id="wires" aria-hidden="true"></svg>
+
+        <div class="node n-pm" data-role="pm">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3.5" rx="1"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg>
+          <b><span class="sdot"></span>项目经理</b>
+          <small>需求 · 链路 · 验收</small>
+          <em>&nbsp;</em>
+          <span class="chip">空闲</span>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s1" data-role="s1">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8.5l2 2 4-4.5"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="17.5" x2="13" y2="17.5"/></svg>
+          <b><span class="sdot"></span>需求评审</b>
+          <small>产品经理</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s2" data-role="s2">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1L19 8l-3-3L5 16l-1 4z"/><line x1="13.5" y1="6.5" x2="16.5" y2="9.5"/></svg>
+          <b><span class="sdot"></span>产品设计</b>
+          <small>产品经理</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s3" data-role="s3">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6M9 6h6M9 8h4"/><path d="M5 4v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-3-3"/><path d="M8.5 13.5l2 2 4-4"/></svg>
+          <b><span class="sdot"></span>测试用例</b>
+          <small>测试工程师</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s4" data-role="s4">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 7 3 12 8 17"/><polyline points="16 7 21 12 16 17"/></svg>
+          <b><span class="sdot"></span>实现</b>
+          <small>全栈工程师</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s5" data-role="s5">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4M11 3v5l-5 9a2 2 0 0 0 1.8 3h8.4a2 2 0 0 0 1.8-3l-5-9V3"/><line x1="8.5" y1="15" x2="15.5" y2="15"/></svg>
+          <b><span class="sdot"></span>测试</b>
+          <small>测试工程师</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-s6" data-role="s6">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="5.5"/><line x1="14.2" y1="14.2" x2="20" y2="20"/></svg>
+          <b><span class="sdot"></span>代码评审</b>
+          <small>评审员</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+
+        <div class="node n-user" data-role="user">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
+          <b><span class="sdot"></span>用户</b>
+          <small>需求方 · 决策人</small>
+          <em>&nbsp;</em>
+          <i class="pill"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i></i>卡片交接 handoff</span>
+      <span><i class="chat"></i>留言 send_message（不唤醒）</span>
+      <span><i class="back"></i>退回重跑 back / rerun</span>
+    </div>
+
+    <div class="foot">
+      <p class="cap" id="cap"></p>
+      <div class="stats">
+        <span><b id="s-stage">-/7</b>当前阶段</span>
+        <span><b id="s-review">0</b>次交接</span>
+        <span><b id="s-ret">0</b>次退回</span>
+        <span><b id="s-dec">0</b>次用户决策</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  window.__errs = [];
+  addEventListener("error", e => window.__errs.push(String(e.message)));
+
+  const $ = s => document.querySelector(s);
+  const stage = $("#stage"), svg = $("#wires"), cap = $("#cap");
+  const stagePills = [...$("#stages").children];
+  const NS = "http://www.w3.org/2000/svg";
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const nodes = {}, edges = {};
+
+  // 线：实线 = 卡片交接；点线 = 留言（不唤醒）；上拱虚线 = 退回重跑。
+  // 主线是链路顺序，pm 是链路的起点与收尾，user 在链外。
+  const EDGES = [
+    { id: "pm-s1",  a: "pm",   b: "s1", label: "按链路交出第一张卡" },
+    { id: "s1-s2",  a: "s1",  b: "s2", label: "产品经理接下一环", core: 1 },
+    { id: "s2-s3",  a: "s2",  b: "s3", label: "测试用例卡", core: 1 },
+    { id: "s3-s4",  a: "s3",  b: "s4", label: "实现卡", core: 1 },
+    { id: "s4-s5",  a: "s4",  b: "s5", label: "提测", core: 1 },
+    { id: "s5-s6",  a: "s5",  b: "s6", label: "代码评审卡", core: 1 },
+    { id: "s6-pm",  a: "s6",  b: "pm", label: "验收汇报", core: 1 },
+    { id: "pm-u",   a: "pm",  b: "user", label: "需求文档 + 链路" },
+    { id: "s2-u",   a: "s2",  b: "user", label: "ask_user 决策" },
+    { id: "s3-u",   a: "s3",  b: "user", label: "留言", chat: 1 },
+    { id: "s4-u",   a: "s4",  b: "user", label: "留言", chat: 1 },
+    // 退回：只回到产出它的那一环
+    { id: "back-s5-s4", a: "s5", b: "s4", label: "back · rerun", back: 1, lift: 44 },
+    { id: "back-s6-s5", a: "s6", b: "s5", label: "back · return_to_me", back: 1, lift: 84 },
+    { id: "back-s6-s4", a: "s6", b: "s4", label: "back · rerun", back: 1, lift: 124 },
+  ];
+
+  // 主剧本：一份需求走完整条链路，含三次失败回合。
+  // out 支持一分为二；rev = 沿同一条边反向（退回给上游）。
+  const MAIN = () => [
+    { stage: 0, out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "“帮我做个笔记应用”", at: "pm", act: "澄清边界：做多大？给谁用？", dur2: 900, cnt: { review: 1 } }],
+      cap: "幕1 需求与链路：用户提出——「帮我做一个本地 Markdown 笔记应用，叫 NoteMark，要标签和全文搜索」。" },
+    { stage: 0, at: "pm", act: "写需求文档，从完整流程里选定链路", dur: 1500,
+      cap: "项目经理写下需求文档，并挑出这条需求要走的那条链路：需求评审 → 产品设计 → 测试用例 → 实现 → 测试 → 代码评审。" },
+    { stage: 0, out: [{ from: "pm", to: "user", edge: "pm-u", label: "需求文档 + 链路待确认", at: "user", act: "确认需求与链路", dur2: 1400, cnt: { dec: 1 } }],
+      cap: "提交给你确认 —— 需求文档和链路都要你点头，才会开工。" },
+    { stage: 0, out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "确认 ✓", at: "pm", act: "建需求，开始接力", dur2: 700, pill: "✓ 已确认" }],
+      cap: "你确认了。CoBot 把第一张卡片交给链路第一环的负责人 —— 不是让某个模型自己挑人。" },
+
+    { stage: 1, out: [{ from: "pm", to: "s1", edge: "pm-s1", label: "需求评审卡", at: "s1", act: "评审需求：搜索范围没定义", dur2: 1600, cnt: { review: 1 } }],
+      cap: "幕2 需求评审：卡片打开时带着需求、链路、当前位置和需求文档。" },
+    { stage: 1, out: [{ from: "s1", to: "pm", edge: "pm-s1", rev: 1, label: "✗ back", at: "pm", act: "补写：搜索含正文与标签", dur2: 1200, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }],
+      cap: "产品经理 handoff(outcome=back)：「全文搜索」没定义范围 —— 只搜标题还是含正文？退回给产出需求的那一环。" },
+    { stage: 1, out: [{ from: "pm", to: "s1", edge: "pm-s1", label: "重跑 · 需求评审", at: "s1", act: "复查 v2：标题+正文+标签", dur2: 1100, cnt: { review: 1 } }] },
+    { stage: 1, at: "s1", act: "需求定稿", dur: 700, pill: "✓ 通过",
+      cap: "复查通过。返工之后重跑这一环，再继续往下走 —— 下一环还是产品经理接。" },
+
+    { stage: 2, out: [{ from: "s1", to: "s2", edge: "s1-s2", label: "产品设计卡", at: "s2", act: "写《产品文档》·画三页原型", dur2: 1800, cnt: { review: 1 } }],
+      cap: "幕3 产品设计：同一张卡片推进到下一环，负责人不变。" },
+    { stage: 2, out: [{ from: "s2", to: "user", edge: "s2-u", label: "ask_user：分栏预览 or 所见即所得？", at: "user", act: "决策中", dur2: 1400, cnt: { dec: 1 } }],
+      cap: "产品经理 ask_user：编辑器用「左写右预览」分栏，还是所见即所得？只有你能拍板。" },
+    { stage: 2, out: [{ from: "user", to: "s2", edge: "s2-u", rev: 1, label: "分栏预览", at: "s2", act: "按分栏方案改原型", dur2: 800 }],
+      cap: "你回答后，产品经理被唤醒继续工作。" },
+
+    { stage: 3, out: [{ from: "s2", to: "s3", edge: "s2-s3", label: "测试用例卡", at: "s3", act: "写用例：搜索 12·标签 9·CRUD 16", dur2: 1600, cnt: { review: 1 } }],
+      cap: "幕4 测试用例：卡片送到测试工程师手上，用例成为实现必须满足的契约。" },
+    { stage: 3, vig: 1, out: [{ from: "user", to: "s3", edge: "s3-u", rev: 1, chat: 1, label: "记得测 1000 条笔记的速度", at: "s3", act: "补一条性能用例", dur2: 800 }],
+      cap: "插播留言：用户提醒测一下 1000 条笔记的搜索速度。留言只留字，不唤醒对方。" },
+
+    { stage: 4, out: [{ from: "s3", to: "s4", edge: "s3-s4", label: "实现卡", at: "s4", act: "读需求+设计+用例，改代码", dur2: 1800, cnt: { review: 1 } }],
+      cap: "幕5 实现：全栈工程师拿到用例，在团队目录里改代码。" },
+    { stage: 4, at: "s4", act: "自测：跑通 38 条冒烟", dur: 1200,
+      cap: "开发先自测一轮。Codex 若要执行命令或改文件，原生审批会送到你面前。" },
+
+    { stage: 5, out: [{ from: "s4", to: "s5", edge: "s4-s5", label: "提测 build 42", at: "s5", act: "按 38 条用例执行", dur2: 1500, cnt: { review: 1 } }],
+      cap: "幕6 测试：测试工程师逐条执行用例。" },
+    { stage: 5, out: [{ from: "s5", to: "s4", edge: "back-s5-s4", label: "✗ back · rerun", at: "s4", act: "修分词边界", dur2: 1300, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }],
+      cap: "bug#7 —— 搜「会议」漏掉「会议纪要」，预分词边界问题。测试环节 handoff(outcome=back)，退回产出它的那一环。" },
+    { stage: 5, vig: 1, out: [{ from: "user", to: "s4", edge: "s4-u", rev: 1, chat: 1, label: "复现：搜单字「会」对比", at: "s4", act: "按复现步骤验证", dur2: 800 }],
+      cap: "插播留言：用户发来复现步骤。仍然是留言 —— 除非成员正好在跑这一轮。" },
+    { stage: 5, out: [{ from: "s4", to: "s5", edge: "s4-s5", rev: 1, label: "修复 · 提测 build 43", at: "s5", act: "回归 38 条 + 性能用例", dur2: 1300, cnt: { review: 1 } }],
+      cap: "修复后重新提测：全部通过，1000 条笔记搜索 80ms。" },
+
+    { stage: 6, out: [{ from: "s5", to: "s6", edge: "s5-s6", label: "代码评审卡", at: "s6", act: "对照清单评审", dur2: 1500, cnt: { review: 1 } }],
+      cap: "幕7 评审与验收：卡片送到评审员手上，评审卡自带检查清单。" },
+    { stage: 6, out: [{ from: "s6", to: "s4", edge: "back-s6-s4", label: "✗ back · rerun", at: "s4", act: "补齐重试预算的测试", dur2: 1200, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }],
+      cap: "评审员 handoff(outcome=back, mode=rerun)：重试预算没有测试覆盖。退回实现环节重跑。" },
+    { stage: 6, out: [{ from: "s4", to: "s6", edge: "s5-s6", rev: 1, label: "重跑 · 代码评审", at: "s6", act: "复查：预算已覆盖", dur2: 1100, cnt: { review: 1 } }] },
+    { stage: 6, out: [{ from: "s6", to: "pm", edge: "s6-pm", label: "✓ done · 验收汇报", at: "pm", act: "汇总：做了什么·怎么核对·验证了什么", dur2: 1500, pill: "✓ 通过" }],
+      cap: "评审通过。链路的最后一环是项目经理的验收汇报 —— 做了什么、怎么检查、验证了什么。" },
+    { stage: 6, out: [{ from: "pm", to: "user", edge: "pm-u", label: "你的验收卡", at: "user", act: "验收 NoteMark v1.0", dur2: 1400, cnt: { dec: 1 } }],
+      cap: "验收汇报变成你的卡片。你接受它，这项需求就完成；也可以要求修改，或随时取消。" },
+  ];
+
+  // 聚焦某个环节时，只播它在整条链路里的那一小段。
+  const ROLE_SCRIPTS = {
+    pm: () => [
+      { out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "“做个笔记应用”", at: "pm", act: "澄清需求与边界", dur2: 800, cnt: { review: 1 } }], cap: "项目经理：接收 NoteMark 需求。" },
+      { at: "pm", act: "写需求文档，选定链路", dur: 1200, cap: "写下需求文档，并挑出这条需求要走的那条链路。" },
+      { out: [{ from: "pm", to: "user", edge: "pm-u", label: "需求文档 + 链路待确认", at: "user", act: "确认", dur2: 1000, cnt: { dec: 1 } }], cap: "交给用户确认 —— 需求和链路都由人点头。" },
+      { out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "确认 ✓", at: "pm", act: "建需求，开始接力", dur2: 600, pill: "✓ 已确认" }] },
+      { out: [{ from: "pm", to: "s1", edge: "pm-s1", label: "按链路交出第一张卡", at: "s1", act: "需求评审卡", dur2: 800, cnt: { review: 1 } }], cap: "按链路把第一张卡片交给第一环的负责人。" },
+      { out: [{ from: "s1", to: "pm", edge: "pm-s1", rev: 1, label: "✗ back", at: "pm", act: "补写搜索范围", dur2: 1000, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "被退回：需求范围没写清，补上后重跑。" },
+      { out: [{ from: "s6", to: "pm", edge: "s6-pm", label: "验收汇报", at: "pm", act: "汇总验收材料", dur2: 900, cnt: { review: 1 } }], cap: "链路走到最后一环：项目经理解收汇报。" },
+      { out: [{ from: "pm", to: "user", edge: "pm-u", label: "你的验收卡", at: "user", act: "验收 NoteMark v1.0", dur2: 800, cnt: { dec: 1 } }], cap: "把验收卡交到你手上。" },
+    ],
+    s1: () => [
+      { out: [{ from: "pm", to: "s1", edge: "pm-s1", label: "需求评审卡", at: "s1", act: "评审需求", dur2: 1200, cnt: { review: 1 } }], cap: "需求评审：产品经理接卡片。" },
+      { out: [{ from: "s1", to: "pm", edge: "pm-s1", rev: 1, label: "✗ back", at: "pm", act: "补写搜索范围", dur2: 1000, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "需求范围没定义，退回给产出需求的那一环。" },
+      { out: [{ from: "pm", to: "s1", edge: "pm-s1", label: "重跑 · 需求评审", at: "s1", act: "复查 v2", dur2: 900, cnt: { review: 1 } }] },
+      { out: [{ from: "s1", to: "s2", edge: "s1-s2", label: "产品设计卡", at: "s2", act: "交给下一环", dur2: 800, cnt: { review: 1 } }], cap: "需求定稿，交给下一环 —— 下一环还是产品经理接。" },
+    ],
+    s2: () => [
+      { out: [{ from: "s1", to: "s2", edge: "s1-s2", label: "产品设计卡", at: "s2", act: "写《产品文档》·画三页原型", dur2: 1500, cnt: { review: 1 } }], cap: "产品设计：写文档与原型。" },
+      { out: [{ from: "s2", to: "user", edge: "s2-u", label: "ask_user：编辑器形态？", at: "user", act: "决策中", dur2: 1100, cnt: { dec: 1 } }], cap: "向用户提问：编辑器用分栏还是所见即所得？" },
+      { out: [{ from: "user", to: "s2", edge: "s2-u", rev: 1, label: "分栏预览", at: "s2", act: "按分栏方案改原型", dur2: 700 }], cap: "用户回答后被唤醒，改原型。" },
+      { out: [{ from: "s2", to: "s3", edge: "s2-s3", label: "测试用例卡", at: "s3", act: "交给测试工程师", dur2: 800, cnt: { review: 1 } }], cap: "交给测试工程师写用例。" },
+    ],
+    s3: () => [
+      { out: [{ from: "s2", to: "s3", edge: "s2-s3", label: "测试用例卡", at: "s3", act: "写用例：搜索 12·标签 9·CRUD 16", dur2: 1300, cnt: { review: 1 } }], cap: "测试工程师：为 NoteMark 写 38 条用例。" },
+      { out: [{ from: "user", to: "s3", edge: "s3-u", rev: 1, chat: 1, label: "记得测 1000 条的速度", at: "s3", act: "补性能用例", dur2: 700 }], cap: "用户留言：补上性能用例。留言不唤醒，下次工作才看到。" },
+      { out: [{ from: "s3", to: "s4", edge: "s3-s4", label: "实现卡", at: "s4", act: "交给全栈工程师", dur2: 900, cnt: { review: 1 } }], cap: "交给全栈工程师实现。" },
+    ],
+    s4: () => [
+      { out: [{ from: "s3", to: "s4", edge: "s3-s4", label: "实现卡", at: "s4", act: "读需求+设计+用例，改代码", dur2: 1400, cnt: { review: 1 } }], cap: "全栈工程师：接实现卡。" },
+      { at: "s4", act: "自测：跑通 38 条冒烟", dur: 1000, cap: "开发先自测；需要执行命令或改文件时，审批会送到你面前。" },
+      { out: [{ from: "s4", to: "s5", edge: "s4-s5", label: "提测 build 42", at: "s5", act: "提测", dur2: 900, cnt: { review: 1 } }] },
+      { out: [{ from: "s5", to: "s4", edge: "back-s5-s4", label: "✗ back · rerun", at: "s4", act: "修分词边界", dur2: 900, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "被测试环节退回：修分词边界后重跑实现。" },
+      { out: [{ from: "user", to: "s4", edge: "s4-u", rev: 1, chat: 1, label: "复现：搜「会」", at: "s4", act: "按步骤复现", dur2: 700 }], cap: "用户留言发来复现步骤。" },
+      { out: [{ from: "s6", to: "s4", edge: "back-s6-s4", label: "✗ back · rerun", at: "s4", act: "补齐重试预算的测试", dur2: 900, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "被评审员退回：重跑实现。" },
+    ],
+    s5: () => [
+      { out: [{ from: "s4", to: "s5", edge: "s4-s5", label: "提测 build 42", at: "s5", act: "逐条执行用例", dur2: 1100, cnt: { review: 1 } }], cap: "测试工程师：收提测，逐条执行。" },
+      { out: [{ from: "s5", to: "s4", edge: "back-s5-s4", label: "✗ back · rerun", at: "s4", act: "修分词边界", dur2: 900, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "bug#7：搜「会议」漏「会议纪要」。测试环节可以退回给产出它的那一环。" },
+      { out: [{ from: "s4", to: "s5", edge: "s4-s5", rev: 1, label: "修复 · build 43", at: "s5", act: "回归 + 性能用例", dur2: 900, cnt: { review: 1 } }], cap: "回归通过，1000 条搜索 80ms。" },
+      { out: [{ from: "s5", to: "s6", edge: "s5-s6", label: "代码评审卡", at: "s6", act: "交给评审员", dur2: 800, cnt: { review: 1 } }], cap: "全部通过，交给评审员。" },
+    ],
+    s6: () => [
+      { out: [{ from: "s5", to: "s6", edge: "s5-s6", label: "代码评审卡", at: "s6", act: "对照清单评审", dur2: 1100, cnt: { review: 1 } }], cap: "评审员：接代码评审卡，卡上自带检查清单。" },
+      { out: [{ from: "s6", to: "s4", edge: "back-s6-s4", label: "✗ back · rerun", at: "s4", act: "补齐重试预算的测试", dur2: 900, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "评审打回：只能回到产出这项工作的那一环。" },
+      { out: [{ from: "s4", to: "s6", edge: "s5-s6", rev: 1, label: "重跑 · 代码评审", at: "s6", act: "复查", dur2: 900, cnt: { review: 1 } }] },
+      { out: [{ from: "s6", to: "s5", edge: "back-s6-s5", label: "✗ back · return_to_me", at: "s5", act: "补一条回归用例", dur2: 800, cnt: { ret: 1 }, pill: "✗ 退回", flash: "bad" }], cap: "另一种退回：直接退回给测试环节，改完回到评审员这里。" },
+      { out: [{ from: "s6", to: "pm", edge: "s6-pm", label: "✓ done · 验收汇报", at: "pm", act: "放行，转项目经理验收", dur2: 700, pill: "✓ 通过" }], cap: "评审通过，交项目经理出验收汇报。" },
+    ],
+    user: () => [
+      { out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "“做个笔记应用”", at: "pm", act: "澄清需求", dur2: 700, cnt: { review: 1 } }], cap: "用户：提出 NoteMark —— 本地 Markdown 笔记应用。" },
+      { out: [{ from: "pm", to: "user", edge: "pm-u", label: "需求文档 + 链路待确认", at: "user", act: "确认需求与链路", dur2: 1100, cnt: { dec: 1 } }], cap: "项目经理提交需求文档和链路，等你确认。" },
+      { out: [{ from: "user", to: "pm", edge: "pm-u", rev: 1, label: "确认 ✓", at: "pm", act: "开工", dur2: 600, pill: "✓ 已确认" }] },
+      { out: [{ from: "s2", to: "user", edge: "s2-u", label: "ask_user：编辑器形态？", at: "user", act: "决策中", dur2: 1000, cnt: { dec: 1 } }], cap: "产品经理请用户拍板编辑器形态。" },
+      { out: [{ from: "user", to: "s2", edge: "s2-u", rev: 1, label: "分栏预览", at: "s2", act: "更新原型", dur2: 500 }] },
+      { out: [{ from: "user", to: "s3", edge: "s3-u", rev: 1, chat: 1, label: "记得测 1000 条的速度", at: "s3", act: "补性能用例", dur2: 600 }], cap: "用户留言提醒补性能用例（不唤醒）。" },
+      { out: [{ from: "user", to: "s4", edge: "s4-u", rev: 1, chat: 1, label: "复现：搜「会」", at: "s4", act: "对照复现", dur2: 600 }], cap: "用户留言发复现步骤给开发。" },
+      { out: [{ from: "pm", to: "user", edge: "pm-u", label: "你的验收卡", at: "user", act: "验收 NoteMark v1.0", dur2: 800, cnt: { dec: 1 } }], cap: "最终：项目经理的验收汇报变成你的卡片。" },
+    ],
+  };
+
+  // ───── 时钟与行程 ─────
+  let t = 0, gen = 0, trips = [], timers = [], prev = 0;
+  let speed = 1;
+  try { speed = parseFloat(localStorage.getItem("cobot-demo-speed")) || 1; } catch {}
+
+  const STALE = Symbol("stale");
+  const ease = k => k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+  /* 全局节奏：整轮跑完约 36 秒，慢到能读字幕，快到不让人等。 */
+  const PACE = 0.72;
+  const travel = (dot, e, rev, dur, g) => new Promise((res, rej) =>
+    trips.push({ dot, e, rev, t0: t, dur: still ? dur * .35 / speed : dur * PACE / speed, res, rej, g }));
+  const sleep = (ms, g) => new Promise((res, rej) => timers.push({ t0: t, dur: still ? ms * .5 / speed : ms * PACE / speed, res, rej, g }));
+
+  function mkDot(chat, rev, back) {
+    const c = document.createElementNS(NS, "circle");
+    const cls = back ? "pkt backdot" : chat ? "pkt chatdot" : rev ? "pkt rev" : "pkt";
+    c.setAttribute("r", chat ? 4 : 5); c.setAttribute("class", cls); c.setAttribute("cx", -30);
+    svg.appendChild(c); return c;
+  }
+
+  // ───── 布局：连线 / 进度环 / 标签 ─────
+  function rrect(x, y, w, h, r) {
+    return `M${x + r} ${y} h${w - 2 * r} a${r} ${r} 0 0 1 ${r} ${r} v${h - 2 * r} a${r} ${r} 0 0 1 ${-r} ${r} h${2 * r - w} a${r} ${r} 0 0 1 ${-r} ${-r} v${2 * r - h} a${r} ${r} 0 0 1 ${r} ${-r} Z`;
+  }
+  const box = el => { const s = stage.getBoundingClientRect(), b = el.getBoundingClientRect();
+    return { l: b.left - s.left, r: b.right - s.left, t: b.top - s.top, b: b.bottom - s.top,
+             cx: b.left + b.width / 2 - s.left, cy: b.top + b.height / 2 - s.top }; };
+
+  function layout() {
+    for (const id in nodes) {
+      const n = nodes[id]; n.rect = box(n.el);
+      if (!n.ring) {
+        n.ring = document.createElementNS(NS, "path"); n.ring.setAttribute("class", "ring");
+        svg.insertBefore(n.ring, svg.firstChild);
+      }
+      const p = n.rect, q = 3, R = 13;
+      n.ring.setAttribute("d", rrect(p.l - q, p.t - q, p.r - p.l + 2 * q, p.b - p.t + 2 * q, R + q));
+      n.ringLen = n.ring.getTotalLength();
+      n.ring.style.strokeDasharray = `0 ${n.ringLen}`;
+    }
+    for (const e of EDGES) {
+      const A = nodes[e.a].rect, B = nodes[e.b].rect;
+      let d;
+      if (e.back) {
+        // 退回：向左上方拱起的弧线，方向与「往前走」相反
+        const mx = (A.cx + B.cx) / 2;
+        const my = Math.min(A.t, B.t) - (e.lift || 48);
+        d = `M${A.cx} ${A.t} Q${mx} ${my} ${B.cx} ${B.t}`;
+      } else if (e.b === "user") {
+        const r = A, u = nodes.user.rect;
+        const ux = Math.max(u.l + 30, Math.min(r.cx, u.r - 30));
+        d = `M${r.cx} ${r.b} C${r.cx} ${r.b + 30} ${ux} ${u.t - 26} ${ux} ${u.t}`;
+      } else {
+        d = A.cx < B.cx ? `M${A.r} ${A.cy} L${B.l} ${B.cy}` : `M${A.l} ${A.cy} L${B.r} ${B.cy}`;
+      }
+      if (!e.path) {
+        e.path = document.createElementNS(NS, "path");
+        if (e.chat) e.path.classList.add("chat");
+        if (e.back) e.path.classList.add("back");
+        svg.insertBefore(e.path, svg.firstChild);
+        e.lab = document.createElement("span");
+        e.lab.className = "elabel" + (e.core ? " core" : "");
+        e.lab.textContent = e.label;
+        stage.appendChild(e.lab);
+      }
+      e.path.setAttribute("d", d);
+      const len = e.path.getTotalLength(), m = e.path.getPointAtLength(len / 2);
+      e.lab.style.left = m.x + "px"; e.lab.style.top = m.y + "px";
+    }
+  }
+
+  // ───── 处理过程 ─────
+  function process(id, text, dur, pill, g) {
+    const n = nodes[id];
+    n.pillText = pill || null;
+    if (n.chip) n.chip.textContent = "处理中";
+    return new Promise((res, rej) => {
+      n.em.textContent = text + "…";
+      n.card.classList.remove("bad"); n.card.classList.add("busy");
+      n.p = 0; n.pDur = still ? Math.max(dur * .4 / speed, 260) : dur * PACE / speed;
+      n.pRes = res; n.pRej = rej; n.pG = g;
+    });
+  }
+
+  function finishNode(n, pill) {
+    n.card.classList.remove("busy");
+    n.ring.classList.remove("show");
+    n.ring.style.strokeDasharray = `0 ${n.ringLen}`;
+    if (n.chip) n.chip.textContent = "空闲";
+    n.em.textContent = pill
+      ? (pill.startsWith("✗") ? pill.replace(/^✗\s*/, "") : pill.replace(/^✓\s*/, "") + " ✓")
+      : "";
+    if (pill) {
+      n.pill.textContent = pill; n.pill.classList.add("show");
+      setTimeout(() => n.pill.classList.remove("show"), 1400 / speed);
+      if (pill.startsWith("✗")) {
+        n.card.classList.add("bad");
+        setTimeout(() => n.card.classList.remove("bad"), 900 / speed);
+      }
+    } else {
+      setTimeout(() => { if (!n.card.classList.contains("busy")) n.em.textContent = ""; }, 900 / speed);
+    }
+  }
+
+  // ───── 统计 / 字幕 / 阶段 ─────
+  const stat = { review: 0, ret: 0, dec: 0 };
+  function bump(c) { if (!c) return; for (const k in c) stat[k] += c[k]; renderStats(); }
+  function renderStats() {
+    $("#s-review").textContent = stat.review;
+    $("#s-ret").textContent = stat.ret;
+    $("#s-dec").textContent = stat.dec;
+  }
+  function setStage(i) {
+    stagePills.forEach((p, k) => { p.classList.toggle("cur", k === i); p.classList.toggle("done", k < i); });
+    $("#s-stage").textContent = (i + 1) + "/" + stagePills.length;
+  }
+  function show(s) { cap.textContent = s; cap.classList.remove("in"); void cap.offsetWidth; cap.classList.add("in"); }
+
+  // ───── 步骤执行 ─────
+  async function send(o, g) {
+    if (g !== gen) throw STALE;
+    const via = o.via || [o.edge];
+    const chain = via.map(id => edges[id]);
+    tick(nodes[o.from].el);
+    const dot = mkDot(!!o.chat, !!o.rev, !!(chain[0] && chain[0].back));
+    chain.forEach(e => e.path.classList.add("on"));
+    if (o.label) e_labShow(chain[0]);
+    for (let i = 0; i < chain.length; i++) {
+      const e = chain[i];
+      const len = e.path.getTotalLength();
+      const dur = o.dur || Math.max(440, Math.min(880, len * 1.4));
+      const revSeg = !!o.rev && chain.length === 1 && i === 0;
+      await travel(dot, e, revSeg, dur, g);
+      if (g !== gen) throw STALE;
+      if (i < chain.length - 1) tick(nodes[e.b].el);
+    }
+    dot.remove();
+    tick(nodes[o.to].el);
+    if (o.at) await process(o.at, o.act, o.dur2 || 900, o.pill, g);
+    bump(o.cnt);
+    setTimeout(() => {
+      chain.forEach(e => e.path.classList.remove("on"));
+      e_labHide(chain[0]);
+    }, 600 / speed);
+  }
+  const e_labShow = e => { e.lab.classList.add("show"); };
+  const e_labHide = e => { e.lab.classList.remove("show"); };
+
+  async function runStep(st, g) {
+    if (g !== gen) throw STALE;
+    if (st.stage != null) setStage(st.stage);
+    if (st.cap) show(st.cap);
+    if (st.out) await Promise.all(st.out.map(o => send(o, g)));
+    if (st.at) await process(st.at, st.act, st.dur || 900, st.pill, g);
+    bump(st.cnt);
+  }
+
+  async function playLoop(build, g) {
+    while (g === gen) {
+      try {
+        /* 每一轮从零开始计数，并清掉上一轮留在卡片上的状态文字 */
+        stat.review = 0; stat.ret = 0; stat.dec = 0; renderStats();
+        for (const id in nodes) {
+          const n = nodes[id];
+          n.em.textContent = "";
+          n.pill.classList.remove("show");
+          n.card.classList.remove("busy", "bad");
+          n.p = 0; n.pRes = null;
+        }
+        for (const st of build()) {
+          if (g !== gen) return;
+          await runStep(st, g);
+        }
+        await sleep(4200, g);
+      } catch (err) {
+        if (err !== STALE) { window.__errs.push(String(err && err.message || err)); return; }
+        return;
+      }
+    }
+  }
+
+  const vignOn = () => $("#vig").checked;
+  const mainBuild = () => MAIN().filter(s => !s.vig || vignOn());
+
+  // ───── 聚焦模式 ─────
+  let focusRole = null;
+  function setFocus(role) {
+    focusRole = role;
+    if (!role) { delete stage.dataset.focus; }
+    else {
+      stage.dataset.focus = role;
+      for (const id in nodes) nodes[id].el.classList.toggle("hot", id === role);
+      for (const e of EDGES) {
+        const hot = e.a === role || e.b === role;
+        e.path.classList.toggle("hot", hot);
+        if (hot) e.lab.classList.add("show"); else e.lab.classList.remove("show");
+      }
+    }
+  }
+
+  function tick(el) { el.classList.remove("tick"); void el.offsetWidth; el.classList.add("tick"); }
+
+  // ───── 帧循环 ─────
+  function step(dt) {
+    t += dt;
+    const now = trips; trips = [];
+    for (const tr of now) {
+      if (tr.g !== gen) { try { tr.rej(STALE); } catch {} continue; }
+      const k = Math.min(1, (t - tr.t0) / tr.dur), e = ease(k);
+      if (tr.dot) {
+        const len = tr.e.path.getTotalLength();
+        const pt = tr.e.path.getPointAtLength((tr.rev ? 1 - e : e) * len);
+        tr.dot.setAttribute("cx", pt.x); tr.dot.setAttribute("cy", pt.y);
+      }
+      if (k >= 1) tr.res(); else trips.push(tr);
+    }
+    const nowT = timers; timers = [];
+    for (const tm of nowT) {
+      if (tm.g !== gen) { try { tm.rej(STALE); } catch {} continue; }
+      if (t - tm.t0 >= tm.dur) tm.res(); else timers.push(tm);
+    }
+    for (const id in nodes) {
+      const n = nodes[id];
+      if (!n.pRes) continue;
+      if (n.pG !== gen) { const r = n.pRej; n.pRes = null; try { r(STALE); } catch {} continue; }
+      n.p += dt;
+      const k = Math.min(1, n.p / n.pDur);
+      n.ring.classList.add("show");
+      n.ring.style.strokeDasharray = `${k * n.ringLen} ${n.ringLen}`;
+      if (k >= 1) { const res = n.pRes; n.pRes = null; finishNode(n, n.pillText); res(); }
+    }
+  }
+
+  // 时钟用 setInterval，而不是 rAF。
+  // rAF 在后台标签页和部分 WebView 宿主里会完全停摆，那样演示会永远停在第一幕；
+  // setInterval 最多被浏览器节流到每秒一次，不会停。
+  //
+  // 这里刻意不做可见性门控：IntersectionObserver 在部分宿主里会把「在视口内」
+  // 判成 false，document.hidden 又和真实可见性对不上，任何一个用错都会让演示卡住。
+  // 页面不可见时浏览器本来就会节流定时器，CPU 开销有限。
+  let lastT = 0;
+  function clock() {
+    const now = performance.now();
+    const dt = lastT ? Math.min(now - lastT, 250) : 0;
+    lastT = now;
+    step(dt);
+  }
+
+  // ───── 装配 ─────
+  for (const e of EDGES) edges[e.id] = e;
+  const speedInput = $("#speed"), speedVal = $("#speedVal");
+  const setSpeedUI = v => { speedInput.value = v; speedVal.textContent = (+v) + "×"; };
+  setSpeedUI(speed);
+  speedInput.addEventListener("input", () => {
+    speed = parseFloat(speedInput.value) || 1;
+    setSpeedUI(speed);
+    try { localStorage.setItem("cobot-demo-speed", String(speed)); } catch {}
+  });
+  for (const el of stage.querySelectorAll(".node")) {
+    const id = el.dataset.role;
+    nodes[id] = { el, card: el, em: el.querySelector("em"), pill: el.querySelector(".pill"),
+                  chip: el.querySelector(".chip"),
+                  p: 0, pRes: null, pillText: null };
+    el.addEventListener("click", () => {
+      gen++;
+      const next = focusRole === id ? null : id;
+      setFocus(next);
+      playLoop(next ? ROLE_SCRIPTS[next] : mainBuild, gen);
+    });
+  }
+
+  new ResizeObserver(() => layout()).observe(stage);
+  addEventListener("resize", layout);
+
+  layout();
+  requestAnimationFrame(() => layout());
+  setStage(0);
+  show("示例项目：用户提出「帮我做一个本地 Markdown 笔记应用 NoteMark，要标签和全文搜索」。看一张卡片如何被交接、被打回、重跑，最后落到你的验收卡。点击环节卡可聚焦。");
+  setInterval(clock, 16);
+  playLoop(mainBuild, gen);
+
+  // 调试钩子：宿主节流（rAF 停摆）时可用 __demo.step(ms) 手动泵时钟
+  window.__demo = { step, stats: () => ({ ...stat }) };
+})();
+</script>
+</body>
+</html>

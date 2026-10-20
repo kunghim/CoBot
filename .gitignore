@@ -89,5 +89,8 @@ Desktop.ini
 !/docs/development.md
 !/docs/ai-coding.md
 !/docs/dependencies.md
+!/docs/flow/
+!/docs/flow/README.md
+!/docs/flow/index.html
 !/docs/upgrading.md
 # END managed public file exceptions
