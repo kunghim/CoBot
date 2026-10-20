@@ -29,6 +29,11 @@
     --bg: #faf9f6; --bg2: #f1efe9; --card: #ffffff; --line: #e6e3db;
     --ink: #1d1c19; --ink2: #57544e; --ink3: #918d84;
   }
+  /* 深色外观。宿主页可以用 ?mode=dark|light 强制，跟着系统时由 JS 写入 data-mode。 */
+  :root[data-mode="dark"] {
+    --bg: #151412; --bg2: #1f1e1b; --card: #201e1b; --line: #302d29;
+    --ink: #f3f0e9; --ink2: #b5b1a7; --ink3: #8b857b;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
@@ -288,11 +293,28 @@
     document.body.classList.add("embed");
   }
 
+  /* 外观：宿主页可以用 ?mode= 强制；否则跟随系统 */
+  (function () {
+    var forced = new URLSearchParams(location.search).get("mode");
+    var root = document.documentElement;
+    var apply = function (mode) { root.setAttribute("data-mode", mode); };
+    if (forced === "light" || forced === "dark") {
+      apply(forced);
+    } else if (window.matchMedia) {
+      var q = window.matchMedia("(prefers-color-scheme: dark)");
+      apply(q.matches ? "dark" : "light");
+      if (q.addEventListener) q.addEventListener("change", function (e) { apply(e.matches ? "dark" : "light"); });
+      else if (q.addListener) q.addListener(function (e) { apply(e.matches ? "dark" : "light"); });
+    }
+  })();
+
   const $ = s => document.querySelector(s);
   const stage = $("#stage"), svg = $("#wires"), cap = $("#cap");
   const stagePills = [...$("#stages").children];
   const NS = "http://www.w3.org/2000/svg";
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* ?still=1 冻结在第一帧，用来截图或做静态插图 */
+  const frozen = new URLSearchParams(location.search).has("still");
 
   const nodes = {}, edges = {};
 
@@ -713,8 +735,10 @@
   requestAnimationFrame(() => layout());
   setStage(0);
   show("示例项目：用户提出「帮我做一个本地 Markdown 笔记应用 NoteMark，要标签和全文搜索」。看一张卡片如何被交接、被打回、重跑，最后落到你的验收卡。点击环节卡可聚焦。");
-  setInterval(clock, 16);
-  playLoop(mainBuild, gen);
+  if (!frozen) {
+    setInterval(clock, 16);
+    playLoop(mainBuild, gen);
+  }
 
   // 调试钩子：宿主节流（rAF 停摆）时可用 __demo.step(ms) 手动泵时钟
   window.__demo = { step, stats: () => ({ ...stat }) };
