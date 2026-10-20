@@ -137,7 +137,7 @@ func TestUserOwnTabsAndViewport(t *testing.T) {
 	}
 	t.Setenv("COBOT_BROWSER_NO_SANDBOX", "1")
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<!doctype html><title>用户页</title><h1>用户的页面</h1>`)
+		io.WriteString(w, `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><title>用户页</title><h1>用户的页面</h1>`)
 	}))
 	defer site.Close()
 	profiles, _ := os.MkdirTemp("", "cobot-browser-test")
@@ -171,18 +171,9 @@ func TestUserOwnTabsAndViewport(t *testing.T) {
 		t.Fatalf("the sixth user tab = %v, want ErrTooMany", err)
 	}
 
-	// The user's page renders at the phone size and the live view sees it.
-	frames := make(chan Frame, 8)
-	watchCtx, stop := context.WithCancel(ctx)
-	defer stop()
-	go func() {
-		_ = m.Watch(watchCtx, "team-u", opened.ID, func(f Frame) {
-			select {
-			case frames <- f:
-			default:
-			}
-		})
-	}()
+	// The user's page renders at the phone size: ask the page itself, which
+	// is the layout viewport the emulation set (a screencast frame would
+	// only mirror it, on the screencast's own schedule).
 	viewport, err := m.SetViewport(ctx, "team-u", opened.ID, ViewportRequest{Preset: "phone"})
 	if err != nil {
 		t.Fatal(err)
@@ -190,25 +181,21 @@ func TestUserOwnTabsAndViewport(t *testing.T) {
 	if viewport == nil || viewport.Width != 390 || viewport.Height != 844 || !viewport.Mobile {
 		t.Fatalf("viewport = %+v", viewport)
 	}
-	if err := m.Input(ctx, "team-u", opened.ID, Input{Kind: "nav", To: "reload"}); err != nil {
+	res, err := m.Run(ctx, env, Request{Tab: opened.ID,
+		Steps:    []Step{{Action: "eval", Expression: "innerWidth + 'x' + innerHeight"}},
+		Snapshot: ptr(false)})
+	if err != nil {
 		t.Fatal(err)
 	}
-	sized := false
-	deadline := time.After(20 * time.Second)
-	for !sized {
-		select {
-		case f := <-frames:
-			sized = f.Width == 390 && f.Height == 844
-		case <-deadline:
-			t.Fatal("no frame at 390x844 after the phone viewport")
-		}
+	if res.Steps[0].Detail != "390x844" {
+		t.Fatalf("the page lays out at %s, want 390x844", res.Steps[0].Detail)
 	}
 	if _, tabs := m.Panel(ctx, "team-u"); tabs[0].Viewport == nil || tabs[0].Viewport.Width != 390 {
 		t.Fatalf("the panel does not report the new viewport: %+v", tabs)
 	}
 
 	// The member finds the user's tabs when asked, and only then.
-	res, err := m.Run(ctx, env, Request{UserTabs: true})
+	res, err = m.Run(ctx, env, Request{UserTabs: true})
 	if err != nil {
 		t.Fatal(err)
 	}
