@@ -100,8 +100,16 @@ func toolGuide(role string) string {
 	} else {
 		b.WriteString("- ask_user({question, options?})：只用于只有用户能决定的问题，然后结束这一轮，用户的回答会送回给你。需求范围的变化不要用它，用 handoff 上报项目经理。\n")
 	}
+	if role != "leader" {
+		b.WriteString(browserGuide)
+	}
 	return b.String()
 }
+
+// browserGuide is the one line a member carries about the browser; the rules
+// themselves are returned by the tool on demand (browser.Guide).
+const browserGuide = `- browser({help?, url?, steps?, ...})：团队共用的真实浏览器，用来验证页面、核对界面、查资料。第一次用之前先调用 browser({help: true}) 读使用说明和安全规则（不读的话，第一次真实调用会先把说明返回给你，不执行动作）。
+`
 
 // threadInstructions is a member's developer instructions for a new thread,
 // with the digest of what they told it. The order goes from the most shared

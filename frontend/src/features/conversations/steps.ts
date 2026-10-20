@@ -28,7 +28,16 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
 }
 
 // CoBot's own collaboration tools, described as what the member did.
-const collaborationTools = new Set(['start_requirement', 'handoff', 'view_tasks', 'send_message', 'ask_user']);
+const collaborationTools = new Set(['start_requirement', 'handoff', 'view_tasks', 'send_message', 'ask_user', 'browser']);
+
+/** The address a browser call opens, when it is in one of its steps. */
+function browserTarget(steps: unknown): string {
+  if (!Array.isArray(steps)) return '';
+  for (const step of steps) {
+    if (step && typeof step === 'object' && typeof (step as { url?: unknown }).url === 'string') return (step as { url: string }).url;
+  }
+  return '';
+}
 
 // Codex sub-agent tools and activity kinds with their own wording; anything
 // newer reads as the generic sub-agent line instead of a raw key.
@@ -99,6 +108,7 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
             status: text(args.status),
             question: text(args.question),
             query: text(args.query),
+            url: text(args.url) || browserTarget(args.steps),
             tool,
           },
         };

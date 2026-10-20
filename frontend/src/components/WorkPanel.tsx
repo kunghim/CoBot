@@ -8,6 +8,7 @@ import { EmptyState, Icons, TabPanel, Tabs } from './ui';
 import { useTeams } from '../api/queries';
 import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
+import BrowserPanel from '../features/browser/BrowserPanel';
 import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
 import MemoryList from '../features/memories/MemoryList';
 import QuestionList from '../features/questions/QuestionList';
@@ -15,9 +16,9 @@ import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
 import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
 
-type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
+type TabId = 'tasks' | 'approvals' | 'activity' | 'memory' | 'browser';
 
-const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'memory'];
+const TABS: TabId[] = ['tasks', 'approvals', 'activity', 'memory', 'browser'];
 
 export default function WorkPanel() {
   const { t } = useTranslation();
@@ -63,6 +64,7 @@ export default function WorkPanel() {
         {context && tab === 'approvals' && <ApprovalHistoryList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} />}
         {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />}
         {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
+        {context && tab === 'browser' && <BrowserPanel key={context.team.id} teamId={context.team.id} bots={context.item.bots} />}
         </fieldset>
       </TabPanel>
     </div>
