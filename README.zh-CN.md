@@ -221,6 +221,10 @@ Wails v2 · HTTP JSON + SSE · MCP Go SDK。接口契约在 `api/openapi.yaml`�
 请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎使用中文或英文提交 Issue 和 PR；
 安全问题请参阅 [SECURITY.md](SECURITY.md)。
 
+共享工程规范与命令见[开发指南](docs/development.md)，编码智能体从 [AGENTS.md](AGENTS.md)
+进入并遵循 [AI coding 规范](docs/ai-coding.md)。第三方来源见[依赖说明](docs/dependencies.md)，
+安装、迁移影响与回滚限制见[升级说明](docs/upgrading.md)。
+
 ## 社区参与
 
 欢迎使用中文或英文，一份反馈即可，无需重复提交翻译，也无需加入额外聊天群。

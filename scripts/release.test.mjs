@@ -80,9 +80,25 @@ test('tampering or a checksum containing a different filename blocks a release',
 
 test('asset symlinks cannot expose files outside the staging directory', (t) => {
   const directory = fixture(t);
+  const outside = fixture(t);
   const name = expectedAssets(version)[0];
   unlinkSync(join(directory, name));
-  symlinkSync(join(directory, expectedAssets(version)[1]), join(directory, name));
+  try {
+    symlinkSync(join(outside, name), join(directory, name), 'file');
+  } catch (error) {
+    if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
+    t.skip('Windows file symlinks require Developer Mode or the symbolic-link privilege');
+    return;
+  }
+  assert.throws(() => verifyAssets(directory, version), /Invalid release file/);
+});
+
+test('asset directory links are rejected, including Windows junctions without elevation', (t) => {
+  const directory = fixture(t);
+  const outside = fixture(t);
+  const name = expectedAssets(version)[0];
+  unlinkSync(join(directory, name));
+  symlinkSync(outside, join(directory, name), process.platform === 'win32' ? 'junction' : 'dir');
   assert.throws(() => verifyAssets(directory, version), /Invalid release file/);
 });
 
