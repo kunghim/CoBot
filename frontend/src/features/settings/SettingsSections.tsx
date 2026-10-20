@@ -14,6 +14,7 @@ import {
   useStatus,
   useRoles,
   useSaveProvider,
+  useSessionLogout,
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
@@ -596,47 +597,71 @@ export function SecuritySection() {
   const { t, i18n } = useTranslation();
   const authorizations = useAuthorizations(true);
   const revoke = useRevokeAuthorization();
+  const signOut = useSessionLogout();
   const [revokeError, setRevokeError] = useState('');
+  const [signOutError, setSignOutError] = useState('');
   const items = authorizations.data?.items ?? [];
   return (
-    <Card title={t('settings.authorizations')} description={t('settings.authorizationsHint')}>
-      {authorizations.isPending && <Skeleton className="h-10 w-full" />}
-      {authorizations.isSuccess && items.length === 0 && (
-        <EmptyState icon={<Icons.permission size={20} aria-hidden />} title={t('settings.authorizationsEmpty')} />
-      )}
-      {authorizations.isSuccess && items.length > 0 && (
-        <List>
-          {items.map((item) => (
-            <ListRow
-              key={item.botId + item.engineEpoch}
-              title={<span className="font-mono text-xs">{item.botId.slice(0, 8)}</span>}
-              description={
-                <span className="font-mono">
-                  {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
-                </span>
-              }
-              trailing={
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => {
-                    setRevokeError('');
-                    revoke.mutate(item.botId, { onError: (error) => setRevokeError(apiErrorMessage(t, error)) });
-                  }}
-                >
-                  {t('settings.revoke')}
-                </Button>
-              }
-            />
-          ))}
-        </List>
-      )}
-      {revokeError && (
-        <div className="mt-3">
-          <Alert tone="danger">{revokeError}</Alert>
-        </div>
-      )}
-    </Card>
+    <div className="space-y-6">
+      <Card title={t('settings.authorizations')} description={t('settings.authorizationsHint')}>
+        {authorizations.isPending && <Skeleton className="h-10 w-full" />}
+        {authorizations.isSuccess && items.length === 0 && (
+          <EmptyState icon={<Icons.permission size={20} aria-hidden />} title={t('settings.authorizationsEmpty')} />
+        )}
+        {authorizations.isSuccess && items.length > 0 && (
+          <List>
+            {items.map((item) => (
+              <ListRow
+                key={item.botId + item.engineEpoch}
+                title={<span className="font-mono text-xs">{item.botId.slice(0, 8)}</span>}
+                description={
+                  <span className="font-mono">
+                    {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
+                  </span>
+                }
+                trailing={
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => {
+                      setRevokeError('');
+                      revoke.mutate(item.botId, { onError: (error) => setRevokeError(apiErrorMessage(t, error)) });
+                    }}
+                  >
+                    {t('settings.revoke')}
+                  </Button>
+                }
+              />
+            ))}
+          </List>
+        )}
+        {revokeError && (
+          <div className="mt-3">
+            <Alert tone="danger">{revokeError}</Alert>
+          </div>
+        )}
+      </Card>
+
+      {/* A shared machine keeps the session for days, so there has to be a
+          way to end it without closing the program. */}
+      <Card title={t('settings.sessionTitle')} description={t('settings.sessionHint')}>
+        <Button
+          variant="danger"
+          loading={signOut.isPending}
+          onClick={() => {
+            setSignOutError('');
+            signOut.mutate(undefined, { onError: (error) => setSignOutError(apiErrorMessage(t, error)) });
+          }}
+        >
+          {t('settings.signOut')}
+        </Button>
+        {signOutError && (
+          <div className="mt-3">
+            <Alert tone="danger">{signOutError}</Alert>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 

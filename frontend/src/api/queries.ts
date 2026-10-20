@@ -432,6 +432,17 @@ export function useEngineLogout() {
   });
 }
 
+/** POST /session/logout: ends the page session on the core. */
+export function useSessionLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.sessionLogout(),
+    onSuccess: () => {
+      void qc.clear();
+    },
+  });
+}
+
 /** POST /engine/check: re-runs the self-check, including native hook trust,
  * and replaces the cached engine projection with the fresh one. */
 export function useEngineCheck() {

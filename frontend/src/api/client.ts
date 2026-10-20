@@ -280,6 +280,15 @@ export const api = {
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
+  // sessionLogout ends this page's session on the core. The interface is told
+  // right away, so it shows the sign-in screen instead of waiting for the
+  // next request to come back unauthorized.
+  sessionLogout: async () => {
+    const result = await request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {});
+    clearBearer();
+    notifyUnauthorized();
+    return result;
+  },
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
   // Requirements, cards and questions.
