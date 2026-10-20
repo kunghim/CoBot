@@ -7,7 +7,8 @@ export function checkPrRoute(event) {
   if (!pr) throw new Error('Missing pull request metadata');
   if (pr.base.ref === 'dev') return;
   if (pr.base.ref === 'main' && pr.head.ref === 'dev' && pr.head.repo?.full_name?.toLowerCase() === pr.base.repo?.full_name?.toLowerCase() && pr.head.repo?.full_name) return;
-  throw new Error('Target dev for contributions. Only this repository\'s dev branch may target main. / 普通贡献请向 dev 提交；main 只接受本仓库 dev 的晋级 PR。');
+  if (pr.base.ref === 'main' && pr.user?.login === 'dependabot[bot]' && pr.head.repo?.full_name?.toLowerCase() === pr.base.repo?.full_name?.toLowerCase() && pr.head.repo?.full_name) return;
+  throw new Error('Target dev for contributions. Main accepts this repository\'s dev promotion and Dependabot security updates. / 普通贡献请向 dev 提交；main 只接受本仓库 dev 的晋级 PR 和 Dependabot 安全更新。');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
