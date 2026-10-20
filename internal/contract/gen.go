@@ -79,7 +79,7 @@ const (
 
 // Defines values for EngineLoginType.
 const (
-	Chatgpt EngineLoginType = "chatgpt"
+	EngineLoginTypeChatgpt EngineLoginType = "chatgpt"
 )
 
 // Defines values for EngineStatusStatus.
@@ -140,6 +140,49 @@ const (
 const (
 	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
 	MessagePreviewKindUser      MessagePreviewKind = "user"
+)
+
+// Defines values for ProviderAuthMode.
+const (
+	ProviderAuthModeApiKey  ProviderAuthMode = "api_key"
+	ProviderAuthModeChatgpt ProviderAuthMode = "chatgpt"
+)
+
+// Defines values for ProviderKind.
+const (
+	ProviderKindCustom   ProviderKind = "custom"
+	ProviderKindOfficial ProviderKind = "official"
+)
+
+// Defines values for ProviderEndpointDialect.
+const (
+	AnthropicMessages ProviderEndpointDialect = "anthropic-messages"
+	OpenaiResponses   ProviderEndpointDialect = "openai-responses"
+)
+
+// Defines values for ProviderModelStatus.
+const (
+	ProviderModelStatusFailed  ProviderModelStatus = "failed"
+	ProviderModelStatusOk      ProviderModelStatus = "ok"
+	ProviderModelStatusUnknown ProviderModelStatus = "unknown"
+)
+
+// Defines values for ProviderPresetAuthMode.
+const (
+	ProviderPresetAuthModeApiKey  ProviderPresetAuthMode = "api_key"
+	ProviderPresetAuthModeChatgpt ProviderPresetAuthMode = "chatgpt"
+)
+
+// Defines values for ProviderRequestAuthMode.
+const (
+	ProviderRequestAuthModeApiKey  ProviderRequestAuthMode = "api_key"
+	ProviderRequestAuthModeChatgpt ProviderRequestAuthMode = "chatgpt"
+)
+
+// Defines values for ProviderRequestKind.
+const (
+	ProviderRequestKindCustom   ProviderRequestKind = "custom"
+	ProviderRequestKindOfficial ProviderRequestKind = "official"
 )
 
 // Defines values for QuestionKind.
@@ -363,9 +406,9 @@ const (
 
 // Defines values for ListQuestionsParamsStatus.
 const (
-	ListQuestionsParamsStatusAnswered  ListQuestionsParamsStatus = "answered"
-	ListQuestionsParamsStatusCancelled ListQuestionsParamsStatus = "cancelled"
-	ListQuestionsParamsStatusOpen      ListQuestionsParamsStatus = "open"
+	Answered  ListQuestionsParamsStatus = "answered"
+	Cancelled ListQuestionsParamsStatus = "cancelled"
+	Open      ListQuestionsParamsStatus = "open"
 )
 
 // Defines values for PatchTeamJSONBodyPermissionMode.
@@ -698,6 +741,122 @@ type Model struct {
 		Effort      string `json:"effort"`
 	} `json:"reasoningEfforts,omitempty"`
 	Slug *string `json:"slug,omitempty"`
+}
+
+// Provider A model vendor or gateway the engine can call. The secret is never part of it.
+type Provider struct {
+	AuthMode      ProviderAuthMode   `json:"authMode"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	CredentialRef *string            `json:"credentialRef,omitempty"`
+	DefaultModel  *string            `json:"defaultModel,omitempty"`
+	Endpoints     []ProviderEndpoint `json:"endpoints"`
+
+	// HasCredential Whether a key is stored for this provider.
+	HasCredential *bool        `json:"hasCredential,omitempty"`
+	Id            string       `json:"id"`
+	Kind          ProviderKind `json:"kind"`
+
+	// Models The models the user kept, not the vendor's full catalogue.
+	Models   []ProviderModel `json:"models"`
+	Name     string          `json:"name"`
+	PresetId *string         `json:"presetId,omitempty"`
+
+	// Retries How often the engine may retry a request to this provider.
+	Retries   *ProviderRetries `json:"retries,omitempty"`
+	Revision  int64            `json:"revision"`
+	UpdatedAt time.Time        `json:"updatedAt"`
+}
+
+// ProviderAuthMode defines model for Provider.AuthMode.
+type ProviderAuthMode string
+
+// ProviderKind defines model for Provider.Kind.
+type ProviderKind string
+
+// ProviderEndpoint One wire dialect the provider offers.
+type ProviderEndpoint struct {
+	BaseUrl string                  `json:"baseUrl"`
+	Dialect ProviderEndpointDialect `json:"dialect"`
+}
+
+// ProviderEndpointDialect defines model for ProviderEndpoint.Dialect.
+type ProviderEndpointDialect string
+
+// ProviderModel defines model for ProviderModel.
+type ProviderModel struct {
+	ContextWindow *int    `json:"contextWindow,omitempty"`
+	DefaultEffort *string `json:"defaultEffort,omitempty"`
+	DisplayName   *string `json:"displayName,omitempty"`
+
+	// Failure Stable machine code of the last check.
+	Failure         *string   `json:"failure,omitempty"`
+	Id              string    `json:"id"`
+	InputModalities *[]string `json:"inputModalities,omitempty"`
+
+	// Message Human-readable detail of the last check.
+	Message          *string              `json:"message,omitempty"`
+	Status           *ProviderModelStatus `json:"status,omitempty"`
+	SupportedEfforts *[]string            `json:"supportedEfforts,omitempty"`
+}
+
+// ProviderModelStatus defines model for ProviderModel.Status.
+type ProviderModelStatus string
+
+// ProviderPreset One built-in vendor.
+type ProviderPreset struct {
+	AuthMode    ProviderPresetAuthMode `json:"authMode"`
+	Color       string                 `json:"color"`
+	Endpoints   []ProviderEndpoint     `json:"endpoints"`
+	Id          string                 `json:"id"`
+	KeyPatterns *[]string              `json:"keyPatterns,omitempty"`
+	KeyUrl      *string                `json:"keyUrl,omitempty"`
+
+	// Models Fallback catalogue, used when discovery fails.
+	Models   *[]ProviderModel `json:"models,omitempty"`
+	Name     string           `json:"name"`
+	Official bool             `json:"official"`
+	Short    string           `json:"short"`
+}
+
+// ProviderPresetAuthMode defines model for ProviderPreset.AuthMode.
+type ProviderPresetAuthMode string
+
+// ProviderProbeResult defines model for ProviderProbeResult.
+type ProviderProbeResult struct {
+	// Code Stable machine code
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Ok      bool    `json:"ok"`
+}
+
+// ProviderRequest defines model for ProviderRequest.
+type ProviderRequest struct {
+	// ApiKey Written straight to the encrypted credential store; never stored in the provider record and never returned.
+	ApiKey           *string                 `json:"apiKey,omitempty"`
+	AuthMode         ProviderRequestAuthMode `json:"authMode"`
+	DefaultModel     *string                 `json:"defaultModel,omitempty"`
+	Endpoints        []ProviderEndpoint      `json:"endpoints"`
+	ExpectedRevision *int64                  `json:"expectedRevision,omitempty"`
+	Id               string                  `json:"id"`
+	Kind             ProviderRequestKind     `json:"kind"`
+	Models           *[]ProviderModel        `json:"models,omitempty"`
+	Name             string                  `json:"name"`
+	PresetId         *string                 `json:"presetId,omitempty"`
+
+	// Retries How often the engine may retry a request to this provider.
+	Retries *ProviderRetries `json:"retries,omitempty"`
+}
+
+// ProviderRequestAuthMode defines model for ProviderRequest.AuthMode.
+type ProviderRequestAuthMode string
+
+// ProviderRequestKind defines model for ProviderRequest.Kind.
+type ProviderRequestKind string
+
+// ProviderRetries How often the engine may retry a request to this provider.
+type ProviderRetries struct {
+	Request *int `json:"request,omitempty"`
+	Stream  *int `json:"stream,omitempty"`
 }
 
 // Question defines model for Question.
@@ -1185,6 +1344,24 @@ type CancelMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// DetectProviderJSONBody defines parameters for DetectProvider.
+type DetectProviderJSONBody struct {
+	ApiKey string `json:"apiKey"`
+}
+
+// DiscoverProviderModelsJSONBody defines parameters for DiscoverProviderModels.
+type DiscoverProviderModelsJSONBody struct {
+	ApiKey  *string `json:"apiKey,omitempty"`
+	BaseUrl string  `json:"baseUrl"`
+}
+
+// ProbeProviderModelsJSONBody defines parameters for ProbeProviderModels.
+type ProbeProviderModelsJSONBody struct {
+	ApiKey   *string   `json:"apiKey,omitempty"`
+	BaseUrl  string    `json:"baseUrl"`
+	ModelIds *[]string `json:"modelIds,omitempty"`
+}
+
 // ListQuestionsParams defines parameters for ListQuestions.
 type ListQuestionsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1415,6 +1592,21 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// CreateProviderJSONRequestBody defines body for CreateProvider for application/json ContentType.
+type CreateProviderJSONRequestBody = ProviderRequest
+
+// DetectProviderJSONRequestBody defines body for DetectProvider for application/json ContentType.
+type DetectProviderJSONRequestBody DetectProviderJSONBody
+
+// DiscoverProviderModelsJSONRequestBody defines body for DiscoverProviderModels for application/json ContentType.
+type DiscoverProviderModelsJSONRequestBody DiscoverProviderModelsJSONBody
+
+// ProbeProviderModelsJSONRequestBody defines body for ProbeProviderModels for application/json ContentType.
+type ProbeProviderModelsJSONRequestBody ProbeProviderModelsJSONBody
+
+// UpdateProviderJSONRequestBody defines body for UpdateProvider for application/json ContentType.
+type UpdateProviderJSONRequestBody = ProviderRequest
 
 // AnswerQuestionJSONRequestBody defines body for AnswerQuestion for application/json ContentType.
 type AnswerQuestionJSONRequestBody = AnswerQuestionRequest

@@ -480,6 +480,276 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/providers:
+    get:
+      operationId: listProviders
+      security:
+        - SessionCookie: []
+      summary: Configured model providers
+      responses:
+        "200":
+          description: Providers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [providers]
+                        properties:
+                          providers:
+                            type: array
+                            items: { $ref: "#/components/schemas/Provider" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createProvider
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Add a model provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProviderRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Provider" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/providers/{id}:
+    get:
+      operationId: getProvider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      security:
+        - SessionCookie: []
+      summary: One model provider
+      responses:
+        "200":
+          description: Provider
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Provider" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateProvider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Change a model provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProviderRequest" }
+      responses:
+        "200":
+          description: Provider
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Provider" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteProvider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Remove a model provider
+      responses:
+        "200":
+          description: Removed
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/provider-presets:
+    get:
+      operationId: listProviderPresets
+      security:
+        - SessionCookie: []
+      summary: Built-in vendor catalogue
+      responses:
+        "200":
+          description: Presets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [presets]
+                        properties:
+                          presets:
+                            type: array
+                            items: { $ref: "#/components/schemas/ProviderPreset" }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/providers/detect:
+    post:
+      operationId: detectProvider
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Guess the vendor a pasted key belongs to
+      description: Matches the key against local patterns only; never calls the network. An unknown key returns an empty id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [apiKey]
+              properties:
+                apiKey: { type: string }
+      responses:
+        "200":
+          description: Detected preset id, empty when unknown
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [presetId]
+                        properties:
+                          presetId: { type: string }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/providers/discover:
+    post:
+      operationId: discoverProviderModels
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: List the models an endpoint offers
+      description: "Stateless: the endpoint and key the user just typed are used, so the models can be seen before the provider is stored."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseUrl]
+              properties:
+                baseUrl: { type: string }
+                apiKey: { type: string }
+      responses:
+        "200":
+          description: Model ids
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [models]
+                        properties:
+                          models:
+                            type: array
+                            items: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/providers/probe-models:
+    post:
+      operationId: probeProviderModels
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Check that models can run on an endpoint
+      description: One minimal request per model; a model that cannot run is reported with a stable failure code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseUrl]
+              properties:
+                baseUrl: { type: string }
+                apiKey: { type: string }
+                modelIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: Per-model results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [results]
+                        properties:
+                          results:
+                            type: object
+                            additionalProperties: { $ref: "#/components/schemas/ProviderProbeResult" }
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/session/logout:
     post:
       operationId: sessionLogout
@@ -2024,6 +2294,110 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    Provider:
+      type: object
+      description: A model vendor or gateway the engine can call. The secret is never part of it.
+      required: [id, name, kind, authMode, endpoints, models, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [official, custom] }
+        authMode: { type: string, enum: [chatgpt, api_key] }
+        credentialRef: { type: string }
+        endpoints:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderEndpoint" }
+        models:
+          type: array
+          description: The models the user kept, not the vendor's full catalogue.
+          items: { $ref: "#/components/schemas/ProviderModel" }
+        defaultModel: { type: string }
+        retries: { $ref: "#/components/schemas/ProviderRetries" }
+        presetId: { type: string }
+        revision: { type: integer, format: int64 }
+        hasCredential: { type: boolean, description: Whether a key is stored for this provider. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProviderEndpoint:
+      type: object
+      description: One wire dialect the provider offers.
+      required: [dialect, baseUrl]
+      properties:
+        dialect: { type: string, enum: [openai-responses, anthropic-messages] }
+        baseUrl: { type: string }
+    ProviderModel:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        contextWindow: { type: integer }
+        defaultEffort: { type: string }
+        supportedEfforts:
+          type: array
+          items: { type: string }
+        inputModalities:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [ok, failed, unknown] }
+        failure: { type: string, description: Stable machine code of the last check. }
+        message: { type: string, description: Human-readable detail of the last check. }
+    ProviderRetries:
+      type: object
+      description: How often the engine may retry a request to this provider.
+      properties:
+        request: { type: integer }
+        stream: { type: integer }
+    ProviderRequest:
+      type: object
+      required: [id, name, kind, authMode, endpoints]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [official, custom] }
+        authMode: { type: string, enum: [chatgpt, api_key] }
+        endpoints:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderEndpoint" }
+        models:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderModel" }
+        defaultModel: { type: string }
+        retries: { $ref: "#/components/schemas/ProviderRetries" }
+        presetId: { type: string }
+        apiKey:
+          type: string
+          description: Written straight to the encrypted credential store; never stored in the provider record and never returned.
+        expectedRevision: { type: integer, format: int64 }
+    ProviderPreset:
+      type: object
+      description: One built-in vendor.
+      required: [id, name, short, color, official, authMode, endpoints]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        short: { type: string }
+        color: { type: string }
+        keyUrl: { type: string }
+        official: { type: boolean }
+        authMode: { type: string, enum: [chatgpt, api_key] }
+        endpoints:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderEndpoint" }
+        models:
+          type: array
+          description: Fallback catalogue, used when discovery fails.
+          items: { $ref: "#/components/schemas/ProviderModel" }
+        keyPatterns:
+          type: array
+          items: { type: string }
+    ProviderProbeResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        code: { type: string, description: Stable machine code, e.g. quota or auth_invalid. }
+        message: { type: string }
     Task:
       type: object
       description: A card, one stage of a requirement's route held by one member.

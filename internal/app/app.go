@@ -22,6 +22,7 @@ import (
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 	"sync/atomic"
@@ -53,6 +54,9 @@ type App struct {
 	// CollaborationTokens is the bridge credential authority. Tokens are
 	// minted when a thread starts and are only valid for this core lifetime.
 	CollaborationTokens *auth.TokenStore
+	// Credentials stores the model providers' API keys, encrypted. Nil
+	// disables provider secrets; the rest of the product still works.
+	Credentials secrets.Store
 	// MCPBinary is the cobot executable the engine spawns as the bridge. It
 	// is the same binary the core runs from, resolved at startup.
 	MCPBinary string
@@ -79,6 +83,11 @@ type App struct {
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
+	// ProviderBinderFactory returns the engine that accepts model providers.
+	// It is separate from ControlFactory because the provider surface is
+	// optional: an engine that cannot take providers simply does not
+	// implement engine.ProviderBinder. Nil falls back to the control server.
+	ProviderBinderFactory func(ctx context.Context) (engine.ProviderBinder, error)
 
 	// Avatars is this profile's downloaded avatar catalog; nil serves an
 	// empty catalog and never downloads.

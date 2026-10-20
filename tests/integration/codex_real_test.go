@@ -49,7 +49,7 @@ func TestRealCodexHandshake(t *testing.T) {
 	server, err := codex.Start(context.Background(), codex.ServerOptions{
 		Binary: binary,
 		Cwd:    workdir,
-		Env:    codex.EngineEnv(paths),
+		Env:    codex.EngineEnv(paths, nil),
 		Client: codex.ClientInfo{Name: "cobot-smoke", Title: "CoBot R smoke", Version: "test"},
 		Callbacks: engine.Callbacks{
 			OnExit: func(err error) { exited <- err },

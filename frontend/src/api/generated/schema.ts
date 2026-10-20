@@ -277,6 +277,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Configured model providers */
+        get: operations["listProviders"];
+        put?: never;
+        /** Add a model provider */
+        post: operations["createProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One model provider */
+        get: operations["getProvider"];
+        put?: never;
+        post?: never;
+        /** Remove a model provider */
+        delete: operations["deleteProvider"];
+        options?: never;
+        head?: never;
+        /** Change a model provider */
+        patch: operations["updateProvider"];
+        trace?: never;
+    };
+    "/api/v1/provider-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Built-in vendor catalogue */
+        get: operations["listProviderPresets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Guess the vendor a pasted key belongs to
+         * @description Matches the key against local patterns only; never calls the network. An unknown key returns an empty id.
+         */
+        post: operations["detectProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List the models an endpoint offers
+         * @description Stateless: the endpoint and key the user just typed are used, so the models can be seen before the provider is stored.
+         */
+        post: operations["discoverProviderModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/probe-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check that models can run on an endpoint
+         * @description One minimal request per model; a model that cannot run is reported with a stable failure code.
+         */
+        post: operations["probeProviderModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/session/logout": {
         parameters: {
             query?: never;
@@ -958,6 +1072,93 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A model vendor or gateway the engine can call. The secret is never part of it. */
+        Provider: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "custom";
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            credentialRef?: string;
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            /** @description The models the user kept, not the vendor's full catalogue. */
+            models: components["schemas"]["ProviderModel"][];
+            defaultModel?: string;
+            retries?: components["schemas"]["ProviderRetries"];
+            presetId?: string;
+            /** Format: int64 */
+            revision: number;
+            /** @description Whether a key is stored for this provider. */
+            hasCredential?: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description One wire dialect the provider offers. */
+        ProviderEndpoint: {
+            /** @enum {string} */
+            dialect: "openai-responses" | "anthropic-messages";
+            baseUrl: string;
+        };
+        ProviderModel: {
+            id: string;
+            displayName?: string;
+            contextWindow?: number;
+            defaultEffort?: string;
+            supportedEfforts?: string[];
+            inputModalities?: string[];
+            /** @enum {string} */
+            status?: "ok" | "failed" | "unknown";
+            /** @description Stable machine code of the last check. */
+            failure?: string;
+            /** @description Human-readable detail of the last check. */
+            message?: string;
+        };
+        /** @description How often the engine may retry a request to this provider. */
+        ProviderRetries: {
+            request?: number;
+            stream?: number;
+        };
+        ProviderRequest: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "custom";
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            models?: components["schemas"]["ProviderModel"][];
+            defaultModel?: string;
+            retries?: components["schemas"]["ProviderRetries"];
+            presetId?: string;
+            /** @description Written straight to the encrypted credential store; never stored in the provider record and never returned. */
+            apiKey?: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+        };
+        /** @description One built-in vendor. */
+        ProviderPreset: {
+            id: string;
+            name: string;
+            short: string;
+            color: string;
+            keyUrl?: string;
+            official: boolean;
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            /** @description Fallback catalogue, used when discovery fails. */
+            models?: components["schemas"]["ProviderModel"][];
+            keyPatterns?: string[];
+        };
+        ProviderProbeResult: {
+            ok: boolean;
+            /** @description Stable machine code */
+            code?: string;
+            message?: string;
+        };
         /** @description A card, one stage of a requirement's route held by one member. */
         Task: {
             id: string;
@@ -1986,6 +2187,264 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             503: components["responses"]["Error"];
+        };
+    };
+    listProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Providers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            providers: components["schemas"]["Provider"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updateProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listProviderPresets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Presets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            presets: components["schemas"]["ProviderPreset"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    detectProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    apiKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Detected preset id, empty when unknown */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            presetId: string;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    discoverProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    baseUrl: string;
+                    apiKey?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Model ids */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            models: string[];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+        };
+    };
+    probeProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    baseUrl: string;
+                    apiKey?: string;
+                    modelIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Per-model results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            results: {
+                                [key: string]: components["schemas"]["ProviderProbeResult"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
         };
     };
     sessionLogout: {
