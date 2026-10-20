@@ -50,6 +50,7 @@ import {
   PanelRightOpen,
   Palette,
   Pencil,
+  Plug,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -90,6 +91,7 @@ export const Icons = {
   general: SlidersHorizontal,
   engine: Cpu,
   model: Box,
+  provider: Plug,
   // Actions
   add: Plus,
   edit: Pencil,
@@ -158,7 +160,7 @@ export type IconName = keyof typeof Icons;
 
 /** What each icon means, for the gallery. */
 export const iconMeaning: Record<IconName, string> = {
-  home: '首页', settings: '设置', team: '团队', member: '成员', leader: '队长', tasks: '任务', approvals: '审批', activity: '动态', memory: '记忆', inbox: '待处理', roles: '角色', appearance: '外观', general: '通用设置', engine: '引擎（Codex）', model: '模型',
+  home: '首页', settings: '设置', team: '团队', member: '成员', leader: '队长', tasks: '任务', approvals: '审批', activity: '动态', memory: '记忆', inbox: '待处理', roles: '角色', appearance: '外观', general: '通用设置', engine: '引擎（Codex）', model: '模型', provider: '模型供应商、外部网关',
   add: '新建、添加', edit: '编辑、重命名', delete: '删除', archive: '归档', restore: '恢复', copy: '复制', search: '搜索', filter: '筛选', more: '更多操作', close: '关闭', back: '返回', send: '发送消息', sendMessage: '发给成员', stop: '停止', refresh: '刷新、检查更新', retry: '重试', upload: '上传、选图', download: '下载', openFolder: '打开目录', openExternal: '在外部打开', view: '查看',
   panelLeftOpen: '展开左栏', panelLeftClose: '收起左栏', panelRightOpen: '展开右栏', panelRightClose: '收起右栏', minimize: '最小化', maximize: '最大化',
   expand: '展开', collapse: '收起', previous: '上一个', next: '下一个',

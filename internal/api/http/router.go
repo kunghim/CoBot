@@ -73,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/providers/{id}", s.handleGetProvider)
 	mux.HandleFunc("PATCH /api/v1/providers/{id}", s.handleUpdateProvider)
 	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
+	mux.HandleFunc("POST /api/v1/providers/{id}/probe", s.handleReprobeProvider)
 	mux.HandleFunc("GET /api/v1/provider-presets", s.handleProviderPresets)
 	mux.HandleFunc("POST /api/v1/providers/detect", s.handleDetectProvider)
 	mux.HandleFunc("POST /api/v1/providers/discover", s.handleDiscoverProviderModels)

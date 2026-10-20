@@ -1,7 +1,7 @@
 // Gallery: feedback, data display and page structure.
 import { useState } from 'react';
 import { Inbox, Plus } from 'lucide-react';
-import { Accordion, Alert, Badge, Button, Card, CodeBlock, CopyButton, Count, DescriptionList, Divider, EmptyState, Kbd, List, ListRow, PageHeader, PanelHeader, PanelToggle, ProgressBar, ProgressRing, Section, Skeleton, Spinner, Stat, StatusDot, Table, Tag, Toolbar, useToast } from '../components/ui';
+import { Accordion, Alert, Badge, Button, Card, CodeBlock, CopyButton, Count, DescriptionList, Divider, EmptyState, Kbd, List, ListRow, LogoTile, PageHeader, PanelHeader, PanelToggle, ProgressBar, ProgressRing, Section, Skeleton, Spinner, Stat, StatusDot, Table, Tag, Toolbar, useToast } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 interface UsageRow {
@@ -91,6 +91,28 @@ export default function FeedbackData() {
               { label: '小号，不显示数字', node: <ProgressRing value={45} label="上下文已用" size={16} showValue={false} /> },
             ]}
           />
+        </Demo>
+      </Doc>
+
+      <Doc id="logo-tile" name="LogoTile 字母块" file="components/ui/Display.tsx" use="一行最前面的小色块，说明这一行属于谁（模型供应商、外部网关）。颜色由来源自己带来，不跟主题走，所以每个模式下都认得出；没有颜色时用中性色。">
+        <Demo surface="raised">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="flex items-center gap-2 text-sm">
+              <LogoTile mark="DS" color="#4D6BFE" /> DeepSeek
+            </span>
+            <span className="flex items-center gap-2 text-sm">
+              <LogoTile mark="GLM" color="#3859FF" /> 智谱 GLM
+            </span>
+            <span className="flex items-center gap-2 text-sm">
+              <LogoTile mark="MM" color="#F43F5E" /> MiniMax
+            </span>
+            <span className="flex items-center gap-2 text-sm">
+              <LogoTile mark="公司" /> 自建网关
+            </span>
+            <span className="flex items-center gap-2 text-sm">
+              <LogoTile mark="OA" color="#10A37F" size="sm" /> 小号
+            </span>
+          </div>
         </Demo>
       </Doc>
 

@@ -1,7 +1,7 @@
 // Gallery: actions and form controls.
 import { useState } from 'react';
 import { ChevronDown, Filter, FolderOpen, Moon, Monitor, Plus, Save, Sun, Trash2 } from 'lucide-react';
-import { Button, ButtonGroup, Checkbox, CheckboxCards, Combobox, Field, Fieldset, FileDrop, IconButton, Icons, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle, iconMeaning, shownState } from '../components/ui';
+import { Badge, Button, ButtonGroup, Checkbox, CheckboxCards, Chip, Combobox, Field, Fieldset, FileDrop, IconButton, Icons, NumberInput, RadioCards, RadioGroup, SearchInput, SegmentedControl, Select, Slider, Switch, TextInput, Textarea, Toggle, iconMeaning, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 export default function Actions() {
@@ -20,6 +20,7 @@ export default function Actions() {
   const [notes, setNotes] = useState('');
   const [file, setFile] = useState('');
   const [language, setLanguage] = useState('zh-CN');
+  const [chips, setChips] = useState<ReadonlySet<string>>(() => new Set(['kimi-k3']));
 
   return (
     <Chapter id="actions" title="操作与表单" intro="按钮触发动作；表单控件改变一个值。设置类的控件改了就生效（保存成功用 Toast 告知），对话框里的表单点按钮才提交。">
@@ -259,6 +260,34 @@ export default function Actions() {
               ]}
             />
             <Toggle pressed={toggle} onChange={setToggle} icon={Filter}>只看进行中</Toggle>
+          </div>
+        </Demo>
+      </Doc>
+
+      <Doc id="chip" name="Chip 小片" file="components/ui/Choice.tsx" use="从很多里挑几个，摆成一行（供应商的可用模型、筛选项）。选中的有勾，不只靠颜色区分；末尾可以挂一个 Badge 说明状态。ID、路径一类机器值用 mono。" avoid="只有一个选项时用 Toggle；一行里只点一下就走的用 Button。">
+        <Demo surface="raised">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6'].map((id) => (
+                <Chip
+                  key={id}
+                  mono
+                  pressed={chips.has(id)}
+                  onClick={() =>
+                    setChips((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    })
+                  }
+                  trailing={id === 'kimi-k2.6' ? <Badge tone="danger">不可用</Badge> : undefined}
+                >
+                  {id}
+                </Chip>
+              ))}
+            </div>
+            <p className="text-xs text-neutral-500">已选 {chips.size} / 3</p>
           </div>
         </Demo>
       </Doc>

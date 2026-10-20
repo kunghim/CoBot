@@ -2,7 +2,11 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -232,5 +236,133 @@ func TestDetectProviderFromKeyNeverGuesses(t *testing.T) {
 	}
 	if got := DetectProviderFromKey(""); got != "" {
 		t.Fatalf("an empty key was guessed: %q", got)
+	}
+}
+
+// probeGateway answers like a provider: 200 for a good model, 402 for one
+// that cannot be paid for.
+func probeGateway(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var payload struct {
+			Model string `json:"model"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		w.Header().Set("Content-Type", "application/json")
+		if payload.Model == "broke" {
+			w.WriteHeader(http.StatusPaymentRequired)
+			_, _ = w.Write([]byte(`{"error":{"code":"insufficient_quota","message":"余额不足"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestProbeProviderRecordsTheOutcomeOnTheStoredModels(t *testing.T) {
+	ctx := context.Background()
+	gateway := probeGateway(t)
+	a := providerTestApp(t, &fakeBinder{})
+
+	p := testProvider()
+	p.Endpoints = []domain.ProviderEndpoint{
+		{Dialect: domain.DialectOpenAIResponses, BaseURL: gateway.URL},
+	}
+	p.Models = []domain.ProviderModel{{ID: "good"}, {ID: "broke"}}
+	if _, err := a.SaveProvider(ctx, p, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := a.ProbeProvider(ctx, "cobot_deepseek")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("probed %d models, want 2", len(results))
+	}
+	if !results["good"].OK {
+		t.Fatalf("the working model was reported as broken: %+v", results["good"])
+	}
+	if results["broke"].OK || results["broke"].Code != "quota" {
+		t.Fatalf("the unpaid model was not reported as such: %+v", results["broke"])
+	}
+
+	// The outcome belongs to the stored models: a model that cannot run is
+	// kept and marked, not dropped.
+	stored, err := a.GetProvider(ctx, "cobot_deepseek")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.Models) != 2 {
+		t.Fatalf("a model was dropped: %+v", stored.Models)
+	}
+	byID := map[string]domain.ProviderModel{}
+	for _, m := range stored.Models {
+		byID[m.ID] = m
+	}
+	if byID["good"].Status != domain.ModelStatusOK {
+		t.Fatalf("the working model is marked %q", byID["good"].Status)
+	}
+	if byID["broke"].Status != domain.ModelStatusFailed || byID["broke"].Failure != "quota" {
+		t.Fatalf("the broken model is marked %+v", byID["broke"])
+	}
+}
+
+func TestProbeProviderRefusesAProviderWithNoOpenAIEndpoint(t *testing.T) {
+	ctx := context.Background()
+	a := providerTestApp(t, &fakeBinder{})
+
+	p := testProvider()
+	p.Endpoints = []domain.ProviderEndpoint{
+		{Dialect: domain.DialectAnthropicMessages, BaseURL: "https://api.deepseek.com/anthropic"},
+	}
+	if _, err := a.SaveProvider(ctx, p, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.ProbeProvider(ctx, "cobot_deepseek"); err == nil {
+		t.Fatal("a provider that cannot be probed was probed anyway")
+	}
+}
+
+// A provider that names a catalogue vendor by its id keeps the catalogue
+// reference even when the caller left it out: without it the interface loses
+// the vendor's mark and its localised name.
+func TestSaveProviderKeepsTheCatalogueReference(t *testing.T) {
+	ctx := context.Background()
+	a := providerTestApp(t, &fakeBinder{})
+
+	p := testProvider()
+	p.ID = "deepseek"
+	p.PresetID = ""
+	if _, err := a.SaveProvider(ctx, p, 0); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := a.GetProvider(ctx, "deepseek")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.PresetID != "deepseek" {
+		t.Fatalf("the catalogue reference is %q, want %q", stored.PresetID, "deepseek")
+	}
+}
+
+// A gateway of the user's own keeps no catalogue reference.
+func TestSaveProviderLeavesACustomProviderWithoutOne(t *testing.T) {
+	ctx := context.Background()
+	a := providerTestApp(t, &fakeBinder{})
+
+	p := testProvider()
+	p.ID = "cobot_gateway"
+	if _, err := a.SaveProvider(ctx, p, 0); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := a.GetProvider(ctx, "cobot_gateway")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.PresetID != "" {
+		t.Fatalf("a custom provider was given the catalogue reference %q", stored.PresetID)
 	}
 }

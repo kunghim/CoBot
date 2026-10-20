@@ -143,6 +143,18 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 	if principal.Kind != auth.KindUser {
 		return domain.Settings{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// The selected provider must exist: a dangling id would leave the
+	// profile pointing at nothing.
+	if patch.DefaultProvider != nil && *patch.DefaultProvider != "" {
+		if _, err := sqlite.GetProvider(ctx, a.DB, *patch.DefaultProvider); err != nil {
+			if errors.Is(err, sqlite.ErrNotFound) {
+				return domain.Settings{}, domain.InvalidRequest("error.provider.not_found", map[string]any{
+					"id": *patch.DefaultProvider,
+				})
+			}
+			return domain.Settings{}, sqlite.NormalizeError(err)
+		}
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Settings{}, err

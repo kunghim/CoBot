@@ -998,17 +998,20 @@ type SessionStats struct {
 
 // Settings defines model for Settings.
 type Settings struct {
-	BudgetScope       SettingsBudgetScope `json:"budgetScope"`
-	BudgetTokens      int64               `json:"budgetTokens"`
-	ChainLimit        int                 `json:"chainLimit"`
-	ColorMode         SettingsColorMode   `json:"colorMode"`
-	DefaultModel      string              `json:"defaultModel"`
-	EnginePath        string              `json:"enginePath"`
-	Language          SettingsLanguage    `json:"language"`
-	MemberLimit       int                 `json:"memberLimit"`
-	ReviewRejectLimit int                 `json:"reviewRejectLimit"`
-	Revision          int64               `json:"revision"`
-	Theme             SettingsTheme       `json:"theme"`
+	BudgetScope  SettingsBudgetScope `json:"budgetScope"`
+	BudgetTokens int64               `json:"budgetTokens"`
+	ChainLimit   int                 `json:"chainLimit"`
+	ColorMode    SettingsColorMode   `json:"colorMode"`
+	DefaultModel string              `json:"defaultModel"`
+
+	// DefaultProvider The model provider the profile runs with; empty means the engine's own.
+	DefaultProvider   *string          `json:"defaultProvider,omitempty"`
+	EnginePath        string           `json:"enginePath"`
+	Language          SettingsLanguage `json:"language"`
+	MemberLimit       int              `json:"memberLimit"`
+	ReviewRejectLimit int              `json:"reviewRejectLimit"`
+	Revision          int64            `json:"revision"`
+	Theme             SettingsTheme    `json:"theme"`
 }
 
 // SettingsBudgetScope defines model for Settings.BudgetScope.
@@ -1025,16 +1028,19 @@ type SettingsTheme string
 
 // SettingsPatch defines model for SettingsPatch.
 type SettingsPatch struct {
-	BudgetScope       *SettingsPatchBudgetScope `json:"budgetScope,omitempty"`
-	BudgetTokens      *int64                    `json:"budgetTokens,omitempty"`
-	ChainLimit        *int                      `json:"chainLimit,omitempty"`
-	ColorMode         *SettingsPatchColorMode   `json:"colorMode,omitempty"`
-	DefaultModel      *string                   `json:"defaultModel,omitempty"`
-	EnginePath        *string                   `json:"enginePath,omitempty"`
-	Language          *SettingsPatchLanguage    `json:"language,omitempty"`
-	MemberLimit       *int                      `json:"memberLimit,omitempty"`
-	ReviewRejectLimit *int                      `json:"reviewRejectLimit,omitempty"`
-	Theme             *SettingsPatchTheme       `json:"theme,omitempty"`
+	BudgetScope  *SettingsPatchBudgetScope `json:"budgetScope,omitempty"`
+	BudgetTokens *int64                    `json:"budgetTokens,omitempty"`
+	ChainLimit   *int                      `json:"chainLimit,omitempty"`
+	ColorMode    *SettingsPatchColorMode   `json:"colorMode,omitempty"`
+	DefaultModel *string                   `json:"defaultModel,omitempty"`
+
+	// DefaultProvider The model provider to run with; must name a configured provider.
+	DefaultProvider   *string                `json:"defaultProvider,omitempty"`
+	EnginePath        *string                `json:"enginePath,omitempty"`
+	Language          *SettingsPatchLanguage `json:"language,omitempty"`
+	MemberLimit       *int                   `json:"memberLimit,omitempty"`
+	ReviewRejectLimit *int                   `json:"reviewRejectLimit,omitempty"`
+	Theme             *SettingsPatchTheme    `json:"theme,omitempty"`
 }
 
 // SettingsPatchBudgetScope defines model for SettingsPatch.BudgetScope.

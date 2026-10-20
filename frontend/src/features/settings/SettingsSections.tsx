@@ -620,3 +620,8 @@ export function RolesSection() {
     </Card>
   );
 }
+
+// The model providers live in their own feature folder: they need the
+// vendor catalogue and the add/edit dialog, which the rest of the settings
+// does not.
+export { default as ProviderSection } from '../providers/ProviderSection';

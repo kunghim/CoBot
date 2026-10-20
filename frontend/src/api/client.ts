@@ -164,6 +164,26 @@ export const api = {
       ...(expectedRevision !== undefined ? { expectedRevision } : {}),
     }),
   getSnapshot: () => request<import('./types').Snapshot>('GET', '/api/v1/snapshot'),
+  listProviders: () => request<import('./types').ProviderListResult>('GET', '/api/v1/providers'),
+  listProviderPresets: () => request<import('./types').ProviderPresetListResult>('GET', '/api/v1/provider-presets'),
+  getProvider: (id: string) => request<import('./types').Provider>('GET', `/api/v1/providers/${id}`),
+  createProvider: (body: import('./types').ProviderRequest) =>
+    request<import('./types').Provider>('POST', '/api/v1/providers', body),
+  updateProvider: (id: string, body: import('./types').ProviderRequest) =>
+    request<import('./types').Provider>('PATCH', `/api/v1/providers/${id}`, body),
+  deleteProvider: (id: string) => request<{ deleted: boolean }>('DELETE', `/api/v1/providers/${id}`),
+  reprobeProvider: (id: string) =>
+    request<import('./types').ProviderProbeResults>('POST', `/api/v1/providers/${id}/probe`),
+  detectProvider: (apiKey: string) =>
+    request<{ presetId: string }>('POST', '/api/v1/providers/detect', { apiKey }),
+  discoverProviderModels: (baseUrl: string, apiKey?: string) =>
+    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', { baseUrl, ...(apiKey ? { apiKey } : {}) }),
+  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string) =>
+    request<import('./types').ProviderProbeResults>('POST', '/api/v1/providers/probe-models', {
+      baseUrl,
+      modelIds,
+      ...(apiKey ? { apiKey } : {}),
+    }),
   exchangeBootstrap: async (secret: string) => {
     const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string; csrfCookieName: string }>(
       'POST',

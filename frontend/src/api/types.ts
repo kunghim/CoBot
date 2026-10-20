@@ -33,6 +33,42 @@ export interface EngineStatus {
 
 export type EngineLogin = components['schemas']['EngineLogin'];
 
+// ---------------------------------------------------------------------------
+// Model providers
+// ---------------------------------------------------------------------------
+
+/** A model vendor or gateway the engine can call. */
+export type Provider = components['schemas']['Provider'];
+export type ProviderEndpoint = components['schemas']['ProviderEndpoint'];
+export type ProviderModel = components['schemas']['ProviderModel'];
+export type ProviderRetries = components['schemas']['ProviderRetries'];
+export type ProviderRequest = components['schemas']['ProviderRequest'];
+export type ProviderPreset = components['schemas']['ProviderPreset'];
+export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
+
+/** The dialects an engine can speak. */
+export type ProviderDialect = 'openai-responses' | 'anthropic-messages';
+
+/** GET /providers */
+export interface ProviderListResult {
+  providers: Provider[];
+}
+
+/** GET /provider-presets */
+export interface ProviderPresetListResult {
+  presets: ProviderPreset[];
+}
+
+/** POST /providers/probe-models */
+export interface ProviderProbeResults {
+  results: Record<string, ProviderProbeResult>;
+}
+
+/** POST /providers/discover */
+export interface ProviderDiscoverResult {
+  models: string[];
+}
+
 export interface EngineModel {
   slug?: string;
   id?: string;

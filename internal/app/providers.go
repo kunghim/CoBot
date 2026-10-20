@@ -9,6 +9,7 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
+	"github.com/kunghim/CoBot/internal/provider"
 	"github.com/kunghim/CoBot/internal/providers/presets"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -69,6 +70,14 @@ func (a *App) SaveProvider(ctx context.Context, p domain.Provider, expectedRevis
 	// requires one for every key-carrying provider.
 	if p.CredentialRef == "" && p.AuthMode == domain.ProviderAuthAPIKey {
 		p.CredentialRef = providerCredentialRef(p.ID)
+	}
+	// A provider built from the catalogue keeps its catalogue reference even
+	// when the caller named the vendor by its id alone. Without it the
+	// interface loses the vendor's mark and its localised name.
+	if p.PresetID == "" {
+		if _, ok := presets.ByID(p.ID); ok {
+			p.PresetID = p.ID
+		}
 	}
 	if err := p.Validate(); err != nil {
 		return ProviderView{}, err
@@ -140,6 +149,62 @@ func (a *App) ProviderEnv(ctx context.Context) (map[string]string, error) {
 		env[codex.ProviderEnvKey(p.ID)] = string(secret)
 	}
 	return env, nil
+}
+
+// ProbeProvider checks a stored provider's models again and records the
+// result. The key is read from the credential store: the user never sees it
+// again, so a provider can be re-checked long after it was set up.
+func (a *App) ProbeProvider(ctx context.Context, id string) (map[string]provider.Result, error) {
+	p, err := sqlite.GetProvider(ctx, a.DB, id)
+	if err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+	// The check speaks the OpenAI dialect, which is the one the current
+	// engine uses; a provider that offers no such endpoint cannot be
+	// checked with it.
+	ep, ok := p.EndpointFor(domain.DialectOpenAIResponses)
+	if !ok {
+		return nil, domain.InvalidRequest("error.provider.no_probe_endpoint", map[string]any{
+			"dialect": domain.DialectOpenAIResponses,
+		})
+	}
+	ids := make([]string, 0, len(p.Models))
+	for _, m := range p.Models {
+		ids = append(ids, m.ID)
+	}
+	if len(ids) == 0 {
+		return map[string]provider.Result{}, nil
+	}
+	key := ""
+	if p.CredentialRef != "" && a.Credentials != nil {
+		secret, err := a.Credentials.Get(ctx, p.CredentialRef)
+		if err != nil && !errors.Is(err, secrets.ErrNotFound) {
+			return nil, domain.Internal(err)
+		}
+		if err == nil {
+			key = string(secret)
+		}
+	}
+	results := provider.New().Probe(ctx, ep.BaseURL, key, ids)
+
+	// The outcome belongs to the stored models: a model that cannot run is
+	// kept and marked, not dropped.
+	updated := append([]domain.ProviderModel(nil), p.Models...)
+	for i := range updated {
+		if res, ok := results[updated[i].ID]; ok {
+			updated[i].Status = domain.ModelStatusOK
+			if !res.OK {
+				updated[i].Status = domain.ModelStatusFailed
+			}
+			updated[i].Failure = res.Code
+			updated[i].Message = res.Message
+		}
+	}
+	p.Models = updated
+	if _, err := sqlite.UpsertProvider(ctx, a.DB, p, p.Revision); err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+	return results, nil
 }
 
 // bindProvider hands a provider to the engine.

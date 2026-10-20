@@ -27,6 +27,28 @@ export function List({ children, label }: { children: ReactNode; label?: string 
   return <ul aria-label={label} className="divide-y divide-neutral-200 dark:divide-neutral-800">{children}</ul>;
 }
 
+/**
+ * A small tile with a mark on it: who something belongs to (a model vendor,
+ * a gateway). The colour comes from the source and not from the theme, so
+ * the tile keeps its identity in every mode; the mark is white on it
+ * because the source colour is the vendor's own, not the signal colour.
+ */
+export function LogoTile({ mark, color, size = 'md' }: { mark: string; color?: string; size?: 'sm' | 'md' }) {
+  return (
+    <span
+      aria-hidden
+      className={cx(
+        'inline-flex shrink-0 items-center justify-center font-semibold uppercase leading-none text-white',
+        size === 'sm' ? 'h-6 w-6 rounded-lg text-[10px]' : 'h-7 w-7 rounded-[9px] text-[11px]',
+        !color && 'bg-neutral-400',
+      )}
+      style={color ? { background: color } : undefined}
+    >
+      {mark}
+    </span>
+  );
+}
+
 /** One row: a leading visual, a title and detail, and trailing actions. */
 export function ListRow({ leading, title, description, trailing, onClick, selected = false }: { leading?: ReactNode; title: ReactNode; description?: ReactNode; trailing?: ReactNode; onClick?: () => void; selected?: boolean }) {
   const body = (

@@ -314,6 +314,26 @@ export interface paths {
         patch: operations["updateProvider"];
         trace?: never;
     };
+    "/api/v1/providers/{id}/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a stored provider's models again
+         * @description The key is read from the encrypted credential store, so the user never has to paste it twice. The outcome is recorded on the stored models.
+         */
+        post: operations["reprobeProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/provider-presets": {
         parameters: {
             query?: never;
@@ -1483,6 +1503,8 @@ export interface components {
             /** @enum {string} */
             theme: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel: string;
+            /** @description The model provider the profile runs with; empty means the engine's own. */
+            defaultProvider?: string;
             memberLimit: number;
             chainLimit: number;
             reviewRejectLimit: number;
@@ -1500,6 +1522,8 @@ export interface components {
             /** @enum {string} */
             theme?: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel?: string;
+            /** @description The model provider to run with; must name a configured provider. */
+            defaultProvider?: string;
             memberLimit?: number;
             chainLimit?: number;
             reviewRejectLimit?: number;
@@ -2321,6 +2345,36 @@ export interface operations {
             401: components["responses"]["Error"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    reprobeProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-model results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            results: {
+                                [key: string]: components["schemas"]["ProviderProbeResult"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     listProviderPresets: {

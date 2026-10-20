@@ -207,3 +207,17 @@ func (s *Server) handleProbeProviderModels(w http.ResponseWriter, r *http.Reques
 	results := provider.New().Probe(r.Context(), req.BaseURL, req.APIKey, req.ModelIDs)
 	writeData(w, r, http.StatusOK, map[string]any{"results": results})
 }
+
+// handleReprobeProvider checks a stored provider's models again. The key
+// comes from the credential store, so the user never has to paste it twice.
+func (s *Server) handleReprobeProvider(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireUser(w, r); !ok {
+		return
+	}
+	results, err := s.App.ProbeProvider(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"results": results})
+}
