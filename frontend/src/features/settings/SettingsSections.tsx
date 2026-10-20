@@ -9,13 +9,15 @@ import {
   useEngineLoginCancel,
   useEngineLogout,
   useEngineModels,
+  useProviders,
   useRevokeAuthorization,
   useStatus,
   useRoles,
+  useSaveProvider,
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
-import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
+import type { EngineModel, ProviderRequest, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
 import {
@@ -34,6 +36,7 @@ import {
   Select,
   Skeleton,
   StatusDot,
+  useToast,
   type Tone,
 } from '../../components/ui';
 import { desktopBridge } from '../../platform/native-bridge';
@@ -429,11 +432,21 @@ export function EngineSection() {
 export function ModelsSection({ settings, save, errors }: SectionProps) {
   const { t } = useTranslation();
   const engine = useEngine();
+  const providers = useProviders();
   const models = useEngineModels(engine.data?.status === 'ready');
+  const saveProvider = useSaveProvider();
+  const toast = useToast();
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
   useEffect(() => setDefaultModel(settings.defaultModel), [settings.defaultModel]);
 
-  if (engine.data && engine.data.status !== 'ready') {
+  // The provider the profile runs with decides which models exist. The
+  // engine's own list belongs to the engine's own vendor, and a third-party
+  // gateway never has those models; the official provider is the engine's
+  // own account, so it keeps the engine's list.
+  const provider = providers.data?.providers.find((entry) => entry.id === settings.defaultProvider);
+  const gateway = provider && provider.authMode !== 'chatgpt' ? provider : null;
+
+  if (!gateway && engine.data && engine.data.status !== 'ready') {
     return (
       <Card>
         <EmptyState icon={<Icons.engine size={20} aria-hidden />} title={t('settings.modelsNeedEngine')} />
@@ -441,27 +454,69 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
     );
   }
 
-  const options = (current: string): EngineModel[] => {
-    const list = models.data?.models ?? [];
-    const known = new Set(list.map((entry) => entry.slug ?? entry.id ?? ''));
-    if (current !== '' && !known.has(current)) return [{ slug: current, displayName: current }, ...list];
-    return list;
-  };
+  const options: { value: string; label: string }[] = gateway
+    ? gateway.models.map((model) => ({
+        value: model.id,
+        label:
+          model.status === 'failed'
+            ? `${model.displayName || model.id} · ${t('settings.modelUnavailable')}`
+            : model.displayName || model.id,
+      }))
+    : (models.data?.models ?? []).flatMap((model: EngineModel) => {
+        const id = model.slug ?? model.id ?? '';
+        return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
+      });
+
+  // The value the profile runs with: a gateway's own default model, or the
+  // profile's own setting. A gateway without a default falls back to its
+  // first model, the same way the core picks the model for a turn, so the
+  // picker shows what a turn will really ask for.
+  const value = gateway ? (gateway.defaultModel ?? gateway.models[0]?.id ?? '') : defaultModel;
+  if (value !== '' && !options.some((option) => option.value === value)) {
+    options.unshift({ value, label: value });
+  }
 
   return (
     <Card>
       <div className="max-w-sm">
-        <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} error={errors.defaultModel}>
+        <Field
+          label={t('settings.defaultModel')}
+          hint={gateway ? t('settings.defaultModelProviderHint', { provider: gateway.name }) : t('settings.defaultModelHint')}
+          error={errors.defaultModel}
+        >
           <Select
-            value={defaultModel}
+            value={value}
             options={[
-              { value: '', label: t('settings.modelUnset') },
-              ...options(defaultModel).flatMap((model) => {
-                const id = model.slug ?? model.id ?? '';
-                return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
-              }),
+              { value: '', label: t(gateway ? 'settings.modelUnsetProvider' : 'settings.modelUnset') },
+              ...options,
             ]}
             onChange={(next) => {
+              if (gateway) {
+                // The provider's own default model is what a turn asks for;
+                // the profile's setting is only the fallback for a profile
+                // that runs with no provider.
+                const body: ProviderRequest = {
+                  id: gateway.id,
+                  name: gateway.name,
+                  kind: gateway.kind,
+                  authMode: gateway.authMode,
+                  endpoints: gateway.endpoints,
+                  models: gateway.models,
+                  defaultModel: next,
+                  retries: gateway.retries,
+                  presetId: gateway.presetId,
+                  expectedRevision: gateway.revision,
+                };
+                saveProvider.mutate(
+                  { id: gateway.id, body },
+                  {
+                    onError: (error) => {
+                      toast.show({ tone: 'danger', title: t('settings.saveFailed'), description: apiErrorMessage(t, error) });
+                    },
+                  },
+                );
+                return;
+              }
               setDefaultModel(next);
               save('defaultModel', { defaultModel: next }, (persisted) => setDefaultModel(persisted.defaultModel));
             }}
