@@ -127,10 +127,13 @@ func runServe(args []string, version string) int {
 		var already *platform.ErrAlreadyRunning
 		if errors.As(err, &already) {
 			fmt.Fprintf(os.Stderr, "CoBot is already running for profile %s\n  endpoint: %s\n  (pid %d owns this profile; a second scheduler is never started)\n", env, already.Endpoint, already.PID)
+			// The plain address is enough — the page issues itself a session
+			// as it loads. The one-time link stays available for a browser
+			// that has to be authorized the old way.
 			if link := mintLinkForRunningInstance(env, *dataRoot); link != "" {
-				fmt.Printf("  fresh web link (one-time, 60s): %s\n", link)
-				launchBrowser(link, *noOpen)
+				fmt.Printf("  one-time link (60s): %s\n", link)
 			}
+			launchBrowser(already.Endpoint, *noOpen)
 			return 3
 		}
 		fmt.Fprintf(os.Stderr, "failed to start core: %v\n", err)
@@ -141,10 +144,15 @@ func runServe(args []string, version string) int {
 	fmt.Printf("  profile:   %s\n", env)
 	fmt.Printf("  endpoint:  %s\n", core.Endpoint)
 	fmt.Printf("  data root: %s\n", core.Paths.Root)
+	// The browser is sent to the plain address. The core issues the page a
+	// session as it loads, so this address keeps working: it stays the same
+	// across restarts and can be bookmarked. The one-time link is printed
+	// for the cases that still need it — another browser, another profile.
 	link := core.Endpoint + "/#cobot-bootstrap=" + core.StartupBootstrap
-	fmt.Printf("  web link:  %s\n", link)
-	fmt.Println("  (the link is one-time and expires in 60 seconds; a second `cobot serve` mints a fresh one)")
-	launchBrowser(link, *noOpen)
+	fmt.Printf("  web link:  %s\n", core.Endpoint)
+	fmt.Printf("  one-time:  %s\n", link)
+	fmt.Println("  (the one-time link expires in 60 seconds; the address above does not)")
+	launchBrowser(core.Endpoint, *noOpen)
 
 	select {
 	case <-ctx.Done():
