@@ -2,8 +2,10 @@
 
 CoBot is a local multi-agent application with one Go core shared by Web
 and desktop. Keep changes small, observable, and suitable for future use
-cases beyond coding. This guide is the public development entry point;
-maintainers' local design notes and AI instructions are not prerequisites.
+cases beyond coding. This guide covers contribution and community policy.
+See the [development guide](docs/development.md) for engineering rules and
+[AGENTS.md](AGENTS.md) for the shared coding-agent entry point. Private notes
+and personal instructions are not prerequisites.
 
 ## Issues, pull requests and releases
 
@@ -48,8 +50,8 @@ A merged PR is not a promise of an immediate
 release. Repository write access is not required to propose a change.
 
 Keep `main` as the default stable branch. Only this repository's `dev`
-branch may open a promotion PR into `main`. Squash topic PRs into `dev`;
-use a merge commit for `dev -> main` so repeated promotions retain shared
+branch may open a promotion PR into `main`. Use a merge commit for
+`dev -> main` so repeated promotions retain shared
 ancestry. Retain both long-lived branches and delete only finished topic
 branches. After promotion, bring `main` back into `dev` before the next
 promotion. Do not require a second approving account while there is only
@@ -220,132 +222,29 @@ MSI/ZIP 与 Apple Silicon DMG 构建和结构校验，生成含校验文件、�
 GitHub 构建；随后下载草稿中的同一批产物，补充安装、首次打开和必要的真实 Codex
 验收记录，再由维护者发布。账号登录和签名凭据不进入流水线。
 
-## Working locally
+## Development and validation
 
-Use Go 1.25.12+ (the `go.mod` minimum), Node.js 24+, and npm 11+. Install frontend dependencies with
-`npm ci --prefix frontend`. Run `scripts/dev.ps1` on Windows or
-`scripts/dev.sh` on macOS/Linux. Use the development profile or an explicit
-temporary data root; never test with a production database or everyday
-Codex credentials. Do not disable native sandboxing, approvals, or hook
-trust to make a test pass.
+Follow the [development guide](docs/development.md) for environment setup,
+architecture, commands, runtime and data boundaries, API generation,
+migrations, translations and validation. It also documents the native
+lease hook and manual trust review. Keep engineering instructions there
+so they do not diverge between contribution and development guides.
 
-API contract changes originate in `api/openapi.yaml`. Regenerate with
-`scripts/generate.ps1` or `scripts/generate.sh`, and include the generated
-Go/TypeScript changes in the same commit. Keep application behavior in
-`internal/app`; HTTP handlers, native shells, and MCP bridges should remain
-adapters. Persist business facts and their replay records atomically. Keep
-model operations outside SQL transactions.
+See [dependencies and notices](docs/dependencies.md) for third-party sources
+and [upgrading](docs/upgrading.md) for package updates, data migration and rollback.
 
-Provide both Chinese and English UI text in `frontend/src/i18n/locales`.
-Use message keys for errors and accessible names for icon buttons. Do not
-embed technical diagnostics in normal product flows unless users need
-them to make a decision.
+Coding agents enter through [AGENTS.md](AGENTS.md) and follow the
+[AI coding workflow](docs/ai-coding.md). Human contributors remain
+responsible for AI-assisted changes and their verification.
 
-## Runtime, upgrades and the native hook
+Private documentation belongs in the ignored checkout-root `.local/`
+directory. Its optional `.local/README.md` can index personal environment
+notes, drafts and discussions. It may be empty or absent; public development
+must not depend on it. Shared project requirements belong in committed docs.
 
-The service binds to loopback. Development defaults to `~/.cobot-dev` and
-production to `~/.cobot`. Tests must use an explicit temporary `--data-root`.
-Each team selects a working directory, visible to every member; its `.cobot`
-directory holds local interaction resources. CoBot does not automatically
-commit project files or implement a Git execution engine.
-
-Before upgrading, stop the service normally and preserve its entire data
-root. Startup runs embedded forward SQL migrations and backs up an existing
-database before migrating. Restore a stopped, matching database/profile
-backup to roll back; do not run an old binary on a newer schema. Do not copy
-only the main SQLite file while WAL writers are active.
-
-At startup CoBot locates Codex on `PATH`, requires at least the verified
-version (`MinSupportedVersion`), and reports the result in Settings, which
-only displays it. The settings API still accepts `enginePath`; tests use it
-to point at a fake engine, and the UI does not expose it.
-
-The minimum Codex version is platform-specific: macOS uses 0.146.0 after an
-ARM64 native smoke test covering sign-in, model turns, task delivery, file tools,
-command approval/rejection and restart; Windows and Linux retain the 0.161.0
-baseline. This is a compatibility floor, not full acceptance of every platform.
-
-Codex skips hooks that are untrusted or have changed. CoBot registers its
-native lease hook only in its private Codex environment and then records
-trust itself through the app-server (`hooks/list`, then `config/batchWrite`
-of `hooks.state.<key>.trusted_hash`), the same record `/hooks` writes. It
-does so only when the private `hooks.json` is byte-for-byte the guard CoBot
-generated and matches its ownership record, and only for that one entry:
-project hooks in team directories, managed hooks and edited files are never
-trusted automatically. Upgrades re-trust the new definition the same way.
-Settings shows whether the hook is authorized and offers a retry. The hook
-matches only shell commands and file patches (`Bash|apply_patch`), and
-coverage is limited to native paths that actually invoke it; hooks do not revoke
-commands already running or provide complete isolation.
-
-If automatic trust is refused (for example because the private hooks file
-was edited), you can still review it manually: finish any running work,
-start Codex against CoBot's private environment and type `/hooks`. Check
-that the command points to your CoBot helper and current data root before
-trusting it. Never use flags that bypass trust. The example sets the
-variables for this shell only and restores them afterwards; replace both
-paths with your own absolute paths.
-
-```powershell
-$cobotRoot = 'C:\your\cobot-data-root'
-$teamDirectory = 'C:\your\team-directory'
-$previousCodexHome = $env:CODEX_HOME
-$previousCodexSQLiteHome = $env:CODEX_SQLITE_HOME
-try {
-    $env:CODEX_HOME = Join-Path $cobotRoot 'engines/codex/home'
-    $env:CODEX_SQLITE_HOME = Join-Path $cobotRoot 'engines/codex/sqlite'
-    # On Windows the hook command calls cobot directly when the paths need no quoting,
-    # otherwise it is a base64 -EncodedCommand; decode it to inspect, do not run it.
-    $hooks = Get-Content (Join-Path $env:CODEX_HOME 'hooks.json') -Raw | ConvertFrom-Json
-    $command = $hooks.hooks.PreToolUse[0].hooks[0].command
-    if ($command -match '-EncodedCommand (\S+)$') {
-        [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
-    } else { $command }
-    codex --no-daemon --no-alt-screen --cd $teamDirectory
-    # Inside Codex, type /hooks, review, then exit.
-} finally {
-    $env:CODEX_HOME = $previousCodexHome
-    $env:CODEX_SQLITE_HOME = $previousCodexSQLiteHome
-}
-```
-
-On macOS, set the same two variables in a subshell and run
-`codex --no-daemon --cd "$teamDirectory"`. `--no-daemon` avoids a socket path
-length limit with long private paths; it does not change sandboxing or hook
-trust. This CLI session is only for reviewing configuration: tool turns not
-dispatched by CoBot have no host binding and are refused by the guard.
-Re-review after an upgrade changes the helper path.
-
-## Validation
-
-Run `scripts/check.ps1` or `scripts/check.sh`: gofmt, contract drift,
-frontend build/types/tests, Go vet/build, and unit/integration tests. On Windows,
-`scripts/check.ps1 -Desktop` also compiles the native shell. These checks
-do not prove macOS installation or native runtime behavior.
-
-Browser regression tests (10 Playwright spec files under `tests/e2e/specs`)
-use the real core with a fake engine. Global setup builds the frontend,
-`cobot` and the fake Codex host into `.tmp/bin` and starts a core on a
-throwaway data root under `.tmp/test-runs`, so frontend dependencies must
-already be installed:
-
-```sh
-cd tests/e2e
-npm ci
-npx playwright install chromium
-npx playwright test
-```
-
-If Chrome is already installed, `COBOT_E2E_CHANNEL=chrome npx playwright test`
-uses that browser without downloading another one. Record the channel and version
-with results; CI defaults to Playwright's pinned Chromium.
-
-Install browser system dependencies only where appropriate for your
-machine or CI environment. Real Codex acceptance is an explicit separate
-test: it requires an isolated profile, official login, and an available
-account quota. Record versions, exact scope, observed facts, failures, and
-untested portions. Do not describe a mock, standalone adapter invocation,
-or model's unverified claim as real engine acceptance.
+中文说明：工程规范、开发命令与验证要求见[开发指南](docs/development.md)，
+智能体统一从 [AGENTS.md](AGENTS.md) 进入。私人文档统一放在不提交的 `.local/`，
+其 README 可以为空或不存在，不影响正常开发；共同遵守的要求应写入公共规范。
 
 ## Changes and reports
 
@@ -435,14 +334,8 @@ final merge decision; passing CI does not automatically approve or merge a PR.
 There is no additional mandatory approval-count gate while one maintainer runs
 the project. Issue claim commands do not operate on PRs.
 
-| Merge route | Method |
-| --- | --- |
-| Topic branch into `dev` | Squash and merge: one PR becomes one commit |
-| `dev` into `main` | Merge commit: retain shared history between long-lived branches |
-
-Squashing a topic PR combines its individual development commits; they do not
-all appear separately on the mainline. This applies to new PRs and does not
-rewrite existing published history. Start the next task on a new topic branch.
+Promote `dev` into `main` with a merge commit so the long-lived branches keep
+their shared history. Start the next task on a new topic branch.
 After promotion, synchronize `main` back into `dev` without rewriting history,
 using a fast-forward when possible. Keep both long-lived branches; only remove
 a finished topic branch after confirming its work is integrated and it is no
@@ -467,9 +360,9 @@ Issue 来源标识。只有升级后用户或调用方需要调整用法的实�
 
 未完成用 Draft，完成后请求审查。CI 通过、重要审查意见解决后，由维护者决定合并；
 追加提交后重新核对差异与当前检查。暂不增加强制审批人数，也不自动批准或合并。
-普通 PR 默认 Squash 成一条提交，开发中的各条 commit 不逐条进入主线；`dev` 晋级
-`main` 使用 Merge commit。这不改写既有历史。晋级后将 `main` 同步回 `dev`，有条件
-时快进；确认无 worktree 或其他任务继续使用后再清理已完成的功能分支。
+`dev` 晋级 `main` 使用 Merge commit，以保留长期分支的共同历史。晋级后将 `main`
+同步回 `dev`，有条件时快进；确认无 worktree 或其他任务继续使用后再清理已完成的
+功能分支。
 
 普通 PR 用 `Refs #编号` 关联，合入 `dev` 先说明进展，真正解决的问题在晋级 `main`
 时再关闭。合并不等于发布，新版本和发布时间仍另行决定。
