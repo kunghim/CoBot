@@ -27,9 +27,9 @@ function isWide(): boolean {
 
 export function ShellProvider({ children, titleBar = false }: { children: ReactNode; titleBar?: boolean }) {
   const [narrow, setNarrow] = useState(() => !isWide());
-  // A wide window starts with the list open; a narrow one with the
-  // conversation, so the first load shows what the user came for.
-  const [listOpen, setListOpenState] = useState(isWide);
+  // The list starts open at every width: on a narrow window it is the only
+  // side beside the conversation, and folding it is one click away.
+  const [listOpen, setListOpenState] = useState(true);
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia(WIDE);

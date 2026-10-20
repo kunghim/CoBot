@@ -491,7 +491,7 @@
       "memberBusy": "正在操作",
       "memberHint": "你也可以直接点击、输入，不会打断他",
       "userOwn": "你打开的",
-      "userHint": "你打开的 · 成员需要时可以查看",
+      "userHint": "成员需要时可以查看",
       "closed": "页面已关闭",
       "closeClosed": "关闭这个标签页",
       "viewport": "视口大小",

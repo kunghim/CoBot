@@ -217,6 +217,8 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
 
   const memberName = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
   const isUser = page?.owner === 'user';
+  // "In use" is a member working; the user's own page is never busy.
+  const busy = !isUser && (page?.busy ?? false);
   const statusLabel = isUser
     ? t('workspace.browser.userOwn')
     : t('workspace.browser.memberTab', { name: memberName(page?.memberId ?? '') });
@@ -267,9 +269,9 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
       </div>
       <div className="flex items-center gap-2 px-0.5">
         <p className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-2xs text-neutral-500 dark:text-neutral-400">
-          {page?.busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />}
+          {busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />}
           <span className="truncate font-medium text-neutral-700 dark:text-neutral-300">{statusLabel}</span>
-          {page?.busy && <span className="shrink-0 rounded bg-emerald-100 px-1 py-px text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{t('workspace.browser.memberBusy')}</span>}
+          {busy && <span className="shrink-0 rounded bg-emerald-100 px-1 py-px text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{t('workspace.browser.memberBusy')}</span>}
           <span className="truncate">· {statusHint}</span>
         </p>
         <span className="shrink-0 font-mono text-2xs tabular-nums text-neutral-500 dark:text-neutral-400">

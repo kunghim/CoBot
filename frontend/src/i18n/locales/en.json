@@ -493,7 +493,7 @@
       "memberBusy": "In use",
       "memberHint": "Click and type as you like; it will not interrupt them",
       "userOwn": "Yours",
-      "userHint": "Yours · a member can use it when needed",
+      "userHint": "a member can use it when needed",
       "closed": "The page was closed",
       "closeClosed": "Close this tab",
       "viewport": "Viewport size",
