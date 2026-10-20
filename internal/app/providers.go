@@ -232,28 +232,46 @@ func (a *App) unbindProvider(ctx context.Context, id string) error {
 	return binder.UnbindProvider(ctx, id)
 }
 
-// ResolveModel returns the model a turn should use.
+// ThreadProvider returns the provider a thread should run with, and the model
+// that belongs to it.
 //
-// The provider the profile runs with has the first say: its own default
-// model is the one the user picked for that vendor. The engine's own
-// default model belongs to a vendor the profile may no longer be using, and
-// asking for it against a third-party gateway is how a turn ends in a 400
-// about a model that vendor never had.
+// The engine refuses a provider id it does not know — "Model provider `x` not
+// found" is a hard error, not a fallback — so an id is only handed over when
+// it names a provider that is actually configured. The official provider is
+// never named: it is the engine's own account, and the engine would have to
+// know a third-party id for it.
 //
-// Without a provider the profile's own setting decides, and an empty answer
-// lets the engine choose.
-func (a *App) ResolveModel(ctx context.Context) (string, error) {
+// The model comes from the same place. The provider's own default model is
+// the one the user picked for that vendor; the engine's default model
+// belongs to a vendor the profile may no longer be using, and asking for it
+// against a third-party gateway is how a turn ends in a 400 about a model
+// that vendor never had.
+func (a *App) ThreadProvider(ctx context.Context) (providerID string, model string, err error) {
 	settings, err := a.GetSettings(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	if settings.DefaultProvider != "" {
-		p, err := sqlite.GetProvider(ctx, a.DB, settings.DefaultProvider)
-		if err == nil && p.DefaultModel != "" {
-			return p.DefaultModel, nil
-		}
+	id := settings.DefaultProvider
+	if id == "" {
+		return "", settings.DefaultModel, nil
 	}
-	return settings.DefaultModel, nil
+	p, err := sqlite.GetProvider(ctx, a.DB, id)
+	if err != nil {
+		// The provider is gone: the thread runs with the engine's own
+		// account rather than failing to start at all.
+		return "", settings.DefaultModel, nil
+	}
+	if p.AuthMode == domain.ProviderAuthChatGPT {
+		return "", settings.DefaultModel, nil
+	}
+	model = p.DefaultModel
+	if model == "" && len(p.Models) > 0 {
+		model = p.Models[0].ID
+	}
+	if model == "" {
+		model = settings.DefaultModel
+	}
+	return id, model, nil
 }
 
 // selectProviderInEngine makes the engine run with the named provider.

@@ -24,6 +24,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
@@ -279,6 +280,14 @@ func newM2Harness(t *testing.T) *m2Harness {
 		DB: db, Paths: paths, Hub: events.NewHub(), Live: events.NewLiveHub(), InstanceID: "test-instance",
 		ServiceEpoch: "epoch-0", Version: "test", Logger: logger,
 	}
+	// The credential store holds the model providers' keys, and the binder
+	// stands in for the engine that takes a provider.
+	store, err := secrets.New(paths.CredentialsDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Credentials = store
+	a.ProviderBinderFactory = func(context.Context) (engine.ProviderBinder, error) { return newProviderBinder(), nil }
 	tokens := auth.NewTokenStore(time.Hour)
 	a.CollaborationTokens = tokens
 	bearer := auth.NewBearerStore(time.Hour)

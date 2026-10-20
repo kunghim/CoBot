@@ -515,6 +515,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		ApprovalPolicy:        spec.ApprovalPolicy,
 		ApprovalsReviewer:     spec.ApprovalsReviewer,
 		Model:                 spec.Model,
+		ModelProvider:         spec.ModelProvider,
 		DeveloperInstructions: spec.DeveloperInstructions,
 		Config:                spec.Config,
 	}, &res)
@@ -529,18 +530,25 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 }
 
 // ResumeThread reattaches a previously created thread.
-func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+//
+// It reports the model and the provider the thread runs with, as the engine
+// answered it: the engine ignores a provider for a thread that is already
+// loaded here, and a record CoBot kept itself cannot say which of the two
+// happened.
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
+	res := ThreadResumeResult{}
 	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-		Model: spec.Model, DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+		Model: spec.Model, ModelProvider: spec.ModelProvider,
+		DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
 		ExcludeTurns: true,
-	}, nil); err != nil {
-		return fmt.Errorf("thread/resume: %w", err)
+	}, &res); err != nil {
+		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)
-	return nil
+	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider}, nil
 }
 
 // ThreadLoaded reports whether this app-server has the thread loaded: it

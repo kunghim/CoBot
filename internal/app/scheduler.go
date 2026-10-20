@@ -355,7 +355,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// The model comes from the provider the profile runs with, not from the
 	// engine's own default: that default names a model of a vendor this
 	// profile may no longer be talking to.
-	model, err := s.app.ResolveModel(ctx)
+	_, model, err := s.app.ThreadProvider(ctx)
 	if err != nil {
 		return err
 	}
@@ -879,7 +879,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	model, err := s.app.ResolveModel(ctx)
+	providerID, model, err := s.app.ThreadProvider(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -893,6 +893,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
 		Model:                 model,
+		ModelProvider:         providerID,
 		DeveloperInstructions: instructions,
 		Config:                config,
 	}
@@ -903,20 +904,24 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
 			return session.ProviderThreadID, nil
 		}
-		if err := server.ResumeThread(ctx, session.ProviderThreadID, spec); err == nil {
+		resumed, rerr := server.ResumeThread(ctx, session.ProviderThreadID, spec)
+		if rerr == nil {
 			// The thread now belongs to this connection, so rebind it: thread
 			// ids are only unique inside one engine, and every later lookup
 			// (approval routing, turn completion) resolves the bot by
 			// (thread, epoch). A resume on a new connection without this
 			// update would silently drop that connection's events.
-			if session.EngineEpoch != server.Epoch() {
+			// The model and the provider are the engine's own answer: a
+			// record CoBot kept itself names the provider the thread had
+			// before, not the one it runs with now.
+			if session.EngineEpoch != server.Epoch() || session.ModelProvider != resumed.ModelProvider {
 				tx, txErr := s.app.DB.BeginTx(ctx, nil)
 				if txErr != nil {
 					return "", txErr
 				}
 				if uerr := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
 					BotID: bot.ID, ProviderThreadID: session.ProviderThreadID,
-					EngineEpoch: server.Epoch(), Model: session.Model, ModelProvider: session.ModelProvider,
+					EngineEpoch: server.Epoch(), Model: resumed.Model, ModelProvider: resumed.ModelProvider,
 				}); uerr != nil {
 					tx.Rollback()
 					return "", uerr

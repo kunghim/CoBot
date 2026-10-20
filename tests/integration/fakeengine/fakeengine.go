@@ -42,6 +42,9 @@ type Server struct {
 	steers            []Steer
 	replied           []Reply
 	ShutdownCalls     int
+	// ThreadProviders records the provider each thread was started or
+	// resumed with, so a test can see which one CoBot asked for.
+	ThreadProviders []string
 }
 
 func (s *Server) SetTurnFact(threadID, turnID, status string) {
@@ -147,21 +150,23 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.threads[id] = true
 	s.loaded[id] = true
 	s.instructions = append(s.instructions, spec.DeveloperInstructions)
-	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: "fake"}, nil
+	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: spec.ModelProvider}, nil
 }
 
-func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resumes++
 	if s.ResumeErr != nil {
-		return s.ResumeErr
+		return engine.ThreadInfo{}, s.ResumeErr
 	}
 	if !s.threads[threadID] {
-		return fmt.Errorf("unknown thread %s", threadID)
+		return engine.ThreadInfo{}, fmt.Errorf("unknown thread %s", threadID)
 	}
 	s.loaded[threadID] = true
-	return nil
+	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	return engine.ThreadInfo{ThreadID: threadID, Model: "fake-model", ModelProvider: spec.ModelProvider}, nil
 }
 
 func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engine.TurnOptions) (string, error) {
