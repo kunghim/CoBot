@@ -8,6 +8,10 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
+// builtinProvider is the provider the engine uses when no other one is
+// selected: its own account and its own endpoint.
+const builtinProvider = "openai"
+
 // Dialects lists the wire dialects this engine speaks. Codex 0.161 accepts
 // only the OpenAI Responses dialect: a chat-completions provider is rejected
 // by the engine outright rather than silently downgraded to its own default
@@ -94,6 +98,33 @@ func (s *Server) UnbindProvider(ctx context.Context, providerID string) error {
 	delete(providers, providerID)
 	if _, err := s.writeConfigValue(ctx, "model_providers", providers, "replace"); err != nil {
 		return err
+	}
+	return nil
+}
+
+// SelectProvider makes the engine use the named provider.
+//
+// Codex keeps the choice in one place: the top level "model_provider" key.
+// A provider that is only in the table is never used, and a turn then still
+// goes to the engine's own endpoint — which is how a configured third-party
+// key ends up not being used at all. The empty id means the engine's own
+// provider, which is what it uses by default.
+func (s *Server) SelectProvider(ctx context.Context, providerID string) error {
+	if providerID == "" {
+		providerID = builtinProvider
+	}
+	if _, err := s.writeConfigValue(ctx, "model_provider", providerID, "upsert"); err != nil {
+		return err
+	}
+	// Confirm the engine really holds the choice: a write that reports
+	// success but leaves nothing behind would send requests to the wrong
+	// endpoint.
+	cfg, err := s.readConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if got, _ := cfg["model_provider"].(string); got != providerID {
+		return fmt.Errorf("engine did not accept the provider %q (it holds %q)", providerID, got)
 	}
 	return nil
 }

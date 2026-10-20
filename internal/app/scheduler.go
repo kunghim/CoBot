@@ -352,6 +352,13 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
+	// The model comes from the provider the profile runs with, not from the
+	// engine's own default: that default names a model of a vendor this
+	// profile may no longer be talking to.
+	model, err := s.app.ResolveModel(ctx)
+	if err != nil {
+		return err
+	}
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
 	// settings; it never interrupts work that already started (G07/G08).
@@ -531,7 +538,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
-	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
 		// The engine answered with a refusal, so no turn exists: the run
@@ -872,7 +879,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	settings, err := s.app.GetSettings(ctx)
+	model, err := s.app.ResolveModel(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -885,7 +892,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Cwd:                   cwd,
 		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
-		Model:                 settings.DefaultModel,
+		Model:                 model,
 		DeveloperInstructions: instructions,
 		Config:                config,
 	}

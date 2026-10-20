@@ -155,13 +155,35 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 			return domain.Settings{}, sqlite.NormalizeError(err)
 		}
 	}
+	// The engine runs with the provider the profile names, and the engine
+	// keeps that choice in its own configuration. The engine is told first:
+	// a value it refuses must not be written down, and a profile that says
+	// "run with this provider" while the engine still uses its own endpoint
+	// is exactly the failure this avoids.
+	previousProvider := ""
+	if patch.DefaultProvider != nil {
+		before, err := a.GetSettings(ctx)
+		if err != nil {
+			return domain.Settings{}, err
+		}
+		previousProvider = before.DefaultProvider
+		if err := a.selectProviderInEngine(ctx, *patch.DefaultProvider); err != nil {
+			return domain.Settings{}, err
+		}
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
+		if patch.DefaultProvider != nil {
+			a.restoreProviderInEngine(ctx, previousProvider)
+		}
 		return domain.Settings{}, err
 	}
 	defer tx.Rollback()
 	saved, err := sqlite.UpdateSettingsTx(ctx, tx, patch, expectedRevision)
 	if err != nil {
+		if patch.DefaultProvider != nil {
+			a.restoreProviderInEngine(ctx, previousProvider)
+		}
 		return domain.Settings{}, sqlite.NormalizeError(err)
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, saved); err != nil {

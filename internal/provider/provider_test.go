@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -350,6 +352,70 @@ func TestProbeReturnsEveryModelEvenWhenAllFail(t *testing.T) {
 		if result.OK {
 			t.Fatalf("model %q reported OK", id)
 		}
+	}
+}
+
+// The probe speaks the dialect the engine speaks. The engine only ever
+// calls /responses, so a probe that asked /chat/completions would tell a
+// Responses-only vendor that its model does not exist.
+func TestProbeSpeaksTheEnginesDialect(t *testing.T) {
+	var gotPath, gotAuth string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"resp-1","status":"completed","output":[]}`)
+	}))
+	defer server.Close()
+
+	results := New().Probe(context.Background(), server.URL, "sk-test", []string{"a-model"})
+	if !results["a-model"].OK {
+		t.Fatalf("the model was reported as broken: %+v", results)
+	}
+	if gotPath != "/responses" {
+		t.Fatalf("the probe asked %q, want /responses", gotPath)
+	}
+	if gotBody["model"] != "a-model" {
+		t.Fatalf("the probe named %v, want a-model", gotBody["model"])
+	}
+	if gotBody["input"] == nil {
+		t.Fatalf("the probe did not use the Responses input field: %v", gotBody)
+	}
+	if gotAuth != "Bearer sk-test" {
+		t.Fatalf("the key did not travel in the header: %q", gotAuth)
+	}
+}
+
+// A real vendor's catalogue is far bigger than the cap on a failure answer.
+// A truncated list is not a small list: it is a body that no longer parses,
+// and it used to be reported as an endpoint that speaks no known protocol.
+func TestDiscoverReadsARealisticCatalogue(t *testing.T) {
+	entries := make([]string, 0, 400)
+	for i := 0; i < 400; i++ {
+		entries = append(entries, fmt.Sprintf(`{"id":"vendor-model-%03d","object":"model","owned_by":"vendor"}`, i))
+	}
+	body := `{"object":"list","data":[` + strings.Join(entries, ",") + `]}`
+	if len(body) <= maxBodyBytes {
+		t.Fatalf("the fixture is %d bytes; it no longer covers the old cap", len(body))
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	defer server.Close()
+
+	got, err := New().Discover(context.Background(), server.URL, "sk-test")
+	if err != nil {
+		t.Fatalf("Discover returned error: %v", err)
+	}
+	if len(got) != 400 {
+		t.Fatalf("got %d ids, want 400", len(got))
+	}
+	if got[0] != "vendor-model-000" || got[399] != "vendor-model-399" {
+		t.Fatalf("the catalogue did not survive the read: %v", got[:2])
 	}
 }
 

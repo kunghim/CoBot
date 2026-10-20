@@ -842,6 +842,7 @@ type ProviderRequest struct {
 	Models           *[]ProviderModel        `json:"models,omitempty"`
 	Name             string                  `json:"name"`
 	PresetId         *string                 `json:"presetId,omitempty"`
+	RequestId        openapi_types.UUID      `json:"requestId"`
 
 	// Retries How often the engine may retry a request to this provider.
 	Retries *ProviderRetries `json:"retries,omitempty"`
@@ -1352,20 +1353,23 @@ type CancelMessageJSONBody struct {
 
 // DetectProviderJSONBody defines parameters for DetectProvider.
 type DetectProviderJSONBody struct {
-	ApiKey string `json:"apiKey"`
+	ApiKey    string             `json:"apiKey"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // DiscoverProviderModelsJSONBody defines parameters for DiscoverProviderModels.
 type DiscoverProviderModelsJSONBody struct {
-	ApiKey  *string `json:"apiKey,omitempty"`
-	BaseUrl string  `json:"baseUrl"`
+	ApiKey    *string            `json:"apiKey,omitempty"`
+	BaseUrl   string             `json:"baseUrl"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ProbeProviderModelsJSONBody defines parameters for ProbeProviderModels.
 type ProbeProviderModelsJSONBody struct {
-	ApiKey   *string   `json:"apiKey,omitempty"`
-	BaseUrl  string    `json:"baseUrl"`
-	ModelIds *[]string `json:"modelIds,omitempty"`
+	ApiKey    *string            `json:"apiKey,omitempty"`
+	BaseUrl   string             `json:"baseUrl"`
+	ModelIds  *[]string          `json:"modelIds,omitempty"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ListQuestionsParams defines parameters for ListQuestions.

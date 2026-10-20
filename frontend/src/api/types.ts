@@ -42,7 +42,9 @@ export type Provider = components['schemas']['Provider'];
 export type ProviderEndpoint = components['schemas']['ProviderEndpoint'];
 export type ProviderModel = components['schemas']['ProviderModel'];
 export type ProviderRetries = components['schemas']['ProviderRetries'];
-export type ProviderRequest = components['schemas']['ProviderRequest'];
+/** The body of a provider write. The request id is not part of it: the api
+ * client adds one to every write, the way it does for every other endpoint. */
+export type ProviderRequest = Omit<components['schemas']['ProviderRequest'], 'requestId'>;
 export type ProviderPreset = components['schemas']['ProviderPreset'];
 export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
 

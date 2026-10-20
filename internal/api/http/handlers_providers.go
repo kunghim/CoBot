@@ -12,6 +12,10 @@ import (
 // once and goes straight into the encrypted credential store; it is never
 // part of the stored provider record and never comes back out.
 type providerRequest struct {
+	// RequestID is the idempotency key every write carries. The client adds
+	// it to every POST body, so a handler that does not declare it would
+	// refuse its own product's request.
+	RequestID    string                    `json:"requestId"`
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
 	Kind         string                    `json:"kind"`
@@ -156,7 +160,8 @@ func (s *Server) handleDetectProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		APIKey string `json:"apiKey"`
+		RequestID string `json:"requestId"`
+		APIKey    string `json:"apiKey"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
@@ -173,8 +178,9 @@ func (s *Server) handleDiscoverProviderModels(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var req struct {
-		BaseURL string `json:"baseUrl"`
-		APIKey  string `json:"apiKey"`
+		RequestID string `json:"requestId"`
+		BaseURL   string `json:"baseUrl"`
+		APIKey    string `json:"apiKey"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
@@ -196,9 +202,10 @@ func (s *Server) handleProbeProviderModels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var req struct {
-		BaseURL  string   `json:"baseUrl"`
-		APIKey   string   `json:"apiKey"`
-		ModelIDs []string `json:"modelIds"`
+		RequestID string   `json:"requestId"`
+		BaseURL   string   `json:"baseUrl"`
+		APIKey    string   `json:"apiKey"`
+		ModelIDs  []string `json:"modelIds"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)

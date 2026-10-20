@@ -1142,6 +1142,8 @@ export interface components {
             stream?: number;
         };
         ProviderRequest: {
+            /** Format: uuid */
+            requestId: string;
             id: string;
             name: string;
             /** @enum {string} */
@@ -2412,6 +2414,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
                     apiKey: string;
                 };
             };
@@ -2443,6 +2447,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
                     baseUrl: string;
                     apiKey?: string;
                 };
@@ -2476,6 +2482,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
                     baseUrl: string;
                     apiKey?: string;
                     modelIds?: string[];

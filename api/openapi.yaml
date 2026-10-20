@@ -685,8 +685,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [apiKey]
+              required: [requestId, apiKey]
               properties:
+                requestId: { type: string, format: uuid }
                 apiKey: { type: string }
       responses:
         "200":
@@ -719,8 +720,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [baseUrl]
+              required: [requestId, baseUrl]
               properties:
+                requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
       responses:
@@ -758,8 +760,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [baseUrl]
+              required: [requestId, baseUrl]
               properties:
+                requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
                 modelIds:
@@ -2384,8 +2387,9 @@ components:
         stream: { type: integer }
     ProviderRequest:
       type: object
-      required: [id, name, kind, authMode, endpoints]
+      required: [requestId, id, name, kind, authMode, endpoints]
       properties:
+        requestId: { type: string, format: uuid }
         id: { type: string }
         name: { type: string }
         kind: { type: string, enum: [official, custom] }

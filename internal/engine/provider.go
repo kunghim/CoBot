@@ -21,6 +21,14 @@ type ProviderBinder interface {
 	BindProvider(ctx context.Context, p domain.Provider) error
 	// UnbindProvider removes a provider this engine no longer serves.
 	UnbindProvider(ctx context.Context, providerID string) error
+	// SelectProvider makes the engine use the named provider from now on. An
+	// empty id puts the engine's own provider back.
+	//
+	// This is separate from BindProvider on purpose: a provider that is only
+	// in the engine's table is never used. The engine keeps the choice in
+	// one place, and a profile that says "run with this provider" has to
+	// put it there, or every turn still goes to the engine's own endpoint.
+	SelectProvider(ctx context.Context, providerID string) error
 }
 
 // AuthProvider is the capability of engines that need the user to authorize

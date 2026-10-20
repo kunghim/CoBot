@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
@@ -21,9 +22,10 @@ import (
 
 // fakeBinder records what the product asked the engine to do.
 type fakeBinder struct {
-	bound   []domain.Provider
-	unbound []string
-	err     error
+	bound    []domain.Provider
+	unbound  []string
+	selected string
+	err      error
 }
 
 func (f *fakeBinder) Dialects() []string { return []string{domain.DialectOpenAIResponses} }
@@ -38,6 +40,11 @@ func (f *fakeBinder) BindProvider(ctx context.Context, p domain.Provider) error 
 
 func (f *fakeBinder) UnbindProvider(ctx context.Context, id string) error {
 	f.unbound = append(f.unbound, id)
+	return nil
+}
+
+func (f *fakeBinder) SelectProvider(ctx context.Context, id string) error {
+	f.selected = id
 	return nil
 }
 
@@ -153,6 +160,51 @@ func TestProviderCredentialIsStoredEncryptedAndNeverListed(t *testing.T) {
 	}
 	if env["COBOT_PROVIDER_COBOT_DEEPSEEK_KEY"] != "sk-super-secret-value" {
 		t.Fatalf("the engine environment does not carry the key: %v", env)
+	}
+}
+
+// The profile says which provider it runs with, and the engine has to be
+// told: a provider that is only in the engine's table is never used, and
+// every turn still goes to the engine's own endpoint.
+func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
+	ctx := context.Background()
+	binder := &fakeBinder{}
+	a := providerTestApp(t, binder)
+	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
+		t.Fatal(err)
+	}
+	id := "cobot_deepseek"
+	if _, err := a.UpdateSettings(ctx, auth.NewPrincipalUser(""), domain.SettingsPatch{
+		DefaultProvider: &id,
+	}, 0); err != nil {
+		t.Fatalf("set the default provider: %v", err)
+	}
+	if binder.selected != "cobot_deepseek" {
+		t.Fatalf("the engine runs with %q, want cobot_deepseek", binder.selected)
+	}
+	settings, err := a.GetSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.DefaultProvider != "cobot_deepseek" {
+		t.Fatalf("the profile names %q", settings.DefaultProvider)
+	}
+}
+
+// A default that names no configured provider is refused, and the engine is
+// not switched to something that does not exist.
+func TestSettingADanglingDefaultProviderIsRefused(t *testing.T) {
+	ctx := context.Background()
+	binder := &fakeBinder{}
+	a := providerTestApp(t, binder)
+	id := "not-configured"
+	if _, err := a.UpdateSettings(ctx, auth.NewPrincipalUser(""), domain.SettingsPatch{
+		DefaultProvider: &id,
+	}, 0); err == nil {
+		t.Fatal("a dangling default provider was accepted")
+	}
+	if binder.selected != "" {
+		t.Fatalf("the engine was switched to %q", binder.selected)
 	}
 }
 

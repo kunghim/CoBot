@@ -62,7 +62,10 @@ func (d *Discoverer) Probe(ctx context.Context, baseURL, apiKey string, modelIDs
 	if len(modelIDs) == 0 {
 		return results
 	}
-	endpoint := strings.TrimRight(baseURL, "/") + "/chat/completions"
+	// The engine speaks the Responses dialect and nothing else, so the check
+	// has to speak it too: a gateway that serves only /responses would be
+	// told its model does not exist if the probe asked /chat/completions.
+	endpoint := strings.TrimRight(baseURL, "/") + "/responses"
 
 	ids := dedupe(modelIDs)
 
@@ -94,25 +97,21 @@ func (d *Discoverer) Probe(ctx context.Context, baseURL, apiKey string, modelIDs
 }
 
 // probeRequest is the smallest request that still exercises a model end to
-// end. It carries the model name and nothing else: no secret may end up in
-// a request body, because bodies get logged by gateways.
+// end, in the dialect the engine uses. It carries the model name and nothing
+// else: no secret may end up in a request body, because bodies get logged by
+// gateways.
 type probeRequest struct {
-	Model     string         `json:"model"`
-	Messages  []probeMessage `json:"messages"`
-	MaxTokens int            `json:"max_tokens"`
-}
-
-type probeMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Model           string `json:"model"`
+	Input           string `json:"input"`
+	MaxOutputTokens int    `json:"max_output_tokens"`
 }
 
 // probeModel sends one minimal request and turns the answer into a Result.
 func (d *Discoverer) probeModel(ctx context.Context, endpoint, apiKey, modelID string) Result {
 	encoded, err := json.Marshal(probeRequest{
-		Model:     modelID,
-		Messages:  []probeMessage{{Role: "user", Content: "ping"}},
-		MaxTokens: 1,
+		Model:           modelID,
+		Input:           "ping",
+		MaxOutputTokens: 1,
 	})
 	if err != nil {
 		return failureResult(CodeEngineInternal, failure.Text(CodeEngineInternal))

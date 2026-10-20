@@ -12,10 +12,10 @@ import (
 // Codex the only writer of its own file format — and, more importantly, lets
 // it reject a bad value instead of silently falling back to defaults.
 type configWriteParams struct {
-	KeyPath       string         `json:"keyPath"`
-	Value         map[string]any `json:"value"`
-	MergeStrategy string         `json:"mergeStrategy"`
-	FilePath      string         `json:"filePath,omitempty"`
+	KeyPath       string `json:"keyPath"`
+	Value         any    `json:"value"`
+	MergeStrategy string `json:"mergeStrategy"`
+	FilePath      string `json:"filePath,omitempty"`
 	// ExpectedVersion guards against a concurrent writer; empty skips the
 	// check.
 	ExpectedVersion string `json:"expectedVersion,omitempty"`
@@ -35,7 +35,10 @@ type configReadResult struct {
 // returns the new file version. A rejected value comes back as an error that
 // already explains the fix — Codex refuses a bad wire_api instead of dropping
 // the whole configuration and quietly using its own default endpoint.
-func (s *Server) writeConfigValue(ctx context.Context, keyPath string, value map[string]any, mergeStrategy string) (configWriteResult, error) {
+//
+// The value is whatever the key holds: a table for a provider, a string for
+// the provider the engine runs with.
+func (s *Server) writeConfigValue(ctx context.Context, keyPath string, value any, mergeStrategy string) (configWriteResult, error) {
 	var out configWriteResult
 	err := s.client.Call(ctx, "config/value/write", configWriteParams{
 		KeyPath:       keyPath,

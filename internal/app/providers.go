@@ -232,6 +232,56 @@ func (a *App) unbindProvider(ctx context.Context, id string) error {
 	return binder.UnbindProvider(ctx, id)
 }
 
+// ResolveModel returns the model a turn should use.
+//
+// The provider the profile runs with has the first say: its own default
+// model is the one the user picked for that vendor. The engine's own
+// default model belongs to a vendor the profile may no longer be using, and
+// asking for it against a third-party gateway is how a turn ends in a 400
+// about a model that vendor never had.
+//
+// Without a provider the profile's own setting decides, and an empty answer
+// lets the engine choose.
+func (a *App) ResolveModel(ctx context.Context) (string, error) {
+	settings, err := a.GetSettings(ctx)
+	if err != nil {
+		return "", err
+	}
+	if settings.DefaultProvider != "" {
+		p, err := sqlite.GetProvider(ctx, a.DB, settings.DefaultProvider)
+		if err == nil && p.DefaultModel != "" {
+			return p.DefaultModel, nil
+		}
+	}
+	return settings.DefaultModel, nil
+}
+
+// selectProviderInEngine makes the engine run with the named provider.
+//
+// The profile's setting is the truth, but the engine keeps the choice in its
+// own configuration, and that is where it has to land: a provider that is
+// only in the engine's table is never used, and every turn still goes to the
+// engine's own endpoint.
+func (a *App) selectProviderInEngine(ctx context.Context, id string) error {
+	binder, err := a.providerBinder(ctx)
+	if err != nil {
+		return err
+	}
+	if err := binder.SelectProvider(ctx, id); err != nil {
+		return providerEngineError(err)
+	}
+	return nil
+}
+
+// restoreProviderInEngine puts the engine back on the provider it had before
+// a change that did not go through. A failure here cannot be reported to the
+// user as the cause of the original failure, so it is only logged.
+func (a *App) restoreProviderInEngine(ctx context.Context, id string) {
+	if err := a.selectProviderInEngine(ctx, id); err != nil && a.Logger != nil {
+		a.Logger.Warn("could not restore the engine's model provider", "providerId", id, "error", err)
+	}
+}
+
 // providerBinder returns the profile's engine as something that can accept
 // model providers. The control server is the one that outlives a single
 // team, which matches the shared private engine home.

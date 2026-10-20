@@ -28,6 +28,14 @@ const (
 	// hostile or broken endpoint stream forever.
 	maxBodyBytes = 8 << 10
 
+	// maxModelListBytes caps the model list. It is far larger than the
+	// answer to a failure check, and it has to be: a real vendor lists
+	// hundreds of models, and a gateway's catalogue ran past twenty
+	// kilobytes. A truncated list is not a small list — it is a body that
+	// no longer parses, which used to be reported as an endpoint that
+	// speaks no known protocol.
+	maxModelListBytes = 1 << 20
+
 	// defaultDiscoverTimeout bounds one whole Discover call: listing models
 	// is a single request and must not hold the UI hostage.
 	defaultDiscoverTimeout = 20 * time.Second
@@ -99,7 +107,7 @@ func (d *Discoverer) Discover(ctx context.Context, baseURL, apiKey string) ([]st
 	}
 	defer resp.Body.Close()
 
-	body, err := readBody(resp.Body)
+	body, err := readBodyLimit(resp.Body, maxModelListBytes)
 	if err != nil {
 		return nil, classifyError("discover", 0, "", err)
 	}
@@ -168,6 +176,11 @@ func stringField(fields map[string]any, key string) string {
 // readBody reads at most maxBodyBytes of a response body.
 func readBody(r io.Reader) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r, maxBodyBytes))
+}
+
+// readBodyLimit reads at most the given number of bytes of a response body.
+func readBodyLimit(r io.Reader, limit int64) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(r, limit))
 }
 
 // httpClient returns the client to use, falling back to the default one for a
