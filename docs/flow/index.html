@@ -161,6 +161,12 @@
   @media (prefers-reduced-motion: reduce) {
     .wires path.on, .node.busy .sdot, .node.bad, .cap.in { animation: none; }
   }
+
+  /* 嵌进官网时用 ?embed=1：去掉自己的页头和外壳，只留图形 */
+  body.embed { background: transparent; }
+  body.embed > .wrap { max-width: none; padding: 0; }
+  body.embed header { display: none; }
+  body.embed .panel { border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -276,6 +282,11 @@
 (() => {
   window.__errs = [];
   addEventListener("error", e => window.__errs.push(String(e.message)));
+
+  /* 嵌进官网时只留图形 */
+  if (new URLSearchParams(location.search).has("embed")) {
+    document.body.classList.add("embed");
+  }
 
   const $ = s => document.querySelector(s);
   const stage = $("#stage"), svg = $("#wires"), cap = $("#cap");
