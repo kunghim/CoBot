@@ -65,11 +65,12 @@ test('policy rejects traversal and private-directory publication exceptions', ()
   assert.ok(privateReason('.unknown/file', baseline));
 });
 
-function pr(base, head, repo = 'kunghim/CoBot') {
-  return { pull_request: { base: { ref: base, repo: { full_name: 'kunghim/CoBot' } }, head: { ref: head, repo: repo ? { full_name: repo } : null } } };
+function pr(base, head, repo = 'kunghim/CoBot', login = 'contributor') {
+  return { pull_request: { base: { ref: base, repo: { full_name: 'kunghim/CoBot' } }, head: { ref: head, repo: repo ? { full_name: repo } : null }, user: { login } } };
 }
-test('topic/fork PRs target dev and only the same repository dev promotes to main', () => {
+test('topic/fork PRs target dev; only dev promotions and Dependabot updates target main', () => {
   assert.doesNotThrow(() => checkPrRoute(pr('dev', 'feature', 'contributor/CoBot')));
   assert.doesNotThrow(() => checkPrRoute(pr('main', 'dev')));
-  for (const event of [pr('main', 'feature'), pr('main', 'dev', 'contributor/CoBot'), pr('main', 'dev', null), pr('release', 'dev'), {}]) assert.throws(() => checkPrRoute(event));
+  assert.doesNotThrow(() => checkPrRoute(pr('main', 'dependabot/go_modules/example', 'kunghim/CoBot', 'dependabot[bot]')));
+  for (const event of [pr('main', 'feature'), pr('main', 'dependabot/go_modules/example'), pr('main', 'dependabot/go_modules/example', 'contributor/CoBot', 'dependabot[bot]'), pr('main', 'dev', 'contributor/CoBot'), pr('main', 'dev', null), pr('release', 'dev'), {}]) assert.throws(() => checkPrRoute(event));
 });
