@@ -391,6 +391,14 @@ const (
 	Wheel SendTeamBrowserInputJSONBodyKind = "wheel"
 )
 
+// Defines values for SetTeamBrowserTabViewportJSONBodyPreset.
+const (
+	Clear   SetTeamBrowserTabViewportJSONBodyPreset = "clear"
+	Desktop SetTeamBrowserTabViewportJSONBodyPreset = "desktop"
+	Phone   SetTeamBrowserTabViewportJSONBodyPreset = "phone"
+	Tablet  SetTeamBrowserTabViewportJSONBodyPreset = "tablet"
+)
+
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
 	// AnswerText The answer; for a confirmation or acceptance
@@ -521,6 +529,13 @@ type Bot struct {
 
 // BotStatus defines model for Bot.Status.
 type BotStatus string
+
+// BrowserViewport A tab's real window size as the page renders it; absent on a tab nobody set one for (the browser's default window).
+type BrowserViewport struct {
+	Height int   `json:"height"`
+	Mobile *bool `json:"mobile,omitempty"`
+	Width  int   `json:"width"`
+}
 
 // CollaborationRequest defines model for CollaborationRequest.
 type CollaborationRequest struct {
@@ -1336,6 +1351,33 @@ type StreamTeamBrowserTabParams struct {
 	Tab string `form:"tab" json:"tab"`
 }
 
+// OpenTeamBrowserTabJSONBody defines parameters for OpenTeamBrowserTab.
+type OpenTeamBrowserTabJSONBody struct {
+	RequestId *openapi_types.UUID `json:"requestId,omitempty"`
+
+	// Url Initial address (browser-internal schemes refused); omit to open a blank page.
+	Url *string `json:"url,omitempty"`
+}
+
+// CloseTeamBrowserTabParams defines parameters for CloseTeamBrowserTab.
+type CloseTeamBrowserTabParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// SetTeamBrowserTabViewportJSONBody defines parameters for SetTeamBrowserTabViewport.
+type SetTeamBrowserTabViewportJSONBody struct {
+	Height *int  `json:"height,omitempty"`
+	Mobile *bool `json:"mobile,omitempty"`
+
+	// Preset desktop 1280x744, tablet 768x1024, phone 390x844 (mobile), clear back to the browser's default window; or give width and height.
+	Preset    *SetTeamBrowserTabViewportJSONBodyPreset `json:"preset,omitempty"`
+	RequestId *openapi_types.UUID                      `json:"requestId,omitempty"`
+	Width     *int                                     `json:"width,omitempty"`
+}
+
+// SetTeamBrowserTabViewportJSONBodyPreset defines parameters for SetTeamBrowserTabViewport.
+type SetTeamBrowserTabViewportJSONBodyPreset string
+
 // OpenTeamPathJSONBody defines parameters for OpenTeamPath.
 type OpenTeamPathJSONBody struct {
 	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
@@ -1454,6 +1496,12 @@ type AddBotJSONRequestBody AddBotJSONBody
 
 // SendTeamBrowserInputJSONRequestBody defines body for SendTeamBrowserInput for application/json ContentType.
 type SendTeamBrowserInputJSONRequestBody SendTeamBrowserInputJSONBody
+
+// OpenTeamBrowserTabJSONRequestBody defines body for OpenTeamBrowserTab for application/json ContentType.
+type OpenTeamBrowserTabJSONRequestBody OpenTeamBrowserTabJSONBody
+
+// SetTeamBrowserTabViewportJSONRequestBody defines body for SetTeamBrowserTabViewport for application/json ContentType.
+type SetTeamBrowserTabViewportJSONRequestBody SetTeamBrowserTabViewportJSONBody
 
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody

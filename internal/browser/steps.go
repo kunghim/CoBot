@@ -696,14 +696,12 @@ func (r *callRun) snapshot(ctx context.Context) (string, error) {
 
 func (r *callRun) viewport(ctx context.Context, st Step) (string, error) {
 	if st.Width <= 0 || st.Height <= 0 {
-		if err := r.cur.cdp(ctx, "Emulation.clearDeviceMetricsOverride", nil, nil); err != nil {
+		if err := r.cur.setViewport(ctx, nil); err != nil {
 			return "", err
 		}
 		return "已恢复默认窗口大小", nil
 	}
-	if err := r.cur.cdp(ctx, "Emulation.setDeviceMetricsOverride", map[string]any{
-		"width": st.Width, "height": st.Height, "deviceScaleFactor": 1, "mobile": st.Mobile,
-	}, nil); err != nil {
+	if err := r.cur.setViewport(ctx, &Viewport{Width: st.Width, Height: st.Height, Mobile: st.Mobile}); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("窗口大小 %dx%d", st.Width, st.Height), nil

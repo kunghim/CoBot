@@ -109,6 +109,8 @@ func toolSchema(name string) json.RawMessage {
 			"additionalProperties": false,
 		}
 		add("help", flag("Return the usage, safety and confirmation guide instead of running anything. Read it before first use."), false)
+		add("userTabs", flag("List the tabs the user opened for themselves (id, title, url) and run nothing else. "+
+			"Look only when the user mentions pages they opened; their tabs are hidden from you otherwise, and any member may use one by its id."), false)
 		add("url", str("Open this address first (same as a leading goto step)."), false)
 		add("tab", str("One of your tabs, from an earlier result; omit for your current tab."), false)
 		add("steps", map[string]any{"type": "array", "items": step, "maxItems": 30,

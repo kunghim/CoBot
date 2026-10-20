@@ -39,6 +39,9 @@ type Request struct {
 	Screenshot bool `json:"screenshot,omitempty"`
 	// Help asks for the usage and safety guide instead of running anything.
 	Help bool `json:"help,omitempty"`
+	// UserTabs lists the tabs the user opened for themselves and runs
+	// nothing else; it never starts a browser.
+	UserTabs bool `json:"userTabs,omitempty"`
 }
 
 //go:embed guide.md
@@ -95,6 +98,9 @@ type Result struct {
 	Console     []string     `json:"console,omitempty"`
 	Downloads   []string     `json:"downloads,omitempty"`
 	Tabs        []TabInfo    `json:"tabs,omitempty"`
+	// UserTabs answers a userTabs request: the tabs the user opened for
+	// themselves, whether or not a member may use them.
+	UserTabs []TabInfo `json:"userTabs,omitempty"`
 	// Guide and Note answer a help request, or a first call made before the
 	// guide was read: nothing was run.
 	Guide string `json:"guide,omitempty"`
@@ -124,13 +130,20 @@ const (
 	maxSteps         = 30
 	maxTabsPerMember = 5
 	maxTabsPerTeam   = 15
-	defaultStepTime  = 15 * time.Second
-	maxStepTime      = 40 * time.Second
+	// The user's own tabs have their own cap and count against neither of
+	// the member limits above.
+	maxTabsPerUser  = 5
+	defaultStepTime = 15 * time.Second
+	maxStepTime     = 40 * time.Second
 	// A tool call must answer within the bridge's 60 seconds.
 	callBudget = 50 * time.Second
 	// A browser nobody used for this long is closed; its profile stays.
 	defaultIdle = 10 * time.Minute
 )
+
+// OwnerUser marks a tab the user opened themselves. Member ids are UUIDs,
+// so no member can collide with this reserved owner.
+const OwnerUser = "__user__"
 
 // Error kinds the caller can tell apart.
 var (
@@ -162,6 +175,13 @@ func NewManager(dir string, logger *slog.Logger) *Manager {
 func (m *Manager) Run(ctx context.Context, env Env, req Request) (Result, error) {
 	if env.TeamID == "" || env.MemberID == "" || env.TeamDir == "" {
 		return Result{}, fmt.Errorf("%w: missing team or member", ErrBadRequest)
+	}
+	// Listing the user's own tabs answers from live state and starts
+	// nothing: a browser nobody opened has no tabs to show.
+	if req.UserTabs {
+		ctx, cancel := context.WithTimeout(ctx, callBudget)
+		defer cancel()
+		return m.userTabs(ctx, env.TeamID)
 	}
 	steps, err := normalize(req)
 	if err != nil {

@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -123,5 +124,124 @@ func TestLiveViewShowsAndDrivesATab(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Watch did not end")
+	}
+}
+
+// TestUserOwnTabsAndViewport drives what the workspace's browser tabs stand
+// on: the user's own tabs and their cap, the window size a tab renders at,
+// the panel reporting owner and viewport, and a member using the user's page
+// when it is pointed at one.
+func TestUserOwnTabsAndViewport(t *testing.T) {
+	if _, err := Find(); err != nil {
+		t.Skip("no Chromium-based browser on this machine")
+	}
+	t.Setenv("COBOT_BROWSER_NO_SANDBOX", "1")
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `<!doctype html><title>用户页</title><h1>用户的页面</h1>`)
+	}))
+	defer site.Close()
+	profiles, _ := os.MkdirTemp("", "cobot-browser-test")
+	defer func() { time.Sleep(time.Second); _ = os.RemoveAll(profiles) }()
+	m := NewManager(profiles, nil)
+	defer m.Shutdown()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	env := Env{TeamID: "team-u", MemberID: "member-1", TeamDir: profiles}
+
+	// The user opens their own page and the browser comes up for them.
+	opened, err := m.OpenUserTab(ctx, "team-u", site.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opened.Owner != "user" || opened.Member != "" || !strings.Contains(opened.Title, "用户页") {
+		t.Fatalf("opened tab = %+v", opened)
+	}
+	running, tabs := m.Panel(ctx, "team-u")
+	if !running || len(tabs) != 1 || tabs[0].Owner != "user" || tabs[0].Viewport != nil {
+		t.Fatalf("panel = %v %+v", running, tabs)
+	}
+
+	// Their cap is their own: the sixth tab is refused...
+	for i := 1; i < maxTabsPerUser; i++ {
+		if _, err := m.OpenUserTab(ctx, "team-u", "about:blank"); err != nil {
+			t.Fatalf("user tab %d: %v", i+1, err)
+		}
+	}
+	if _, err := m.OpenUserTab(ctx, "team-u", "about:blank"); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("the sixth user tab = %v, want ErrTooMany", err)
+	}
+
+	// The user's page renders at the phone size and the live view sees it.
+	frames := make(chan Frame, 8)
+	watchCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	go func() {
+		_ = m.Watch(watchCtx, "team-u", opened.ID, func(f Frame) {
+			select {
+			case frames <- f:
+			default:
+			}
+		})
+	}()
+	viewport, err := m.SetViewport(ctx, "team-u", opened.ID, ViewportRequest{Preset: "phone"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if viewport == nil || viewport.Width != 390 || viewport.Height != 844 || !viewport.Mobile {
+		t.Fatalf("viewport = %+v", viewport)
+	}
+	if err := m.Input(ctx, "team-u", opened.ID, Input{Kind: "nav", To: "reload"}); err != nil {
+		t.Fatal(err)
+	}
+	sized := false
+	deadline := time.After(20 * time.Second)
+	for !sized {
+		select {
+		case f := <-frames:
+			sized = f.Width == 390 && f.Height == 844
+		case <-deadline:
+			t.Fatal("no frame at 390x844 after the phone viewport")
+		}
+	}
+	if _, tabs := m.Panel(ctx, "team-u"); tabs[0].Viewport == nil || tabs[0].Viewport.Width != 390 {
+		t.Fatalf("the panel does not report the new viewport: %+v", tabs)
+	}
+
+	// The member finds the user's tabs when asked, and only then.
+	res, err := m.Run(ctx, env, Request{UserTabs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.UserTabs) != maxTabsPerUser {
+		t.Fatalf("userTabs listed %d tabs, want %d", len(res.UserTabs), maxTabsPerUser)
+	}
+	if !strings.Contains(res.UserTabs[0].Title, "用户页") {
+		t.Fatalf("the user's page is not first in the list: %+v", res.UserTabs[0])
+	}
+
+	// Pointed at one, the member works in the user's page.
+	res, err = m.Run(ctx, env, Request{Tab: opened.ID,
+		Steps:    []Step{{Action: "eval", Expression: "document.title"}},
+		Snapshot: ptr(false)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Steps[0].Detail, "用户页") {
+		t.Fatalf("the member's step on the user's tab = %+v", res.Steps[0])
+	}
+
+	// Closing takes it away from the panel and from the list.
+	if err := m.CloseTab("team-u", opened.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, tabs := m.Panel(ctx, "team-u"); len(tabs) != maxTabsPerUser-1 {
+		t.Fatalf("panel lists %d tabs after closing, want %d", len(tabs), maxTabsPerUser-1)
+	}
+	res, err = m.Run(ctx, env, Request{UserTabs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.UserTabs) != maxTabsPerUser-1 {
+		t.Fatalf("userTabs lists %d tabs after closing, want %d", len(res.UserTabs), maxTabsPerUser-1)
 	}
 }
