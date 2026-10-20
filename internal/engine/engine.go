@@ -196,11 +196,18 @@ type Step struct {
 
 // Problem is an engine error or warning inside a turn. WillRetry marks a
 // transient failure the engine is already retrying (e.g. reconnecting).
+//
+// Code is the engine's own name for the failure (serverOverloaded,
+// httpConnectionFailed...). FailureCode is the root cause behind it, taken
+// from the vendor's HTTP status: an empty balance and a rejected key both
+// arrive as "the request failed", and only the status tells them apart.
+// It is empty when the engine named a failure without saying why.
 type Problem struct {
-	Level     string // error | warning
-	Message   string
-	Code      string
-	WillRetry bool
+	Level       string // error | warning
+	Message     string
+	Code        string
+	FailureCode string
+	WillRetry   bool
 }
 
 // Callbacks is the handler set an app-server delivers events through.

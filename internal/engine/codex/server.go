@@ -16,6 +16,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/failure"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
@@ -470,7 +471,18 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		}
 		if err := json.Unmarshal(params, &p); err == nil {
 			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
-			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: errorCode(p.Error.CodexErrorInfo), WillRetry: p.WillRetry}
+			code := errorCode(p.Error.CodexErrorInfo)
+			failureCode := ""
+			if root, _, ok := failure.FromCodexErrorInfo(p.Error.CodexErrorInfo); ok {
+				// The vendor's status is the root cause: an empty balance
+				// and a rejected key both arrive as "the request failed",
+				// and only the status tells them apart. The engine's own
+				// message is kept as it is — the caller decides what is
+				// safe to store, and the retry attempt count is read
+				// from it.
+				failureCode = root
+			}
+			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: code, FailureCode: failureCode, WillRetry: p.WillRetry}
 		}
 	case "warning":
 		var p struct {

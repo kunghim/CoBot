@@ -442,7 +442,7 @@ func TestClassifyTable(t *testing.T) {
 		{"unsupported in body", http.StatusBadRequest, "unsupported operation", CodeProtocolUnsupported, messageProtocolUnsupported},
 		{"no status", 0, "", CodeNetwork, messageNetwork},
 		{"server error", http.StatusBadGateway, "", CodeNetwork, messageNetwork},
-		{"anything else", http.StatusBadRequest, "", CodeEngineInternal, messageEngineInternal},
+		{"anything else", http.StatusBadRequest, "", CodeRequestRejected, messageRequestRejected},
 	}
 
 	for _, tc := range cases {

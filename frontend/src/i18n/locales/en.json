@@ -201,6 +201,17 @@
       "responseStreamDisconnected": "The connection to the model dropped, so this turn did not finish; send again",
       "internalServerError": "The model service had an internal error; send again later"
     },
+    "providerError": {
+      "quota": "The provider ran out of balance, so this turn did not finish. Top the provider up and send again",
+      "rate_limit": "The provider is rate limiting requests, so this turn did not finish. Send again in a moment",
+      "auth_invalid": "The provider refused the API key, so this turn did not finish. Check the provider's key in Settings",
+      "model_unknown": "The provider does not have this model, so this turn did not finish. Pick another model in Settings",
+      "context_exceeded": "The conversation is longer than the model can handle; start a new task or shorten the request",
+      "protocol_unsupported": "The provider's endpoint does not fit this engine; pick another provider in Settings",
+      "request_rejected": "The provider refused the request, so this turn did not finish. Check the model name and the request, then try again",
+      "network": "Cannot reach the provider's endpoint; check the address and the network, then send again",
+      "engine_internal": "The provider's model service had an internal error; send again later"
+    },
     "file": { "open": "Open file", "reveal": "Show in folder" },
     "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
     "duration": { "seconds": "{{s}}s", "minutes": "{{m}}m {{s}}s" },

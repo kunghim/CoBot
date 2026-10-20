@@ -201,6 +201,17 @@
       "responseStreamDisconnected": "与模型服务的连接中断，这一轮没能完成，请重发",
       "internalServerError": "模型服务内部出错，请稍后重发"
     },
+    "providerError": {
+      "quota": "供应商的余额不足，这一轮没能完成。请给供应商充值后重发",
+      "rate_limit": "供应商触发了限流，这一轮没能完成。请稍后重发",
+      "auth_invalid": "供应商拒绝了密钥，这一轮没能完成。请到设置里检查这个供应商的密钥",
+      "model_unknown": "供应商没有这个模型，这一轮没能完成。请到设置里换一个模型",
+      "context_exceeded": "对话内容超出了模型能处理的长度，请开一个新任务或精简要求后重试",
+      "protocol_unsupported": "供应商的端点不支持这个引擎，请在设置里换一个供应商",
+      "request_rejected": "供应商拒绝了这次请求，这一轮没能完成。请检查模型名和参数后重试",
+      "network": "连不上供应商的端点，请检查地址和网络后重发",
+      "engine_internal": "供应商的模型服务内部出错，请稍后重发"
+    },
     "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
     "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
     "duration": { "seconds": "{{s}} 秒", "minutes": "{{m}} 分 {{s}} 秒" },

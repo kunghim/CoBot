@@ -22,6 +22,7 @@ const (
 	CodeModelUnknown        = failure.CodeModelUnknown
 	CodeContextExceeded     = failure.CodeContextExceeded
 	CodeProtocolUnsupported = failure.CodeProtocolUnsupported
+	CodeRequestRejected     = failure.CodeRequestRejected
 	CodeNetwork             = failure.CodeNetwork
 	CodeEngineInternal      = failure.CodeEngineInternal
 )
@@ -37,6 +38,7 @@ var (
 	messageModelUnknown        = failure.Text(CodeModelUnknown)
 	messageContextExceeded     = failure.Text(CodeContextExceeded)
 	messageProtocolUnsupported = failure.Text(CodeProtocolUnsupported)
+	messageRequestRejected     = failure.Text(CodeRequestRejected)
 	messageNetwork             = failure.Text(CodeNetwork)
 	messageEngineInternal      = failure.Text(CodeEngineInternal)
 )

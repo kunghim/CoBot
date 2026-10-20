@@ -54,7 +54,7 @@ func TestClassifyHTTPStatusBranch(t *testing.T) {
 		status int
 		want   string
 	}{
-		{400, CodeEngineInternal},
+		{400, CodeRequestRejected},
 		{401, CodeAuthInvalid},
 		{402, CodeQuota},
 		{403, CodeAuthInvalid},
@@ -99,6 +99,7 @@ func TestTextCoversEveryCode(t *testing.T) {
 		CodeModelUnknown,
 		CodeContextExceeded,
 		CodeProtocolUnsupported,
+		CodeRequestRejected,
 		CodeNetwork,
 		CodeEngineInternal,
 		CodeUnknown,
@@ -128,25 +129,29 @@ func TestFromCodexErrorInfo(t *testing.T) {
 		name string
 		raw  string
 		want string
+		ok   bool
 	}{
-		{"http connection failed with 402", `{"httpConnectionFailed": {"httpStatusCode": 402}}`, CodeQuota},
-		{"stream disconnected with 401", `{"responseStreamDisconnected": {"httpStatusCode": 401}}`, CodeAuthInvalid},
-		{"too many attempts with 429", `{"responseTooManyFailedAttempts": {"httpStatusCode": 429}}`, CodeRateLimit},
-		{"status field name", `{"httpConnectionFailed": {"status": 404}}`, CodeModelUnknown},
-		{"statusCode field name", `{"httpConnectionFailed": {"statusCode": 405}}`, CodeProtocolUnsupported},
-		{"status as string", `{"httpConnectionFailed": {"httpStatusCode": "402"}}`, CodeQuota},
-		{"no status", `{"responseStreamDisconnected": {}}`, CodeEngineInternal},
-		{"null status", `{"responseStreamDisconnected": {"httpStatusCode": null}}`, CodeEngineInternal},
-		{"stream connection failed with 500", `{"responseStreamConnectionFailed": {"httpStatusCode": 500}}`, CodeNetwork},
-		{"bare string", `"other"`, CodeEngineInternal},
-		{"null", `null`, CodeEngineInternal},
-		{"empty", ``, CodeEngineInternal},
-		{"invalid json", `{not json`, CodeEngineInternal},
-		{"array", `["other"]`, CodeEngineInternal},
+		{"http connection failed with 402", `{"httpConnectionFailed": {"httpStatusCode": 402}}`, CodeQuota, true},
+		{"stream disconnected with 401", `{"responseStreamDisconnected": {"httpStatusCode": 401}}`, CodeAuthInvalid, true},
+		{"too many attempts with 429", `{"responseTooManyFailedAttempts": {"httpStatusCode": 429}}`, CodeRateLimit, true},
+		{"status field name", `{"httpConnectionFailed": {"status": 404}}`, CodeModelUnknown, true},
+		{"statusCode field name", `{"httpConnectionFailed": {"statusCode": 405}}`, CodeProtocolUnsupported, true},
+		{"status as string", `{"httpConnectionFailed": {"httpStatusCode": "402"}}`, CodeQuota, true},
+		{"no status", `{"responseStreamDisconnected": {}}`, CodeEngineInternal, false},
+		{"null status", `{"responseStreamDisconnected": {"httpStatusCode": null}}`, CodeEngineInternal, false},
+		{"stream connection failed with 500", `{"responseStreamConnectionFailed": {"httpStatusCode": 500}}`, CodeNetwork, true},
+		{"bare string", `"other"`, CodeEngineInternal, false},
+		{"null", `null`, CodeEngineInternal, false},
+		{"empty", ``, CodeEngineInternal, false},
+		{"invalid json", `{not json`, CodeEngineInternal, false},
+		{"array", `["other"]`, CodeEngineInternal, false},
 	} {
-		code, message := FromCodexErrorInfo(json.RawMessage(tc.raw))
+		code, message, ok := FromCodexErrorInfo(json.RawMessage(tc.raw))
 		if code != tc.want {
 			t.Errorf("%s: code=%q want %q", tc.name, code, tc.want)
+		}
+		if ok != tc.ok {
+			t.Errorf("%s: ok=%v want %v", tc.name, ok, tc.ok)
 		}
 		if message == "" {
 			t.Errorf("%s: empty message", tc.name)
@@ -169,7 +174,7 @@ func TestFromCodexErrorInfoNamesTheScenario(t *testing.T) {
 		{`{"responseStreamDisconnected": {"httpStatusCode": 500}}`, "连接中断"},
 		{`{"responseTooManyFailedAttempts": {"httpStatusCode": 429}}`, "多次尝试失败"},
 	} {
-		_, message := FromCodexErrorInfo(json.RawMessage(tc.raw))
+		_, message, _ := FromCodexErrorInfo(json.RawMessage(tc.raw))
 		if message != tc.want {
 			t.Errorf("%s: message=%q want %q", tc.raw, message, tc.want)
 		}
@@ -190,7 +195,7 @@ func TestMessagesCarryNoSecret(t *testing.T) {
 			t.Errorf("status %d: message %q leaks the url", status, message)
 		}
 	}
-	_, message := FromCodexErrorInfo(json.RawMessage(`{"httpConnectionFailed": {"httpStatusCode": 401, "apiKey": "` + secret + `"}}`))
+	_, message, _ := FromCodexErrorInfo(json.RawMessage(`{"httpConnectionFailed": {"httpStatusCode": 401, "apiKey": "` + secret + `"}}`))
 	if strings.Contains(message, secret) {
 		t.Errorf("codex error info: message %q leaks the secret", message)
 	}

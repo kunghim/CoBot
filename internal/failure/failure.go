@@ -29,6 +29,7 @@ const (
 	CodeModelUnknown        = "model_unknown"
 	CodeContextExceeded     = "context_exceeded"
 	CodeProtocolUnsupported = "protocol_unsupported"
+	CodeRequestRejected     = "request_rejected"
 	CodeNetwork             = "network"
 	CodeEngineInternal      = "engine_internal"
 	CodeUnknown             = "unknown"
@@ -115,6 +116,12 @@ func classifyStatus(status int) (string, string) {
 		return CodeAuthInvalid, Text(CodeAuthInvalid)
 	case 402:
 		return CodeQuota, Text(CodeQuota)
+	case 400:
+		// The provider refused the request on its own terms and said
+		// nothing about why. A wrong model name and a malformed request
+		// both land here, and both are the user's to fix: sending the
+		// same request again would fail the same way.
+		return CodeRequestRejected, Text(CodeRequestRejected)
 	case 404:
 		// The request may have named a model that does not exist or an
 		// endpoint path that does not exist; only the caller knows which,
@@ -149,6 +156,8 @@ func Text(code string) string {
 		return "上下文超限"
 	case CodeProtocolUnsupported:
 		return "端点不支持"
+	case CodeRequestRejected:
+		return "请求被拒绝"
 	case CodeNetwork:
 		return "连不上"
 	case CodeEngineInternal:
@@ -167,19 +176,24 @@ func Text(code string) string {
 // symptom. The split is deliberate: the code is what a caller branches on
 // (a quota failure must not be retried), the message is what the user reads.
 // Text(code) renders the root cause when the caller wants that instead.
-func FromCodexErrorInfo(raw json.RawMessage) (string, string) {
+//
+// ok reports whether the payload carried a status to classify. It is false
+// when Codex named a failure without saying why: the engine then knew what
+// happened but not its cause, and the caller keeps Codex's own code and
+// wording instead of pretending to know the reason.
+func FromCodexErrorInfo(raw json.RawMessage) (string, string, bool) {
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
-		return CodeEngineInternal, Text(CodeEngineInternal)
+		return CodeEngineInternal, Text(CodeEngineInternal), false
 	}
 	var name string
 	if err := json.Unmarshal(raw, &name); err == nil {
 		// A bare string names the failure but carries no status to classify.
-		return CodeEngineInternal, Text(CodeEngineInternal)
+		return CodeEngineInternal, Text(CodeEngineInternal), false
 	}
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &object); err != nil || len(object) == 0 {
-		return CodeEngineInternal, Text(CodeEngineInternal)
+		return CodeEngineInternal, Text(CodeEngineInternal), false
 	}
 	key, value := pickKey(object)
 	status, ok := statusFrom(value)
@@ -189,15 +203,15 @@ func FromCodexErrorInfo(raw json.RawMessage) (string, string) {
 		// That is the engine not understanding its own error, not a
 		// provider refusing a request, and not a network problem either.
 		if scenario != "" {
-			return CodeEngineInternal, scenario
+			return CodeEngineInternal, scenario, false
 		}
-		return CodeEngineInternal, Text(CodeEngineInternal)
+		return CodeEngineInternal, Text(CodeEngineInternal), false
 	}
 	code, message := classifyStatus(status)
 	if scenario != "" {
-		return code, scenario
+		return code, scenario, true
 	}
-	return code, message
+	return code, message, true
 }
 
 // scenarioMessage names the Codex transport symptom. Codex keys are matched
