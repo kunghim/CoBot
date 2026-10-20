@@ -128,8 +128,7 @@ test('home shows only real actions and tabs support arrow keys', async ({ page }
   await expect(secondTab).toHaveAttribute('aria-selected', 'true');
   await expect(secondTab).toBeFocused();
   await secondTab.press('End');
-  // The work panel's last tab is the live browser page.
-  await expect(page.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: /记忆/ })).toHaveAttribute('aria-selected', 'true');
   await secondTab.press('Home');
   await expect(firstTab).toHaveAttribute('aria-selected', 'true');
 });

@@ -2,6 +2,7 @@
 // machine's localStorage, plus the info card over the conversation — which
 // belongs to the member in view and closes when the view switches.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useWorkPanelRequests } from '../../app/workPanelNav';
 import {
   initialWorkspaceState,
   loadWorkspace,
@@ -48,6 +49,8 @@ export function WorkspaceProvider({ teamId, botId, children }: { teamId: string 
     setEntry((previous) => {
       if (!previous.teamId) return previous;
       const state = workspaceReducer(previous.state, action);
+      // A no-op action keeps the same state and skips the write.
+      if (state === previous.state) return previous;
       saveWorkspace(workspaceKey(previous.teamId), state);
       return { teamId: previous.teamId, state };
     });
@@ -57,6 +60,9 @@ export function WorkspaceProvider({ teamId, botId, children }: { teamId: string 
   // another conversation, so it closes itself.
   const [cardOpen, setCardOpen] = useState(false);
   useEffect(() => setCardOpen(false), [botId]);
+  // An activity entry asking to show a tab opens the card; the panel inside
+  // it takes the request and shows the right page.
+  useWorkPanelRequests(useCallback(() => setCardOpen(true), []));
 
   const value = useMemo<WorkspaceContext>(
     () => ({

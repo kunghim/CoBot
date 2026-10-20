@@ -952,6 +952,7 @@ paths:
                             memberId: { type: string, description: The bot id, present for a member's tab only. }
                             url: { type: string }
                             title: { type: string }
+                            busy: { type: boolean, description: A member's call is working in this tab right now. }
                             viewport:
                               $ref: "#/components/schemas/BrowserViewport"
         "404":

@@ -2487,6 +2487,8 @@ export interface operations {
                                 memberId?: string;
                                 url: string;
                                 title: string;
+                                /** @description A member's call is working in this tab right now. */
+                                busy?: boolean;
                                 viewport?: components["schemas"]["BrowserViewport"];
                             }[];
                         };

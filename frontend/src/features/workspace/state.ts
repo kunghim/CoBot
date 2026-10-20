@@ -63,12 +63,15 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
   switch (action.type) {
     case 'collapse':
       return { ...state, open: false };
-    case 'setWidth':
-      return { ...state, width: clampWidth(action.width) };
+    case 'setWidth': {
+      const width = clampWidth(action.width);
+      return width === state.width ? state : { ...state, width };
+    }
     case 'newTab': {
       const existing = tabById(state, NEW_TAB_ID);
       if (existing >= 0) {
-        return { ...state, open: true, activeId: state.tabs[existing].id };
+        if (state.open && state.activeId === NEW_TAB_ID) return state;
+        return { ...state, open: true, activeId: NEW_TAB_ID };
       }
       const tab: WorkspaceTab = { id: NEW_TAB_ID, kind: 'new', title: '', ref: '' };
       return { ...state, open: true, tabs: [...state.tabs, tab], activeId: tab.id };
@@ -81,9 +84,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const first = state.tabs.length === 0;
       const focus = (action.focus ?? false) || first;
       if (existing >= 0) {
+        const previous = state.tabs[existing];
+        const title = tab.title || previous.title;
+        if (title === previous.title && (!focus || (state.open && state.activeId === tab.id))) return state;
         const tabs = state.tabs.slice();
         // Refresh the stored title with what the page reports now.
-        tabs[existing] = { ...tabs[existing], title: tab.title || tabs[existing].title };
+        tabs[existing] = { ...previous, title };
         return {
           ...state,
           open: focus ? true : state.open,
@@ -101,6 +107,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case 'focus': {
       const index = tabById(state, action.id);
       if (index < 0) return state;
+      if (state.open && state.activeId === action.id) return state;
       return { ...state, open: true, activeId: action.id };
     }
     case 'close': {

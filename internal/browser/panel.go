@@ -25,6 +25,8 @@ type PanelTab struct {
 	URL      string    `json:"url"`
 	Title    string    `json:"title"`
 	Viewport *Viewport `json:"viewport,omitempty"`
+	// Busy says a member's call is working in this tab right now.
+	Busy bool `json:"busy,omitempty"`
 }
 
 // Frame is one picture of a tab. Width and Height are the page's CSS pixels,
@@ -90,6 +92,10 @@ func (tb *teamBrowser) panelTab(ctx context.Context, conn *cdpConn, t *tab) Pane
 		info.Owner, info.Member = "user", ""
 	} else {
 		info.Member = t.member
+	}
+	// The call lock is held for a whole member call; a free lock means idle.
+	if info.Busy = t.callMu.TryLock(); info.Busy {
+		t.callMu.Unlock()
 	}
 	infoCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()

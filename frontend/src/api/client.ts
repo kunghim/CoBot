@@ -313,6 +313,12 @@ export const api = {
   openTeamPath: (teamId: string, path: string, reveal = false) =>
     request<{ path: string }>('POST', `/api/v1/teams/${teamId}/open-path`, { path, reveal }),
   getTeamBrowser: (teamId: string) => request<BrowserPanelState>('GET', `/api/v1/teams/${teamId}/browser`),
+  openBrowserTab: (teamId: string, url: string) =>
+    request<{ tab: BrowserTab }>('POST', `/api/v1/teams/${teamId}/browser/tabs`, { url }),
+  closeBrowserTab: (teamId: string, tab: string) =>
+    request<{ ok: boolean }>('DELETE', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}`),
+  setBrowserTabViewport: (teamId: string, tab: string, body: BrowserViewportRequest) =>
+    request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
   listAuthorizations: () =>
@@ -323,8 +329,23 @@ export const api = {
 
 import { desktopBridge } from '../platform/native-bridge';
 
-export interface BrowserTab { id: string; memberId: string; url: string; title: string }
+export interface BrowserViewport { width: number; height: number; mobile?: boolean }
+export interface BrowserTab {
+  id: string;
+  /** "member": a member's page; "user": a tab the user opened themselves. */
+  owner: 'member' | 'user';
+  /** The bot id, present for a member's tab only. */
+  memberId?: string;
+  url: string;
+  title: string;
+  /** A member's call is working in this tab right now. */
+  busy?: boolean;
+  /** The window size the page renders at, once someone set one. */
+  viewport?: BrowserViewport;
+}
 export interface BrowserPanelState { available: boolean; running: boolean; tabs: BrowserTab[] }
+/** One set-viewport call: a preset or an explicit size; see POST .../viewport. */
+export interface BrowserViewportRequest { preset?: 'desktop' | 'tablet' | 'phone' | 'clear'; width?: number; height?: number; mobile?: boolean }
 export interface BrowserFrame { tab: string; width: number; height: number; data: string }
 /** One thing the user did in the live view; see POST /teams/{id}/browser/input. */
 export interface BrowserInput {

@@ -30,18 +30,24 @@ test('member scope and drafts survive switching between conversations', async ({
   const captain = row.getByRole('button', { name: /项目经理 项目经理$/ });
   const backend = row.getByRole('button', { name: /全栈工程师$/ });
   const qa = row.getByRole('button', { name: /测试工程师$/ });
-  const panel = page.getByRole('complementary', { name: '工作面板' });
+  // The pages live in the info card; switching members closes it, so each
+  // conversation reopens it before its own board is checked.
+  const panel = page.getByRole('region', { name: '信息面板' });
+  const openCard = () => page.getByRole('button', { name: '展开信息面板' }).click();
   await captain.click();
+  await openCard();
   await page.getByRole('textbox', { name: '给 项目经理 发消息……' }).fill('captain-draft');
   await expect(panel.getByText('captain-only-task', { exact: true })).toBeVisible();
   await expect(panel.getByText('backend-only-task', { exact: true })).toBeVisible();
   await backend.click();
+  await openCard();
   const composer = page.getByRole('textbox', { name: '给 全栈工程师 发消息……' });
   await expect(composer).toHaveValue('');
   await composer.fill('backend-draft');
   await expect(panel.getByText('backend-only-task', { exact: true })).toBeVisible();
   await expect(panel.getByText('captain-only-task', { exact: true })).toHaveCount(0);
   await qa.click();
+  await openCard();
   await expect(panel.getByText('暂无需求', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '安全审批' })).toHaveCount(0);
   await captain.click();
@@ -65,7 +71,8 @@ test('task board can load cards beyond its first page', async ({ page, context }
   const row = page.getByRole('complementary', { name: '团队列表' }).getByRole('listitem').filter({ hasText: 'task-pagination' }).first();
   await row.locator('button[aria-expanded="false"]:not([aria-haspopup])').first().click();
   await row.getByRole('button', { name: /全栈工程师$/ }).click();
-  const panel = page.getByRole('complementary', { name: '工作面板' });
+  await page.getByRole('button', { name: '展开信息面板' }).click();
+  const panel = page.getByRole('region', { name: '信息面板' });
   await panel.getByRole('button', { name: /page-requirement/ }).click();
   await expect(panel.getByText('page-task-060', { exact: true })).toBeVisible();
   await expect(panel.getByText('page-task-001', { exact: true })).toHaveCount(0);

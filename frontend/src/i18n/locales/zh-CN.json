@@ -8,9 +8,7 @@
     "teamList": "团队列表",
     "workPanel": "工作面板",
     "openTeamList": "展开团队列表",
-    "closeTeamList": "收起团队列表",
-    "openWorkPanel": "展开工作面板",
-    "closeWorkPanel": "收起工作面板"
+    "closeTeamList": "收起团队列表"
   },
   "home": {
     "noTeams": "还没有团队。创建团队后，项目经理与成员会在这里协作。",
@@ -449,8 +447,7 @@
       "tasks": "任务",
       "approvals": "审批",
       "activity": "动态",
-      "memory": "记忆",
-      "browser": "浏览器"
+      "memory": "记忆"
     }
   },
   "browser": {
@@ -466,7 +463,45 @@
     "reload": "刷新",
     "address": "地址",
     "view": "团队浏览器画面，可直接点击和输入",
+    "userTab": "你打开的",
     "sharedHint": "这是和成员共用的浏览器：你的操作会直接作用在页面上，成员下次操作时会知道你动过。登录一次，团队里所有成员共用登录状态。"
+  },
+  "workspace": {
+    "tablist": "工作区",
+    "closeTab": "关闭",
+    "newTab": "新建标签页",
+    "collapse": "收起工作区",
+    "createTab": "创建标签页",
+    "resize": "工作区宽度",
+    "infoPanel": "信息面板",
+    "openInfoPanel": "展开信息面板",
+    "closeInfoPanel": "收起信息面板",
+    "newPage": {
+      "browser": "浏览器",
+      "browserHint": "打开一个网页标签，你和成员都能在里面干活",
+      "file": "文件",
+      "changes": "变更",
+      "terminal": "终端",
+      "later": "以后",
+      "memberPages": "成员正在用的页面",
+      "noMemberPages": "成员还没有打开页面"
+    },
+    "browser": {
+      "memberTab": "{{name}} 的标签页",
+      "memberBusy": "正在操作",
+      "memberHint": "你也可以直接点击、输入，不会打断他",
+      "userOwn": "你打开的",
+      "userHint": "你打开的 · 成员需要时可以查看",
+      "closed": "页面已关闭",
+      "closeClosed": "关闭这个标签页",
+      "viewport": "视口大小",
+      "viewportFit": "适应窗口",
+      "viewportFull": "实际大小",
+      "viewportDesktop": "桌面 1280 × 744",
+      "viewportTablet": "平板 768 × 1024",
+      "viewportPhone": "手机 390 × 844",
+      "notAvailable": "浏览器用不了"
+    }
   },
   "tasks": {
     "ownerUser": "你",
