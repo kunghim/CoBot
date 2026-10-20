@@ -11,6 +11,7 @@ import {
   useEngineModels,
   useProviders,
   useRevokeAuthorization,
+  useSettings,
   useStatus,
   useRoles,
   useSaveProvider,
@@ -238,6 +239,8 @@ function AvatarCatalogCard() {
 export function EngineSection() {
   const { t } = useTranslation();
   const engine = useEngine();
+  const settings = useSettings(true);
+  const providers = useProviders();
   const login = useEngineLogin();
   const loginCancel = useEngineLoginCancel();
   const logout = useEngineLogout();
@@ -323,17 +326,26 @@ export function EngineSection() {
 
   const info = engine.data;
   const loggedIn = info?.loggedIn ?? false;
+  // A third-party provider runs on its own key: the engine's own ChatGPT
+  // account is not part of that setup, so asking to sign in would be noise.
+  const gateway = providers.data?.providers.find((entry) => entry.id === settings.data?.defaultProvider);
+  const usesGateway = !!gateway && gateway.authMode !== 'chatgpt';
   const statusText = !info
     ? t('status.loading')
     : info.status === 'ready'
-      ? loggedIn ? t('settings.engineReady') : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
+      ? loggedIn
+        ? t('settings.engineReady')
+        : usesGateway
+          ? t('settings.engineGatewayReady')
+          : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
       : info.status === 'error'
         ? t('settings.engineError')
         : info.status === 'starting'
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
-  // Ready but signed out is not ready to work: it reads as a warning.
-  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
+  // Ready but signed out is not ready to work: it reads as a warning. A
+  // gateway needs no sign-in at all, so there it is plain ready.
+  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn || usesGateway ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
   const hookState = info?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
   const hookKey = hookState === 'trusted' ? 'Trusted' : hookState === 'failed' ? 'Failed' : 'Untrusted';
   const hookTone: Tone = hookState === 'trusted' ? 'success' : hookState === 'failed' ? 'danger' : 'warning';
@@ -349,16 +361,19 @@ export function EngineSection() {
         <div className="space-y-4">
           <p className="flex items-center gap-2 text-sm" role="status">
             <StatusDot tone={engineTone} label={statusText} />
-            <span className={info?.status === 'ready' && !loggedIn ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
+            <span className={info?.status === 'ready' && !loggedIn && !usesGateway ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
               {statusText}
               {info?.version ? ` · ${info.version}` : ''}
               {info?.status === 'ready' && loggedIn ? ` · ${t('settings.engineLoggedIn')}` : ''}
             </span>
           </p>
+          {usesGateway && !loggedIn && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('settings.engineGatewayLoginHint')}</p>
+          )}
           {details.length > 0 && <DescriptionList items={details} />}
           {info?.errorKey && <Alert tone="danger">{errorMessage(t, info.errorKey)}</Alert>}
           <div className="flex flex-wrap items-center gap-2">
-            {!loggedIn && info?.status === 'ready' && !loginPending && (
+            {!loggedIn && info?.status === 'ready' && !loginPending && !usesGateway && (
               <Button variant="primary" onClick={startLogin} loading={login.isPending}>
                 {t('engine.login')}
               </Button>
@@ -444,8 +459,22 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
   // engine's own list belongs to the engine's own vendor, and a third-party
   // gateway never has those models; the official provider is the engine's
   // own account, so it keeps the engine's list.
+  //
+  // Until the provider list is in, there is no telling which list is the
+  // right one, so the picker waits instead of showing the engine's models
+  // for a moment and then swapping them out.
+  if (providers.isPending) {
+    return (
+      <Card>
+        <Skeleton className="h-9 w-64" />
+      </Card>
+    );
+  }
   const provider = providers.data?.providers.find((entry) => entry.id === settings.defaultProvider);
   const gateway = provider && provider.authMode !== 'chatgpt' ? provider : null;
+  // A provider that is named but gone leaves the profile on the engine's
+  // own account, which is what the core falls back to as well.
+  const providerGone = !!settings.defaultProvider && !provider;
 
   if (!gateway && engine.data && engine.data.status !== 'ready') {
     return (
@@ -482,7 +511,13 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
       <div className="max-w-sm">
         <Field
           label={t('settings.defaultModel')}
-          hint={gateway ? t('settings.defaultModelProviderHint', { provider: gateway.name }) : t('settings.defaultModelHint')}
+          hint={
+            gateway
+              ? t('settings.defaultModelProviderHint', { provider: gateway.name })
+              : providerGone
+                ? t('settings.defaultModelProviderGone')
+                : t('settings.defaultModelHint')
+          }
           error={errors.defaultModel}
         >
           <Select

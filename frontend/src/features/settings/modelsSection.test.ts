@@ -16,6 +16,7 @@ type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Setting
 
 const state = vi.hoisted(() => ({
   providers: [] as unknown[],
+  providersPending: false,
   engineModels: [] as unknown[],
   saveProvider: vi.fn(),
   toast: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock('../../api/queries', async (importOriginal) => {
     ...actual,
     useEngine: () => ({ data: { status: 'ready' } }),
     useEngineModels: () => ({ data: { models: state.engineModels } }),
-    useProviders: () => ({ data: { providers: state.providers } }),
+    useProviders: () => ({ data: { providers: state.providers }, isPending: state.providersPending }),
     useSaveProvider: () => ({ mutate: state.saveProvider }),
   };
 });
@@ -67,6 +68,7 @@ describe('the model picker follows the provider in use', () => {
     root = createRoot(host);
     save = vi.fn<Save>();
     state.providers = [];
+    state.providersPending = false;
     state.engineModels = [engineModel];
     state.saveProvider.mockReset();
     state.toast.mockReset();
@@ -155,5 +157,18 @@ describe('the model picker follows the provider in use', () => {
     render({ defaultProvider: 'cpa' });
     const chosen = host.querySelector('button[role="combobox"]')?.textContent ?? '';
     expect(chosen).toContain('DeepSeek V4 Pro');
+  });
+
+  it('waits for the provider list instead of showing the engine models first', () => {
+    state.providersPending = true;
+    render({ defaultProvider: 'cpa' });
+    expect(host.querySelector('button[role="combobox"]')).toBeFalsy();
+    expect(host.textContent).not.toContain('GPT 6.1');
+  });
+
+  it('says so when the provider named in the settings is gone', () => {
+    state.providers = [];
+    render({ defaultProvider: 'cpa' });
+    expect(host.textContent).toContain('已经不在了');
   });
 });
