@@ -17,10 +17,16 @@ import (
 
 // PanelTab is one open tab of a team's browser, for the live view.
 type PanelTab struct {
-	ID     string `json:"id"`
-	Member string `json:"memberId"`
-	URL    string `json:"url"`
-	Title  string `json:"title"`
+	ID string `json:"id"`
+	// Owner is "member" (a bot's tab) or "user" (a tab the user opened
+	// themselves); Member is the bot id for a member's tab only.
+	Owner    string    `json:"owner"`
+	Member   string    `json:"memberId,omitempty"`
+	URL      string    `json:"url"`
+	Title    string    `json:"title"`
+	Viewport *Viewport `json:"viewport,omitempty"`
+	// Busy says a member's call is working in this tab right now.
+	Busy bool `json:"busy,omitempty"`
 }
 
 // Frame is one picture of a tab. Width and Height are the page's CSS pixels,
@@ -73,23 +79,38 @@ func (m *Manager) Panel(ctx context.Context, teamID string) (running bool, tabs 
 	tb.mu.Unlock()
 	sort.Slice(list, func(i, j int) bool { return tabOrder(list[i].id) < tabOrder(list[j].id) })
 	for _, t := range list {
-		info := PanelTab{ID: t.id, Member: t.member}
-		infoCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		var got struct {
-			TargetInfo struct {
-				URL   string `json:"url"`
-				Title string `json:"title"`
-			} `json:"targetInfo"`
-		}
-		if err := conn.call(infoCtx, "", "Target.getTargetInfo", map[string]any{"targetId": t.target}, &got); err == nil {
-			info.URL, info.Title = got.TargetInfo.URL, got.TargetInfo.Title
-		} else {
-			info.URL, info.Title = t.pageInfoCached()
-		}
-		cancel()
-		tabs = append(tabs, info)
+		tabs = append(tabs, tb.panelTab(ctx, conn, t))
 	}
 	return true, tabs
+}
+
+// panelTab fills one tab's entry: owner, current address and title, and the
+// window size it renders at when one was set.
+func (tb *teamBrowser) panelTab(ctx context.Context, conn *cdpConn, t *tab) PanelTab {
+	info := PanelTab{ID: t.id, Owner: "member", Viewport: t.viewportOf()}
+	if t.member == OwnerUser {
+		info.Owner, info.Member = "user", ""
+	} else {
+		info.Member = t.member
+	}
+	// The call lock is held for a whole member call; a free lock means idle.
+	if info.Busy = t.callMu.TryLock(); info.Busy {
+		t.callMu.Unlock()
+	}
+	infoCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	var got struct {
+		TargetInfo struct {
+			URL   string `json:"url"`
+			Title string `json:"title"`
+		} `json:"targetInfo"`
+	}
+	if err := conn.call(infoCtx, "", "Target.getTargetInfo", map[string]any{"targetId": t.target}, &got); err == nil {
+		info.URL, info.Title = got.TargetInfo.URL, got.TargetInfo.Title
+	} else {
+		info.URL, info.Title = t.pageInfoCached()
+	}
+	return info
 }
 
 // tabOrder sorts "t2" before "t10".
@@ -347,4 +368,112 @@ func (t *tab) userNav(ctx context.Context, to string) error {
 		return err
 	}
 	return t.cdp(ctx, "Page.navigate", map[string]any{"url": url}, nil)
+}
+
+// OpenUserTab opens a page in a tab the user owns. The user asked for it, so
+// a browser that is down comes up; the tab counts against the user's own cap
+// and against neither member limit.
+func (m *Manager) OpenUserTab(ctx context.Context, teamID, rawURL string) (PanelTab, error) {
+	target := strings.TrimSpace(rawURL)
+	if target == "" {
+		target = "about:blank"
+	} else if _, err := checkURL(target); err != nil {
+		return PanelTab{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	tb := m.team(teamID)
+	tb.begin()
+	defer tb.end(m.idle)
+	if err := tb.ensureStarted(ctx, m); err != nil {
+		return PanelTab{}, err
+	}
+	t, err := tb.newTab(ctx, OwnerUser)
+	if err != nil {
+		return PanelTab{}, err
+	}
+	if target != "about:blank" {
+		if _, err := t.navigate(ctx, target); err != nil {
+			tb.removeTab(t)
+			return PanelTab{}, err
+		}
+	}
+	conn := tb.getConn()
+	if conn == nil {
+		tb.removeTab(t)
+		return PanelTab{}, fmt.Errorf("the browser is not running")
+	}
+	return tb.panelTab(ctx, conn, t), nil
+}
+
+// CloseTab closes one tab of a running team browser: the user may close
+// their own page and a member's page too.
+func (m *Manager) CloseTab(teamID, tabID string) error {
+	tb, t, err := m.tabOf(teamID, tabID)
+	if err != nil {
+		return err
+	}
+	tb.removeTab(t)
+	return nil
+}
+
+// SetViewport changes a tab's real window size; the last setter (user or
+// member) wins and the panel reports what the page now renders at.
+func (m *Manager) SetViewport(ctx context.Context, teamID, tabID string, req ViewportRequest) (*Viewport, error) {
+	vp, err := resolveViewport(req)
+	if err != nil {
+		return nil, err
+	}
+	_, t, err := m.tabOf(teamID, tabID)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.setViewport(ctx, vp); err != nil {
+		return nil, err
+	}
+	return t.viewportOf(), nil
+}
+
+// userTabs lists the tabs the user opened for themselves, answering from
+// live state only: asking never starts a browser.
+func (m *Manager) userTabs(ctx context.Context, teamID string) (Result, error) {
+	m.mu.Lock()
+	tb := m.teams[teamID]
+	m.mu.Unlock()
+	out := []TabInfo{}
+	if tb == nil {
+		return Result{UserTabs: out}, nil
+	}
+	conn := tb.getConn()
+	if conn == nil || !conn.alive() {
+		return Result{UserTabs: out,
+			Note: "团队浏览器没有在运行，用户当前没有打开的标签页。"}, nil
+	}
+	tb.mu.Lock()
+	list := make([]*tab, 0, len(tb.tabs))
+	for _, t := range tb.tabs {
+		if t.member == OwnerUser {
+			list = append(list, t)
+		}
+	}
+	tb.mu.Unlock()
+	sort.Slice(list, func(i, j int) bool { return tabOrder(list[i].id) < tabOrder(list[j].id) })
+	for _, t := range list {
+		info := TabInfo{ID: t.id}
+		infoCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		var got struct {
+			TargetInfo struct {
+				URL   string `json:"url"`
+				Title string `json:"title"`
+			} `json:"targetInfo"`
+		}
+		if err := conn.call(infoCtx, "", "Target.getTargetInfo", map[string]any{"targetId": t.target}, &got); err == nil {
+			info.URL, info.Title = got.TargetInfo.URL, got.TargetInfo.Title
+		} else {
+			info.URL, info.Title = t.pageInfoCached()
+		}
+		cancel()
+		out = append(out, info)
+	}
+	return Result{UserTabs: out}, nil
 }

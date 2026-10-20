@@ -8,9 +8,7 @@
     "teamList": "Team list",
     "workPanel": "Work panel",
     "openTeamList": "Expand team list",
-    "closeTeamList": "Collapse team list",
-    "openWorkPanel": "Expand work panel",
-    "closeWorkPanel": "Collapse work panel"
+    "closeTeamList": "Collapse team list"
   },
   "home": {
     "noTeams": "No teams yet. Create one and the project manager and members will collaborate here.",
@@ -451,8 +449,7 @@
       "tasks": "Tasks",
       "approvals": "Approvals",
       "activity": "Activity",
-      "memory": "Memories",
-      "browser": "Browser"
+      "memory": "Memories"
     }
   },
   "browser": {
@@ -468,7 +465,45 @@
     "reload": "Reload",
     "address": "Address",
     "view": "The team's browser; click and type to use it",
+    "userTab": "Your tab",
     "sharedHint": "This browser is shared with the members: what you do acts on the page, and a member is told when you touched its tab. Sign in once and every member shares the login."
+  },
+  "workspace": {
+    "tablist": "Workspace",
+    "closeTab": "Close",
+    "newTab": "New tab",
+    "collapse": "Collapse the workspace",
+    "createTab": "New tab",
+    "resize": "Workspace width",
+    "infoPanel": "Info panel",
+    "openInfoPanel": "Open the info panel",
+    "closeInfoPanel": "Close the info panel",
+    "newPage": {
+      "browser": "Browser",
+      "browserHint": "Open a web page you and the members can both work in",
+      "file": "File",
+      "changes": "Changes",
+      "terminal": "Terminal",
+      "later": "Later",
+      "memberPages": "Pages the members are using",
+      "noMemberPages": "No member has opened a page yet"
+    },
+    "browser": {
+      "memberTab": "{{name}}'s tab",
+      "memberBusy": "In use",
+      "memberHint": "Click and type as you like; it will not interrupt them",
+      "userOwn": "Yours",
+      "userHint": "a member can use it when needed",
+      "closed": "The page was closed",
+      "closeClosed": "Close this tab",
+      "viewport": "Viewport size",
+      "viewportFit": "Fit the window",
+      "viewportFull": "Actual size",
+      "viewportDesktop": "Desktop 1280 × 744",
+      "viewportTablet": "Tablet 768 × 1024",
+      "viewportPhone": "Phone 390 × 844",
+      "notAvailable": "The browser is unavailable"
+    }
   },
   "tasks": {
     "ownerUser": "You",

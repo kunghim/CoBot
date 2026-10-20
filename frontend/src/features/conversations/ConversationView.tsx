@@ -20,7 +20,9 @@ import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess from './RunProcess';
 import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
-import { Alert, Composer, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
+import { Alert, Composer, FloatingCard, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
+import WorkPanel from '../../components/WorkPanel';
+import { useWorkspace } from '../workspace/WorkspaceProvider';
 import Avatar from '../avatars/Avatar';
 import { MemberAvatarButton } from '../avatars/AvatarEditors';
 import ExchangeOverlay from './ExchangeOverlay';
@@ -36,6 +38,13 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const cancel = useCancelMessage(bot.id);
   const interrupt = useInterruptRun(bot.id);
   const retryRun = useRetryRun(bot.id);
+  const workspace = useWorkspace();
+  const infoButtonRef = useRef<HTMLButtonElement>(null);
+  // Closing the card returns the focus to the button that opened it.
+  const closeCard = () => {
+    workspace.setCardOpen(false);
+    infoButtonRef.current?.focus();
+  };
 
   const { drafts, setDraft, clearSentDraft } = useSelectedBot();
   const draft = drafts[bot.id] ?? '';
@@ -137,7 +146,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
     <TeamMembersContext.Provider value={membersById}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 items-center gap-3 px-4 py-2">
-        <ShellToggle side="left" />
+        <ShellToggle />
         <MemberAvatarButton bot={bot} disabled={readOnly} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold leading-5">{headerTitle}</p>
@@ -151,10 +160,35 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             )}
           </p>
         </div>
-        <ShellToggle side="right" />
+        {/* The conversation's own controls: the info card, and the way into
+            the workspace. The new-tab button stands aside while the
+            workspace is open (its strip has its own +). */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <IconButton
+            ref={infoButtonRef}
+            icon={Icons.tasks}
+            size="sm"
+            aria-expanded={workspace.cardOpen}
+            label={workspace.cardOpen ? t('workspace.closeInfoPanel') : t('workspace.openInfoPanel')}
+            onClick={() => (workspace.cardOpen ? closeCard() : workspace.setCardOpen(true))}
+          />
+          {!workspace.state.open && (
+            <IconButton icon={Icons.add} size="sm" label={t('workspace.createTab')} onClick={workspace.newTab} />
+          )}
+        </div>
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
+      {workspace.cardOpen && (
+        <FloatingCard
+          label={t('workspace.infoPanel')}
+          closeLabel={t('common.close')}
+          onClose={closeCard}
+          className="absolute bottom-3 right-3 top-3 z-10"
+        >
+          <WorkPanel />
+        </FloatingCard>
+      )}
       {exchange && (
         <ExchangeOverlay
           key={`${exchange.peerId}:${exchange.anchorId}`}
@@ -172,7 +206,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-8 py-4"
+        className={`min-h-0 flex-1 overflow-y-auto py-4 ${workspace.cardOpen ? 'pl-8 pr-[25rem]' : 'px-8'}`}
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (

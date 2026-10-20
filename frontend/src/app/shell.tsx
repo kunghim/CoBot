@@ -1,26 +1,19 @@
-// The workspace shell's state: whether the team list and the work panel are
-// open, and whether the window is narrow. The panels always sit in the
-// layout beside the conversation, never over it, so opening one never stops
-// the user from working; on a narrow window opening one side closes the
-// other, so the conversation keeps its room. The toggles live at the two
-// ends of the desktop title bar when the app draws one, otherwise at the two
-// ends of the page header — the conversation header, or the home page's top
-// row — so they never move.
+// The workspace shell's state: whether the team list is open, and whether
+// the window is narrow. The list always sits in the layout beside the
+// conversation, never over it; on a narrow window it steps aside so the
+// conversation keeps its room. The toggle lives at the left end of the
+// desktop title bar when the app draws one, otherwise at the left end of the
+// page header, so it never moves. The workspace on the right and the info
+// card over the conversation have their own state (features/workspace).
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PanelToggle } from '../components/ui';
-import { useWorkPanelRequests } from './workPanelNav';
 
 interface Shell {
   listOpen: boolean;
-  panelOpen: boolean;
   narrow: boolean;
   setListOpen: (open: boolean) => void;
-  setPanelOpen: (open: boolean) => void;
-  /** A page of the work panel (the browser) asks for more room. */
-  panelWide: boolean;
-  setPanelWide: (wide: boolean) => void;
-  /** The app draws its own title bar (desktop), which holds the toggles. */
+  /** The app draws its own title bar (desktop), which holds the toggle. */
   titleBar: boolean;
 }
 
@@ -34,34 +27,18 @@ function isWide(): boolean {
 
 export function ShellProvider({ children, titleBar = false }: { children: ReactNode; titleBar?: boolean }) {
   const [narrow, setNarrow] = useState(() => !isWide());
-  // A wide window starts with both panels open; a narrow one with the team
-  // list only, so the conversation is not squeezed on the first load.
-  const [listOpen, setList] = useState(true);
-  const [panelOpen, setPanel] = useState(isWide);
-  const [panelWide, setPanelWide] = useState(false);
+  // The list starts open at every width: on a narrow window it is the only
+  // side beside the conversation, and folding it is one click away.
+  const [listOpen, setListOpenState] = useState(true);
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia(WIDE);
-    const update = () => {
-      setNarrow(!query.matches);
-      // Becoming narrow with both open keeps the list and folds the panel.
-      if (!query.matches) setPanel(false);
-    };
+    const update = () => setNarrow(!query.matches);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  // On a narrow window the two sides take turns.
-  const setListOpen = useCallback((open: boolean) => {
-    setList(open);
-    if (open && !isWide()) setPanel(false);
-  }, []);
-  const setPanelOpen = useCallback((open: boolean) => {
-    setPanel(open);
-    if (open && !isWide()) setList(false);
-  }, []);
-  // Showing something in the work panel opens it first.
-  useWorkPanelRequests(useCallback(() => setPanelOpen(true), [setPanelOpen]));
-  return <ShellContext.Provider value={{ listOpen, panelOpen, narrow, setListOpen, setPanelOpen, panelWide, setPanelWide, titleBar }}>{children}</ShellContext.Provider>;
+  const setListOpen = useCallback((open: boolean) => setListOpenState(open), []);
+  return <ShellContext.Provider value={{ listOpen, narrow, setListOpen, titleBar }}>{children}</ShellContext.Provider>;
 }
 
 export function useShell(): Shell {
@@ -71,21 +48,20 @@ export function useShell(): Shell {
 }
 
 /**
- * The toggle for one side panel. A page header places it with place
- * 'header'; it then steps aside when the title bar holds the toggles.
+ * The toggle for the team list. A page header places it with place
+ * 'header'; it then steps aside when the title bar holds the toggle.
  */
-export function ShellToggle({ side, place = 'header' }: { side: 'left' | 'right'; place?: 'header' | 'titlebar' }) {
+export function ShellToggle({ place = 'header' }: { place?: 'header' | 'titlebar' }) {
   const { t } = useTranslation();
   const shell = useShell();
   if (place === 'header' && shell.titleBar) return null;
-  const open = side === 'left' ? shell.listOpen : shell.panelOpen;
   return (
     <PanelToggle
-      side={side}
-      open={open}
-      onToggle={() => (side === 'left' ? shell.setListOpen(!open) : shell.setPanelOpen(!open))}
-      openLabel={t(side === 'left' ? 'nav.openTeamList' : 'nav.openWorkPanel')}
-      closeLabel={t(side === 'left' ? 'nav.closeTeamList' : 'nav.closeWorkPanel')}
+      side="left"
+      open={shell.listOpen}
+      onToggle={() => shell.setListOpen(!shell.listOpen)}
+      openLabel={t('nav.openTeamList')}
+      closeLabel={t('nav.closeTeamList')}
     />
   );
 }

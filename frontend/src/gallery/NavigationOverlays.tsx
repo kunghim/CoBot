@@ -1,7 +1,7 @@
 // Gallery: navigation and things that float.
 import { useState } from 'react';
 import { Archive, Copy, Home, MoreHorizontal, Palette, Pencil, Settings, Settings2, ShieldCheck, Smile, Trash2, Users } from 'lucide-react';
-import { AlertDialog, Breadcrumbs, Button, ComposerOption, Count, Dialog, Field, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, Steps, TabPanel, Tabs, TextInput, Tooltip, Tree, shownState } from '../components/ui';
+import { AlertDialog, Breadcrumbs, Button, ComposerOption, Count, Dialog, Field, FloatingCard, IconButton, Menu, NavItem, NavSection, Pagination, Popover, RailItem, Sheet, SplitHandle, Steps, TabPanel, TabStrip, Tabs, TextInput, Tooltip, Tree, shownState } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const MODES = [
@@ -22,6 +22,14 @@ export default function NavigationOverlays() {
   const [sheet, setSheet] = useState<'left' | 'right' | null>(null);
   const [last, setLast] = useState('');
   const [mode, setMode] = useState('默认权限');
+  const [wsTabs, setWsTabs] = useState([
+    { id: 'browser:t1', label: '测试工程师 · 我的待办' },
+    { id: 'file:index.html', label: 'index.html' },
+    { id: 'changes', label: '变更' },
+  ]);
+  const [wsActive, setWsActive] = useState('browser:t1');
+  const [wsWidth, setWsWidth] = useState(560);
+  const [card, setCard] = useState(false);
 
   return (
     <Chapter id="navigation" title="导航与浮层" intro="导航把人带到别处；浮层临时盖在页面上。所有导航项都有静止、悬停、当前三种看得出的状态；所有浮层都能用 Esc 关闭，关闭后焦点回到打开它的按钮。">
@@ -198,6 +206,46 @@ export default function NavigationOverlays() {
           <Sheet open={sheet !== null} side={sheet ?? 'right'} onClose={() => setSheet(null)} title={sheet === 'left' ? '团队列表' : '工作面板'} closeLabel="关闭">
             <p className="text-sm text-neutral-500">面板内容</p>
           </Sheet>
+        </Demo>
+      </Doc>
+
+      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，打开时内容为它让位。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+        <Demo surface="sunken">
+          <div className="flex h-64 w-full">
+            <div className="min-w-0 flex-1">
+              <TabStrip
+                tabs={wsTabs}
+                activeId={wsActive}
+                label="工作区标签页"
+                closeTabLabel="关闭"
+                onSelect={setWsActive}
+                onClose={(id) => {
+                  const next = wsTabs.filter((tab) => tab.id !== id);
+                  setWsTabs(next);
+                  if (wsActive === id) setWsActive(next[next.length - 1]?.id ?? '');
+                }}
+                onNew={() => {
+                  if (!wsTabs.some((tab) => tab.id === 'new')) setWsTabs([...wsTabs, { id: 'new', label: '新标签页' }]);
+                  setWsActive('new');
+                }}
+                newTabLabel="新建标签页"
+                onCollapse={() => setLast('工作区已收起（标签保留）')}
+                collapseLabel="收起工作区"
+              />
+              <p className="px-2 pt-3 text-xs text-neutral-500 dark:text-neutral-400">当前宽度 {wsWidth}px · {last || '内容区'}</p>
+            </div>
+            <SplitHandle value={wsWidth} min={380} max={1200} label="工作区宽度" onChange={setWsWidth} />
+            {card && (
+              <FloatingCard label="信息" closeLabel="收起" onClose={() => setCard(false)} className="ml-2">
+                <p className="px-3 py-2 text-sm">任务、审批、动态、记忆四页放在这里；Esc 收起。</p>
+              </FloatingCard>
+            )}
+          </div>
+          <div className="mt-3">
+            <Button size="sm" variant={card ? 'secondary' : 'ghost'} onClick={() => setCard((open) => !open)} aria-expanded={card}>
+              {card ? '收起信息卡' : '打开信息卡'}
+            </Button>
+          </div>
         </Demo>
       </Doc>
     </Chapter>
