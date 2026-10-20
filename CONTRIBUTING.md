@@ -50,8 +50,8 @@ A merged PR is not a promise of an immediate
 release. Repository write access is not required to propose a change.
 
 Keep `main` as the default stable branch. Only this repository's `dev`
-branch may open a promotion PR into `main`. Squash topic PRs into `dev`;
-use a merge commit for `dev -> main` so repeated promotions retain shared
+branch may open a promotion PR into `main`. Use a merge commit for
+`dev -> main` so repeated promotions retain shared
 ancestry. Retain both long-lived branches and delete only finished topic
 branches. After promotion, bring `main` back into `dev` before the next
 promotion. Do not require a second approving account while there is only
@@ -334,14 +334,8 @@ final merge decision; passing CI does not automatically approve or merge a PR.
 There is no additional mandatory approval-count gate while one maintainer runs
 the project. Issue claim commands do not operate on PRs.
 
-| Merge route | Method |
-| --- | --- |
-| Topic branch into `dev` | Squash and merge: one PR becomes one commit |
-| `dev` into `main` | Merge commit: retain shared history between long-lived branches |
-
-Squashing a topic PR combines its individual development commits; they do not
-all appear separately on the mainline. This applies to new PRs and does not
-rewrite existing published history. Start the next task on a new topic branch.
+Promote `dev` into `main` with a merge commit so the long-lived branches keep
+their shared history. Start the next task on a new topic branch.
 After promotion, synchronize `main` back into `dev` without rewriting history,
 using a fast-forward when possible. Keep both long-lived branches; only remove
 a finished topic branch after confirming its work is integrated and it is no
@@ -366,9 +360,9 @@ Issue 来源标识。只有升级后用户或调用方需要调整用法的实�
 
 未完成用 Draft，完成后请求审查。CI 通过、重要审查意见解决后，由维护者决定合并；
 追加提交后重新核对差异与当前检查。暂不增加强制审批人数，也不自动批准或合并。
-普通 PR 默认 Squash 成一条提交，开发中的各条 commit 不逐条进入主线；`dev` 晋级
-`main` 使用 Merge commit。这不改写既有历史。晋级后将 `main` 同步回 `dev`，有条件
-时快进；确认无 worktree 或其他任务继续使用后再清理已完成的功能分支。
+`dev` 晋级 `main` 使用 Merge commit，以保留长期分支的共同历史。晋级后将 `main`
+同步回 `dev`，有条件时快进；确认无 worktree 或其他任务继续使用后再清理已完成的
+功能分支。
 
 普通 PR 用 `Refs #编号` 关联，合入 `dev` 先说明进展，真正解决的问题在晋级 `main`
 时再关闭。合并不等于发布，新版本和发布时间仍另行决定。
