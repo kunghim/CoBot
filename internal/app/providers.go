@@ -210,8 +210,10 @@ func (a *App) ProbeProvider(ctx context.Context, id string) (map[string]provider
 // bindProvider hands a provider to the engine.
 func (a *App) bindProvider(ctx context.Context, p domain.Provider) error {
 	if p.AuthMode == domain.ProviderAuthChatGPT {
-		// The official provider uses the engine's own login; there is
-		// nothing to bind.
+		// The official provider is the engine's own account: there is no
+		// endpoint and no key to hand over, and the engine already knows
+		// it. Refusing here would make the official provider impossible to
+		// store at all.
 		return nil
 	}
 	binder, err := a.providerBinder(ctx)
@@ -291,13 +293,27 @@ func (a *App) selectProviderInEngine(ctx context.Context, id string) error {
 	return nil
 }
 
-// restoreProviderInEngine puts the engine back on the provider it had before
-// a change that did not go through. A failure here cannot be reported to the
-// user as the cause of the original failure, so it is only logged.
-func (a *App) restoreProviderInEngine(ctx context.Context, id string) {
-	if err := a.selectProviderInEngine(ctx, id); err != nil && a.Logger != nil {
-		a.Logger.Warn("could not restore the engine's model provider", "providerId", id, "error", err)
-	}
+// syncEngineProvider tells the engine which provider the profile runs with.
+//
+// It happens in the background: the engine's own configuration is a fallback
+// for the paths that do not name a provider, and a busy engine must not hold
+// the user's change up. One write runs at a time, and each one carries the
+// value that is current when it starts, so two quick changes cannot arrive
+// out of order.
+func (a *App) syncEngineProvider(ctx context.Context) {
+	// The request's context ends with the response; the write outlives it.
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		a.providerSyncMu.Lock()
+		defer a.providerSyncMu.Unlock()
+		settings, err := a.GetSettings(detached)
+		if err != nil || settings.DefaultProvider == "" {
+			return
+		}
+		if err := a.selectProviderInEngine(detached, settings.DefaultProvider); err != nil && a.Logger != nil {
+			a.Logger.Warn("the engine did not take the profile's model provider", "providerId", settings.DefaultProvider, "error", err)
+		}
+	}()
 }
 
 // providerBinder returns the profile's engine as something that can accept

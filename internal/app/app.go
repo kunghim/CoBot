@@ -80,6 +80,10 @@ type App struct {
 	engineControl   *controlServer
 	engineLoginMu   sync.Mutex
 	engineLogin     *engine.LoginInfo
+	// providerSyncMu serializes the writes that put the profile's provider
+	// into the engine's own configuration, so two quick changes cannot
+	// arrive out of order.
+	providerSyncMu sync.Mutex
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
@@ -155,35 +159,13 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 			return domain.Settings{}, sqlite.NormalizeError(err)
 		}
 	}
-	// The engine runs with the provider the profile names, and the engine
-	// keeps that choice in its own configuration. The engine is told first:
-	// a value it refuses must not be written down, and a profile that says
-	// "run with this provider" while the engine still uses its own endpoint
-	// is exactly the failure this avoids.
-	previousProvider := ""
-	if patch.DefaultProvider != nil {
-		before, err := a.GetSettings(ctx)
-		if err != nil {
-			return domain.Settings{}, err
-		}
-		previousProvider = before.DefaultProvider
-		if err := a.selectProviderInEngine(ctx, *patch.DefaultProvider); err != nil {
-			return domain.Settings{}, err
-		}
-	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
-		if patch.DefaultProvider != nil {
-			a.restoreProviderInEngine(ctx, previousProvider)
-		}
 		return domain.Settings{}, err
 	}
 	defer tx.Rollback()
 	saved, err := sqlite.UpdateSettingsTx(ctx, tx, patch, expectedRevision)
 	if err != nil {
-		if patch.DefaultProvider != nil {
-			a.restoreProviderInEngine(ctx, previousProvider)
-		}
 		return domain.Settings{}, sqlite.NormalizeError(err)
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, saved); err != nil {
@@ -201,6 +183,14 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 		return domain.Settings{}, err
 	}
 	a.Hub.Publish()
+	// The engine is told after the profile is written. Its own configuration
+	// is a fallback for the paths that do not name a provider — a thread
+	// always names its own — so a busy engine must not hold the change up,
+	// and a fallback that did not land must not undo what the profile
+	// already accepted. The next change writes it again.
+	if patch.DefaultProvider != nil {
+		a.syncEngineProvider(ctx)
+	}
 	// A budget change can un-hold deliveries the old limit paused, so the
 	// affected bots are re-woken immediately instead of waiting for a message
 	// that may never come.

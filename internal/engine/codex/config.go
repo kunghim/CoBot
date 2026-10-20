@@ -5,7 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 )
+
+// configTimeout bounds one exchange with the engine's configuration. The
+// engine shares its home with the team engines, and a busy one can hold the
+// call; a bounded wait turns that into an error the caller can read
+// instead of a request that never returns.
+const configTimeout = 10 * time.Second
 
 // configWriteParams mirrors the app-server's config/value/write request.
 // Writing through the engine instead of editing config.toml by hand keeps
@@ -39,8 +46,10 @@ type configReadResult struct {
 // The value is whatever the key holds: a table for a provider, a string for
 // the provider the engine runs with.
 func (s *Server) writeConfigValue(ctx context.Context, keyPath string, value any, mergeStrategy string) (configWriteResult, error) {
+	callCtx, cancel := context.WithTimeout(ctx, configTimeout)
+	defer cancel()
 	var out configWriteResult
-	err := s.client.Call(ctx, "config/value/write", configWriteParams{
+	err := s.client.Call(callCtx, "config/value/write", configWriteParams{
 		KeyPath:       keyPath,
 		Value:         value,
 		MergeStrategy: mergeStrategy,
@@ -53,8 +62,10 @@ func (s *Server) writeConfigValue(ctx context.Context, keyPath string, value any
 
 // readConfig reads the engine's effective configuration.
 func (s *Server) readConfig(ctx context.Context) (map[string]any, error) {
+	callCtx, cancel := context.WithTimeout(ctx, configTimeout)
+	defer cancel()
 	var out configReadResult
-	if err := s.client.Call(ctx, "config/read", map[string]any{}, &out); err != nil {
+	if err := s.client.Call(callCtx, "config/read", map[string]any{}, &out); err != nil {
 		return nil, fmt.Errorf("codex config read: %w", err)
 	}
 	return out.Config, nil

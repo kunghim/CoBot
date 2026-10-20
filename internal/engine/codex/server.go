@@ -151,7 +151,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	// along with how it was started and how it ended.
 	peer := fmt.Sprintf("codex#%d", cmd.Process.Pid)
 	if opts.Trace != nil {
-		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": cmd.Env})
+		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": tracedEnv(cmd.Env)})
 		opts.Trace.Record("codex.process", "start", peer, started)
 	}
 	stderrLines.SetPeer(peer)
@@ -500,6 +500,38 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 	if s.callbacks.OnNotification != nil {
 		s.callbacks.OnNotification(n)
 	}
+}
+
+// tracedEnv records the environment the engine was started with, with the
+// values of credential-looking variables left out. A provider's API key
+// rides in that environment, and a recording is a file the user can copy
+// around; the name still says whether the variable was set.
+func tracedEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			out = append(out, entry)
+			continue
+		}
+		if secretEnvName(name) {
+			out = append(out, name+"=<redacted>")
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// secretEnvName reports whether an environment variable holds a credential.
+func secretEnvName(name string) bool {
+	upper := strings.ToUpper(name)
+	for _, marker := range []string{"KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"} {
+		if strings.Contains(upper, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // Epoch identifies this app-server lifetime (leases/requests reference it).

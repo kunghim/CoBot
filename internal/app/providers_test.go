@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -22,10 +23,18 @@ import (
 
 // fakeBinder records what the product asked the engine to do.
 type fakeBinder struct {
-	bound    []domain.Provider
-	unbound  []string
-	selected string
-	err      error
+	bound     []domain.Provider
+	unbound   []string
+	selected  string
+	err       error
+	selectErr error
+	// selectedCh reports every selection attempt, so a test can wait for the
+	// write that happens off the request path.
+	selectedCh chan string
+}
+
+func newFakeBinder() *fakeBinder {
+	return &fakeBinder{selectedCh: make(chan string, 8)}
 }
 
 func (f *fakeBinder) Dialects() []string { return []string{domain.DialectOpenAIResponses} }
@@ -44,6 +53,15 @@ func (f *fakeBinder) UnbindProvider(ctx context.Context, id string) error {
 }
 
 func (f *fakeBinder) SelectProvider(ctx context.Context, id string) error {
+	if f.selectedCh != nil {
+		select {
+		case f.selectedCh <- id:
+		default:
+		}
+	}
+	if f.selectErr != nil {
+		return f.selectErr
+	}
 	f.selected = id
 	return nil
 }
@@ -165,10 +183,11 @@ func TestProviderCredentialIsStoredEncryptedAndNeverListed(t *testing.T) {
 
 // The profile says which provider it runs with, and the engine has to be
 // told: a provider that is only in the engine's table is never used, and
-// every turn still goes to the engine's own endpoint.
+// every turn still goes to the engine's own endpoint. The write happens off
+// the request path, so the test waits for it.
 func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
 	ctx := context.Background()
-	binder := &fakeBinder{}
+	binder := newFakeBinder()
 	a := providerTestApp(t, binder)
 	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
 		t.Fatal(err)
@@ -179,8 +198,13 @@ func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
 	}, 0); err != nil {
 		t.Fatalf("set the default provider: %v", err)
 	}
-	if binder.selected != "cobot_deepseek" {
-		t.Fatalf("the engine runs with %q, want cobot_deepseek", binder.selected)
+	select {
+	case got := <-binder.selectedCh:
+		if got != "cobot_deepseek" {
+			t.Fatalf("the engine was told %q, want cobot_deepseek", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the engine was never told which provider to run with")
 	}
 	settings, err := a.GetSettings(ctx)
 	if err != nil {
@@ -191,8 +215,8 @@ func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
 	}
 }
 
-// A default that names no configured provider is refused, and the engine is
-// not switched to something that does not exist.
+// A dangling default provider is refused, and the engine is not switched to
+// something that does not exist.
 func TestSettingADanglingDefaultProviderIsRefused(t *testing.T) {
 	ctx := context.Background()
 	binder := &fakeBinder{}
@@ -205,6 +229,57 @@ func TestSettingADanglingDefaultProviderIsRefused(t *testing.T) {
 	}
 	if binder.selected != "" {
 		t.Fatalf("the engine was switched to %q", binder.selected)
+	}
+}
+
+// An engine that will not take the provider does not undo a change the
+// profile already accepted. The engine's own configuration is a fallback for
+// the paths that do not name a provider; a thread always names its own.
+func TestABusyEngineDoesNotUndoTheProfileChange(t *testing.T) {
+	ctx := context.Background()
+	binder := newFakeBinder()
+	binder.selectErr = errors.New("the engine is busy")
+	a := providerTestApp(t, binder)
+	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
+		t.Fatal(err)
+	}
+	id := "cobot_deepseek"
+	saved, err := a.UpdateSettings(ctx, auth.NewPrincipalUser(""), domain.SettingsPatch{
+		DefaultProvider: &id,
+	}, 0)
+	if err != nil {
+		t.Fatalf("the profile change was refused because the engine was busy: %v", err)
+	}
+	if saved.DefaultProvider != "cobot_deepseek" {
+		t.Fatalf("the profile names %q", saved.DefaultProvider)
+	}
+	// The engine was asked, and refused: the write happens off the request
+	// path, so the refusal lands after the change was accepted.
+	select {
+	case <-binder.selectedCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the engine was never asked which provider to run with")
+	}
+}
+
+// The official provider is the engine's own account: it has no endpoint and
+// no key to hand over, and it still has to be storable.
+func TestTheOfficialProviderCanBeStored(t *testing.T) {
+	ctx := context.Background()
+	binder := &fakeBinder{}
+	a := providerTestApp(t, binder)
+	view, err := a.SaveProvider(ctx, domain.Provider{
+		ID: "openai", Name: "OpenAI", Kind: domain.ProviderKindOfficial,
+		AuthMode: domain.ProviderAuthChatGPT,
+	}, 0)
+	if err != nil {
+		t.Fatalf("the official provider could not be stored: %v", err)
+	}
+	if view.HasCredential {
+		t.Fatal("the official provider reports a key")
+	}
+	if len(binder.bound) != 0 {
+		t.Fatal("the engine was asked to bind the official provider")
 	}
 }
 

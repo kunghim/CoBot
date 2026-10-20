@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -145,6 +146,27 @@ func TestStartThreadWithoutAProviderNamesNone(t *testing.T) {
 	p := req["params"].(map[string]any)
 	if _, named := p["modelProvider"]; named {
 		t.Fatalf("a thread without a provider named one: %v", p)
+	}
+}
+
+// A provider's key rides in the engine's environment, and a recording is a
+// file the user can copy around: the value is left out, the name stays, so
+// the recording still says whether the variable was set.
+func TestTracedEnvKeepsTheNameAndDropsTheValue(t *testing.T) {
+	got := tracedEnv([]string{
+		"PATH=C:\\bin",
+		"COBOT_PROVIDER_CPA_KEY=sk-the-secret",
+		"HOME=C:\\Users\\kungh",
+	})
+	joined := strings.Join(got, " ")
+	if strings.Contains(joined, "sk-the-secret") {
+		t.Fatalf("the recording kept the key: %v", got)
+	}
+	if !strings.Contains(joined, "COBOT_PROVIDER_CPA_KEY=") {
+		t.Fatalf("the recording lost the name: %v", got)
+	}
+	if !strings.Contains(joined, "PATH=C:\\bin") {
+		t.Fatalf("the recording lost an ordinary variable: %v", got)
 	}
 }
 
