@@ -17,6 +17,10 @@ vi.mock('../../api/queries', () => ({
     },
   }),
   useSetTeamReasoningEffort: () => ({ mutateAsync: state.save, isPending: false }),
+  // The picker follows the provider the profile runs with, so it needs the
+  // provider list and the way to write a gateway's own default model.
+  useProviders: () => ({ data: { providers: [] } }),
+  useSaveProvider: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('../../components/ui/Toast', () => ({ useToast: () => ({ show: state.toast, dismiss: vi.fn() }) }));
 vi.mock('../settings/useSettingSaver', () => ({ useSettingSaver: () => ({ save: vi.fn() }) }));

@@ -19,9 +19,10 @@ import {
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
-import type { EngineModel, ProviderRequest, Settings, SettingsPatch } from '../../api/types';
+import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
+import { gatewayModelID, gatewayModelRequest, gatewayModels, gatewayOf, providerOf } from '../providers/providerModels';
 import {
   Alert,
   Button,
@@ -470,8 +471,8 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
       </Card>
     );
   }
-  const provider = providers.data?.providers.find((entry) => entry.id === settings.defaultProvider);
-  const gateway = provider && provider.authMode !== 'chatgpt' ? provider : null;
+  const provider = providerOf(providers.data?.providers, settings.defaultProvider);
+  const gateway = gatewayOf(providers.data?.providers, settings.defaultProvider);
   // A provider that is named but gone leaves the profile on the engine's
   // own account, which is what the core falls back to as well.
   const providerGone = !!settings.defaultProvider && !provider;
@@ -485,13 +486,7 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
   }
 
   const options: { value: string; label: string }[] = gateway
-    ? gateway.models.map((model) => ({
-        value: model.id,
-        label:
-          model.status === 'failed'
-            ? `${model.displayName || model.id} · ${t('settings.modelUnavailable')}`
-            : model.displayName || model.id,
-      }))
+    ? gatewayModels(gateway, t('settings.modelUnavailable')).map((option) => ({ value: option.id, label: option.label }))
     : (models.data?.models ?? []).flatMap((model: EngineModel) => {
         const id = model.slug ?? model.id ?? '';
         return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
@@ -501,7 +496,7 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
   // profile's own setting. A gateway without a default falls back to its
   // first model, the same way the core picks the model for a turn, so the
   // picker shows what a turn will really ask for.
-  const value = gateway ? (gateway.defaultModel ?? gateway.models[0]?.id ?? '') : defaultModel;
+  const value = gateway ? gatewayModelID(gateway) : defaultModel;
   if (value !== '' && !options.some((option) => option.value === value)) {
     options.unshift({ value, label: value });
   }
@@ -531,20 +526,8 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
                 // The provider's own default model is what a turn asks for;
                 // the profile's setting is only the fallback for a profile
                 // that runs with no provider.
-                const body: ProviderRequest = {
-                  id: gateway.id,
-                  name: gateway.name,
-                  kind: gateway.kind,
-                  authMode: gateway.authMode,
-                  endpoints: gateway.endpoints,
-                  models: gateway.models,
-                  defaultModel: next,
-                  retries: gateway.retries,
-                  presetId: gateway.presetId,
-                  expectedRevision: gateway.revision,
-                };
                 saveProvider.mutate(
-                  { id: gateway.id, body },
+                  { id: gateway.id, body: gatewayModelRequest(gateway, next) },
                   {
                     onError: (error) => {
                       toast.show({ tone: 'danger', title: t('settings.saveFailed'), description: apiErrorMessage(t, error) });

@@ -132,7 +132,7 @@ export function ModelEffortPanel({ models, model, onModel, levels, effort, onEff
         <IconButton icon={RotateCcw} label={labels.reset} size="sm" shape="circle" disabled={isDefault} onClick={onReset} />
       </div>
       <div className="mt-3">
-        <SteppedSlider levels={levels} value={effort} onChange={onEffort} label={labels.effort} />
+        {levels.length > 0 && <SteppedSlider levels={levels} value={effort} onChange={onEffort} label={labels.effort} />}
       </div>
     </div>
   );
