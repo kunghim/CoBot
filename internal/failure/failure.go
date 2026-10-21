@@ -75,6 +75,13 @@ func ClassifyHTTP(status int, body string) (string, string) {
 	return classifyStatus(status)
 }
 
+// ClassifyBody maps a vendor's error body that came without an HTTP status
+// to a machine code, and reports false when the body names nothing it
+// knows. Like ClassifyHTTP, it never returns body text.
+func ClassifyBody(body string) (string, bool) {
+	return classifyBody(body)
+}
+
 // classifyBody looks for a well-known vendor error code in the response body.
 //
 // The body is normalized first: vendors write the same reason in several

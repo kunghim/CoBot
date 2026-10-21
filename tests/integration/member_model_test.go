@@ -138,6 +138,37 @@ func TestAnOfficialThreadIsNotReloadedOnEveryTurn(t *testing.T) {
 	if got := fake.Resumes(); got != 0 {
 		t.Fatalf("the official thread was resumed %d times while still loaded", got)
 	}
+	if _, off := fake.ThreadConfigs[0]["web_search"]; off {
+		t.Fatal("the ChatGPT account keeps web search; nothing should turn it off")
+	}
+}
+
+// Web search runs on OpenAI's side, and a provider that does not run it may
+// refuse every turn that offers it, so a member on an API provider starts
+// its thread without it.
+func TestAMemberOnAnAPIProviderGoesWithoutWebSearch(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+
+	saveProvider(t, h, "gateway", "gateway-model")
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	engineer := bots[1]
+	if _, err := h.app.SetBotModel(ctx, h.user, engineer.ID, "gateway", "gateway-model", engineer.Revision); err != nil {
+		t.Fatalf("choose the engineer's model: %v", err)
+	}
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{
+		BotID: engineer.ID, Text: "hi", RequestID: "no-web-search",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	if got := fake.ThreadProviders; len(got) != 1 || got[0] != "gateway" {
+		t.Fatalf("the thread named %v", got)
+	}
+	if got := fake.ThreadConfigs[0]["web_search"]; got != "disabled" {
+		t.Fatalf("web search on the API provider's thread is %v, want disabled", got)
+	}
 }
 
 func setDefaultModel(t *testing.T, h *m2Harness, providerID, model string) {

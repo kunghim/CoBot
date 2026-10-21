@@ -45,7 +45,10 @@ type Server struct {
 	// ThreadProviders records the provider each thread was started or
 	// resumed with, so a test can see which one CoBot asked for.
 	ThreadProviders []string
-	archived        []string
+	// ThreadConfigs records the config each thread was started or resumed
+	// with, in the same order.
+	ThreadConfigs []map[string]any
+	archived      []string
 }
 
 func (s *Server) SetTurnFact(threadID, turnID, status string) {
@@ -152,6 +155,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.loaded[id] = true
 	s.instructions = append(s.instructions, spec.DeveloperInstructions)
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: answeredProvider(spec.ModelProvider)}, nil
 }
 
@@ -167,6 +171,7 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	}
 	s.loaded[threadID] = true
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
 	return engine.ThreadInfo{ThreadID: threadID, Model: "fake-model", ModelProvider: answeredProvider(spec.ModelProvider)}, nil
 }
 

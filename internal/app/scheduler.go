@@ -899,6 +899,17 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	if err != nil {
 		return "", err
 	}
+	if providerID != officialEngineProvider {
+		// Web search is a tool OpenAI runs on its own side. The engine
+		// offers it with every request, and a provider that does not run
+		// it may refuse the whole turn over it (Xiaomi MiMo does, with
+		// responses_feature_not_supported), so a member on any provider
+		// but the ChatGPT account goes without it.
+		if config == nil {
+			config = map[string]any{}
+		}
+		config["web_search"] = "disabled"
+	}
 	instructions, told := s.app.threadInstructions(ctx, team, bot, role)
 	spec := engine.ThreadSpec{
 		Cwd:                   cwd,
