@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -21,6 +22,10 @@ import (
 
 // lastReplyRunes bounds the member's last reply quoted in a handover.
 const lastReplyRunes = 400
+
+// joinedToolName is a CoBot tool spelled with its namespace joined in, as
+// code mode writes it.
+var joinedToolName = regexp.MustCompile(`(?:tools\.)?mcp__cobot__([A-Za-z_]+)`)
 
 // threadPathReader is implemented by engines that can say where a thread's
 // record is, for a thread CoBot did not learn it of when it loaded it.
@@ -168,7 +173,9 @@ func (a *App) lastReply(ctx context.Context, botID string) string {
 		if messages[i].Kind != domain.MessageKindAssistant {
 			continue
 		}
-		text := strings.Join(strings.Fields(messages[i].RenderText()), " ")
+		// A tool named the way another vendor's model spelled it is how the
+		// next model would learn to spell it: the name alone goes in.
+		text := joinedToolName.ReplaceAllString(strings.Join(strings.Fields(messages[i].RenderText()), " "), "$1")
 		if text == "" {
 			continue
 		}

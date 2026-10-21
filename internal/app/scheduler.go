@@ -914,7 +914,9 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		}
 		config["web_search"] = "disabled"
 	}
-	instructions, told := s.app.threadInstructions(ctx, team, bot, role)
+	// A thread is started for one vendor (see needsFreshThread), so the way
+	// it is told to call the tools is fixed with it.
+	instructions, told := s.app.threadInstructions(ctx, team, bot, role, providerID == officialEngineProvider)
 	spec := engine.ThreadSpec{
 		Cwd:                   cwd,
 		Permission:            permissionMode(team),

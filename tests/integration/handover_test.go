@@ -170,3 +170,32 @@ func botRevision(t *testing.T, h *m2Harness, botID string) int64 {
 	}
 	return bot.Revision
 }
+
+// Each thread is told to call the tools the way its vendor's model can:
+// the ChatGPT account in code mode, another vendor as plain calls in the
+// mcp__cobot namespace.
+func TestAThreadIsToldToCallToolsTheWayItsVendorCan(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	engineer, tester := bots[1], bots[2]
+
+	// With no provider configured, a member runs on the ChatGPT account.
+	sendAndFinish(t, h, fake, engineer, "official")
+	saveVendorProvider(t, h, "vendor", "vendor-model")
+	chooseModel(t, h, tester.ID, "vendor", "vendor-model")
+	sendAndFinish(t, h, fake, tester, "vendor")
+	if got := fake.ThreadProviders; len(got) != 2 || got[0] != "openai" || got[1] != "vendor" {
+		t.Fatalf("the threads ran on %v", got)
+	}
+	got := fake.Instructions()
+	if len(got) != 2 {
+		t.Fatalf("%d threads started", len(got))
+	}
+	if !strings.Contains(got[0], "tools.mcp__cobot__") {
+		t.Fatal("the ChatGPT account's thread lost the code-mode spelling")
+	}
+	if strings.Contains(got[1], "tools.mcp__cobot__") || !strings.Contains(got[1], "mcp__cobot 这个命名空间") {
+		t.Fatal("another vendor's thread is told the code-mode spelling")
+	}
+}
