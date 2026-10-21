@@ -199,3 +199,73 @@ func TestAThreadIsToldToCallToolsTheWayItsVendorCan(t *testing.T) {
 		t.Fatal("another vendor's thread is told the code-mode spelling")
 	}
 }
+
+// A card left open after the turn that worked on it is reminded once; a
+// turn the user spent talking to the member about something else is not.
+func TestAnOpenCardIsRemindedOnceAndOnlyAfterItsOwnTurn(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	pm, dev := bots[0], bots[1]
+
+	h.handCard(t, team, pm, dev, "做页面", "能打开")
+	waitUntil(t, 5*time.Second, "card turn", func() bool { return len(fake.Turns()) == 1 })
+	finishTurn(t, h, fake, fake.Turns()[0], dev.ID)
+	waitUntil(t, 5*time.Second, "reminder turn", func() bool { return len(fake.Turns()) == 2 })
+	if !strings.Contains(fake.Turns()[1].Text, "这一轮结束了，但卡片还没有交接") {
+		t.Fatalf("the second turn is not the reminder:\n%s", fake.Turns()[1].Text)
+	}
+	finishTurn(t, h, fake, fake.Turns()[1], dev.ID)
+
+	sendAndFinish(t, h, fake, dev, "随便聊聊")
+	time.Sleep(300 * time.Millisecond)
+	if n := len(fake.Turns()); n != 3 {
+		t.Fatalf("%d turns; the card was reminded again", n)
+	}
+}
+
+// Stopping a chain cancels the handoff that was waiting, so the
+// requirement stays open with nobody on it; the conversation of the member
+// the step was for says where it stopped and how to go on.
+func TestAStoppedChainSaysWhereTheRequirementStopped(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	settings, err := h.app.GetSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := 1
+	if _, err := h.app.UpdateSettings(ctx, h.user, domain.SettingsPatch{ChainLimit: &one}, settings.Revision); err != nil {
+		t.Fatal(err)
+	}
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	pm, dev := bots[0], bots[1]
+	f := reviewFlow{t: t, h: h, fake: fake}
+
+	card, req := h.handCard(t, team, pm, dev, "做页面", "能打开")
+	turn := f.waitTurn(dev, "做页面")
+	f.call(dev, "handoff", map[string]any{"cardId": card.ID, "outcome": "done", "summary": "做好了", "idempotencyKey": "stop-notice"})
+	f.finish(dev, turn, "")
+	waitUntil(t, 5*time.Second, "budget card", func() bool {
+		pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
+	})
+	pending, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+	if _, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, domain.ChainOptionStop, "", pending[0].Revision); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	messages, err := sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, m := range messages {
+		if m.Kind == domain.MessageKindSystem && strings.Contains(m.RenderText(), "已按你的选择停止这条链") && strings.Contains(m.RenderText(), req.Title) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no notice in the project manager's conversation: %+v", messages)
+	}
+}

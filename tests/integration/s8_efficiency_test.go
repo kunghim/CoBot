@@ -40,9 +40,13 @@ func TestCardsShareATurnAndHandedOffOnesAreDropped(t *testing.T) {
 		t.Fatalf("the handed-off card was handed over again: %q", both.Text)
 	}
 	f.finish(dev, both, "")
+	// The turn ended with both cards still open: one reminder names both,
+	// and a turn that again hands nothing on is not reminded twice.
+	reminder := f.waitTurn(dev, "这一轮结束了，但卡片还没有交接", "卡片乙", "卡片丙")
+	f.finish(dev, reminder, "")
 	time.Sleep(300 * time.Millisecond)
-	if n := len(f.turnsOf(dev)); n != 2 {
-		t.Fatalf("member turns = %d, want 2", n)
+	if n := len(f.turnsOf(dev)); n != 3 {
+		t.Fatalf("member turns = %d, want 3", n)
 	}
 	for _, title := range []string{"卡片乙", "卡片丙"} {
 		if got := f.task(ids[title]); got.Status != domain.TaskDoing {

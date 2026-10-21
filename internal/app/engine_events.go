@@ -322,6 +322,17 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 			nextStatus = domain.BotStatusWaitingInput
 		}
 	}
+	// A turn that ended with the member's card still open, and nothing else
+	// coming, gets one reminder to hand it on.
+	if st.status == domain.RunCompleted && nextStatus == domain.BotStatusIdle {
+		reminded, err := remindUnhandedCardsLocked(ctx, tx, teamID, botID, run.ID)
+		if err != nil {
+			return err
+		}
+		if reminded {
+			nextStatus = domain.BotStatusQueued
+		}
+	}
 	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
 		return err
 	}

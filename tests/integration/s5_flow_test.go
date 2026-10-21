@@ -269,20 +269,19 @@ func TestNotesReachTheNextTurn(t *testing.T) {
 		t.Fatal("a note woke its recipient")
 	}
 	finishTurn(t, h, fake, fake.Turns()[0], dev.ID)
+	// The card is still open, so the developer is reminded once; that next
+	// turn lists the card it still holds.
+	waitUntil(t, 5*time.Second, "developer reminder", func() bool { return len(fake.Turns()) == 2 })
+	if text := fake.Turns()[1].Text; !strings.Contains(text, "# 你手上的卡片") || !strings.Contains(text, "做页面") || !strings.Contains(text, "还没有交接") {
+		t.Fatalf("the reminder turn lacks the card:\n%s", text)
+	}
+	finishTurn(t, h, fake, fake.Turns()[1], dev.ID)
 
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: qa.ID, Text: "你好"}); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, 5*time.Second, "tester turn", func() bool { return len(fake.Turns()) == 2 })
-	if text := fake.Turns()[1].Text; !strings.Contains(text, "页面结构是单文件") || !strings.Contains(text, "不需要回复") {
+	waitUntil(t, 5*time.Second, "tester turn", func() bool { return len(fake.Turns()) == 3 })
+	if text := fake.Turns()[2].Text; !strings.Contains(text, "页面结构是单文件") || !strings.Contains(text, "不需要回复") {
 		t.Fatalf("tester turn lacks the note:\n%s", text)
-	}
-	// The developer's next turn lists the card it still holds.
-	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: dev.ID, Text: "进度？"}); err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, 5*time.Second, "developer turn", func() bool { return len(fake.Turns()) == 3 })
-	if text := fake.Turns()[2].Text; !strings.Contains(text, "# 你手上的卡片") || !strings.Contains(text, "做页面") {
-		t.Fatalf("developer turn lacks its cards:\n%s", text)
 	}
 }

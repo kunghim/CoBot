@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -566,4 +567,79 @@ func migratorBefore(t *testing.T, db *sql.DB, first string) (*Migrator, error) {
 		}
 	}
 	return NewMigratorWithFS(db, testutil.NewMapFS(source))
+}
+
+// Version 23 drops the tasks of the old collaboration model. A team that
+// had some is told in its project manager's conversation how many went and
+// where the snapshot taken before the upgrade is.
+func TestDroppedTasksAreToldToTheirTeam(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open(filepath.Join(dir, "cobot.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := map[string]string{}
+	for _, path := range files {
+		if name := strings.TrimPrefix(path, "migrations/"); name < "00023" {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before[name] = string(raw)
+		}
+	}
+	old, err := NewMigratorWithFS(db, testutil.NewMapFS(before))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := old.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, team := range []string{"busy", "idle"} {
+		if _, err := db.ExecContext(ctx, `INSERT INTO teams (id, name, leader_id, profile_instance, status, created_at, updated_at) VALUES (?, ?, ?, 'i', 'active', ?, ?)`, team, team, team+"-lead", now, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO bots (id, team_id, name, role_id, role_version, is_leader, created_at) VALUES (?, ?, '项目经理', 'leader', 'old', 1, ?)`, team+"-lead", team, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, status := range []string{"doing", "todo", "done"} {
+		if _, err := db.ExecContext(ctx, `INSERT INTO tasks (id, team_id, owner_id, title, status, created_at, updated_at) VALUES (?, 'busy', 'busy-lead', '旧任务', ?, ?, ?)`, fmt.Sprintf("task-%d", i), status, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current, err := NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := current.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	notes := map[string]string{}
+	rows, err := db.QueryContext(ctx, `SELECT team_id, blocks FROM messages WHERE kind = ?`, domain.MessageKindSystem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var team, blocks string
+		if err := rows.Scan(&team, &blocks); err != nil {
+			t.Fatal(err)
+		}
+		notes[team] = blocks
+	}
+	note, ok := notes["busy"]
+	if !ok || !strings.Contains(note, "共 3 个任务，其中 2 个还没完成") || !strings.Contains(note, "cobot-v22-") {
+		t.Fatalf("the busy team was not told: %q", note)
+	}
+	if _, told := notes["idle"]; told {
+		t.Fatal("a team without tasks was told about dropped ones")
+	}
 }
