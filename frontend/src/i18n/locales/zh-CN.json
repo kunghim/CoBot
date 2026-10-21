@@ -770,7 +770,9 @@
   "auth": {
     "authorizing": "正在授权…",
     "unauthorizedTitle": "需要授权",
-    "unauthorizedBody": "页面会话不存在或已过期。请在终端重新运行 cobot serve（同 profile 会打印新的 60 秒一次性链接），或使用桌面端打开。",
+    "unauthorizedBody": "这个浏览器还没有拿到会话。刷新一次通常就够了；还是不行就在终端重新运行 cobot serve，或者用桌面端打开。",
+    "unreachableTitle": "服务没连上",
+    "unreachableBody": "连不上 CoBot 的服务。请确认 cobot serve 还在运行，然后重试。",
     "retry": "重试"
   },
   "status": {

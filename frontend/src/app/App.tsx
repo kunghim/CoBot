@@ -10,29 +10,30 @@ import { useAppearance } from './appearance';
 import { AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
 import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
 import { ShellProvider, ShellToggle } from './shell';
+import { authStateFrom, type AuthState } from './authState';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
-type AuthState = 'checking' | 'authorized' | 'unauthorized';
-
-/** Reads a startup secret from the URL fragment (product flow), asks the
- * desktop bridge, or — in development only — the Vite dev server. */
-async function obtainAndExchangeSecret(): Promise<boolean> {
+/** Redeems a startup secret if there is one: the URL fragment (product
+ * flow), the desktop bridge, or — in development only — the Vite dev
+ * server.
+ *
+ * Getting no secret is not a failure. The core issues the page a session as
+ * it loads, so the ordinary case needs nothing from here. */
+async function obtainAndExchangeSecret(): Promise<void> {
   const params = new URLSearchParams(window.location.hash.slice(1));
   const fragmentSecret = params.get('cobot-bootstrap');
   if (fragmentSecret) {
-    await api.exchangeBootstrap(fragmentSecret);
+    // The fragment is spent either way: a secret that has expired would
+    // otherwise be offered again on every reload, and fail again.
     history.replaceState(null, '', window.location.pathname + window.location.search);
-    return true;
+    await api.exchangeBootstrap(fragmentSecret);
+    return;
   }
   const nativeSecret = await desktopSecret();
-  if (nativeSecret) { await api.exchangeBootstrap(nativeSecret); return true; }
+  if (nativeSecret) { await api.exchangeBootstrap(nativeSecret); return; }
   const devSecret = await devLinkSecret();
-  if (devSecret) {
-    await api.exchangeBootstrap(devSecret);
-    return true;
-  }
-  return false;
+  if (devSecret) { await api.exchangeBootstrap(devSecret); }
 }
 
 export default function App() {
@@ -98,31 +99,30 @@ function Screens() {
       return;
     }
     if (attemptedRef.current) {
-      setAuthState('unauthorized');
+      setAuthState(authStateFrom({ authorized: status.data?.authorized, failed: status.isError }));
       return;
     }
     attemptedRef.current = true;
     let cancelled = false;
     void (async () => {
+      // A secret that has expired or was already used is no reason to lock
+      // the page out: the core issues this page a session as it loads, and
+      // only the core's answer decides whether the page is in.
       try {
-        const ok = await obtainAndExchangeSecret();
-        if (cancelled) return;
-        if (!ok) {
-          setAuthState('unauthorized');
-          return;
-        }
-        const result = await status.refetch();
-        if (cancelled) return;
-        setAuthState(result.data?.authorized ? 'authorized' : 'unauthorized');
+        await obtainAndExchangeSecret();
       } catch {
-        if (!cancelled) setAuthState('unauthorized');
+        // Ignored on purpose; the status below is the authority.
       }
+      if (cancelled) return;
+      const result = await status.refetch();
+      if (cancelled) return;
+      setAuthState(authStateFrom({ authorized: result.data?.authorized, failed: result.isError }));
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status.isFetched, status.isFetching, status.data?.authorized]);
+  }, [status.isFetched, status.isFetching, status.isError, status.data?.authorized]);
 
   const snapshot = useSnapshot(authState === 'authorized');
   useEffect(() => {
@@ -151,8 +151,12 @@ function Screens() {
           <div className="flex items-start gap-3">
             <BrandMark size={40} label={t('app.title')} />
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{t('auth.unauthorizedTitle')}</h1>
-              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('auth.unauthorizedBody')}</p>
+              <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
+                {t(authState === 'unreachable' ? 'auth.unreachableTitle' : 'auth.unauthorizedTitle')}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                {t(authState === 'unreachable' ? 'auth.unreachableBody' : 'auth.unauthorizedBody')}
+              </p>
               <div className="mt-5">
                 <Button
                   variant="primary"
