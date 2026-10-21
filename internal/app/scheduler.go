@@ -539,6 +539,9 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
+	if model == "" {
+		model = turnModel(turnCtx, choice, server)
+	}
 	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {

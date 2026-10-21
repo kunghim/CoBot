@@ -51,7 +51,7 @@ var bodyClues = []bodyClue{
 	{CodeQuota, []string{"insufficient_quota", "billing", "payment_required"}},
 	{CodeRateLimit, []string{"rate_limit", "too_many_requests"}},
 	{CodeAuthInvalid, []string{"invalid_api_key", "unauthorized", "permission_denied", "authentication"}},
-	{CodeModelUnknown, []string{"model_not_found", "does not exist", "unknown model"}},
+	{CodeModelUnknown, []string{"model_not_found", "does not exist", "unknown model", "model is not supported"}},
 	{CodeContextExceeded, []string{"context_length", "too many tokens", "maximum context"}},
 	{CodeProtocolUnsupported, []string{"not supported", "unsupported"}},
 }

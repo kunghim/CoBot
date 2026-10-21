@@ -151,3 +151,39 @@ func setDefaultModel(t *testing.T, h *m2Harness, providerID, model string) {
 		t.Fatalf("name the default model: %v", err)
 	}
 }
+
+// A member moved back to the default after a model of its own runs the
+// engine's default model again. A turn that names no model keeps whatever
+// its thread last ran with, so the default has to be named.
+func TestAMemberBackOnTheDefaultLeavesItsOwnModel(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	engineer := bots[1]
+	engineer, err := h.app.SetBotModel(ctx, h.user, engineer.ID, "openai", "chosen-model", engineer.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: engineer.ID, Text: "first", RequestID: "own-model"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "first turn", func() bool { return len(fake.Turns()) == 1 })
+	first := fake.Turns()[0]
+	fake.EmitTurnCompleted(first.ThreadID, first.TurnID, "completed", "done")
+	if first.Model != "chosen-model" {
+		t.Fatalf("the first turn asked for %q", first.Model)
+	}
+
+	if _, err := h.app.SetBotModel(ctx, h.user, engineer.ID, "", "", engineer.Revision); err != nil {
+		t.Fatalf("back to the default: %v", err)
+	}
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: engineer.ID, Text: "second", RequestID: "back-to-default"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "second turn", func() bool { return len(fake.Turns()) == 2 })
+	if got := fake.Turns()[1].Model; got != "fake-model" {
+		t.Fatalf("the turn after going back asked for %q, want the engine's default", got)
+	}
+}

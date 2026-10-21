@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -72,7 +74,7 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	}
 	for _, c := range candidates {
 		if p, ok := byID[c.provider]; ok && p.Enabled {
-			return choiceFor(p, c.model, settings.DefaultModel), nil
+			return a.namedModel(ctx, choiceFor(p, c.model, settings.DefaultModel)), nil
 		}
 	}
 	// With nothing named, the first enabled provider that can run a turn:
@@ -80,12 +82,84 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	signedIn := a.EngineStatusCached().LoggedIn
 	for _, p := range providers {
 		if p.Enabled && (p.AuthMode != domain.ProviderAuthChatGPT || signedIn) {
-			return choiceFor(p, "", settings.DefaultModel), nil
+			return a.namedModel(ctx, choiceFor(p, "", settings.DefaultModel)), nil
 		}
 	}
 	// Nothing is configured or everything is off: the engine's own account
 	// is what is left, and the core does not refuse to run on it.
-	return ModelChoice{EngineProvider: officialEngineProvider, Model: settings.DefaultModel}, nil
+	return a.namedModel(ctx, ModelChoice{EngineProvider: officialEngineProvider, Model: settings.DefaultModel}), nil
+}
+
+// namedModel fills in the engine's own default model when a choice on the
+// ChatGPT account names none. A turn that asks for no model keeps whatever
+// model its thread last ran with, so a member moved back to "the default"
+// from a model of its own would otherwise go on running that model.
+func (a *App) namedModel(ctx context.Context, choice ModelChoice) ModelChoice {
+	if choice.Model == "" && choice.EngineProvider == officialEngineProvider {
+		choice.Model = a.engineDefaultModel(ctx)
+	}
+	return choice
+}
+
+// engineDefaultModel is the model the engine marks as its default, cached
+// for a few minutes; empty when the engine cannot say.
+func (a *App) engineDefaultModel(ctx context.Context) string {
+	a.engineDefaultMu.Lock()
+	defer a.engineDefaultMu.Unlock()
+	if a.engineDefault != "" && time.Now().Before(a.engineDefaultUntil) {
+		return a.engineDefault
+	}
+	raw, err := a.ModelList(ctx)
+	if err != nil {
+		return ""
+	}
+	id := defaultModelIn(raw)
+	if id != "" {
+		a.engineDefault, a.engineDefaultUntil = id, time.Now().Add(5*time.Minute)
+	}
+	return id
+}
+
+// defaultModelIn picks the default model out of a sanitized model list: the
+// one marked as default, else the first.
+func defaultModelIn(raw json.RawMessage) string {
+	var list struct {
+		Models []struct {
+			Slug      string `json:"slug"`
+			ID        string `json:"id"`
+			IsDefault bool   `json:"isDefault"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(raw, &list) != nil || len(list.Models) == 0 {
+		return ""
+	}
+	pick := list.Models[0]
+	for _, m := range list.Models {
+		if m.IsDefault {
+			pick = m
+			break
+		}
+	}
+	if pick.Slug != "" {
+		return pick.Slug
+	}
+	return pick.ID
+}
+
+// turnModel is the model a turn asks the team's own engine for. A choice on
+// the ChatGPT account that still names none takes the engine's default from
+// that engine: a turn without a model keeps the one its thread last used.
+func turnModel(ctx context.Context, choice ModelChoice, server interface {
+	ModelList(context.Context) (json.RawMessage, error)
+}) string {
+	if choice.Model != "" || choice.EngineProvider != officialEngineProvider {
+		return choice.Model
+	}
+	raw, err := server.ModelList(ctx)
+	if err != nil {
+		return ""
+	}
+	return defaultModelIn(sanitizeModels(raw))
 }
 
 // choiceFor names the model a provider serves for a requested id: the

@@ -481,6 +481,11 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 				// safe to store, and the retry attempt count is read
 				// from it.
 				failureCode = root
+			} else if status, ok := httpErrorStatus(p.Error.Message); ok {
+				// Without structured detail the engine passes the
+				// vendor's own error body on as its message; the status
+				// and the body's wording are the same evidence.
+				failureCode, _ = failure.ClassifyHTTP(status, p.Error.Message)
 			}
 			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: code, FailureCode: failureCode, WillRetry: p.WillRetry}
 		}
@@ -1056,4 +1061,22 @@ func (s *Server) Ping(ctx context.Context) error {
 // (for example account/logout).
 func (s *Server) Call(ctx context.Context, method string, params any, out any) error {
 	return s.client.Call(ctx, method, params, out)
+}
+
+// httpErrorStatus reads the HTTP status out of an error message that is a
+// vendor's JSON error body, as the engine passes one on when it has nothing
+// structured to say, for example
+// {"type":"error","status":400,"error":{"message":"..."}}.
+func httpErrorStatus(message string) (int, bool) {
+	trimmed := strings.TrimSpace(message)
+	if !strings.HasPrefix(trimmed, "{") {
+		return 0, false
+	}
+	var body struct {
+		Status int `json:"status"`
+	}
+	if json.Unmarshal([]byte(trimmed), &body) != nil || body.Status < 400 || body.Status > 599 {
+		return 0, false
+	}
+	return body.Status, true
 }
