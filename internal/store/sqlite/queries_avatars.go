@@ -22,6 +22,20 @@ func SetBotAvatar(ctx context.Context, tx *sql.Tx, botID string, ref *domain.Ava
 	return nil
 }
 
+// SetBotModel stores the model a member runs with; an empty provider makes
+// the member follow the default model again. It returns ErrNotFound for a
+// deleted or unknown member.
+func SetBotModel(ctx context.Context, tx *sql.Tx, botID, providerID, model string) error {
+	result, err := tx.ExecContext(ctx, `UPDATE bots SET provider_id = ?, model = ?, revision = revision + 1 WHERE id = ? AND deleted_at = ''`, providerID, model, botID)
+	if err != nil {
+		return fmt.Errorf("set bot model: %w", err)
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // RoleAvatars returns the avatars the user chose for roles, by role id.
 func RoleAvatars(ctx context.Context, q Queryer) (map[string]domain.AvatarRef, error) {
 	rows, err := q.QueryContext(ctx, `SELECT role_id, avatar FROM role_avatars`)

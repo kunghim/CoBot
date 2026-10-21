@@ -97,6 +97,11 @@ func (a *App) SaveProvider(ctx context.Context, p domain.Provider, expectedRevis
 
 // DeleteProvider removes a provider and tells the engine to forget it.
 func (a *App) DeleteProvider(ctx context.Context, id string) error {
+	// The ChatGPT account is always in the list; switching it off is how a
+	// user stops offering it.
+	if current, err := sqlite.GetProvider(ctx, a.DB, id); err == nil && current.AuthMode == domain.ProviderAuthChatGPT {
+		return domain.InvalidRequest("error.provider.official_permanent", nil)
+	}
 	if err := sqlite.DeleteProvider(ctx, a.DB, id); err != nil {
 		return sqlite.NormalizeError(err)
 	}
@@ -234,61 +239,6 @@ func (a *App) unbindProvider(ctx context.Context, id string) error {
 	return binder.UnbindProvider(ctx, id)
 }
 
-// ThreadProvider returns the provider a thread should run with, and the model
-// that belongs to it.
-//
-// A team that names its own provider wins; a team that does not follows the
-// profile's default. The thread's own record is not consulted: it says which
-// provider the thread had, not the one it should have.
-//
-// The engine refuses a provider id it does not know — "Model provider `x` not
-// found" is a hard error, not a fallback — so an id is only handed over when
-// it names a provider that is actually configured. The official provider is
-// never named: it is the engine's own account, and the engine would have to
-// know a third-party id for it.
-//
-// The model comes from the same place. The provider's own default model is
-// the one the user picked for that vendor; the engine's default model
-// belongs to a vendor the profile may no longer be using, and asking for it
-// against a third-party gateway is how a turn ends in a 400 about a model
-// that vendor never had.
-func (a *App) ThreadProvider(ctx context.Context, teamID string) (providerID string, model string, err error) {
-	settings, err := a.GetSettings(ctx)
-	if err != nil {
-		return "", "", err
-	}
-	id := settings.DefaultProvider
-	if teamID != "" {
-		team, err := sqlite.GetTeamByID(ctx, a.DB, teamID)
-		if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
-			return "", "", err
-		}
-		if team.ProviderID != "" {
-			id = team.ProviderID
-		}
-	}
-	if id == "" {
-		return "", settings.DefaultModel, nil
-	}
-	p, err := sqlite.GetProvider(ctx, a.DB, id)
-	if err != nil {
-		// The provider is gone: the thread runs with the engine's own
-		// account rather than failing to start at all.
-		return "", settings.DefaultModel, nil
-	}
-	if p.AuthMode == domain.ProviderAuthChatGPT {
-		return "", settings.DefaultModel, nil
-	}
-	model = p.DefaultModel
-	if model == "" && len(p.Models) > 0 {
-		model = p.Models[0].ID
-	}
-	if model == "" {
-		model = settings.DefaultModel
-	}
-	return id, model, nil
-}
-
 // selectProviderInEngine makes the engine run with the named provider.
 //
 // The profile's setting is the truth, but the engine keeps the choice in its
@@ -306,25 +256,20 @@ func (a *App) selectProviderInEngine(ctx context.Context, id string) error {
 	return nil
 }
 
-// syncEngineProvider tells the engine which provider the profile runs with.
+// syncEngineProvider puts the engine's own default back on its own account.
 //
-// It happens in the background: the engine's own configuration is a fallback
-// for the paths that do not name a provider, and a busy engine must not hold
-// the user's change up. One write runs at a time, and each one carries the
-// value that is current when it starts, so two quick changes cannot arrive
-// out of order.
+// Every thread names the provider it runs with, so the engine's configured
+// default is only what calls without a thread see — the model list among
+// them, which has to be the engine's own. A profile that once set another
+// provider as that default is put back here. It happens in the background,
+// one write at a time, so a busy engine never holds a settings change up.
 func (a *App) syncEngineProvider(ctx context.Context) {
-	// The request's context ends with the response; the write outlives it.
 	detached := context.WithoutCancel(ctx)
 	go func() {
 		a.providerSyncMu.Lock()
 		defer a.providerSyncMu.Unlock()
-		settings, err := a.GetSettings(detached)
-		if err != nil || settings.DefaultProvider == "" {
-			return
-		}
-		if err := a.selectProviderInEngine(detached, settings.DefaultProvider); err != nil && a.Logger != nil {
-			a.Logger.Warn("the engine did not take the profile's model provider", "providerId", settings.DefaultProvider, "error", err)
+		if err := a.selectProviderInEngine(detached, ""); err != nil && a.Logger != nil {
+			a.Logger.Warn("the engine did not take its own account back as the default", "error", err)
 		}
 	}()
 }

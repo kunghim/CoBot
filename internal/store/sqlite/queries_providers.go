@@ -12,7 +12,7 @@ import (
 )
 
 // providerColumns lists the model_providers columns in scan order.
-const providerColumns = `id, name, kind, auth_mode, credential_ref, endpoints_json, models_json, default_model, retries_json, preset_id, revision, created_at, updated_at`
+const providerColumns = `id, name, kind, auth_mode, credential_ref, endpoints_json, models_json, default_model, retries_json, preset_id, enabled, revision, created_at, updated_at`
 
 // ListProviders reads every model provider, oldest first.
 func ListProviders(ctx context.Context, q Queryer) ([]domain.Provider, error) {
@@ -64,9 +64,10 @@ func scanProvider(s scanner) (domain.Provider, error) {
 		retriesJSON   string
 		created       string
 		updated       string
+		enabled       int
 	)
 	err := s.Scan(&p.ID, &p.Name, &p.Kind, &p.AuthMode, &p.CredentialRef, &endpointsJSON,
-		&modelsJSON, &p.DefaultModel, &retriesJSON, &p.PresetID, &p.Revision, &created, &updated)
+		&modelsJSON, &p.DefaultModel, &retriesJSON, &p.PresetID, &enabled, &p.Revision, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Provider{}, ErrNotFound
 	}
@@ -84,6 +85,7 @@ func scanProvider(s scanner) (domain.Provider, error) {
 	if err := json.Unmarshal([]byte(retriesJSON), &p.Retries); err != nil {
 		p.Retries = domain.ProviderRetries{}
 	}
+	p.Enabled = enabled != 0
 	p.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	p.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	return p, nil
@@ -131,9 +133,12 @@ func UpsertProviderTx(ctx context.Context, tx *sql.Tx, p domain.Provider, expect
 	current, err := getProvider(ctx, tx, p.ID)
 	switch {
 	case errors.Is(err, ErrNotFound):
+		// A provider the user just added is on offer straight away. Whether
+		// it stays on is SetProviderEnabled's business, never a save's, so
+		// an edit form that knows nothing about it cannot switch it off.
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO model_providers (`+providerColumns+`)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`,
 			p.ID, p.Name, p.Kind, p.AuthMode, p.CredentialRef, string(endpointsJSON),
 			string(modelsJSON), p.DefaultModel, string(retriesJSON), p.PresetID, now, now)
 		if err != nil {
@@ -160,6 +165,43 @@ func UpsertProviderTx(ctx context.Context, tx *sql.Tx, p domain.Provider, expect
 		}
 	}
 	return getProvider(ctx, tx, p.ID)
+}
+
+// SetProviderEnabled switches whether members may pick a provider's models.
+func SetProviderEnabled(ctx context.Context, db *sql.DB, id string, enabled bool, expectedRevision int64) (domain.Provider, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Provider{}, fmt.Errorf("begin provider enable tx: %w", err)
+	}
+	defer tx.Rollback()
+	current, err := getProvider(ctx, tx, id)
+	if errors.Is(err, ErrNotFound) {
+		return domain.Provider{}, domain.NotFound("error.provider.not_found", map[string]any{"id": id})
+	}
+	if err != nil {
+		return domain.Provider{}, err
+	}
+	if expectedRevision > 0 && current.Revision != expectedRevision {
+		return domain.Provider{}, domain.RevisionConflict("error.provider.revision_conflict", map[string]any{
+			"expected": expectedRevision, "actual": current.Revision,
+		})
+	}
+	value := 0
+	if enabled {
+		value = 1
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `UPDATE model_providers SET enabled = ?, revision = revision + 1, updated_at = ? WHERE id = ?`, value, now, id); err != nil {
+		return domain.Provider{}, fmt.Errorf("set provider enabled: %w", err)
+	}
+	saved, err := getProvider(ctx, tx, id)
+	if err != nil {
+		return domain.Provider{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Provider{}, err
+	}
+	return saved, nil
 }
 
 // DeleteProvider removes a model provider.

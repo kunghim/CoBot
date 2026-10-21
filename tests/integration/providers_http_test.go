@@ -222,9 +222,17 @@ func TestProviderSurfaceSpeaksTheClientsRequest(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("list providers = %d, want 200: %v", status, out)
 	}
-	items, _ := envelope(out)["providers"].([]any)
+	all, _ := envelope(out)["providers"].([]any)
+	// The ChatGPT account is listed in every profile; the key belongs to
+	// the other one.
+	var items []any
+	for _, item := range all {
+		if entry, _ := item.(map[string]any); entry["authMode"] != "chatgpt" {
+			items = append(items, item)
+		}
+	}
 	if len(items) != 1 {
-		t.Fatalf("the profile holds %d providers, want 1", len(items))
+		t.Fatalf("the profile holds %d providers besides ChatGPT, want 1", len(items))
 	}
 	first, _ := items[0].(map[string]any)
 	if first["hasCredential"] != true {

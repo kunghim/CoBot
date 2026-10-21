@@ -152,7 +152,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.loaded[id] = true
 	s.instructions = append(s.instructions, spec.DeveloperInstructions)
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
-	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: spec.ModelProvider}, nil
+	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: answeredProvider(spec.ModelProvider)}, nil
 }
 
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
@@ -167,7 +167,16 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	}
 	s.loaded[threadID] = true
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
-	return engine.ThreadInfo{ThreadID: threadID, Model: "fake-model", ModelProvider: spec.ModelProvider}, nil
+	return engine.ThreadInfo{ThreadID: threadID, Model: "fake-model", ModelProvider: answeredProvider(spec.ModelProvider)}, nil
+}
+
+// answeredProvider is the provider the engine reports for a thread. Codex
+// names its own account "openai" when a thread asks for none.
+func answeredProvider(asked string) string {
+	if asked == "" {
+		return "openai"
+	}
+	return asked
 }
 
 // ArchiveThread plays the engine setting a thread aside, so it can be loaded

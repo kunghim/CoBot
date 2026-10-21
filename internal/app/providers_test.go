@@ -147,7 +147,7 @@ func TestSaveProviderKeepsNothingWhenTheEngineRefusesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
+	if len(withoutOfficial(list)) != 0 {
 		t.Fatalf("a refused provider reached the database: %+v", list)
 	}
 }
@@ -181,11 +181,12 @@ func TestProviderCredentialIsStoredEncryptedAndNeverListed(t *testing.T) {
 	}
 }
 
-// The profile says which provider it runs with, and the engine has to be
-// told: a provider that is only in the engine's table is never used, and
-// every turn still goes to the engine's own endpoint. The write happens off
-// the request path, so the test waits for it.
-func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
+// Every thread names its own provider, so the engine's configured default
+// stays on its own account: that default is what calls without a thread
+// see, the model list among them. Naming a default model in the settings
+// puts the engine back there rather than onto the named provider. The write
+// happens off the request path, so the test waits for it.
+func TestSettingTheDefaultModelKeepsTheEngineOnItsOwnAccount(t *testing.T) {
 	ctx := context.Background()
 	binder := newFakeBinder()
 	a := providerTestApp(t, binder)
@@ -200,8 +201,8 @@ func TestSettingTheDefaultProviderSelectsItInTheEngine(t *testing.T) {
 	}
 	select {
 	case got := <-binder.selectedCh:
-		if got != "cobot_deepseek" {
-			t.Fatalf("the engine was told %q, want cobot_deepseek", got)
+		if got != "" {
+			t.Fatalf("the engine was told %q, want its own account", got)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("the engine was never told which provider to run with")
@@ -315,7 +316,7 @@ func TestDeleteProviderTellsTheEngine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
+	if len(withoutOfficial(list)) != 0 {
 		t.Fatalf("the provider survived the delete: %+v", list)
 	}
 }
@@ -492,4 +493,15 @@ func TestSaveProviderLeavesACustomProviderWithoutOne(t *testing.T) {
 	if stored.PresetID != "" {
 		t.Fatalf("a custom provider was given the catalogue reference %q", stored.PresetID)
 	}
+}
+
+// withoutOfficial drops the ChatGPT account, which every profile lists.
+func withoutOfficial(list []ProviderView) []ProviderView {
+	out := []ProviderView{}
+	for _, p := range list {
+		if p.AuthMode != domain.ProviderAuthChatGPT {
+			out = append(out, p)
+		}
+	}
+	return out
 }

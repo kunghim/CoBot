@@ -352,13 +352,14 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
-	// The model comes from the provider the profile runs with, not from the
-	// engine's own default: that default names a model of a vendor this
-	// profile may no longer be talking to.
-	_, model, err := s.app.ThreadProvider(ctx, team.ID)
+	// The model is the one this member runs with, not the engine's own
+	// default: that default names a model of a vendor the member may not
+	// be talking to.
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
 	if err != nil {
 		return err
 	}
+	model := choice.Model
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
 	// settings; it never interrupts work that already started (G07/G08).
@@ -886,10 +887,11 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	providerID, model, err := s.app.ThreadProvider(ctx, team.ID)
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
 	if err != nil {
 		return "", err
 	}
+	providerID, model := choice.EngineProvider, choice.Model
 	config, err := s.threadConfig(ctx, team, bot, server.Epoch(), runID)
 	if err != nil {
 		return "", err
@@ -908,7 +910,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		// A thread that was started with another provider has to let go of
 		// it: the engine ignores a provider for a thread it already holds.
 		// Archiving and unarchiving is how it lets go, and the resume below
-		// loads it again with the provider the team runs with.
+		// loads it again with the provider the member runs with.
 		switching := session.ModelProvider != "" && session.ModelProvider != providerID
 		if switching {
 			if reloader, ok := server.(threadReloader); ok {

@@ -1,10 +1,10 @@
-// The model provider section of the settings: what is in use now, what else
-// is configured, and the one button that adds another.
+// The model provider section of the settings: every provider the profile
+// knows, each one switched on or off, and the one button that adds another.
 //
-// Which provider is in use is the server's answer — settings.defaultProvider
-// — and so is every change to it: "enable" writes that field, and the row
-// under "in use" is the provider it names. Nothing about the choice is kept
-// in this browser, so the page cannot drift from the profile.
+// Every enabled provider is on offer at once — its models can be picked in
+// any conversation — and a disabled one is out of every picker. The ChatGPT
+// account is always in the list: it is the provider whose credential is a
+// browser sign-in, and the sign-in happens on its card.
 //
 // A piece of interface that more than one view needs belongs in
 // components/ui and is registered in the gallery (frontend/src/gallery);
@@ -12,72 +12,134 @@
 import { useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys, useDeleteProvider, useProviderPresets, useProviders, useSettings, useUpdateSettings } from '../../api/queries';
-import type { Provider, ProviderPreset, Settings } from '../../api/types';
-import { Alert, AlertDialog, Badge, Button, Card, Icons, LogoTile, Skeleton, cx, useToast } from '../../components/ui';
+import { useDeleteProvider, useProviderPresets, useProviders, useSetProviderEnabled } from '../../api/queries';
+import type { Provider, ProviderPreset } from '../../api/types';
+import { Alert, AlertDialog, Badge, Button, Card, Icons, LogoTile, Skeleton, Switch, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import { desktopBridge } from '../../platform/native-bridge';
 import AddProviderDialog, { CODEX_DIALECT, engineOf, presetName, providerMark } from './AddProviderDialog';
+import { isOfficial } from './providerModels';
+import { useChatGPTAccount } from './useChatGPTAccount';
+
+/** The ChatGPT account's own sign-in controls. */
+function AccountControls({ t }: { t: TFunction }) {
+  const account = useChatGPTAccount();
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {!account.signedIn && !account.pending && (
+          <Button size="sm" variant="primary" onClick={account.start} loading={account.starting} disabled={!account.ready}>
+            {t('engine.login')}
+          </Button>
+        )}
+        {account.pending && (
+          <>
+            {account.authUrl && (
+              <a
+                href={account.authUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-medium text-signal-600 hover:underline dark:text-signal-400"
+                onClick={(event) => {
+                  // The desktop shell opens it in the default browser.
+                  if (desktopBridge()) {
+                    event.preventDefault();
+                    account.clearError();
+                    void account.openNative(account.authUrl);
+                  }
+                }}
+              >
+                {t('engine.openLogin')}
+                <Icons.openExternal size={14} aria-hidden />
+              </a>
+            )}
+            <span className="text-sm text-neutral-500 dark:text-neutral-400" role="status">
+              {t('engine.waitingLogin')}
+            </span>
+            <Button size="sm" onClick={account.cancel} loading={account.cancelling}>
+              {t('engine.cancelLogin')}
+            </Button>
+          </>
+        )}
+        {account.signedIn && (
+          <Button size="sm" onClick={account.signOut} loading={account.signingOut}>
+            {t('engine.logout')}
+          </Button>
+        )}
+      </div>
+      {!account.ready && <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('providers.accountNeedsEngine')}</p>}
+      {account.timedOut && <Alert tone="warning">{t('engine.loginTimeout')}</Alert>}
+      {account.error && (
+        <Alert tone="danger" onClose={account.clearError} closeLabel={t('common.close')}>
+          {account.error}
+        </Alert>
+      )}
+    </div>
+  );
+}
 
 interface RowProps {
   provider: Provider;
   preset: ProviderPreset | undefined;
-  current: boolean;
+  signedIn: boolean;
+  switching: boolean;
   t: TFunction;
+  onToggle: (enabled: boolean) => void;
   onEdit: () => void;
-  onEnable?: () => void;
   onRemove: () => void;
 }
 
-/** One configured provider: who it is, where it points, what to do with it. */
-function ProviderRow({ provider, preset, current, t, onEdit, onEnable, onRemove }: RowProps) {
-  // The official provider signs in with the ChatGPT account and has neither
-  // an endpoint nor a key of its own.
-  const official = provider.authMode === 'chatgpt';
+/** One provider: who it is, where it points, whether it is on offer. */
+function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdit, onRemove }: RowProps) {
+  const official = isOfficial(provider);
+  const name = preset ? presetName(preset, t) : provider.name;
   const endpoint = provider.endpoints.find((entry) => entry.dialect === CODEX_DIALECT)?.baseUrl ?? provider.endpoints[0]?.baseUrl ?? '';
   const engines = [...new Set(provider.endpoints.map((entry) => engineOf(entry.dialect)))];
+  const usable = provider.models.filter((entry) => entry.status !== 'failed').length;
   return (
     <div
       className={cx(
         'flex items-start gap-3 rounded-xl border p-3',
-        current
-          ? 'border-signal-500 ring-1 ring-signal-500'
-          : 'border-neutral-200 bg-neutral-100/60 dark:border-neutral-800 dark:bg-white/[0.02]',
+        provider.enabled
+          ? 'border-neutral-200 bg-neutral-100/60 dark:border-neutral-800 dark:bg-white/[0.02]'
+          : 'border-dashed border-neutral-300 dark:border-neutral-700',
       )}
     >
       <LogoTile mark={providerMark(provider, preset)} color={preset?.color} />
-      <div className="min-w-0 flex-1">
+      <div className={cx('min-w-0 flex-1', !provider.enabled && 'opacity-60')}>
         <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-          {preset ? presetName(preset, t) : provider.name}
-          {current && provider.defaultModel && <Badge mono>{provider.defaultModel}</Badge>}
+          {name}
+          {!provider.enabled && <Badge>{t('providers.disabled')}</Badge>}
         </p>
         {official ? (
-          <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">{t('providers.officialLogin')}</p>
+          <>
+            <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">
+              {signedIn ? t('providers.accountSignedIn') : t('providers.accountSignedOut')}
+            </p>
+            <AccountControls t={t} />
+          </>
         ) : (
           <>
             <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{endpoint}</p>
-            {current && (
-              <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">
-                {engines.length ? t('providers.usableWith', { engines: engines.join(t('providers.listSeparator')) }) : t('providers.noEndpoint')}
-              </p>
-            )}
+            <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">
+              {t('providers.modelSummary', { count: provider.models.length, usable })}
+              {engines.length ? ` · ${t('providers.usableWith', { engines: engines.join(t('providers.listSeparator')) })}` : ''}
+            </p>
           </>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        {onEnable && (
-          <Button size="sm" onClick={onEnable}>
-            {t('providers.enable')}
-          </Button>
-        )}
         {!official && (
-          <Button size="sm" onClick={onEdit}>
-            {t('providers.edit')}
-          </Button>
+          <>
+            <Button size="sm" onClick={onEdit}>
+              {t('providers.edit')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onRemove}>
+              {t('providers.remove')}
+            </Button>
+          </>
         )}
-        <Button size="sm" variant="ghost" onClick={onRemove}>
-          {t('providers.remove')}
-        </Button>
+        <Switch checked={provider.enabled} disabled={switching} label={t('providers.enabledLabel')} onChange={onToggle} />
       </div>
     </div>
   );
@@ -86,52 +148,41 @@ function ProviderRow({ provider, preset, current, t, onEdit, onEnable, onRemove 
 export default function ProviderSection() {
   const { t } = useTranslation();
   const toast = useToast();
-  const qc = useQueryClient();
   const providers = useProviders();
   const presets = useProviderPresets();
-  const settings = useSettings(true);
-  const update = useUpdateSettings();
+  const account = useChatGPTAccount();
   const remove = useDeleteProvider();
+  const setEnabled = useSetProviderEnabled();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Provider | null>(null);
   const [pendingRemove, setPendingRemove] = useState<Provider | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [switchingId, setSwitchingId] = useState('');
   const [errorText, setErrorText] = useState('');
 
-  const list = providers.data?.providers ?? [];
+  // The ChatGPT account first, then the others in the order they were added.
+  const list = useMemo(() => {
+    const all = providers.data?.providers ?? [];
+    return [...all.filter(isOfficial), ...all.filter((entry) => !isOfficial(entry))];
+  }, [providers.data]);
   const presetList = useMemo(() => presets.data?.presets ?? [], [presets.data]);
   const presetById = useMemo(() => new Map(presetList.map((entry) => [entry.id, entry])), [presetList]);
-
-  // The provider in use is the one the server names; a profile with none
-  // yet has nothing under "in use".
-  const inUseId = settings.data?.defaultProvider ?? '';
-  const current = list.find((entry) => entry.id === inUseId) ?? null;
-  const others = current ? list.filter((entry) => entry.id !== current.id) : list;
 
   const displayName = (provider: Provider) => {
     const preset = provider.presetId ? presetById.get(provider.presetId) : undefined;
     return preset ? presetName(preset, t) : provider.name;
   };
 
-  // The revision the profile is at right now, read when the write happens
-  // and not when the page was drawn, so a setting saved in between does
-  // not make this write look stale.
-  const revision = () => qc.getQueryData<Settings>(queryKeys.settings)?.revision;
-
-  // Enabling a provider writes the profile's default; the server refuses an
-  // id it does not know, so the provider is checked against the list first.
-  const enable = (provider: Provider) => {
-    if (!list.some((entry) => entry.id === provider.id)) {
-      setErrorText(t('providers.enableFailed'));
-      return;
-    }
+  const toggle = (provider: Provider, enabled: boolean) => {
     setErrorText('');
-    update.mutate(
-      { patch: { defaultProvider: provider.id }, expectedRevision: revision() },
+    setSwitchingId(provider.id);
+    setEnabled.mutate(
+      { id: provider.id, enabled, expectedRevision: provider.revision },
       {
-        onSuccess: () => toast.show({ tone: 'success', title: t('providers.enabled', { name: displayName(provider) }) }),
+        onSuccess: () => toast.show({ tone: 'success', title: t(enabled ? 'providers.enabled' : 'providers.disabledToast', { name: displayName(provider) }) }),
         onError: (error) => setErrorText(apiErrorMessage(t, error)),
+        onSettled: () => setSwitchingId(''),
       },
     );
   };
@@ -142,10 +193,6 @@ export default function ProviderSection() {
     setErrorText('');
     try {
       await remove.mutateAsync(pendingRemove.id);
-      // The profile must not keep pointing at a provider that is gone.
-      if (pendingRemove.id === inUseId) {
-        await update.mutateAsync({ patch: { defaultProvider: '' }, expectedRevision: revision() });
-      }
       toast.show({ tone: 'success', title: t('providers.removed', { name: displayName(pendingRemove) }) });
       setPendingRemove(null);
     } catch (error) {
@@ -156,28 +203,14 @@ export default function ProviderSection() {
   };
 
   const onSaved = (saved: Provider, modelCount: number) => {
-    // The first provider is the one the profile runs with from then on.
-    const becomesDefault = !inUseId;
     setDialogOpen(false);
-    setEditing(null);
-    if (becomesDefault) {
-      update.mutate(
-        { patch: { defaultProvider: saved.id }, expectedRevision: revision() },
-        { onError: (error) => setErrorText(apiErrorMessage(t, error)) },
-      );
-    }
     toast.show({
       tone: 'success',
-      title: t(editing ? 'providers.updated' : becomesDefault ? 'providers.savedFirst' : 'providers.saved', {
-        name: displayName(saved),
-        count: modelCount,
-      }),
-      description: becomesDefault ? t('providers.readyToUse') : undefined,
+      title: t(editing ? 'providers.updated' : 'providers.saved', { name: displayName(saved), count: modelCount }),
+      description: editing ? undefined : t('providers.readyToUse'),
     });
+    setEditing(null);
   };
-
-  const groupLabel = 'text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400';
-  const emptyBox = 'rounded-xl border border-dashed border-neutral-300 px-4 py-6 text-center text-sm leading-6 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300';
 
   return (
     <div className="space-y-6">
@@ -196,58 +229,27 @@ export default function ProviderSection() {
           </Button>
         }
       >
+        <p className="mb-4 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('providers.intro')}</p>
         {providers.isPending && <Skeleton className="h-16 w-full" />}
         {providers.isError && <Alert tone="danger">{t('status.error')}</Alert>}
         {providers.isSuccess && (
-          <div className="space-y-5">
-            <div>
-              <p className={groupLabel}>{t('providers.inUse')}</p>
-              <div className="mt-2">
-                {settings.isPending ? (
-                  <Skeleton className="h-16 w-full" />
-                ) : current ? (
-                  <ProviderRow
-                    provider={current}
-                    preset={current.presetId ? presetById.get(current.presetId) : undefined}
-                    current
-                    t={t}
-                    onEdit={() => {
-                      setEditing(current);
-                      setDialogOpen(true);
-                    }}
-                    onRemove={() => setPendingRemove(current)}
-                  />
-                ) : list.length === 0 ? (
-                  <div className={emptyBox}>{t('providers.empty')}</div>
-                ) : (
-                  <div className={emptyBox}>{t('providers.noneInUse')}</div>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className={groupLabel}>{t('providers.added')}</p>
-              <div className="mt-2 space-y-2">
-                {others.length === 0 ? (
-                  <div className={emptyBox}>{t('providers.emptyAdded')}</div>
-                ) : (
-                  others.map((provider) => (
-                    <ProviderRow
-                      key={provider.id}
-                      provider={provider}
-                      preset={provider.presetId ? presetById.get(provider.presetId) : undefined}
-                      current={false}
-                      t={t}
-                      onEdit={() => {
-                        setEditing(provider);
-                        setDialogOpen(true);
-                      }}
-                      onEnable={() => enable(provider)}
-                      onRemove={() => setPendingRemove(provider)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
+          <div className="space-y-2">
+            {list.map((provider) => (
+              <ProviderRow
+                key={provider.id}
+                provider={provider}
+                preset={provider.presetId ? presetById.get(provider.presetId) : undefined}
+                signedIn={account.signedIn}
+                switching={switchingId === provider.id}
+                t={t}
+                onToggle={(enabled) => toggle(provider, enabled)}
+                onEdit={() => {
+                  setEditing(provider);
+                  setDialogOpen(true);
+                }}
+                onRemove={() => setPendingRemove(provider)}
+              />
+            ))}
           </div>
         )}
         {errorText && (
