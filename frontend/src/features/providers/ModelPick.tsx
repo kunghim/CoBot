@@ -65,9 +65,9 @@ export default function ModelPick({ models, selected, statuses, onToggle, onAdd,
   const [query, setQuery] = useState('');
   const shown = visibleModels(models, query);
   const typed = query.trim();
-  // A vendor's list is not always complete, so an id the search does not
-  // find can still be kept as typed.
-  const canAdd = typed !== '' && !models.includes(typed);
+  // A vendor's list is not always complete, so an id the search finds
+  // nothing for can still be kept as typed.
+  const canAdd = typed !== '' && shown.length === 0;
 
   const add = () => {
     if (!canAdd) return;
