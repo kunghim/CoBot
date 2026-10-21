@@ -2592,6 +2592,8 @@ export interface operations {
                     requestId: string;
                     baseUrl: string;
                     apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
                 };
             };
         };
@@ -2627,6 +2629,8 @@ export interface operations {
                     requestId: string;
                     baseUrl: string;
                     apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
                     modelIds?: string[];
                 };
             };

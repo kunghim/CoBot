@@ -97,6 +97,7 @@ func TestTextCoversEveryCode(t *testing.T) {
 		CodeRateLimit,
 		CodeAuthInvalid,
 		CodeModelUnknown,
+		CodeModelUnavailable,
 		CodeContextExceeded,
 		CodeProtocolUnsupported,
 		CodeRequestRejected,
@@ -217,5 +218,27 @@ func TestAModelTheAccountDoesNotOfferIsAnUnknownModel(t *testing.T) {
 	body := `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-x' model is not supported when using Codex with a ChatGPT account."}}`
 	if code, _ := ClassifyHTTP(400, body); code != CodeModelUnknown {
 		t.Fatalf("classified as %q, want %q", code, CodeModelUnknown)
+	}
+}
+
+// Bodies a CLIProxyAPI gateway and the vendors behind it really answered a
+// probe with. A model the gateway has no price or no account for is not an
+// empty balance, and a vendor that says 余额不足 under HTTP 429 wants a
+// top-up, not a pause.
+func TestAGatewayThatCannotServeAModelIsNotAnEmptyBalance(t *testing.T) {
+	cases := []struct {
+		status int
+		body   string
+		want   string
+	}{
+		{503, `{"error":{"code":"model_price_error","message":"Model glm-5.3-flashx has no configured price","type":"cpa_key_billing_error"}}`, CodeModelUnavailable},
+		{503, `{"error":{"message":"auth_not_found: no auth available (providers=zcode, model=glm-4.5)","type":"server_error","code":"internal_server_error"}}`, CodeModelUnavailable},
+		{429, `{"error":{"code":"1113","message":"余额不足或无可用资源包,请充值。"}}`, CodeQuota},
+		{429, `{"error":{"message":"Cursor stream failed: resource_exhausted","type":"rate_limit_error","code":"rate_limit_exceeded"}}`, CodeRateLimit},
+	}
+	for _, c := range cases {
+		if code, _ := ClassifyHTTP(c.status, c.body); code != c.want {
+			t.Errorf("%d %s: got %q, want %q", c.status, c.body, code, c.want)
+		}
 	}
 }

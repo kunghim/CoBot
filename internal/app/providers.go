@@ -156,6 +156,39 @@ func (a *App) ProviderEnv(ctx context.Context) (map[string]string, error) {
 	return env, nil
 }
 
+// StoredProviderKey is the key a stored provider keeps, for a check the
+// user runs while editing it with the key field left empty. The key only
+// goes to an address the provider already has: the address comes from the
+// caller, and a stored key sent wherever it was asked to go would leave
+// the machine with the first request that named a host of its own.
+func (a *App) StoredProviderKey(ctx context.Context, id, baseURL string) (string, error) {
+	p, err := sqlite.GetProvider(ctx, a.DB, id)
+	if err != nil {
+		return "", sqlite.NormalizeError(err)
+	}
+	known := false
+	for _, ep := range p.Endpoints {
+		if strings.TrimRight(ep.BaseURL, "/") == strings.TrimRight(strings.TrimSpace(baseURL), "/") {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return "", domain.InvalidRequest("error.provider.key_needs_its_endpoint", nil)
+	}
+	if p.CredentialRef == "" || a.Credentials == nil {
+		return "", nil
+	}
+	secret, err := a.Credentials.Get(ctx, p.CredentialRef)
+	if errors.Is(err, secrets.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", domain.Internal(err)
+	}
+	return string(secret), nil
+}
+
 // ProbeProvider checks a stored provider's models again and records the
 // result. The key is read from the credential store: the user never sees it
 // again, so a provider can be re-checked long after it was set up.

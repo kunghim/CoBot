@@ -22,11 +22,14 @@ import (
 // Stable machine codes. These are internal contracts, not user-facing text.
 const (
 	// CodeOK marks a request that was answered.
-	CodeOK                  = "ok"
-	CodeQuota               = "quota"
-	CodeRateLimit           = "rate_limit"
-	CodeAuthInvalid         = "auth_invalid"
-	CodeModelUnknown        = "model_unknown"
+	CodeOK           = "ok"
+	CodeQuota        = "quota"
+	CodeRateLimit    = "rate_limit"
+	CodeAuthInvalid  = "auth_invalid"
+	CodeModelUnknown = "model_unknown"
+	// CodeModelUnavailable: a gateway lists the model but cannot serve it
+	// now — it holds no account for it, or has no price set for it.
+	CodeModelUnavailable    = "model_unavailable"
 	CodeContextExceeded     = "context_exceeded"
 	CodeProtocolUnsupported = "protocol_unsupported"
 	CodeRequestRejected     = "request_rejected"
@@ -48,7 +51,12 @@ type bodyClue struct {
 // vendor that reports "insufficient_quota" under HTTP 429 wants the user to
 // top up, not to slow down.
 var bodyClues = []bodyClue{
-	{CodeQuota, []string{"insufficient_quota", "billing", "payment_required"}},
+	// A gateway that cannot serve a model it lists says so in its own
+	// words. It goes first: CLIProxyAPI's billing plugin calls a model
+	// without a price a "cpa_key_billing_error", which is not an empty
+	// balance.
+	{CodeModelUnavailable, []string{"model_price_error", "no configured price", "auth_not_found", "no auth available"}},
+	{CodeQuota, []string{"insufficient_quota", "insufficient_balance", "billing", "payment_required", "余额不足", "资源包"}},
 	{CodeRateLimit, []string{"rate_limit", "too_many_requests"}},
 	{CodeAuthInvalid, []string{"invalid_api_key", "unauthorized", "permission_denied", "authentication"}},
 	{CodeModelUnknown, []string{"model_not_found", "does not exist", "unknown model", "model is not supported"}},
@@ -159,6 +167,8 @@ func Text(code string) string {
 		return "密钥无效"
 	case CodeModelUnknown:
 		return "模型不存在"
+	case CodeModelUnavailable:
+		return "网关暂不提供这个模型"
 	case CodeContextExceeded:
 		return "上下文超限"
 	case CodeProtocolUnsupported:

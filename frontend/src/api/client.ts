@@ -178,13 +178,18 @@ export const api = {
     request<import('./types').ProviderProbeResults>('POST', `/api/v1/providers/${id}/probe`),
   detectProvider: (apiKey: string) =>
     request<{ presetId: string }>('POST', '/api/v1/providers/detect', { apiKey }),
-  discoverProviderModels: (baseUrl: string, apiKey?: string) =>
-    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', { baseUrl, ...(apiKey ? { apiKey } : {}) }),
-  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string) =>
+  // Without a typed key, providerId names a stored provider whose own key
+  // the server uses; baseUrl has to be one of that provider's endpoints.
+  discoverProviderModels: (baseUrl: string, apiKey?: string, providerId?: string) =>
+    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', {
+      baseUrl,
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
+    }),
+  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string, providerId?: string) =>
     request<import('./types').ProviderProbeResults>('POST', '/api/v1/providers/probe-models', {
       baseUrl,
       modelIds,
-      ...(apiKey ? { apiKey } : {}),
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
     }),
   exchangeBootstrap: async (secret: string) => {
     const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string; csrfCookieName: string }>(
