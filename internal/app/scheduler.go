@@ -927,7 +927,13 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Config:                config,
 	}
 	var handover *domain.ThreadHandover
-	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
+	session, sessionErr := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID)
+	if sessionErr == nil && session.ProviderThreadID == "" && session.Handover != nil {
+		// CoBot let go of the thread itself (a card the member kept failing
+		// to hand on); the new thread is handed over from it.
+		handover = session.Handover
+	}
+	if sessionErr == nil && session.ProviderThreadID != "" {
 		if s.app.needsFreshThread(ctx, session, choice) {
 			// Another vendor's model cannot take this thread's history as
 			// its input. The thread is left as it is, so its record stays

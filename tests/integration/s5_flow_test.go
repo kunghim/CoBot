@@ -276,12 +276,14 @@ func TestNotesReachTheNextTurn(t *testing.T) {
 		t.Fatalf("the reminder turn lacks the card:\n%s", text)
 	}
 	finishTurn(t, h, fake, fake.Turns()[1], dev.ID)
+	waitUntil(t, 5*time.Second, "developer second reminder", func() bool { return len(fake.Turns()) == 3 })
+	finishTurn(t, h, fake, fake.Turns()[2], dev.ID)
 
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: qa.ID, Text: "你好"}); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, 5*time.Second, "tester turn", func() bool { return len(fake.Turns()) == 3 })
-	if text := fake.Turns()[2].Text; !strings.Contains(text, "页面结构是单文件") || !strings.Contains(text, "不需要回复") {
+	waitUntil(t, 5*time.Second, "tester turn", func() bool { return len(fake.Turns()) == 4 })
+	if text := fake.Turns()[3].Text; !strings.Contains(text, "页面结构是单文件") || !strings.Contains(text, "不需要回复") {
 		t.Fatalf("tester turn lacks the note:\n%s", text)
 	}
 }

@@ -237,6 +237,19 @@ func UpsertProviderSession(ctx context.Context, tx *sql.Tx, session domain.Provi
 	return nil
 }
 
+// RetireSessionThread lets go of a member's thread: its next turn starts a
+// new one, handed over from this one.
+func RetireSessionThread(ctx context.Context, tx *sql.Tx, botID string, handover domain.ThreadHandover) error {
+	data, err := json.Marshal(handover)
+	if err != nil {
+		return fmt.Errorf("encode handover: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE provider_sessions SET provider_thread_id = '', handover = ? WHERE bot_id = ?`, string(data), botID); err != nil {
+		return fmt.Errorf("retire session thread: %w", err)
+	}
+	return nil
+}
+
 // SetSessionHandover records (or, with nil, clears) the thread a member's
 // thread took over from.
 func SetSessionHandover(ctx context.Context, tx *sql.Tx, botID string, handover *domain.ThreadHandover) error {

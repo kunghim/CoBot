@@ -200,9 +200,11 @@ func TestAThreadIsToldToCallToolsTheWayItsVendorCan(t *testing.T) {
 	}
 }
 
-// A card left open after the turn that worked on it is reminded once; a
-// turn the user spent talking to the member about something else is not.
-func TestAnOpenCardIsRemindedOnceAndOnlyAfterItsOwnTurn(t *testing.T) {
+// A card left open after the turn that worked on it is reminded, and once
+// more on a fresh thread handed over from the old one; then it is left for
+// the user. A turn the user spent talking to the member about something
+// else counts for nothing.
+func TestAnOpenCardIsRemindedTwiceAndOnlyAfterItsOwnTurn(t *testing.T) {
 	h := newM2Harness(t)
 	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	fake := h.ensureFake(t, team.ID)
@@ -216,11 +218,22 @@ func TestAnOpenCardIsRemindedOnceAndOnlyAfterItsOwnTurn(t *testing.T) {
 		t.Fatalf("the second turn is not the reminder:\n%s", fake.Turns()[1].Text)
 	}
 	finishTurn(t, h, fake, fake.Turns()[1], dev.ID)
+	waitUntil(t, 5*time.Second, "second reminder", func() bool { return len(fake.Turns()) == 3 })
+	second := fake.Turns()[2]
+	if second.ThreadID == fake.Turns()[1].ThreadID {
+		t.Fatal("the second reminder ran on the thread that kept failing")
+	}
+	for _, want := range []string{handoverHeading, fakeengine.TranscriptPath(fake.Turns()[1].ThreadID), "上次提醒后还是没有交出"} {
+		if !strings.Contains(second.Text, want) {
+			t.Fatalf("the second reminder lacks %q:\n%s", want, second.Text)
+		}
+	}
+	finishTurn(t, h, fake, second, dev.ID)
 
 	sendAndFinish(t, h, fake, dev, "随便聊聊")
 	time.Sleep(300 * time.Millisecond)
-	if n := len(fake.Turns()); n != 3 {
-		t.Fatalf("%d turns; the card was reminded again", n)
+	if n := len(fake.Turns()); n != 4 {
+		t.Fatalf("%d turns; the card was reminded a third time", n)
 	}
 }
 
