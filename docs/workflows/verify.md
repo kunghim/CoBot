@@ -9,8 +9,8 @@
 | Go 代码 | `go test ./internal/... ./tests/...` |
 | 前端代码 | `npm run typecheck --prefix frontend`、`npm test --prefix frontend` |
 | 跨前后端的界面流程 | 浏览器测试：`cd tests/e2e`，`npm ci`，`npx playwright test` |
-| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs` |
-| 只改文档 | `node scripts/check-public-files.mjs`，核对路径、命令和链接 |
+| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs` |
+| 只改文档 | `node scripts/check-docs.mjs`（命名、索引、链接）和 `node scripts/check-public-files.mjs`；命令和说法自己核对 |
 
 改代码后、交付前运行完整检查 `./scripts/check.ps1` 或 `./scripts/check.sh`（Windows 加 `-Desktop` 会额外编译桌面壳）。
 通过后没有新原因就不重复跑无关检查。重要的状态变化补针对行为的回归测试，不写只复述实现的测试。

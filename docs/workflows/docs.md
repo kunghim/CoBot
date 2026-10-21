@@ -22,7 +22,7 @@
   模块列表、文件清单、版本号这类能从代码查到的不写；需要时写“以哪个文件为准”。
 - `rules/` 按改动路径触发，`workflows/` 按任务触发，`product/` 是产品现状和决定，`reference/` 很少需要。单篇尽量一屏读完。
 - 新的产品决定定下来后，在 `product/decisions.md` 加一行；功能实现后同步 `product/overview.md`。
-- 同一条规则只写在一处，其他地方链接。新增、移动或删除文档时，同步 `docs/README.md` 和 AGENTS.md 的路由表。
+- 同一条规则只写在一处，其他地方链接。新增、移动或删除文档时，同步 `docs/README.md` 和 AGENTS.md 的路由表；`node scripts/check-docs.mjs` 会检查文件名、索引是否列全和链接是否有效。
 - 智能体指令文件（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 等）和助手配置目录默认不提交，目前只公开根目录的
   `AGENTS.md`、`CLAUDE.md`。要公开其他指令文件，先把路径加入 `scripts/public-files-policy.json` 的 `publicFiles`，
   再运行 `node scripts/check-public-files.mjs --write-ignore`。
