@@ -741,7 +741,7 @@ func ListDeliveriesByMessage(ctx context.Context, q Queryer, messageID string) (
 }
 
 // ListUnresolvedRuns returns every run in a non-terminal state across all
-// teams; after a restart none of them may be taken over (H03).
+// teams; after a restart none of them may be taken over.
 func ListUnresolvedRuns(ctx context.Context, q Queryer) ([]domain.Run, error) {
 	rows, err := q.QueryContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
 		FROM runs WHERE status IN (?, ?, ?, ?, ?) ORDER BY started_at ASC`,

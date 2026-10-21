@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestLeaseLifecycle pins the four failure reasons H06 depends on: missing,
+// TestLeaseLifecycle pins the four failure reasons the side-effect gate depends on: missing,
 // corrupt, expired and foreign-instance all stay distinguishable, and a
 // freshly written lease is valid for this instance.
 func TestLeaseLifecycle(t *testing.T) {

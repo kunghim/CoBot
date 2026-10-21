@@ -313,7 +313,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			lock.Release()
 		}
 	}()
-	// The local event ledger mirrors every recorded event to disk (H08).
+	// The local event ledger mirrors every recorded event to disk.
 	// Startup drains whatever previous runs left into the database — by event
 	// id, so nothing duplicates — before reconciliation classifies state.
 	sink, sinkErr := eventsink.Open(paths.Root, instanceID)
@@ -328,7 +328,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	}
 	// Classify whatever the previous process left behind before the loop can
 	// claim anything: unknown runs, unknown deliveries, dead-connection
-	// approvals, and one recovery card per unresolved run (H03/H05).
+	// approvals, and one recovery card per unresolved run.
 	if err := application.ReconcileAfterRestart(ctx); err != nil {
 		return nil, fmt.Errorf("reconcile after restart: %w", err)
 	}

@@ -109,7 +109,7 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 // Start launches the dispatch loop and the lease refresh loop until Stop.
 // Leases tick on their own goroutine (review B9): a slow engine call inside
 // dispatch must never starve the 2-second refresh, or every member's bridge
-// would start refusing side effects while the core is healthy (H06).
+// would start refusing side effects while the core is healthy.
 func (s *Scheduler) Start() {
 	go func() {
 		defer close(s.done)
@@ -171,7 +171,7 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	s.mu.Unlock()
 	var errs []error
 	for teamID, rt := range teams {
-		// H01: request interruption of every in-flight turn before the engine
+		// Request interruption of every in-flight turn before the engine
 		// goes down. Whatever cannot finish in the bounded window dies with
 		// its own process; the next startup's reconciliation classifies it as
 		// unknown instead of this shutdown guessing an outcome.
@@ -361,7 +361,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
-	// settings; it never interrupts work that already started (G07/G08).
+	// settings; it never interrupts work that already started.
 	if pause, perr := s.app.budgetPaused(ctx, team.ID, bot.ID, settings); perr != nil {
 		return perr
 	} else if pause != nil {
@@ -506,7 +506,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	unlock()
 	// The counted wake committed with the claim: emit its events now, before
 	// any engine interaction can fail, so the fact is never persisted without
-	// its trail (review B18).
+	// its trail.
 	for _, ev := range chainEvents {
 		s.app.recordEvent(ctx, ev)
 	}
@@ -548,7 +548,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
-		// unknown until verified, never silently retried (D04).
+		// unknown until verified, never silently retried.
 		return s.unknownStart(ctx, run.ID, delivery.ID, bot.ID)
 	}
 
@@ -577,7 +577,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	s.app.startAssignedTasks(ctx, run.ID, bot.ID)
 
 	// The engine may spawn this bot's MCP bridge at any moment inside the
-	// turn; the lease must already be fresh when it asks to act (H06).
+	// turn; the lease must already be fresh when it asks to act.
 	s.app.TouchLease(ctx, bot.ID)
 	return nil
 }
@@ -785,7 +785,7 @@ func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64)
 	lock.Unlock()
 	s.logger.Info("idle team engine stopped", "teamId", teamID, "idleFor", s.IdleEngineTimeout.String())
 	// The shutdown waits for the process; off the lease loop, so leases keep
-	// their 2-second refresh (H06). Stop joins it like any worker.
+	// their 2-second refresh. Stop joins it like any worker.
 	s.workers.Add(1)
 	go func() {
 		defer s.workers.Done()
@@ -1014,7 +1014,7 @@ func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot doma
 		auth.BridgeEnvToken:    token,
 		// The bridge needs to know which member it acts for and where the
 		// local leases live, so a stale executor refuses side effects even
-		// without HTTP (H06).
+		// without HTTP.
 		auth.BridgeEnvBotID:    bot.ID,
 		auth.BridgeEnvLeaseDir: s.app.LeaseDir(),
 		// The bridge offers only the tools of this member's role.

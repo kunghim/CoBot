@@ -1,4 +1,4 @@
-// Package eventsink is the local durable event ledger (H08): live events
+// Package eventsink is the local durable event ledger: live events
 // are appended to per-instance JSONL files as they are recorded, drained
 // into the events table by id (never twice), quarantined when corrupt, and
 // pruned only after import. Un-imported evidence is never silently deleted.

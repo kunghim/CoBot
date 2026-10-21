@@ -165,7 +165,7 @@ func findRecoveryDecision(t *testing.T, h *m2Harness, teamID, runID string) doma
 	return domain.Approval{}
 }
 
-// TestDecisionKeptWhenReplyFails restores the F03 evidence the first fix
+// TestDecisionKeptWhenReplyFails restores the evidence the first fix
 // round accidentally removed: the decision is committed first and the reply
 // failure only marks the response unknown — a second decision still
 // conflicts (review A/B).
@@ -210,7 +210,7 @@ func TestDecisionKeptWhenReplyFails(t *testing.T) {
 
 // TestDecidedHistorySurvivesEngineExit: cards decided BEFORE a crash keep
 // their decision and revision through the exit-time invalidation, which only
-// touches pending requests (F04/F06 history rule).
+// touches pending requests (decided history is kept).
 func TestDecidedHistorySurvivesEngineExit(t *testing.T) {
 	h := newM2Harness(t)
 	team, bots := h.createTeam(t, nil)

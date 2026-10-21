@@ -20,7 +20,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// TestSchedulerKeepsLeasesFresh pins H06's writer: while the core runs, the
+// TestSchedulerKeepsLeasesFresh covers the lease writer: while the core runs, the
 // scheduler's ticker keeps every live member's lease fresh for this
 // instance, so external helpers can trust it.
 func TestSchedulerKeepsLeasesFresh(t *testing.T) {
@@ -39,7 +39,7 @@ func TestSchedulerKeepsLeasesFresh(t *testing.T) {
 	}
 }
 
-// TestBridgeSideEffectGateUsesLocalLease pins H06's reader: the spawned
+// TestBridgeSideEffectGateUsesLocalLease covers the lease reader: the spawned
 // bridge refuses side effects on a missing or stale lease, and read tools
 // keep working so the model can still inspect state.
 func TestBridgeSideEffectGateUsesLocalLease(t *testing.T) {
@@ -130,7 +130,7 @@ func mustText(t *testing.T, res *mcp.CallToolResult) string {
 	return out.String()
 }
 
-// TestEventLedgerAppendImportAndGap pins H08: live events mirror to disk,
+// TestEventLedgerAppendImportAndGap: live events mirror to disk,
 // import is idempotent by event id, corrupt files are quarantined as
 // evidence after their valid lines are imported, an over-capacity ledger
 // records one visible gap instead of deleting un-imported evidence, and
@@ -171,7 +171,7 @@ func TestEventLedgerAppendImportAndGap(t *testing.T) {
 
 	// The mirror holds events the database already has: importing drains the
 	// file and inserts nothing new — the same event arriving twice is one
-	// row (H08's idempotency). A foreign event later proves new rows land.
+	// row (the ledger's idempotency). A foreign event later proves new rows land.
 	var before int
 	if err := h.app.DB.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&before); err != nil {
 		t.Fatalf("count: %v", err)

@@ -56,8 +56,7 @@ func seedUnresolvedRun(t *testing.T, h *m2Harness, team domain.Team, bot domain.
 	return run.ID, deliveryID
 }
 
-// TestRestartReconciliationClassifiesUnresolvedWork pins H03/H04/H09 and the
-// proactive half of F04: nothing is taken over, the unknown facts (turn id,
+// TestRestartReconciliationClassifiesUnresolvedWork: nothing is taken over, the unknown facts (turn id,
 // epoch, delivery) are preserved rather than invented away, dead-connection
 // approvals are invalidated while decided history is untouched, the locked
 // bot cannot dispatch while an unrelated bot can, and reconciliation is
@@ -171,7 +170,7 @@ func TestRestartReconciliationClassifiesUnresolvedWork(t *testing.T) {
 		t.Fatalf("recovery cards after second reconcile = %d, want 1", count)
 	}
 
-	// H04: the locked bot cannot start new work; an unrelated bot can.
+	// The locked bot cannot start new work; an unrelated bot can.
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: lost.ID, Text: "被锁成员的新消息"}); err != nil {
 		t.Fatalf("msg to locked bot: %v", err)
 	}
@@ -185,7 +184,7 @@ func TestRestartReconciliationClassifiesUnresolvedWork(t *testing.T) {
 	}
 }
 
-// TestRecoveryDecisionsContinueRerunAbandon pins H05: every choice first
+// TestRecoveryDecisionsContinueRerunAbandon: every choice first
 // confirms the old execution ended, then continue preserves the unknown
 // delivery as a fact, rerun requeues the original request, abandon cancels
 // it, and each choice frees the bot for new work.
@@ -298,7 +297,7 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 	}
 }
 
-// TestStopInterruptsInFlightRuns pins H01: shutting the scheduler down
+// TestStopInterruptsInFlightRuns: shutting the scheduler down
 // requests interruption of every in-flight turn, shuts its own engines down,
 // and stops starting new work.
 func TestStopInterruptsInFlightRuns(t *testing.T) {

@@ -141,7 +141,7 @@ func authorize(t *testing.T, core *bootstrap.Core, c *client) {
 	}
 }
 
-// A02/A04: committed settings survive restart; a new profile starts clean.
+// Committed settings survive restart; a new profile starts clean.
 func TestSettingsPersistAcrossRestartAndProfilesAreIsolated(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "dev-profile")
 	core := startCore(t, platform.EnvDevelopment, root)
@@ -189,7 +189,7 @@ func TestSettingsPersistAcrossRestartAndProfilesAreIsolated(t *testing.T) {
 	}
 }
 
-// A03: a second core on the same profile refuses to start and reports the
+// A second core on the same profile refuses to start and reports the
 // running instance instead of double-owning the database.
 func TestSecondStartRefusesSameProfile(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "profile")
@@ -209,7 +209,7 @@ func TestSecondStartRefusesSameProfile(t *testing.T) {
 	}
 }
 
-// A06: bootstrap secrets are single-use and short-lived; forged origins,
+// Bootstrap secrets are single-use and short-lived; forged origins,
 // missing CSRF and unauthenticated access are rejected.
 func TestAuthGuards(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "profile")
@@ -266,7 +266,7 @@ func (c *client) patchSettingsWithoutCSRF(patch map[string]any) (*http.Response,
 	}, nil)
 }
 
-// A08-ish stream mechanics: snapshot cursor plus SSE delivery of durable
+// Stream mechanics: snapshot cursor plus SSE delivery of durable
 // events after the cursor, without losing commits made while streaming.
 func TestSnapshotAndEventStream(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "profile")

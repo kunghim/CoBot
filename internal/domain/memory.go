@@ -8,7 +8,7 @@ import (
 // Memory is one stored working method or preference, owned by exactly one
 // member of exactly one team. It never holds task evidence, secrets or
 // large source excerpts; the write path enforces size and refuses
-// secret-shaped bodies (G05).
+// secret-shaped bodies.
 type Memory struct {
 	ID           string    `json:"id"`
 	TeamID       string    `json:"teamId"`
@@ -31,7 +31,7 @@ func (m Memory) IsLive() bool { return m.DeletedAt == "" }
 const MemoryLimitMaxBody = 2000
 
 // MemorySearchMaxItems and MemorySearchMaxChars bound one retrieval so the
-// caller's context stays bounded regardless of how much is stored (G05).
+// caller's context stays bounded regardless of how much is stored.
 const (
 	MemorySearchMaxItems = 10
 	MemorySearchMaxChars = 6000

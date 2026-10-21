@@ -20,7 +20,7 @@ import (
 // thread config without importing the collaboration package.
 // BridgeEnvBotID and BridgeEnvLeaseDir tell the spawned bridge which member
 // it acts for and where the local leases live, so it can refuse side effects
-// from a stale executor without depending on HTTP (H06).
+// from a stale executor without depending on HTTP.
 const (
 	BridgeEnvBotID    = "COBOT_BOT_ID"
 	BridgeEnvLeaseDir = "COBOT_LEASE_DIR"

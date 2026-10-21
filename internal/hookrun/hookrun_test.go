@@ -60,7 +60,7 @@ func childSpec(sideEffect bool) HookSpec {
 	}
 }
 
-// TestHookAdapterReportsRealCoverage pins H07: only user-configured commands
+// TestHookAdapterReportsRealCoverage: only user-configured commands
 // run, an unknown name is honestly uncovered (not "blocked"), and a side
 // effect without a fresh lease is refused before anything executes.
 func TestHookAdapterReportsRealCoverage(t *testing.T) {

@@ -88,7 +88,7 @@ func ListChains(ctx context.Context, q Queryer, teamID, status string, limit int
 
 // CountChainWake records one counted wake. The unique (chain, dispatchKey)
 // pair makes a redelivery a no-op: counted=false means it was already counted
-// and the caller must not increment the chain again (G01).
+// and the caller must not increment the chain again.
 func CountChainWake(ctx context.Context, tx *sql.Tx, chainID, dispatchKey, deliveryID, wokenBotID string) (bool, error) {
 	if dispatchKey == "" {
 		dispatchKey = deliveryID
@@ -254,7 +254,7 @@ func ActiveChainDeliveries(ctx context.Context, q Queryer, chainID string) ([]De
 
 // ResetEvaluatingChains returns interrupted risk evaluations to active: after
 // a restart no evaluation is in flight, and a chain must never wait forever
-// on a session that died with the previous process (G03).
+// on a session that died with the previous process.
 func ResetEvaluatingChains(ctx context.Context, db *sql.DB) ([]string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id FROM chains WHERE status = ?`, "evaluating")
 	if err != nil {
