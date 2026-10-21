@@ -35,6 +35,10 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
   const [address, setAddress] = useState('');
   const [editing, setEditing] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
+  // The size the status row shows. frameSize is read on every pointer
+  // event and stays a ref; this copy re-renders the row when a new
+  // viewport arrives, which a ref alone never does.
+  const [frame, setFrame] = useState({ width: 1280, height: 900 });
   const [scale, setScale] = useState<Scale>('fit');
   const [viewportError, setViewportError] = useState<string | null>(null);
 
@@ -94,7 +98,9 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
             target.height = image.naturalHeight;
           }
           target.getContext('2d')?.drawImage(image, 0, 0);
-          frameSize.current = { width: frame.width || image.naturalWidth, height: frame.height || image.naturalHeight };
+          const size = { width: frame.width || image.naturalWidth, height: frame.height || image.naturalHeight };
+          frameSize.current = size;
+          setFrame((current) => (current.width === size.width && current.height === size.height ? current : size));
           setHasFrame(true);
         }
         decoding = false;
@@ -208,7 +214,7 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
   }
 
   // Fit the picture into the box, or show it at 100% inside a scroller.
-  const natural = frameSize.current;
+  const natural = frame;
   const fitScale = box.width > 0 && box.height > 0 ? Math.min(box.width / natural.width, box.height / natural.height) : 1;
   const shown = scale === 'fit' ? fitScale : 1;
   const shownWidth = Math.round(natural.width * shown);
