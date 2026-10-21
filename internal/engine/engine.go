@@ -49,6 +49,9 @@ type ThreadInfo struct {
 	Cwd           string
 	Model         string
 	ModelProvider string
+	// Path is the file the engine keeps the thread's full record in, when
+	// it says.
+	Path string
 }
 
 // Server is one team's app-server instance. It is not safe for arbitrary

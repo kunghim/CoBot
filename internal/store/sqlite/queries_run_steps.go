@@ -2,6 +2,9 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -141,4 +144,47 @@ func scanRunSteps(rows interface {
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// LastEndedRun is the member's latest run that has ended, other than the
+// one named (the run being started now).
+func LastEndedRun(ctx context.Context, q Queryer, botID, exceptRunID string) (domain.Run, error) {
+	var r domain.Run
+	var started, ended string
+	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
+		FROM runs WHERE bot_id = ? AND id != ? AND ended_at != '' ORDER BY ended_at DESC, id DESC LIMIT 1`, botID, exceptRunID).
+		Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Run{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Run{}, err
+	}
+	r.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+	r.EndedAt, _ = time.Parse(time.RFC3339Nano, ended)
+	return r, nil
+}
+
+// RunFailureCode is the failure code of the last error notice a run
+// recorded, or "" when it recorded none with a code.
+func RunFailureCode(ctx context.Context, q Queryer, runID string) string {
+	rows, err := q.QueryContext(ctx, `SELECT detail FROM run_steps WHERE run_id = ? AND kind = ? ORDER BY seq DESC`, runID, domain.StepKindNotice)
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if rows.Scan(&raw) != nil {
+			return ""
+		}
+		var detail struct {
+			Level       string `json:"level"`
+			FailureCode string `json:"failureCode"`
+		}
+		if json.Unmarshal([]byte(raw), &detail) == nil && detail.Level == "error" && detail.FailureCode != "" {
+			return detail.FailureCode
+		}
+	}
+	return ""
 }
