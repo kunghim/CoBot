@@ -1856,6 +1856,11 @@ paths:
               required: [requestId]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
       responses:
         "200":
           description: Cancelled requirement
