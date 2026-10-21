@@ -662,7 +662,9 @@
   "auth": {
     "authorizing": "Authorizing…",
     "unauthorizedTitle": "Authorization required",
-    "unauthorizedBody": "This page session does not exist or has expired. Re-run `cobot serve` in a terminal (a running instance prints a fresh 60-second one-time link), or open the desktop app.",
+    "unauthorizedBody": "This browser does not hold a session yet. A refresh usually does it; if not, re-run `cobot serve` in a terminal, or open the desktop app.",
+    "unreachableTitle": "Service unreachable",
+    "unreachableBody": "CoBot's service did not answer. Check that `cobot serve` is still running, then retry.",
     "retry": "Retry"
   },
   "status": {

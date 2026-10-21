@@ -40,6 +40,77 @@ func TestBootstrapRecoversFromStaleIdentity(t *testing.T) {
 	}
 }
 
+// The page issues itself a session as it loads. This is what lets a
+// bookmarked address keep working: the user opens the address and is in,
+// with nothing to fetch from a terminal and nothing that expires.
+func TestPageLoadIssuesItsOwnSession(t *testing.T) {
+	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
+	c := newClient(t, core.Endpoint)
+
+	response, _ := c.do("GET", "/", nil, map[string]string{"Accept": "text/html,application/xhtml+xml"})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("page load = %d", response.StatusCode)
+	}
+	if c.sessionName == "" || c.cookies[c.sessionName] == "" {
+		t.Fatal("the page was not issued a session")
+	}
+	// The session it was given is a working one.
+	response, _ = c.do("GET", "/api/v1/settings", nil, nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("the session from the page load does not work: %d", response.StatusCode)
+	}
+}
+
+// A reload keeps the session it already has. Minting another one on every
+// load would fill the session file with sessions nobody uses.
+func TestPageReloadKeepsItsSession(t *testing.T) {
+	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
+	c := newClient(t, core.Endpoint)
+
+	c.do("GET", "/", nil, map[string]string{"Accept": "text/html"})
+	first := c.cookies[c.sessionName]
+	if first == "" {
+		t.Fatal("the page was not issued a session")
+	}
+	c.do("GET", "/", nil, map[string]string{"Accept": "text/html"})
+	if c.cookies[c.sessionName] != first {
+		t.Fatal("the page was issued a second session on reload")
+	}
+}
+
+// Only a page opens a session. A program on the machine that asks for the
+// API directly is still refused, the way it always was.
+func TestApiWithoutACredentialStaysRefused(t *testing.T) {
+	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
+	c := newClient(t, core.Endpoint)
+
+	response, _ := c.do("GET", "/api/v1/settings", nil, nil)
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("settings without a credential = %d, want 401", response.StatusCode)
+	}
+	if c.sessionName != "" {
+		t.Fatal("an API request was issued a session")
+	}
+}
+
+// Another site in the user's own browser is still turned away, and it never
+// reaches the point where a session could be issued to it.
+func TestAnotherSiteCannotOpenASession(t *testing.T) {
+	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
+	c := newClient(t, core.Endpoint)
+
+	response, _ := c.do("GET", "/", nil, map[string]string{
+		"Accept": "text/html",
+		"Origin": "https://evil.example",
+	})
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site page load = %d, want 403", response.StatusCode)
+	}
+	if c.sessionName != "" {
+		t.Fatal("a refused request was issued a session")
+	}
+}
+
 func TestLocalStopDoesNotAcceptPageAuthority(t *testing.T) {
 	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
 	c := newClient(t, core.Endpoint)
