@@ -47,7 +47,9 @@ export default function ReasoningEffortSelect({ team, disabled }: { team: Team; 
   // The efforts CoBot can send are the ones the engine knows; a gateway's
   // own model does not change what the engine accepts.
   const levels = model?.reasoningEfforts ?? [];
-  const selected = gateway ? gatewayModelID(gateway) : modelId(model!);
+  // An engine that lists no models leaves nothing selected; the picker then
+  // hides itself below rather than reading a model that is not there.
+  const selected = gateway ? gatewayModelID(gateway) : model ? modelId(model) : '';
   const stored = team.reasoningEffort ?? '';
   const label = (effort: string) => t(`effort.level.${effort}`, { defaultValue: effort });
 
