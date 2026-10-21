@@ -81,7 +81,7 @@ func TestAHandoverIsToldOnTheFirstTurnOnly(t *testing.T) {
 	for _, want := range []string{
 		handoverHeading,
 		fakeengine.TranscriptPath(first.ThreadID),
-		"之前是 alpha 的 alpha-model，现在是 beta 的 beta-model",
+		"之前是 alpha（alpha-model），现在是 beta（beta-model）",
 		"上一轮的结果：完成",
 		"你最后的回复：「做完了：one」",
 	} {

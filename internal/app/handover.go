@@ -81,7 +81,7 @@ func (a *App) handoverText(ctx context.Context, bot domain.Bot, runID string, h 
 		b.WriteString("之前的会话没有接过来，它的记录也找不到了，下面是 CoBot 记下的情况。\n")
 	} else {
 		b.WriteString("之前的会话没有接过来，它的完整记录还在，只作参考：\n\n")
-		b.WriteString(h.TranscriptPath)
+		b.WriteString(readablePath(h.TranscriptPath))
 		b.WriteString("\n\n这是之前那个会话的完整记录（JSONL，每行一条），有用户的消息、你的回复、工具调用和结果。")
 		b.WriteString("不要修改或删除这个文件，也不要尝试恢复那个会话。\n\n")
 		b.WriteString("先看下面的最新状态和当前工作目录，缺细节再到记录里读需要的部分，最近的内容在文件末尾。")
@@ -127,9 +127,15 @@ func (a *App) modelLabel(ctx context.Context, providerID, model string) string {
 		name = "官方账号"
 	}
 	if model == "" {
-		return name + " 的默认模型"
+		return name + "（默认模型）"
 	}
-	return name + " 的 " + model
+	return name + "（" + model + "）"
+}
+
+// readablePath drops the extended-length prefix Windows paths can carry
+// (\\?\): the path is for the model to open with ordinary tools.
+func readablePath(path string) string {
+	return strings.TrimPrefix(path, `\\?\`)
 }
 
 // runOutcome says how a run ended, with the failure's reason when the
