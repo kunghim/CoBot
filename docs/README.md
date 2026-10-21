@@ -1,7 +1,7 @@
 # 文档索引
 
 这些文档主要写给编码智能体，按需读取。入口是 [AGENTS.md](../AGENTS.md)：它按改动路径和任务类型指向下面的文件。
-贡献流程见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
+贡献流程见 [CONTRIBUTING.md](../CONTRIBUTING.md)；第一次参与、想了解整体怎么配合，先读给人看的 [共建者手册](handbook.md)。
 
 ## 按改动路径（`rules/`）
 

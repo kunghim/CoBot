@@ -2,11 +2,12 @@
 
 CoBot is a local multi-agent application with one Go core shared by Web and
 desktop. This guide covers how to contribute. Engineering rules live in
-[docs/](docs/README.md) (written in Chinese); coding agents start from
+[docs/](docs/README.md) (written in Chinese; start with the
+[contributor handbook](docs/handbook.md)); coding agents start from
 [AGENTS.md](AGENTS.md). Private notes are never a prerequisite.
 
 CoBot 是 Web 与桌面共用一套 Go 核心的本地多智能体应用。本文说明如何参与贡献；
-工程规范见 [docs/](docs/README.md)，编码智能体从 [AGENTS.md](AGENTS.md) 进入。参与开发不需要任何私人笔记。
+工程规范见 [docs/](docs/README.md)，先读给人看的 [共建者手册](docs/handbook.md)；编码智能体从 [AGENTS.md](AGENTS.md) 进入。参与开发不需要任何私人笔记。
 
 ## Where to start / 从哪里开始
 
