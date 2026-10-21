@@ -33,6 +33,7 @@ import (
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/webui"
 	"github.com/kunghim/CoBot/internal/wiretrace"
@@ -120,6 +121,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		// Without an explicit address the profile keeps one port across
 		// restarts, so a bookmarked page and its session keep working.
 		listen = net.JoinHostPort("127.0.0.1", strconv.Itoa(preferredPort(paths)))
+	}
+	if err := loopbackOnly(listen); err != nil {
+		return nil, err
 	}
 
 	lock, err := platform.AcquireLock(paths, 2*time.Second)
@@ -228,6 +232,16 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	application.Avatars = catalog
 	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
 
+	// The credential store holds the model providers' API keys, encrypted
+	// with the platform's key protection. A store that cannot be opened is
+	// not fatal: the product still works, only the provider secrets do not.
+	store, credErr := secrets.New(paths.CredentialsDir())
+	if credErr != nil {
+		logger.Warn("credential store unavailable", "error", credErr)
+	} else {
+		application.Credentials = store
+	}
+
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
 	if err := hookrun.EnsureNativeConfig(paths, helper); err != nil {
@@ -247,10 +261,17 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		if err != nil {
 			return nil, err
 		}
+		// The provider secrets ride in the child's environment; the
+		// configuration only names the variables, so the key itself never
+		// reaches a file the user might open.
+		secrets, err := application.ProviderEnv(startCtx)
+		if err != nil {
+			return nil, err
+		}
 		return codex.Start(startCtx, codex.ServerOptions{
 			Binary:    binary,
 			Cwd:       cwd,
-			Env:       codex.EngineEnv(paths),
+			Env:       codex.EngineEnv(paths, secrets),
 			Client:    codex.ClientInfo{Name: "cobot", Title: "CoBot", Version: opts.Version},
 			Callbacks: callbacks,
 			Logger:    logger,

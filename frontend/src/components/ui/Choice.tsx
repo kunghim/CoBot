@@ -279,3 +279,59 @@ export function Toggle({ pressed, onChange, children, size = 'md', icon: Icon }:
     </button>
   );
 }
+
+/**
+ * A small toggle in a wrapped row: pick several out of many (the models of
+ * a provider, a set of filters). The chosen state is not carried by color
+ * alone — a check mark marks it, and the chip reads its own state.
+ */
+export function Chip({
+  pressed,
+  onClick,
+  children,
+  trailing,
+  mono = false,
+  tone = 'neutral',
+  disabled = false,
+  title,
+  className,
+}: {
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  /** A small marker on the right, e.g. a status badge. */
+  trailing?: ReactNode;
+  /** Machine values (ids, paths) use the monospace face. */
+  mono?: boolean;
+  /** danger: the chip reports a broken thing, so it reads red when chosen. */
+  tone?: 'neutral' | 'danger';
+  disabled?: boolean;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      className={cx(
+        'inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        mono && 'font-mono',
+        pressed
+          ? tone === 'danger'
+            ? 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
+            : 'border-signal-500 bg-signal-500/10 text-signal-600 dark:text-signal-400'
+          : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-900/[0.04] dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-white/[0.07]',
+        className,
+      )}
+    >
+      <span aria-hidden className={cx('text-[9px] leading-none', !pressed && 'opacity-0')}>
+        ✓
+      </span>
+      <span className="min-w-0 truncate">{children}</span>
+      {trailing}
+    </button>
+  );
+}

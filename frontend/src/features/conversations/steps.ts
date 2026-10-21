@@ -50,6 +50,15 @@ const knownErrorCodes = new Set([
   'httpConnectionFailed', 'responseStreamConnectionFailed', 'responseStreamDisconnected', 'internalServerError',
 ]);
 
+// Root causes taken from a gateway's own HTTP status. They say what the
+// provider refused and why, which the engine's symptom codes cannot: a
+// balance that ran out, a key that was refused and a model that does not
+// exist all reach the engine as "the request failed".
+const providerFailureCodes = new Set([
+  'quota', 'rate_limit', 'auth_invalid', 'model_unknown', 'context_exceeded',
+  'protocol_unsupported', 'request_rejected', 'network', 'engine_internal',
+]);
+
 /** One-line description of a step. */
 export function describeStep(step: RunStep, nameOf: (botId: string) => string): Phrase {
   const d = step.detail ?? {};
@@ -86,6 +95,14 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       // Known engine error codes read in the user's language; the engine's
       // own text stays available in the step's detail.
       const code = text(d.code);
+      // A third-party gateway answers with its own status, and that status
+      // is the root cause: an empty balance and a rejected key both arrive
+      // as "the request failed". It comes first because it names the reason
+      // rather than the symptom.
+      const failureCode = text(d.failureCode);
+      if (d.level !== 'warning' && providerFailureCodes.has(failureCode)) {
+        return { key: `conversation.providerError.${failureCode}` };
+      }
       if (d.level !== 'warning' && knownErrorCodes.has(code)) return { key: `conversation.engineError.${code}` };
       return { key: d.level === 'warning' ? 'conversation.step.warning' : 'conversation.step.error', params: { message: text(d.message) } };
     }

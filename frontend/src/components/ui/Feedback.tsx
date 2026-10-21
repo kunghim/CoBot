@@ -65,9 +65,9 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
 }
 
 /** A short label of state or category. */
-export function Badge({ tone = 'neutral', children, dot = false }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
+export function Badge({ tone = 'neutral', children, dot = false, mono = false }: { tone?: Tone; children: ReactNode; dot?: boolean; mono?: boolean }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium leading-4', toneSoft[tone])}>
+    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium leading-4', mono && 'font-mono', toneSoft[tone])}>
       {dot && <span className={cx('h-1.5 w-1.5 rounded-full', toneSolid[tone])} />}
       {children}
     </span>

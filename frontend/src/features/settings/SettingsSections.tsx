@@ -9,15 +9,20 @@ import {
   useEngineLoginCancel,
   useEngineLogout,
   useEngineModels,
+  useProviders,
   useRevokeAuthorization,
+  useSettings,
   useStatus,
   useRoles,
+  useSaveProvider,
+  useSessionLogout,
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
 import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
+import { gatewayModelID, gatewayModelRequest, gatewayModels, gatewayOf, providerOf } from '../providers/providerModels';
 import {
   Alert,
   Button,
@@ -34,6 +39,7 @@ import {
   Select,
   Skeleton,
   StatusDot,
+  useToast,
   type Tone,
 } from '../../components/ui';
 import { desktopBridge } from '../../platform/native-bridge';
@@ -234,6 +240,8 @@ function AvatarCatalogCard() {
 export function EngineSection() {
   const { t } = useTranslation();
   const engine = useEngine();
+  const settings = useSettings(true);
+  const providers = useProviders();
   const login = useEngineLogin();
   const loginCancel = useEngineLoginCancel();
   const logout = useEngineLogout();
@@ -319,17 +327,26 @@ export function EngineSection() {
 
   const info = engine.data;
   const loggedIn = info?.loggedIn ?? false;
+  // A third-party provider runs on its own key: the engine's own ChatGPT
+  // account is not part of that setup, so asking to sign in would be noise.
+  const gateway = providers.data?.providers.find((entry) => entry.id === settings.data?.defaultProvider);
+  const usesGateway = !!gateway && gateway.authMode !== 'chatgpt';
   const statusText = !info
     ? t('status.loading')
     : info.status === 'ready'
-      ? loggedIn ? t('settings.engineReady') : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
+      ? loggedIn
+        ? t('settings.engineReady')
+        : usesGateway
+          ? t('settings.engineGatewayReady')
+          : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
       : info.status === 'error'
         ? t('settings.engineError')
         : info.status === 'starting'
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
-  // Ready but signed out is not ready to work: it reads as a warning.
-  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
+  // Ready but signed out is not ready to work: it reads as a warning. A
+  // gateway needs no sign-in at all, so there it is plain ready.
+  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn || usesGateway ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
   const hookState = info?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
   const hookKey = hookState === 'trusted' ? 'Trusted' : hookState === 'failed' ? 'Failed' : 'Untrusted';
   const hookTone: Tone = hookState === 'trusted' ? 'success' : hookState === 'failed' ? 'danger' : 'warning';
@@ -345,16 +362,19 @@ export function EngineSection() {
         <div className="space-y-4">
           <p className="flex items-center gap-2 text-sm" role="status">
             <StatusDot tone={engineTone} label={statusText} />
-            <span className={info?.status === 'ready' && !loggedIn ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
+            <span className={info?.status === 'ready' && !loggedIn && !usesGateway ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
               {statusText}
               {info?.version ? ` · ${info.version}` : ''}
               {info?.status === 'ready' && loggedIn ? ` · ${t('settings.engineLoggedIn')}` : ''}
             </span>
           </p>
+          {usesGateway && !loggedIn && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('settings.engineGatewayLoginHint')}</p>
+          )}
           {details.length > 0 && <DescriptionList items={details} />}
           {info?.errorKey && <Alert tone="danger">{errorMessage(t, info.errorKey)}</Alert>}
           <div className="flex flex-wrap items-center gap-2">
-            {!loggedIn && info?.status === 'ready' && !loginPending && (
+            {!loggedIn && info?.status === 'ready' && !loginPending && !usesGateway && (
               <Button variant="primary" onClick={startLogin} loading={login.isPending}>
                 {t('engine.login')}
               </Button>
@@ -429,11 +449,35 @@ export function EngineSection() {
 export function ModelsSection({ settings, save, errors }: SectionProps) {
   const { t } = useTranslation();
   const engine = useEngine();
+  const providers = useProviders();
   const models = useEngineModels(engine.data?.status === 'ready');
+  const saveProvider = useSaveProvider();
+  const toast = useToast();
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
   useEffect(() => setDefaultModel(settings.defaultModel), [settings.defaultModel]);
 
-  if (engine.data && engine.data.status !== 'ready') {
+  // The provider the profile runs with decides which models exist. The
+  // engine's own list belongs to the engine's own vendor, and a third-party
+  // gateway never has those models; the official provider is the engine's
+  // own account, so it keeps the engine's list.
+  //
+  // Until the provider list is in, there is no telling which list is the
+  // right one, so the picker waits instead of showing the engine's models
+  // for a moment and then swapping them out.
+  if (providers.isPending) {
+    return (
+      <Card>
+        <Skeleton className="h-9 w-64" />
+      </Card>
+    );
+  }
+  const provider = providerOf(providers.data?.providers, settings.defaultProvider);
+  const gateway = gatewayOf(providers.data?.providers, settings.defaultProvider);
+  // A provider that is named but gone leaves the profile on the engine's
+  // own account, which is what the core falls back to as well.
+  const providerGone = !!settings.defaultProvider && !provider;
+
+  if (!gateway && engine.data && engine.data.status !== 'ready') {
     return (
       <Card>
         <EmptyState icon={<Icons.engine size={20} aria-hidden />} title={t('settings.modelsNeedEngine')} />
@@ -441,27 +485,57 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
     );
   }
 
-  const options = (current: string): EngineModel[] => {
-    const list = models.data?.models ?? [];
-    const known = new Set(list.map((entry) => entry.slug ?? entry.id ?? ''));
-    if (current !== '' && !known.has(current)) return [{ slug: current, displayName: current }, ...list];
-    return list;
-  };
+  const options: { value: string; label: string }[] = gateway
+    ? gatewayModels(gateway, t('settings.modelUnavailable')).map((option) => ({ value: option.id, label: option.label }))
+    : (models.data?.models ?? []).flatMap((model: EngineModel) => {
+        const id = model.slug ?? model.id ?? '';
+        return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
+      });
+
+  // The value the profile runs with: a gateway's own default model, or the
+  // profile's own setting. A gateway without a default falls back to its
+  // first model, the same way the core picks the model for a turn, so the
+  // picker shows what a turn will really ask for.
+  const value = gateway ? gatewayModelID(gateway) : defaultModel;
+  if (value !== '' && !options.some((option) => option.value === value)) {
+    options.unshift({ value, label: value });
+  }
 
   return (
     <Card>
       <div className="max-w-sm">
-        <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} error={errors.defaultModel}>
+        <Field
+          label={t('settings.defaultModel')}
+          hint={
+            gateway
+              ? t('settings.defaultModelProviderHint', { provider: gateway.name })
+              : providerGone
+                ? t('settings.defaultModelProviderGone')
+                : t('settings.defaultModelHint')
+          }
+          error={errors.defaultModel}
+        >
           <Select
-            value={defaultModel}
+            value={value}
             options={[
-              { value: '', label: t('settings.modelUnset') },
-              ...options(defaultModel).flatMap((model) => {
-                const id = model.slug ?? model.id ?? '';
-                return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
-              }),
+              { value: '', label: t(gateway ? 'settings.modelUnsetProvider' : 'settings.modelUnset') },
+              ...options,
             ]}
             onChange={(next) => {
+              if (gateway) {
+                // The provider's own default model is what a turn asks for;
+                // the profile's setting is only the fallback for a profile
+                // that runs with no provider.
+                saveProvider.mutate(
+                  { id: gateway.id, body: gatewayModelRequest(gateway, next) },
+                  {
+                    onError: (error) => {
+                      toast.show({ tone: 'danger', title: t('settings.saveFailed'), description: apiErrorMessage(t, error) });
+                    },
+                  },
+                );
+                return;
+              }
               setDefaultModel(next);
               save('defaultModel', { defaultModel: next }, (persisted) => setDefaultModel(persisted.defaultModel));
             }}
@@ -541,47 +615,71 @@ export function SecuritySection() {
   const { t, i18n } = useTranslation();
   const authorizations = useAuthorizations(true);
   const revoke = useRevokeAuthorization();
+  const signOut = useSessionLogout();
   const [revokeError, setRevokeError] = useState('');
+  const [signOutError, setSignOutError] = useState('');
   const items = authorizations.data?.items ?? [];
   return (
-    <Card title={t('settings.authorizations')} description={t('settings.authorizationsHint')}>
-      {authorizations.isPending && <Skeleton className="h-10 w-full" />}
-      {authorizations.isSuccess && items.length === 0 && (
-        <EmptyState icon={<Icons.permission size={20} aria-hidden />} title={t('settings.authorizationsEmpty')} />
-      )}
-      {authorizations.isSuccess && items.length > 0 && (
-        <List>
-          {items.map((item) => (
-            <ListRow
-              key={item.botId + item.engineEpoch}
-              title={<span className="font-mono text-xs">{item.botId.slice(0, 8)}</span>}
-              description={
-                <span className="font-mono">
-                  {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
-                </span>
-              }
-              trailing={
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => {
-                    setRevokeError('');
-                    revoke.mutate(item.botId, { onError: (error) => setRevokeError(apiErrorMessage(t, error)) });
-                  }}
-                >
-                  {t('settings.revoke')}
-                </Button>
-              }
-            />
-          ))}
-        </List>
-      )}
-      {revokeError && (
-        <div className="mt-3">
-          <Alert tone="danger">{revokeError}</Alert>
-        </div>
-      )}
-    </Card>
+    <div className="space-y-6">
+      <Card title={t('settings.authorizations')} description={t('settings.authorizationsHint')}>
+        {authorizations.isPending && <Skeleton className="h-10 w-full" />}
+        {authorizations.isSuccess && items.length === 0 && (
+          <EmptyState icon={<Icons.permission size={20} aria-hidden />} title={t('settings.authorizationsEmpty')} />
+        )}
+        {authorizations.isSuccess && items.length > 0 && (
+          <List>
+            {items.map((item) => (
+              <ListRow
+                key={item.botId + item.engineEpoch}
+                title={<span className="font-mono text-xs">{item.botId.slice(0, 8)}</span>}
+                description={
+                  <span className="font-mono">
+                    {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
+                  </span>
+                }
+                trailing={
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => {
+                      setRevokeError('');
+                      revoke.mutate(item.botId, { onError: (error) => setRevokeError(apiErrorMessage(t, error)) });
+                    }}
+                  >
+                    {t('settings.revoke')}
+                  </Button>
+                }
+              />
+            ))}
+          </List>
+        )}
+        {revokeError && (
+          <div className="mt-3">
+            <Alert tone="danger">{revokeError}</Alert>
+          </div>
+        )}
+      </Card>
+
+      {/* A shared machine keeps the session for days, so there has to be a
+          way to end it without closing the program. */}
+      <Card title={t('settings.sessionTitle')} description={t('settings.sessionHint')}>
+        <Button
+          variant="danger"
+          loading={signOut.isPending}
+          onClick={() => {
+            setSignOutError('');
+            signOut.mutate(undefined, { onError: (error) => setSignOutError(apiErrorMessage(t, error)) });
+          }}
+        >
+          {t('settings.signOut')}
+        </Button>
+        {signOutError && (
+          <div className="mt-3">
+            <Alert tone="danger">{signOutError}</Alert>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -620,3 +718,8 @@ export function RolesSection() {
     </Card>
   );
 }
+
+// The model providers live in their own feature folder: they need the
+// vendor catalogue and the add/edit dialog, which the rest of the settings
+// does not.
+export { default as ProviderSection } from '../providers/ProviderSection';

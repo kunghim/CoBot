@@ -352,6 +352,13 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
+	// The model comes from the provider the profile runs with, not from the
+	// engine's own default: that default names a model of a vendor this
+	// profile may no longer be talking to.
+	_, model, err := s.app.ThreadProvider(ctx, team.ID)
+	if err != nil {
+		return err
+	}
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
 	// settings; it never interrupts work that already started (G07/G08).
@@ -531,7 +538,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
-	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
 		// The engine answered with a refusal, so no turn exists: the run
@@ -849,6 +856,13 @@ type threadLoadedChecker interface {
 	ThreadLoaded(threadID string) bool
 }
 
+// threadReloader is implemented by engines that can let go of a thread, so
+// it is loaded again with another provider.
+type threadReloader interface {
+	ArchiveThread(ctx context.Context, threadID string) error
+	UnarchiveThread(ctx context.Context, threadID string) error
+}
+
 func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot domain.Bot, cwd string, server engine.Server, runID string) (threadID string, err error) {
 	defer func() {
 		// A recording names the member behind each engine thread.
@@ -872,7 +886,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	settings, err := s.app.GetSettings(ctx)
+	providerID, model, err := s.app.ThreadProvider(ctx, team.ID)
 	if err != nil {
 		return "", err
 	}
@@ -885,31 +899,53 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Cwd:                   cwd,
 		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
-		Model:                 settings.DefaultModel,
+		Model:                 model,
+		ModelProvider:         providerID,
 		DeveloperInstructions: instructions,
 		Config:                config,
 	}
 	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
+		// A thread that was started with another provider has to let go of
+		// it: the engine ignores a provider for a thread it already holds.
+		// Archiving and unarchiving is how it lets go, and the resume below
+		// loads it again with the provider the team runs with.
+		switching := session.ModelProvider != "" && session.ModelProvider != providerID
+		if switching {
+			if reloader, ok := server.(threadReloader); ok {
+				if err := reloader.ArchiveThread(ctx, session.ProviderThreadID); err != nil {
+					s.logger.Warn("could not archive the thread to change its provider", "threadId", session.ProviderThreadID, "error", err)
+				} else if err := reloader.UnarchiveThread(ctx, session.ProviderThreadID); err != nil {
+					s.logger.Warn("could not unarchive the thread to change its provider", "threadId", session.ProviderThreadID, "error", err)
+				}
+			}
+		}
 		// Resuming is for a thread this app-server does not have, after an
 		// engine restart or once Codex unloaded it. A thread that is still
-		// loaded here takes the turn directly.
-		if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
-			return session.ProviderThreadID, nil
+		// loaded here takes the turn directly — unless it is being moved to
+		// another provider, which needs the resume to happen.
+		if !switching {
+			if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
+				return session.ProviderThreadID, nil
+			}
 		}
-		if err := server.ResumeThread(ctx, session.ProviderThreadID, spec); err == nil {
+		resumed, rerr := server.ResumeThread(ctx, session.ProviderThreadID, spec)
+		if rerr == nil {
 			// The thread now belongs to this connection, so rebind it: thread
 			// ids are only unique inside one engine, and every later lookup
 			// (approval routing, turn completion) resolves the bot by
 			// (thread, epoch). A resume on a new connection without this
 			// update would silently drop that connection's events.
-			if session.EngineEpoch != server.Epoch() {
+			// The model and the provider are the engine's own answer: a
+			// record CoBot kept itself names the provider the thread had
+			// before, not the one it runs with now.
+			if session.EngineEpoch != server.Epoch() || session.ModelProvider != resumed.ModelProvider {
 				tx, txErr := s.app.DB.BeginTx(ctx, nil)
 				if txErr != nil {
 					return "", txErr
 				}
 				if uerr := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
 					BotID: bot.ID, ProviderThreadID: session.ProviderThreadID,
-					EngineEpoch: server.Epoch(), Model: session.Model, ModelProvider: session.ModelProvider,
+					EngineEpoch: server.Epoch(), Model: resumed.Model, ModelProvider: resumed.ModelProvider,
 				}); uerr != nil {
 					tx.Rollback()
 					return "", uerr

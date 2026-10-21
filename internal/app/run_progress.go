@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
+	"github.com/kunghim/CoBot/internal/failure"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -80,6 +82,37 @@ func (rt *teamRuntime) forgetLiveRun(threadID, turnID string) {
 	rt.mu.Unlock()
 }
 
+// providerSecrets returns every provider key CoBot holds. The engine runs
+// with them in its environment, so a vendor's error body can echo one back.
+func (s *Scheduler) providerSecrets(ctx context.Context) []string {
+	if s.app == nil {
+		return nil
+	}
+	env, err := s.app.ProviderEnv(ctx)
+	if err != nil {
+		return nil
+	}
+	secrets := make([]string, 0, len(env))
+	for _, secret := range env {
+		if secret != "" {
+			secrets = append(secrets, secret)
+		}
+	}
+	return secrets
+}
+
+// scrub takes provider keys out of text that is about to be stored or logged.
+// A vendor routinely repeats the key that was rejected in its error body, and
+// the engine passes that body on in its own message.
+func scrub(text string, secrets []string) string {
+	for _, secret := range secrets {
+		if strings.Contains(text, secret) {
+			text = strings.ReplaceAll(text, secret, "[redacted]")
+		}
+	}
+	return text
+}
+
 // onProgress records and relays what a running turn is doing: its steps,
 // streamed text and engine problems. It returns false for events that carry
 // no progress, which the caller handles as before.
@@ -87,29 +120,39 @@ func (s *Scheduler) onProgress(ctx context.Context, teamID string, rt *teamRunti
 	if n.Step == nil && n.DeltaKind == "" && n.Problem == nil {
 		return false
 	}
+	// What the user gets to read about a failure: the root cause when the
+	// vendor's status says what it was, and otherwise the engine's own
+	// words with every provider key taken out of them.
+	message := ""
+	if n.Problem != nil {
+		message = scrub(n.Problem.Message, s.providerSecrets(ctx))
+		if n.Problem.FailureCode != "" {
+			message = failure.Text(n.Problem.FailureCode)
+		}
+	}
 	ref, ok := s.resolveLiveRun(ctx, teamID, rt, n.ThreadID, n.TurnID)
 	if !ok {
 		if n.Problem != nil {
 			// A notice outside any turn of ours is only logged.
-			s.logger.Info("engine notice", "teamId", teamID, "level", n.Problem.Level, "message", n.Problem.Message)
+			s.logger.Info("engine notice", "teamId", teamID, "level", n.Problem.Level, "message", message)
 		}
 		return true
 	}
 	switch {
 	case n.Problem != nil && n.Problem.WillRetry:
 		attempt := ref.retries + 1
-		if m := attemptPattern.FindStringSubmatch(n.Problem.Message); m != nil {
+		if m := attemptPattern.FindStringSubmatch(message); m != nil {
 			if reported, err := strconv.Atoi(m[1]); err == nil && reported > 0 {
 				attempt = reported
 			}
 		}
 		ref.retries, ref.retryOpen = attempt, true
 		rt.storeLiveRun(n.ThreadID, n.TurnID, ref)
-		detail, _ := json.Marshal(map[string]any{"attempt": attempt, "message": n.Problem.Message, "code": n.Problem.Code})
+		detail, _ := json.Marshal(map[string]any{"attempt": attempt, "message": message, "code": n.Problem.Code})
 		s.saveStep(ctx, ref, domain.RunStep{ID: retryStepID, Kind: domain.StepKindRetry, Status: engine.StepInProgress, Detail: detail})
 	case n.Problem != nil:
 		s.settleRetry(ctx, rt, n, &ref)
-		detail, _ := json.Marshal(map[string]any{"level": n.Problem.Level, "message": n.Problem.Message, "code": n.Problem.Code})
+		detail, _ := json.Marshal(map[string]any{"level": n.Problem.Level, "message": message, "code": n.Problem.Code, "failureCode": n.Problem.FailureCode})
 		s.saveStep(ctx, ref, domain.RunStep{ID: "cobot-notice-" + domain.NewID(), Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
 	case n.Step != nil:
 		s.settleRetry(ctx, rt, n, &ref)

@@ -50,11 +50,11 @@ type Queryer interface {
 
 // ---- settings ----
 
-const settingsColumns = `revision, language, color_mode, theme, default_model, member_limit, chain_limit, review_reject_limit, budget_scope, budget_tokens, engine_path`
+const settingsColumns = `revision, language, color_mode, theme, default_model, default_provider, member_limit, chain_limit, review_reject_limit, budget_scope, budget_tokens, engine_path`
 
 func scanSettings(row *sql.Row) (domain.Settings, error) {
 	var s domain.Settings
-	err := row.Scan(&s.Revision, &s.Language, &s.ColorMode, &s.Theme, &s.DefaultModel, &s.MemberLimit, &s.ChainLimit, &s.ReviewRejectLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath)
+	err := row.Scan(&s.Revision, &s.Language, &s.ColorMode, &s.Theme, &s.DefaultModel, &s.DefaultProvider, &s.MemberLimit, &s.ChainLimit, &s.ReviewRejectLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Settings{}, ErrNotFound
 	}
@@ -106,11 +106,11 @@ func UpdateSettingsTx(ctx context.Context, tx *sql.Tx, patch domain.SettingsPatc
 	_, err = tx.ExecContext(ctx, `
 		UPDATE settings SET
 			revision = revision + 1,
-			language = ?, color_mode = ?, theme = ?, default_model = ?,
+			language = ?, color_mode = ?, theme = ?, default_model = ?, default_provider = ?,
 			member_limit = ?, chain_limit = ?, review_reject_limit = ?,
 			budget_scope = ?, budget_tokens = ?, engine_path = ?, updated_at = ?
 		WHERE id = 1`,
-		next.Language, next.ColorMode, next.Theme, next.DefaultModel,
+		next.Language, next.ColorMode, next.Theme, next.DefaultModel, next.DefaultProvider,
 		next.MemberLimit, next.ChainLimit, next.ReviewRejectLimit,
 		next.BudgetScope, next.BudgetTokens, next.EnginePath, now)
 	if err != nil {

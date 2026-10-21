@@ -21,11 +21,15 @@ type ThreadSpec struct {
 	// Permission is the team's mode (read_only | default | full). When set,
 	// the adapter derives the engine's sandbox and approval settings from it
 	// and Sandbox/ApprovalPolicy are ignored.
-	Permission            string
-	Sandbox               string         // read-only | workspace-write
-	ApprovalPolicy        string         // untrusted | on-request | never
-	ApprovalsReviewer     string         // user
-	Model                 string         // optional override
+	Permission        string
+	Sandbox           string // read-only | workspace-write
+	ApprovalPolicy    string // untrusted | on-request | never
+	ApprovalsReviewer string // user
+	Model             string // optional override
+	// ModelProvider names the provider this thread runs with. Empty leaves
+	// the engine on its own account. The engine refuses an id it does not
+	// know, so an id is only sent for a provider that is configured.
+	ModelProvider         string         // optional provider id
 	DeveloperInstructions string         // role + collaboration instructions
 	Config                map[string]any // thread-scoped config overrides
 }
@@ -51,7 +55,9 @@ type ThreadInfo struct {
 // concurrent Close; calls themselves are safe to run in parallel.
 type Server interface {
 	StartThread(ctx context.Context, spec ThreadSpec) (ThreadInfo, error)
-	ResumeThread(ctx context.Context, threadID string, spec ThreadSpec) error
+	// ResumeThread reattaches a thread and reports the model and the
+	// provider it runs with, as the engine answered it.
+	ResumeThread(ctx context.Context, threadID string, spec ThreadSpec) (ThreadInfo, error)
 	// StartTurn dispatches one user turn and returns the provider turn id;
 	// completion arrives as notifications, not as this call's result.
 	StartTurn(ctx context.Context, threadID, text string, opts TurnOptions) (turnID string, err error)
@@ -190,11 +196,18 @@ type Step struct {
 
 // Problem is an engine error or warning inside a turn. WillRetry marks a
 // transient failure the engine is already retrying (e.g. reconnecting).
+//
+// Code is the engine's own name for the failure (serverOverloaded,
+// httpConnectionFailed...). FailureCode is the root cause behind it, taken
+// from the vendor's HTTP status: an empty balance and a rejected key both
+// arrive as "the request failed", and only the status tells them apart.
+// It is empty when the engine named a failure without saying why.
 type Problem struct {
-	Level     string // error | warning
-	Message   string
-	Code      string
-	WillRetry bool
+	Level       string // error | warning
+	Message     string
+	Code        string
+	FailureCode string
+	WillRetry   bool
 }
 
 // Callbacks is the handler set an app-server delivers events through.

@@ -16,6 +16,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/failure"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
@@ -151,7 +152,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	// along with how it was started and how it ended.
 	peer := fmt.Sprintf("codex#%d", cmd.Process.Pid)
 	if opts.Trace != nil {
-		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": cmd.Env})
+		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": tracedEnv(cmd.Env)})
 		opts.Trace.Record("codex.process", "start", peer, started)
 	}
 	stderrLines.SetPeer(peer)
@@ -470,7 +471,18 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		}
 		if err := json.Unmarshal(params, &p); err == nil {
 			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
-			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: errorCode(p.Error.CodexErrorInfo), WillRetry: p.WillRetry}
+			code := errorCode(p.Error.CodexErrorInfo)
+			failureCode := ""
+			if root, _, ok := failure.FromCodexErrorInfo(p.Error.CodexErrorInfo); ok {
+				// The vendor's status is the root cause: an empty balance
+				// and a rejected key both arrive as "the request failed",
+				// and only the status tells them apart. The engine's own
+				// message is kept as it is — the caller decides what is
+				// safe to store, and the retry attempt count is read
+				// from it.
+				failureCode = root
+			}
+			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: code, FailureCode: failureCode, WillRetry: p.WillRetry}
 		}
 	case "warning":
 		var p struct {
@@ -502,6 +514,38 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 	}
 }
 
+// tracedEnv records the environment the engine was started with, with the
+// values of credential-looking variables left out. A provider's API key
+// rides in that environment, and a recording is a file the user can copy
+// around; the name still says whether the variable was set.
+func tracedEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			out = append(out, entry)
+			continue
+		}
+		if secretEnvName(name) {
+			out = append(out, name+"=<redacted>")
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// secretEnvName reports whether an environment variable holds a credential.
+func secretEnvName(name string) bool {
+	upper := strings.ToUpper(name)
+	for _, marker := range []string{"KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"} {
+		if strings.Contains(upper, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // Epoch identifies this app-server lifetime (leases/requests reference it).
 func (s *Server) Epoch() string { return s.epoch }
 
@@ -515,6 +559,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		ApprovalPolicy:        spec.ApprovalPolicy,
 		ApprovalsReviewer:     spec.ApprovalsReviewer,
 		Model:                 spec.Model,
+		ModelProvider:         spec.ModelProvider,
 		DeveloperInstructions: spec.DeveloperInstructions,
 		Config:                spec.Config,
 	}, &res)
@@ -529,17 +574,45 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 }
 
 // ResumeThread reattaches a previously created thread.
-func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+//
+// It reports the model and the provider the thread runs with, as the engine
+// answered it: the engine ignores a provider for a thread that is already
+// loaded here, and a record CoBot kept itself cannot say which of the two
+// happened.
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
+	res := ThreadResumeResult{}
 	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-		Model: spec.Model, DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+		Model: spec.Model, ModelProvider: spec.ModelProvider,
+		DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
 		ExcludeTurns: true,
-	}, nil); err != nil {
-		return fmt.Errorf("thread/resume: %w", err)
+	}, &res); err != nil {
+		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)
+	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider}, nil
+}
+
+// ArchiveThread sets a thread aside in the engine.
+//
+// This is how a thread lets go of the provider it was started with: the
+// engine ignores a provider for a thread it already holds, so a thread that
+// has to run with another one is archived and then loaded again.
+func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/archive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/archive: %w", err)
+	}
+	return nil
+}
+
+// UnarchiveThread takes a thread back out of the engine's archive, so it can
+// be loaded again.
+func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/unarchive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/unarchive: %w", err)
+	}
 	return nil
 }
 

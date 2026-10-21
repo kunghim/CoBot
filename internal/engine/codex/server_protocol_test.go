@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +65,108 @@ func TestMissingFilePreviewReadsExactItemWithoutBlockingReader(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("file inspection blocked the RPC reader")
+	}
+}
+
+// A thread names the provider it runs with, and the engine's own answer is
+// what CoBot records: a provider id the engine does not know is a hard
+// error, so the id is only sent for a provider that is configured.
+func TestStartThreadNamesTheProviderAndReadsTheAnswerBack(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	client := NewClient(nopCloser{inW}, outR, ClientHooks{})
+	t.Cleanup(func() { inW.Close(); outW.Close(); client.Wait() })
+	requests := make(chan map[string]any, 4)
+	go func() {
+		scanner := bufio.NewScanner(inR)
+		for scanner.Scan() {
+			var req map[string]any
+			if json.Unmarshal(scanner.Bytes(), &req) != nil {
+				return
+			}
+			requests <- req
+			writeJSONLine(outW, map[string]any{"id": req["id"], "result": map[string]any{
+				"thread":        map[string]any{"id": "th-7"},
+				"cwd":           "team-directory",
+				"model":         "vendor-model",
+				"modelProvider": "gateway",
+			}})
+		}
+	}()
+	s := &Server{client: client}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	info, err := s.StartThread(ctx, engine.ThreadSpec{Cwd: "team-directory", Model: "vendor-model", ModelProvider: "gateway"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := <-requests
+	if req["method"] != "thread/start" {
+		t.Fatalf("wrong method %v", req["method"])
+	}
+	p := req["params"].(map[string]any)
+	if p["modelProvider"] != "gateway" || p["model"] != "vendor-model" {
+		t.Fatalf("the thread did not name its provider: %v", p)
+	}
+	if info.ThreadID != "th-7" || info.ModelProvider != "gateway" {
+		t.Fatalf("the engine's answer was not read back: %+v", info)
+	}
+}
+
+// A thread without a provider leaves the engine on its own account: the
+// parameter is left out rather than sent empty.
+func TestStartThreadWithoutAProviderNamesNone(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	client := NewClient(nopCloser{inW}, outR, ClientHooks{})
+	t.Cleanup(func() { inW.Close(); outW.Close(); client.Wait() })
+	requests := make(chan map[string]any, 4)
+	go func() {
+		scanner := bufio.NewScanner(inR)
+		for scanner.Scan() {
+			var req map[string]any
+			if json.Unmarshal(scanner.Bytes(), &req) != nil {
+				return
+			}
+			requests <- req
+			writeJSONLine(outW, map[string]any{"id": req["id"], "result": map[string]any{
+				"thread": map[string]any{"id": "th-8"}, "cwd": "team-directory", "model": "engine-model", "modelProvider": "openai",
+			}})
+		}
+	}()
+	s := &Server{client: client}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if _, err := s.StartThread(ctx, engine.ThreadSpec{Cwd: "team-directory"}); err != nil {
+		t.Fatal(err)
+	}
+	req := <-requests
+	p := req["params"].(map[string]any)
+	if _, named := p["modelProvider"]; named {
+		t.Fatalf("a thread without a provider named one: %v", p)
+	}
+}
+
+// A provider's key rides in the engine's environment, and a recording is a
+// file the user can copy around: the value is left out, the name stays, so
+// the recording still says whether the variable was set.
+func TestTracedEnvKeepsTheNameAndDropsTheValue(t *testing.T) {
+	got := tracedEnv([]string{
+		"PATH=C:\\bin",
+		"COBOT_PROVIDER_CPA_KEY=sk-the-secret",
+		"HOME=C:\\Users\\kungh",
+	})
+	joined := strings.Join(got, " ")
+	if strings.Contains(joined, "sk-the-secret") {
+		t.Fatalf("the recording kept the key: %v", got)
+	}
+	if !strings.Contains(joined, "COBOT_PROVIDER_CPA_KEY=") {
+		t.Fatalf("the recording lost the name: %v", got)
+	}
+	if !strings.Contains(joined, "PATH=C:\\bin") {
+		t.Fatalf("the recording lost an ordinary variable: %v", got)
 	}
 }
 
@@ -143,11 +246,15 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	if p := (<-requests)["params"].(map[string]any); p["threadId"] != "th-1" || p["turnId"] != "turn-9" {
 		t.Fatal("wrong turn identity", p)
 	}
-	if err = s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", DeveloperInstructions: "current-role", Sandbox: "workspace-write", Config: map[string]any{"mcp_servers.cobot.enabled": true}}); err != nil {
+	resumed, err := s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", ModelProvider: "gateway", DeveloperInstructions: "current-role", Sandbox: "workspace-write", Config: map[string]any{"mcp_servers.cobot.enabled": true}})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["developerInstructions"] != "current-role" || p["config"] == nil || p["excludeTurns"] != true {
+	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["modelProvider"] != "gateway" || p["developerInstructions"] != "current-role" || p["config"] == nil || p["excludeTurns"] != true {
 		t.Fatal("resume lost activation config", p)
+	}
+	if resumed.ThreadID != "th-1" {
+		t.Fatalf("resume reported thread %q", resumed.ThreadID)
 	}
 	// A resumed thread is loaded until Codex closes or unloads it.
 	if !s.ThreadLoaded("th-1") {

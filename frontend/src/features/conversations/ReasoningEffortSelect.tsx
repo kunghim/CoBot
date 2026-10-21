@@ -2,14 +2,15 @@
 // like Codex's: a compact trigger opens the current effort and model, a
 // stepped slider for the efforts the model offers, a model list and a reset
 // to the model's own default. The effort belongs to the team and applies from
-// each member's next turn; the model is CoBot's default model, which every
-// team's members run on.
+// each member's next turn; the model is the one the provider the profile runs
+// with serves, which every team's members run on.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useEngineModels, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
+import { useEngineModels, useProviders, useSaveProvider, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
 import type { EngineModel, Team } from '../../api/types';
 import { ModelEffortPicker, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import { gatewayModelID, gatewayModelRequest, gatewayModels, gatewayOf, type ModelOption } from '../providers/providerModels';
 import { useSettingSaver } from '../settings/useSettingSaver';
 import { createSettledSave, type SettledSave } from './settledSave';
 
@@ -25,12 +26,30 @@ export default function ReasoningEffortSelect({ team, disabled }: { team: Team; 
   const { t } = useTranslation();
   const toast = useToast();
   const settings = useSettings(true);
+  const providers = useProviders();
   const models = useEngineModels(true);
   const setEffort = useSetTeamReasoningEffort();
+  const saveProvider = useSaveProvider();
   const { save } = useSettingSaver();
-  const list = models.data?.models ?? [];
-  const model = currentModel(list, settings.data?.defaultModel);
-  const options = model?.reasoningEfforts ?? [];
+  const engineList = models.data?.models ?? [];
+
+  // A third-party gateway serves its own models; the engine's list belongs
+  // to the engine's own vendor and the core would not ask the gateway for
+  // one of those.
+  const gateway = gatewayOf(providers.data?.providers, settings.data?.defaultProvider ?? '');
+  const options: ModelOption[] = gateway
+    ? gatewayModels(gateway, t('settings.modelUnavailable'))
+    : engineList.flatMap((entry) => {
+        const id = modelId(entry);
+        return id === '' ? [] : [{ id, label: entry.displayName ?? id, description: entry.description }];
+      });
+  const model = currentModel(engineList, settings.data?.defaultModel);
+  // The efforts CoBot can send are the ones the engine knows; a gateway's
+  // own model does not change what the engine accepts.
+  const levels = model?.reasoningEfforts ?? [];
+  // An engine that lists no models leaves nothing selected; the picker then
+  // hides itself below rather than reading a model that is not there.
+  const selected = gateway ? gatewayModelID(gateway) : model ? modelId(model) : '';
   const stored = team.reasoningEffort ?? '';
   const label = (effort: string) => t(`effort.level.${effort}`, { defaultValue: effort });
 
@@ -66,11 +85,11 @@ export default function ReasoningEffortSelect({ team, disabled }: { team: Team; 
   useEffect(() => () => saver.current?.flush(), []);
 
   // Without a model list there is nothing to choose from.
-  if (!model || options.length === 0) return null;
+  if (options.length === 0) return null;
 
   const current = chosen ?? stored;
   // Following the model's default shows the model's default level.
-  const shown = current || model.defaultReasoningEffort || options[0].effort;
+  const shown = current || model?.defaultReasoningEffort || levels[0]?.effort || '';
   const chooseEffort = (effort: string, now = false) => {
     if (effort === current) return;
     setChosen(effort);
@@ -78,16 +97,26 @@ export default function ReasoningEffortSelect({ team, disabled }: { team: Team; 
     if (now) saver.current?.flush();
   };
 
+  const chosenLabel = options.find((option) => option.id === selected)?.label ?? selected;
+
   return (
     <ModelEffortPicker
       disabled={disabled}
-      triggerLabel={`${t('effort.label')}：${current ? label(current) : t('effort.default')} · ${model.displayName ?? modelId(model)}`}
-      models={list.flatMap((entry) => (modelId(entry) ? [{ id: modelId(entry), label: entry.displayName ?? modelId(entry), description: entry.description }] : []))}
-      model={modelId(model)}
+      triggerLabel={`${t('effort.label')}：${current ? label(current) : t('effort.default')} · ${chosenLabel}`}
+      models={options}
+      model={selected}
       onModel={(id) => {
-        if (id !== modelId(model)) save('defaultModel', { defaultModel: id });
+        if (gateway) {
+          // The gateway serves the model, so the gateway is what changes.
+          saveProvider.mutate(
+            { id: gateway.id, body: gatewayModelRequest(gateway, id) },
+            { onError: (error) => toast.show({ tone: 'danger', title: t('effort.saveFailed'), description: apiErrorMessage(t, error) }) },
+          );
+          return;
+        }
+        if (id !== selected) save('defaultModel', { defaultModel: id });
       }}
-      levels={options.map((option) => ({ value: option.effort, label: label(option.effort) }))}
+      levels={levels.map((option) => ({ value: option.effort, label: label(option.effort) }))}
       effort={shown}
       onEffort={chooseEffort}
       isDefault={current === ''}

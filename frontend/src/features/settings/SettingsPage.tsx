@@ -12,12 +12,13 @@ import {
   EngineSection,
   GeneralSection,
   ModelsSection,
+  ProviderSection,
   SecuritySection,
 } from './SettingsSections';
 import ArchivedTeamsSection from './ArchivedTeamsSection';
 import { useSettingSaver } from './useSettingSaver';
 
-type SectionId = 'general' | 'appearance' | 'roles' | 'engine' | 'models' | 'collaboration' | 'archived' | 'security' | 'about';
+type SectionId = 'general' | 'appearance' | 'roles' | 'engine' | 'models' | 'providers' | 'collaboration' | 'archived' | 'security' | 'about';
 
 const sections: { id: SectionId; icon: (typeof Icons)[keyof typeof Icons] }[] = [
   { id: 'general', icon: Icons.general },
@@ -25,6 +26,7 @@ const sections: { id: SectionId; icon: (typeof Icons)[keyof typeof Icons] }[] = 
   { id: 'roles', icon: Icons.roles },
   { id: 'engine', icon: Icons.engine },
   { id: 'models', icon: Icons.model },
+  { id: 'providers', icon: Icons.provider },
   { id: 'collaboration', icon: Icons.team },
   { id: 'archived', icon: Icons.archive },
   { id: 'security', icon: Icons.permission },
@@ -71,6 +73,7 @@ export default function SettingsPage() {
       roles: <RolesSection />,
       engine: <EngineSection />,
       models: <ModelsSection {...props} />,
+      providers: <ProviderSection />,
       collaboration: <CollaborationSection {...props} />,
       archived: <ArchivedTeamsSection />,
       security: <SecuritySection />,

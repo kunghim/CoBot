@@ -13,6 +13,8 @@ export const queryKeys = {
   engine: ['engine'] as const,
   avatarCatalog: ['avatarCatalog'] as const,
   models: ['models'] as const,
+  providers: ['providers'] as const,
+  providerPresets: ['providerPresets'] as const,
   messages: (botId: string) => ['messages', botId] as const,
   exchanges: (botId: string, peerBotId: string) => ['exchanges', botId, peerBotId] as const,
   approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
@@ -240,6 +242,56 @@ export function useRoles(enabled = true) {
   return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
 }
 
+/**
+ * The model providers of this profile. The list is small and changes rarely,
+ * so it is cached until something writes to it.
+ */
+export function useProviders(enabled = true) {
+  return useQuery({ queryKey: queryKeys.providers, queryFn: api.listProviders, enabled });
+}
+
+/** The built-in vendor catalogue the settings page offers. */
+export function useProviderPresets(enabled = true) {
+  return useQuery({ queryKey: queryKeys.providerPresets, queryFn: api.listProviderPresets, enabled, staleTime: Infinity });
+}
+
+export function useSaveProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: import('./types').ProviderRequest }) =>
+      id ? api.updateProvider(id, body) : api.createProvider(body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
+export function useDeleteProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteProvider(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
+/**
+ * Checks a stored provider's models again. The key is read on the server, so
+ * this works long after the provider was set up.
+ */
+export function useReprobeProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.reprobeProvider(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+    },
+  });
+}
+
 /** GET /bots/{id}/messages: one conversation plus queue depth and run state. */
 export function useConversation(botId: string | null) {
   const query = useInfiniteQuery({ queryKey: queryKeys.messages(botId ?? ''), queryFn: ({ pageParam }) => api.listMessages(botId as string, { before: pageParam || undefined }), initialPageParam: '', getNextPageParam: (page) => page.nextCursor || undefined, enabled: botId !== null });
@@ -403,6 +455,17 @@ export function useEngineLogout() {
     mutationFn: () => api.engineLogout(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.engine });
+    },
+  });
+}
+
+/** POST /session/logout: ends the page session on the core. */
+export function useSessionLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.sessionLogout(),
+    onSuccess: () => {
+      void qc.clear();
     },
   });
 }

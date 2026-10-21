@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,6 +97,54 @@ func (a *App) PatchTeamPermissionMode(ctx context.Context, principal auth.Princi
 	}
 	defer tx.Rollback()
 	team, err := sqlite.UpdateTeamPermissionModeTx(ctx, tx, teamID, mode, expectedRevision)
+	if err != nil {
+		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
+	a.Hub.Publish()
+	return team, nil
+}
+
+// PatchTeamProvider names the model provider a team runs with. An empty id
+// puts the team back on the profile's default.
+//
+// The change takes effect from the team's next turn: a thread that is
+// already running keeps the provider it was started with, and the engine is
+// asked to load the thread again with the new one.
+func (a *App) PatchTeamProvider(ctx context.Context, principal auth.Principal, teamID, providerID string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	if principal.Kind != auth.KindUser {
+		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if providerID != "" {
+		// A provider that does not exist would leave the team pointing at
+		// nothing, and the engine refuses an id it does not know.
+		if _, err := sqlite.GetProvider(ctx, a.DB, providerID); err != nil {
+			if errors.Is(err, sqlite.ErrNotFound) {
+				return domain.Team{}, domain.InvalidRequest("error.provider.not_found", map[string]any{"id": providerID})
+			}
+			return domain.Team{}, sqlite.NormalizeError(err)
+		}
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	team, err := sqlite.UpdateTeamProviderTx(ctx, tx, teamID, providerID, expectedRevision)
 	if err != nil {
 		return domain.Team{}, sqlite.NormalizeError(err)
 	}

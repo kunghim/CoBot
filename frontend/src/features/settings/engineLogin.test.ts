@@ -15,6 +15,10 @@ vi.mock('../../api/queries', () => ({
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineCheck: () => ({ mutate: vi.fn(), isPending: false }),
+  // The engine section also asks which provider the profile runs with, so
+  // it can tell that a third-party provider needs no ChatGPT sign-in.
+  useProviders: () => ({ data: { providers: [] }, isPending: false }),
+  useSettings: () => ({ data: { defaultProvider: '' }, isPending: false }),
 }));
 
 const authURL = 'https://auth.openai.com/oauth/authorize?state=test-only';

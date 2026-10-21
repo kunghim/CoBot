@@ -22,6 +22,7 @@ import (
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 	"sync/atomic"
@@ -53,6 +54,9 @@ type App struct {
 	// CollaborationTokens is the bridge credential authority. Tokens are
 	// minted when a thread starts and are only valid for this core lifetime.
 	CollaborationTokens *auth.TokenStore
+	// Credentials stores the model providers' API keys, encrypted. Nil
+	// disables provider secrets; the rest of the product still works.
+	Credentials secrets.Store
 	// MCPBinary is the cobot executable the engine spawns as the bridge. It
 	// is the same binary the core runs from, resolved at startup.
 	MCPBinary string
@@ -76,9 +80,18 @@ type App struct {
 	engineControl   *controlServer
 	engineLoginMu   sync.Mutex
 	engineLogin     *engine.LoginInfo
+	// providerSyncMu serializes the writes that put the profile's provider
+	// into the engine's own configuration, so two quick changes cannot
+	// arrive out of order.
+	providerSyncMu sync.Mutex
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
+	// ProviderBinderFactory returns the engine that accepts model providers.
+	// It is separate from ControlFactory because the provider surface is
+	// optional: an engine that cannot take providers simply does not
+	// implement engine.ProviderBinder. Nil falls back to the control server.
+	ProviderBinderFactory func(ctx context.Context) (engine.ProviderBinder, error)
 
 	// Avatars is this profile's downloaded avatar catalog; nil serves an
 	// empty catalog and never downloads.
@@ -134,6 +147,18 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 	if principal.Kind != auth.KindUser {
 		return domain.Settings{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// The selected provider must exist: a dangling id would leave the
+	// profile pointing at nothing.
+	if patch.DefaultProvider != nil && *patch.DefaultProvider != "" {
+		if _, err := sqlite.GetProvider(ctx, a.DB, *patch.DefaultProvider); err != nil {
+			if errors.Is(err, sqlite.ErrNotFound) {
+				return domain.Settings{}, domain.InvalidRequest("error.provider.not_found", map[string]any{
+					"id": *patch.DefaultProvider,
+				})
+			}
+			return domain.Settings{}, sqlite.NormalizeError(err)
+		}
+	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Settings{}, err
@@ -158,6 +183,14 @@ func (a *App) UpdateSettings(ctx context.Context, principal auth.Principal, patc
 		return domain.Settings{}, err
 	}
 	a.Hub.Publish()
+	// The engine is told after the profile is written. Its own configuration
+	// is a fallback for the paths that do not name a provider — a thread
+	// always names its own — so a busy engine must not hold the change up,
+	// and a fallback that did not land must not undo what the profile
+	// already accepted. The next change writes it again.
+	if patch.DefaultProvider != nil {
+		a.syncEngineProvider(ctx)
+	}
 	// A budget change can un-hold deliveries the old limit paused, so the
 	// affected bots are re-woken immediately instead of waiting for a message
 	// that may never come.

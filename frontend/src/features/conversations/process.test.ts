@@ -62,6 +62,13 @@ describe('describeStep', () => {
     expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'serverOverloaded', message: 'Selected model is at capacity.' } }), nameOf)).toEqual({ key: 'conversation.engineError.serverOverloaded' });
     expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'other', message: 'boom' } }), nameOf)).toEqual({ key: 'conversation.step.error', params: { message: 'boom' } });
   });
+  it('names the root cause a gateway refused a turn for', () => {
+    expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'httpConnectionFailed', failureCode: 'quota', message: '余额不足' } }), nameOf)).toEqual({ key: 'conversation.providerError.quota' });
+    expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'httpConnectionFailed', failureCode: 'auth_invalid', message: '密钥无效' } }), nameOf)).toEqual({ key: 'conversation.providerError.auth_invalid' });
+    // A cause the interface cannot explain falls back to the engine's own
+    // wording rather than to a key nobody translated.
+    expect(describeStep(step({ kind: 'notice', detail: { level: 'error', code: 'httpConnectionFailed', failureCode: 'something_new', message: 'boom' } }), nameOf)).toEqual({ key: 'conversation.engineError.httpConnectionFailed' });
+  });
   it('describes other tools, retries and changes', () => {
     expect(describeStep(step({ kind: 'tool', detail: { server: 'fs', tool: 'read' } }), nameOf)).toEqual({ key: 'conversation.step.tool', params: { tool: 'fs.read' } });
     expect(describeStep(step({ kind: 'retry', status: 'in_progress', detail: { attempt: 3 } }), nameOf)).toEqual({ key: 'conversation.step.retrying', params: { attempt: 3 } });

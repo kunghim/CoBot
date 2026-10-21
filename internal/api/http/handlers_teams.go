@@ -101,6 +101,7 @@ func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
 		Name             *string `json:"name,omitempty"`
 		PermissionMode   *string `json:"permissionMode,omitempty"`
 		ReasoningEffort  *string `json:"reasoningEffort,omitempty"`
+		ProviderID       *string `json:"providerId,omitempty"`
 		ExpectedRevision *int64  `json:"expectedRevision,omitempty"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
@@ -114,7 +115,7 @@ func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
 	var team domain.Team
 	var err error
 	fields := 0
-	for _, set := range []bool{req.Name != nil, req.PermissionMode != nil, req.ReasoningEffort != nil} {
+	for _, set := range []bool{req.Name != nil, req.PermissionMode != nil, req.ReasoningEffort != nil, req.ProviderID != nil} {
 		if set {
 			fields++
 		}
@@ -126,6 +127,8 @@ func (s *Server) handlePatchTeam(w http.ResponseWriter, r *http.Request) {
 		team, err = s.App.PatchTeamPermissionMode(r.Context(), principal, r.PathValue("id"), *req.PermissionMode, expected)
 	case req.ReasoningEffort != nil:
 		team, err = s.App.PatchTeamReasoningEffort(r.Context(), principal, r.PathValue("id"), *req.ReasoningEffort, expected)
+	case req.ProviderID != nil:
+		team, err = s.App.PatchTeamProvider(r.Context(), principal, r.PathValue("id"), *req.ProviderID, expected)
 	case req.Name != nil:
 		team, err = s.App.PatchTeamName(r.Context(), principal, r.PathValue("id"), *req.Name, expected)
 	default:

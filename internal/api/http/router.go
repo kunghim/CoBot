@@ -67,6 +67,18 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/models", s.handleModels)
 	mux.HandleFunc("GET /api/v1/bots/{id}/stats", s.handleBotStats)
 
+	// Model providers: the vendors or gateways the engine can call.
+	mux.HandleFunc("GET /api/v1/providers", s.handleListProviders)
+	mux.HandleFunc("POST /api/v1/providers", s.handleCreateProvider)
+	mux.HandleFunc("GET /api/v1/providers/{id}", s.handleGetProvider)
+	mux.HandleFunc("PATCH /api/v1/providers/{id}", s.handleUpdateProvider)
+	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
+	mux.HandleFunc("POST /api/v1/providers/{id}/probe", s.handleReprobeProvider)
+	mux.HandleFunc("GET /api/v1/provider-presets", s.handleProviderPresets)
+	mux.HandleFunc("POST /api/v1/providers/detect", s.handleDetectProvider)
+	mux.HandleFunc("POST /api/v1/providers/discover", s.handleDiscoverProviderModels)
+	mux.HandleFunc("POST /api/v1/providers/probe-models", s.handleProbeProviderModels)
+
 	// Teams, roles and members.
 	mux.HandleFunc("GET /api/v1/teams", s.handleListTeams)
 	mux.HandleFunc("POST /api/v1/teams", s.handleCreateTeam)

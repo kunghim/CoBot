@@ -16,18 +16,26 @@ type InitializeParams struct {
 
 // ThreadStartParams mirrors the app-server thread/start request.
 type ThreadStartParams struct {
-	Cwd                   string         `json:"cwd,omitempty"`
-	Sandbox               string         `json:"sandbox,omitempty"`
-	ApprovalPolicy        string         `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer     string         `json:"approvalsReviewer,omitempty"`
-	Model                 string         `json:"model,omitempty"`
+	Cwd               string `json:"cwd,omitempty"`
+	Sandbox           string `json:"sandbox,omitempty"`
+	ApprovalPolicy    string `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer string `json:"approvalsReviewer,omitempty"`
+	Model             string `json:"model,omitempty"`
+	// ModelProvider names the provider this thread runs with. The engine
+	// refuses an id it does not know ("Model provider `x` not found"), so it
+	// is only sent for a provider that is actually configured.
+	ModelProvider         string         `json:"modelProvider,omitempty"`
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
 	Config                map[string]any `json:"config,omitempty"`
 }
 
 // ThreadResumeParams mirrors thread/resume.
 type ThreadResumeParams struct {
-	Model                 string         `json:"model,omitempty"`
+	Model string `json:"model,omitempty"`
+	// ModelProvider names the provider the resumed thread runs with. The
+	// engine ignores it for a thread that is already loaded in this
+	// app-server, and honours it for one it has to load again.
+	ModelProvider         string         `json:"modelProvider,omitempty"`
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
 	ThreadID              string         `json:"threadId"`
 	Cwd                   string         `json:"cwd,omitempty"`
@@ -38,6 +46,15 @@ type ThreadResumeParams struct {
 	// ExcludeTurns leaves the thread's history out of the reply: CoBot keeps
 	// its own record, and full-history replies are deprecated.
 	ExcludeTurns bool `json:"excludeTurns,omitempty"`
+}
+
+// ThreadResumeResult is the thread/resume response. The engine reports the
+// model and the provider the thread actually runs with, which is the only
+// authoritative answer to "who is this thread using" — a record CoBot kept
+// itself can be stale.
+type ThreadResumeResult struct {
+	Model         string `json:"model"`
+	ModelProvider string `json:"modelProvider"`
 }
 
 // ThreadRef is the provider thread identity.

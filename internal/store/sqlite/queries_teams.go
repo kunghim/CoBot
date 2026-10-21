@@ -17,7 +17,7 @@ func GetTeam(ctx context.Context, q Queryer, id string) (domain.Team, string, er
 		FROM teams t LEFT JOIN directory_bindings b ON b.team_id = t.id WHERE t.id = ?`, id)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, "", ErrNotFound
 	}
@@ -43,7 +43,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 	for rows.Next() {
 		var t domain.Team
 		var created, updated, directory string
-		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory); err != nil {
 			return nil, fmt.Errorf("scan team row: %w", err)
 		}
 		t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
@@ -56,7 +56,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 
 func prefixedTeamColumns(prefix string) string {
 	return prefix + `.id, ` + prefix + `.name, ` + prefix + `.profile_instance, ` + prefix + `.leader_id, ` +
-		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at, ` + prefix + `.archived_at, ` + prefix + `.permission_mode, ` + prefix + `.reasoning_effort`
+		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at, ` + prefix + `.archived_at, ` + prefix + `.permission_mode, ` + prefix + `.reasoning_effort, ` + prefix + `.provider_id`
 }
 
 // FindActiveTeamByDirectoryKey returns the binding for a canonical directory.
@@ -66,7 +66,7 @@ func FindActiveTeamByDirectoryKey(ctx context.Context, q Queryer, key string) (d
 		WHERE b.directory_key = ? AND t.status != ?`, key, domain.TeamStatusDeleted)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -455,7 +455,7 @@ func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error)
 	var t domain.Team
 	var created, updated string
 	err := q.QueryRowContext(ctx, `SELECT `+prefixedTeamColumns("t")+` FROM teams t WHERE t.id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort)
+		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -705,6 +705,27 @@ func SetSessionUsageSnapshot(ctx context.Context, q Queryer, botID, snapshot str
 		return fmt.Errorf("set session usage snapshot: %w", err)
 	}
 	return nil
+}
+
+// UpdateTeamProviderTx sets which model provider a team runs with. An empty
+// id puts the team back on the profile's default.
+func UpdateTeamProviderTx(ctx context.Context, tx *sql.Tx, teamID, providerID string, expectedRevision int64) (domain.Team, error) {
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Team{}, ErrNotFound
+		}
+		return domain.Team{}, err
+	}
+	if expectedRevision > 0 && revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET provider_id = ?, revision = revision + 1, updated_at = ? WHERE id = ?`, providerID, now, teamID); err != nil {
+		return domain.Team{}, err
+	}
+	team, _, err := GetTeam(ctx, tx, teamID)
+	return team, err
 }
 
 // UpdateTeamReasoningEffortTx sets how hard the team's members think.
