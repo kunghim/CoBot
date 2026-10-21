@@ -21,7 +21,7 @@
 | --- | --- |
 | [实现流程](workflows/implement.md) | 实现功能、修复、重构 |
 | [验证流程](workflows/verify.md) | 跑测试、起服务、真实 Codex 验证、汇报结果 |
-| [交付流程](workflows/deliver.md) | 做完汇报；提交、推送、开 PR |
+| [交付与同步流程](workflows/deliver.md) | 做完汇报；提交、拉取、推送、开 PR（含私人笔记同步） |
 | [文档流程](workflows/docs.md) | 写方案和记录、整理或归档文档 |
 | [踩坑记录](pitfalls.md) | 每次都会碰到的环境与运行问题 |
 

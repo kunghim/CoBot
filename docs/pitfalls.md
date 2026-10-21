@@ -18,7 +18,7 @@
 ## 新环境
 
 - **新 worktree 里 Go 测试或构建失败？** 先 `npm ci --prefix frontend`，再 `npm run build --prefix frontend`：Go 构建要内嵌前端产物。
-- **新 worktree 里没有 `.local/`？** 正常，它不随分支和 worktree 走。不要去找或复制别人的私人资料。
+- **新 worktree 里没有 `.local/`？** 正常，它只在主检出目录。用 `git rev-parse --git-common-dir` 找到主目录，读写那一份，不在 worktree 里新建或复制。
 - **浏览器测试不想下载 Chromium？** 设 `COBOT_E2E_CHANNEL=chrome` 使用本机 Chrome，记录里写明浏览器渠道和版本。
 - **Windows 上发布测试报 EPERM？** 缺符号链接权限时该用例按设计跳过，目录联接校验照常执行。不要为此改系统权限。
 

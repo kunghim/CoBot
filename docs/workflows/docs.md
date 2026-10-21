@@ -27,6 +27,39 @@
 
 ## 私人资料（`.local/`）
 
+### 只有一份，在主目录
+
+`.local/` 只放在**主检出目录**（第一次 clone 出来的目录）里，所有 worktree 都直接读写这一份，不在 worktree 里另建、不复制、不事后合并。
+
+在任何 worktree 里定位它：
+
+```sh
+git rev-parse --path-format=absolute --git-common-dir   # 输出 <主目录>/.git，它的同级 .local/ 就是
+```
+
+下文的 `<主目录>/.local` 都指这个路径。读写前先确认它存在；不存在说明这位共建者没有私人资料，直接继续，不要创建到 worktree 里。
+
+worktree 在主目录之外运行时，Codex 沙箱和 Claude Code 权限默认不放行这个路径。各自在本机配置里把 `<主目录>/.local`
+加入可写目录（Codex 的 `writable_roots` 或 `--add-dir`，Claude Code 的 `additionalDirectories`）。
+
+### 它是一个独立的 Git 仓库
+
+和 CoBot 代码没有共同历史；主仓库忽略 `.local/`，所以它的内容不会进入代码提交或 PR。
+
+| 操作 | 命令 |
+| --- | --- |
+| 第一次建立 | `git init <主目录>/.local`，再 `git -C <主目录>/.local remote add origin <私有仓库或自己 fork 的地址>` |
+| 换电脑 | `git clone <同一地址> <主目录>/.local` |
+| 存到自己 fork 的单独分支（不另建仓库时） | `git -C <主目录>/.local push origin HEAD:notes` |
+
+远端只能是自己的私有仓库或自己的 fork，**不能是上游 `kunghim/CoBot`**。维护者的上游就是自己的仓库，笔记要另建私有仓库存放。
+什么时候提交、拉取、推送笔记，见 [交付流程](deliver.md)。
+
+### 并行会话
+
+- 一个功能或任务一份文件，各会话只改自己任务的文件；要改别的会话正在用的文件时先问用户。
+- 提交笔记时只 `git add` 本任务写过的文件。
+
 ```
 .local/
   README.md      索引：只列当前有效的文档
