@@ -1,27 +1,40 @@
 # CoBot 编码智能体入口
 
-CoBot 是本地运行的多智能体协作壳，负责团队、任务、消息、审批和调度；具体工作由外部智能体执行。
-保持这一职责边界，不在 CoBot 中重做外部智能体的工具或执行循环。
+CoBot 是本地运行的多智能体协作壳：管团队、需求接力、消息、审批、调度和用量；模型与工具循环由 Codex（`codex app-server`）执行。
+不在 CoBot 里重做 Codex 已有的能力，也不加没有实现的界面入口。
 
-## 公共规范
+## 始终适用
 
-修改前先阅读：
+- 开始前看 `git status --short` 和当前分支，保留不属于你的改动。
+- 不碰 `~/.cobot`、`~/.cobot-dev` 和日常 Codex 登录；不修改用户本机的 Codex 配置、沙箱、登录或防火墙。
+- 缺少必需的工具或资源时说明情况并等待，不猜路径、不静默安装。
+- 文档与代码不一致时以代码为准，并指出差异。
+- 与用户沟通使用用户的语言；代码、标识符和提交信息用英文。
 
-- [贡献指南](CONTRIBUTING.md)：贡献范围、分支、PR 和发布规则。
-- [开发指南](docs/development.md)：架构、命令、工程规范和验证要求。
-- [AI coding 规范](docs/ai-coding.md)：任务执行、协作与交付流程。
+其余规则按下面两张表，到需要时再读。
 
-按任务需要补读相关模块的代码和测试。公共开发不能依赖维护者的私人笔记或历史聊天。
+## 改到哪里，读哪份规则
 
-## 关键边界
+| 改动涉及 | 读 |
+| --- | --- |
+| `api/openapi.yaml`、`internal/api/**` | [rules/api-contract.md](docs/rules/api-contract.md) |
+| `internal/store/sqlite/**` | [rules/migrations.md](docs/rules/migrations.md) |
+| `internal/engine/**`、`internal/hookrun/**` | [rules/engine.md](docs/rules/engine.md) |
+| 接力、卡片、协作工具、角色：`internal/app/relay*`、`chains.go`、`internal/collaboration/**`、`internal/roles/**` | [rules/relay.md](docs/rules/relay.md) |
+| 重启、审批、租约：`recovery.go`、`approval*.go`、`lease.go` | [rules/recovery.md](docs/rules/recovery.md) |
+| `frontend/**` | [rules/frontend.md](docs/rules/frontend.md) |
+| `assets/**` | [rules/assets.md](docs/rules/assets.md) |
 
-- 先检查当前分支和工作区，保留其他人的改动。
-- 测试使用临时数据根，不能使用生产数据或日常 Codex 凭据。
-- 不修改用户本机的 Codex 配置、沙箱、登录或防火墙；CoBot 只管理自己的私有引擎环境。
-- 如实说明验证结果，区分自动化检查、真实引擎验收和原生平台验证。
+## 做到哪一步，读哪份流程
 
-## 可选的本机补充
+| 阶段 | 读 |
+| --- | --- |
+| 开始实现功能或修复 | [workflows/implement.md](docs/workflows/implement.md) |
+| 跑测试、起服务、验证 | [workflows/verify.md](docs/workflows/verify.md)、[pitfalls.md](docs/pitfalls.md) |
+| 做完汇报；提交、推送、开 PR | [workflows/deliver.md](docs/workflows/deliver.md) |
+| 写笔记、方案、记录，整理或归档文档 | [workflows/docs.md](docs/workflows/docs.md) |
+| 依赖、升级回滚、发布、Issue 分诊、hook 排障 | [docs/README.md](docs/README.md#很少需要) |
 
-私有文档统一放在当前工作目录根部、被 Git 忽略的 `.local/` 中。
-若 `.local/README.md` 存在且非空，先阅读它，并按需读取其引用的资料；不存在或为空时直接继续，无需索取。
-所有共建者共同遵守的项目要求应写在上述公共文档中；本机资料用于补充共建者自己的环境和上下文。
+## 本机补充
+
+私人资料在被 Git 忽略的 `.local/`。若 `.local/README.md` 存在且非空，先读它再按需读引用的资料；不存在就直接继续，不索取。

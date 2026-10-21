@@ -2,10 +2,6 @@
   "rootDotEntries": [".github", ".gitignore"],
   "publicFiles": [
     "AGENTS.md",
-    "CLAUDE.md",
-    "docs/development.md",
-    "docs/ai-coding.md",
-    "docs/dependencies.md",
-    "docs/upgrading.md"
+    "CLAUDE.md"
   ]
 }

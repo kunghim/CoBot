@@ -16,7 +16,7 @@ export function validatePolicy(policy) {
   }
   for (const path of policy.publicFiles) {
     if (typeof path !== 'string' || !/^[\p{L}\p{N}_./ -]+$/u.test(path) || path.split('/').some(p => !p || p !== p.trim() || p === '.' || p === '..') || privateDirectory.test(path)) throw new Error('Invalid public file exception');
-    if (!path.startsWith('docs/') && !aiInstruction.test(path)) throw new Error('Public exceptions must be documents or official AI instructions');
+    if (!aiInstruction.test(path)) throw new Error('Public exceptions must be official AI instructions');
   }
 }
 
@@ -39,7 +39,7 @@ export function privateReason(path, policy) {
   if (first.startsWith('.') && !policy.rootDotEntries.includes(first)) return 'root hidden entry is not allowed';
   if (privateDirectory.test(path)) return 'private data or assistant directory';
   if (/^experiments\//i.test(path)) return 'retired experiments';
-  if ((/^docs\//i.test(path) || aiInstruction.test(path)) && !policy.publicFiles.includes(path)) return 'document or AI instruction has not been approved for publication';
+  if (aiInstruction.test(path) && !policy.publicFiles.includes(path)) return 'AI instruction has not been approved for publication';
   return undefined;
 }
 

@@ -281,10 +281,9 @@ and Go and TypeScript types are generated from it.
 Start with [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests in
 English or Chinese are welcome. For security reports, see [SECURITY.md](SECURITY.md).
 
-Shared engineering rules and commands are in the [development guide](docs/development.md).
-Coding agents use [AGENTS.md](AGENTS.md) and the [AI coding workflow](docs/ai-coding.md).
-See [dependencies and notices](docs/dependencies.md) for third-party sources and
-[upgrading](docs/upgrading.md) for installation, migration and rollback limits.
+Engineering rules and commands are indexed in [docs/](docs/README.md) (in Chinese).
+Coding agents start from [AGENTS.md](AGENTS.md). See [dependencies and notices](docs/reference/dependencies.md)
+for third-party sources and [upgrading](docs/reference/upgrading.md) for installation, migration and rollback limits.
 
 ## Community
 

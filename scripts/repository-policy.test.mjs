@@ -35,20 +35,19 @@ test('real Git index accepts product files and contributor settings', t => {
 
 test('force-added private files are rejected; untracked local documents are untouched', t => {
   const { root, put } = fixture(t);
-  mkdirSync(resolve(root, 'docs'));
-  writeFileSync(resolve(root, 'docs/local.md'), 'synthetic untracked document');
+  mkdirSync(resolve(root, '.local'));
+  writeFileSync(resolve(root, '.local/notes.md'), 'synthetic untracked document');
   assert.equal(checkPublicFiles(root), 2);
-  for (const path of ['docs/notes.md', 'AGENTS.md', '.future/config.json', 'frontend/.kimi/settings.json', '.github/copilot-instructions.md', 'tests/traces/run.json', 'runtime.sqlite', 'experiments/run.mjs']) put(path);
-  assert.throws(() => checkPublicFiles(root), error => ['docs/notes.md', 'AGENTS.md', '.future/config.json', 'frontend/.kimi/settings.json', '.github/copilot-instructions.md', 'tests/traces/run.json', 'runtime.sqlite', 'experiments/run.mjs'].every(path => error.message.includes(path)));
-  assert.equal(readFileSync(resolve(root, 'docs/local.md'), 'utf8'), 'synthetic untracked document');
+  for (const path of ['.local/plan.md', 'AGENTS.md', '.future/config.json', 'frontend/.kimi/settings.json', '.github/copilot-instructions.md', 'tests/traces/run.json', 'runtime.sqlite', 'experiments/run.mjs']) put(path);
+  assert.throws(() => checkPublicFiles(root), error => ['.local/plan.md', 'AGENTS.md', '.future/config.json', 'frontend/.kimi/settings.json', '.github/copilot-instructions.md', 'tests/traces/run.json', 'runtime.sqlite', 'experiments/run.mjs'].every(path => error.message.includes(path)));
+  assert.equal(readFileSync(resolve(root, '.local/notes.md'), 'utf8'), 'synthetic untracked document');
 });
 
-test('approved nested bilingual docs and official instructions do not expose neighbors', t => {
-  const policy = { ...baseline, publicFiles: ['docs/versions/v1/README.md', 'docs/介绍.md', 'AGENTS.md', 'CLAUDE.md'] };
+test('docs are public; only approved official instructions are published', t => {
+  const policy = { ...baseline, publicFiles: ['AGENTS.md', 'CLAUDE.md'] };
   const { root, put } = fixture(t, policy);
-  for (const path of policy.publicFiles) put(path);
+  for (const path of [...policy.publicFiles, 'docs/dev/README.md', 'docs/介绍.md']) put(path);
   assert.equal(checkPublicFiles(root), 6);
-  put('docs/versions/v1/private.md');
   put('frontend/AGENTS.md');
   assert.throws(() => checkPublicFiles(root), /has not been approved/);
 });
@@ -60,9 +59,10 @@ test('ignore exceptions must match the policy and remain the final block', t => 
 });
 
 test('policy rejects traversal and private-directory publication exceptions', () => {
-  for (const path of ['docs/../auth.json', 'docs/**', 'docs/.claude/config.json', 'docs/traces/run.json', 'runtime/auth.json']) assert.throws(() => managedIgnore({ ...baseline, publicFiles: [path] }));
+  for (const path of ['../AGENTS.md', 'docs/**', '.claude/CLAUDE.md', 'traces/AGENTS.md', 'docs/guide.md', 'runtime/auth.json']) assert.throws(() => managedIgnore({ ...baseline, publicFiles: [path] }));
   assert.throws(() => managedIgnore({ rootDotEntries: ['.git'], publicFiles: [] }));
   assert.ok(privateReason('.unknown/file', baseline));
+  assert.equal(privateReason('docs/dev/guide.md', baseline), undefined);
 });
 
 function pr(base, head, repo = 'kunghim/CoBot', login = 'contributor') {
