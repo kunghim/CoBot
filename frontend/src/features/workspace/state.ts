@@ -166,3 +166,38 @@ export function saveWorkspace(key: string, state: WorkspaceState): void {
 export function workspaceKey(teamId: string): string {
   return `cobot.workspace.v1.${teamId}`;
 }
+
+/** The room the conversation keeps beside the workspace. */
+export const CONVERSATION_MIN_WIDTH = 420;
+/** The icon rail and the drag line between conversation and workspace. */
+const RAIL_WIDTH = 56;
+const HANDLE_WIDTH = 8;
+
+/** The team list's width at a viewport width (w-[min(16rem,40vw)]). */
+export function teamListWidth(viewport: number): number {
+  return Math.min(256, Math.round(viewport * 0.4));
+}
+
+export interface ColumnLayout {
+  showList: boolean;
+  showConversation: boolean;
+  /** The workspace's drawn width; 0 when it is not drawn. */
+  workspaceWidth: number;
+}
+
+/**
+ * How the columns share a window. The conversation keeps its minimum; the
+ * workspace narrows first, down to its own minimum; then the team list
+ * steps out of the layout; and when even that is not enough, the
+ * workspace takes the room and the conversation waits until it is folded.
+ * The user's own choices (list open, workspace width) are kept: this only
+ * decides what is drawn at this width.
+ */
+export function layoutColumns(viewport: number, listOpen: boolean, workspaceOpen: boolean, workspaceWidth: number): ColumnLayout {
+  if (!workspaceOpen) return { showList: listOpen, showConversation: true, workspaceWidth: 0 };
+  const room = (withList: boolean) => viewport - RAIL_WIDTH - (withList ? teamListWidth(viewport) : 0) - CONVERSATION_MIN_WIDTH - HANDLE_WIDTH;
+  const wanted = clampWidth(workspaceWidth);
+  if (listOpen && room(true) >= MIN_WIDTH) return { showList: true, showConversation: true, workspaceWidth: Math.min(wanted, room(true)) };
+  if (room(false) >= MIN_WIDTH) return { showList: false, showConversation: true, workspaceWidth: Math.min(wanted, room(false)) };
+  return { showList: false, showConversation: false, workspaceWidth: Math.max(0, viewport - RAIL_WIDTH - HANDLE_WIDTH) };
+}
