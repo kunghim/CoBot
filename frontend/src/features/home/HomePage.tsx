@@ -43,9 +43,8 @@ export default function HomePage() {
   return (
     <div className="flex h-full flex-col">
       {!shell.titleBar && (
-        <div className="flex min-h-14 items-center justify-between px-3 py-2">
-          <ShellToggle side="left" />
-          <ShellToggle side="right" />
+        <div className="flex min-h-14 items-center px-3 py-2">
+          <ShellToggle />
         </div>
       )}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-8 pb-14">

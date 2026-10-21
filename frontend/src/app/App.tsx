@@ -53,14 +53,13 @@ export default function App() {
 
 function TitleBar({ desktop }: { desktop: DesktopWindow }) {
   const { t } = useTranslation();
-  // The panel toggles belong to the workspace; Settings has no side panels.
+  // The toggle belongs to the workspace; Settings has no side panels.
   const workspace = !useLocation().pathname.startsWith('/settings');
   return (
     <AppTitleBar
       platform={desktop.platform}
       title="CoBot"
-      left={workspace ? <ShellToggle side="left" place="titlebar" /> : undefined}
-      right={workspace ? <ShellToggle side="right" place="titlebar" /> : undefined}
+      left={workspace ? <ShellToggle place="titlebar" /> : undefined}
       windowControls={{
         minimizeLabel: t('window.minimize'),
         maximizeLabel: t('window.maximize'),

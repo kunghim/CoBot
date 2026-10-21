@@ -12,11 +12,12 @@ import (
 	"time"
 )
 
-// tab is one page a member drives. Its state is fed by the browser's events
-// while the member's steps run.
+// tab is one page its owner drives: a member id, or OwnerUser for a tab the
+// user opened themselves. Its state is fed by the browser's events while the
+// owner's steps run.
 type tab struct {
 	id      string
-	member  string
+	member  string // owner: a bot id, or OwnerUser
 	target  string
 	session string
 	tb      *teamBrowser
@@ -34,6 +35,7 @@ type tab struct {
 	crashed      bool
 	lastURL      string
 	lastTitle    string
+	viewport     *Viewport // nil: the browser's default window
 
 	// The live view: receivers of the screencast, and when the user last
 	// touched the tab against when the member's last call began.
@@ -273,16 +275,38 @@ func (t *tab) onEvent(method string, params json.RawMessage) {
 	}
 }
 
-// newTab opens a tab for a member and makes it the member's current one.
-func (tb *teamBrowser) newTab(ctx context.Context, member string) (*tab, error) {
-	tb.mu.Lock()
-	mine, all := 0, len(tb.tabs)
-	for _, t := range tb.tabs {
-		if t.member == member {
+// tabQuota counts the open tabs against one owner's limits. The user's own
+// tabs have a separate cap and count against neither member limit.
+func tabQuota(tabs map[string]*tab, owner string) (mine, all int) {
+	for _, t := range tabs {
+		if owner == OwnerUser {
+			if t.member == OwnerUser {
+				mine++
+			}
+			continue
+		}
+		if t.member == OwnerUser {
+			continue
+		}
+		all++
+		if t.member == owner {
 			mine++
 		}
 	}
-	if mine >= maxTabsPerMember || all >= maxTabsPerTeam {
+	return mine, all
+}
+
+// newTab opens a tab for its owner (a member id, or OwnerUser for a tab the
+// user opened themselves) and makes it the owner's current one.
+func (tb *teamBrowser) newTab(ctx context.Context, owner string) (*tab, error) {
+	tb.mu.Lock()
+	mine, all := tabQuota(tb.tabs, owner)
+	if owner == OwnerUser {
+		if mine >= maxTabsPerUser {
+			tb.mu.Unlock()
+			return nil, fmt.Errorf("%w: close one of your tabs before opening another (limit %d for your own tabs)", ErrTooMany, maxTabsPerUser)
+		}
+	} else if mine >= maxTabsPerMember || all >= maxTabsPerTeam {
 		tb.mu.Unlock()
 		return nil, fmt.Errorf("%w: close a tab before opening another (limit %d per member)", ErrTooMany, maxTabsPerMember)
 	}
@@ -306,12 +330,12 @@ func (tb *teamBrowser) newTab(ctx context.Context, member string) (*tab, error) 
 	if err := conn.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": created.TargetID, "flatten": true}, &attached); err != nil {
 		return nil, err
 	}
-	t := &tab{id: id, member: member, target: created.TargetID, session: attached.SessionID, tb: tb, inflight: map[string]struct{}{}}
+	t := &tab{id: id, member: owner, target: created.TargetID, session: attached.SessionID, tb: tb, inflight: map[string]struct{}{}}
 	// Register first: events begin with the first enabled domain.
 	tb.mu.Lock()
 	tb.tabs[id] = t
 	tb.bySession[t.session] = t
-	tb.current[member] = id
+	tb.current[owner] = id
 	tb.mu.Unlock()
 	for _, domain := range []string{"Page.enable", "Runtime.enable", "Log.enable", "Network.enable"} {
 		if err := t.cdp(ctx, domain, nil, nil); err != nil {
@@ -380,7 +404,9 @@ func (tb *teamBrowser) pickTab(ctx context.Context, member, id string) (*tab, er
 		sort.Strings(mine)
 		tb.mu.Unlock()
 		return nil, fmt.Errorf("%w: there is no tab %q (your tabs: %s)", ErrBadRequest, id, strings.Join(mine, ", "))
-	} else if t.member != member {
+	} else if t.member != member && t.member != OwnerUser {
+		// A member's tabs stay its own; the user's own tabs any member
+		// may use when it is pointed at one.
 		tb.mu.Unlock()
 		return nil, fmt.Errorf("%w: tab %q", ErrTabNotYour, id)
 	}

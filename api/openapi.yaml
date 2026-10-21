@@ -1255,12 +1255,155 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [id, memberId, url, title]
+                          required: [id, owner, url, title]
                           properties:
                             id: { type: string }
-                            memberId: { type: string }
+                            owner: { type: string, enum: [member, user], description: "member: a member's tab; user: a tab the user opened themselves." }
+                            memberId: { type: string, description: The bot id, present for a member's tab only. }
                             url: { type: string }
                             title: { type: string }
+                            busy: { type: boolean, description: A member's call is working in this tab right now. }
+                            viewport:
+                              $ref: "#/components/schemas/BrowserViewport"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser/tabs:
+    post:
+      operationId: openTeamBrowserTab
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Open a page in a tab the user owns (starts the team's browser when it is down); the user's own tabs count against their limit of 5 per team, never against member limits
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId: { type: string, format: uuid }
+                url:
+                  type: string
+                  description: Initial address (browser-internal schemes refused); omit to open a blank page.
+      responses:
+        "201":
+          description: The opened tab
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [tab]
+                    properties:
+                      tab:
+                        type: object
+                        required: [id, owner, url, title]
+                        properties:
+                          id: { type: string }
+                          owner: { type: string, enum: [member, user] }
+                          memberId: { type: string }
+                          url: { type: string }
+                          title: { type: string }
+                          viewport:
+                            $ref: "#/components/schemas/BrowserViewport"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser/tabs/{tab}:
+    delete:
+      operationId: closeTeamBrowserTab
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Close one tab of the team's browser; the user may close their own page and a member's page too. A tab holds no revision, so this DELETE carries its idempotency key but no If-Match
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tab
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Closed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [ok]
+                    properties:
+                      ok: { type: boolean }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/browser/tabs/{tab}/viewport:
+    post:
+      operationId: setTeamBrowserTabViewport
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set a tab's real window size (page renders at it for the user and every member; last setter wins)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tab
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId: { type: string, format: uuid }
+                preset:
+                  type: string
+                  enum: [desktop, tablet, phone, clear]
+                  description: "desktop 1280x744, tablet 768x1024, phone 390x844 (mobile), clear back to the browser's default window; or give width and height."
+                width: { type: integer }
+                height: { type: integer }
+                mobile: { type: boolean }
+      responses:
+        "200":
+          description: The window size now applied (null after clear)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [viewport]
+                    properties:
+                      viewport:
+                        description: The window size now applied; null after clear.
+                        nullable: true
+                        allOf:
+                          - $ref: "#/components/schemas/BrowserViewport"
+        "400":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/browser/stream:
@@ -2439,6 +2582,14 @@ components:
         ok: { type: boolean }
         code: { type: string, description: Stable machine code, e.g. quota or auth_invalid. }
         message: { type: string }
+    BrowserViewport:
+      type: object
+      required: [width, height]
+      description: A tab's real window size as the page renders it; absent on a tab nobody set one for (the browser's default window).
+      properties:
+        width: { type: integer }
+        height: { type: integer }
+        mobile: { type: boolean }
     Task:
       type: object
       description: A card, one stage of a requirement's route held by one member.

@@ -43,7 +43,10 @@ test('work panel pages show real data and team lifecycle verbs work', async ({ p
     { name: '验收汇报', kind: 'accept' },
   ], [{ title: 'e2e实现', ownerId: leader.id, stageIndex: 1 }]);
   await page.reload();
-  const panel = page.getByRole('complementary', { name: /工作面板|work panel/i });
+  // The pages live in the info card over the conversation now: the header
+  // button opens it, and it shows as a labelled region.
+  await page.getByRole('button', { name: /展开信息面板|open the info panel/i }).click();
+  const panel = page.getByRole('region', { name: /信息面板|info panel/i });
   await expect(panel).toBeVisible();
   await panel.getByRole('tab', { name: /^任务$|^Tasks$/ }).click();
   await panel.getByRole('button', { name: /e2e需求/ }).click();
@@ -124,32 +127,24 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   await expect(page.getByRole('complementary', { name: /团队列表|team list/i }).getByText(label)).toBeVisible({ timeout: 15000 });
 });
 
-// I05: on a narrow screen the team list and work panel stay in the layout,
-// beside the conversation and never over it: they fold away through their
-// toggles, nothing modal opens, and the two sides take turns.
-test('narrow screen keeps both panels reachable', async ({ page }) => {
+// I05: on a narrow screen the team list stays in the layout, beside the
+// page and never over it: it folds away through its toggle and nothing
+// modal opens. The workspace yields to the conversation on narrow windows
+// by never taking more than its share.
+test('narrow screen keeps the team list beside the page', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 560 });
   await page.goto('/');
 
   await expect(page.getByRole('navigation').first()).toBeVisible();
   const listPanel = page.getByRole('complementary', { name: /团队列表|team list/i });
-  const workPanel = page.getByRole('complementary', { name: /工作面板|work panel/i });
 
-  // A narrow window starts with the list open and the work panel folded.
+  // A narrow window starts with the list open, beside the page.
   await expect(listPanel).toBeVisible();
-  await expect(workPanel).toBeHidden();
-
-  // Opening the work panel folds the list; neither is a dialog.
-  await page.getByRole('button', { name: /展开工作面板|expand work panel/i }).click();
-  await expect(workPanel).toBeVisible();
-  await expect(listPanel).toBeHidden();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // The same toggles fold and reopen them.
-  await page.getByRole('button', { name: /收起工作面板|collapse work panel/i }).click();
-  await expect(workPanel).toBeHidden();
-  await page.getByRole('button', { name: /展开团队列表|expand team list/i }).click();
-  await expect(listPanel).toBeVisible();
+  // The toggle folds and reopens it.
   await page.getByRole('button', { name: /收起团队列表|collapse team list/i }).click();
   await expect(listPanel).toBeHidden();
+  await page.getByRole('button', { name: /展开团队列表|expand team list/i }).click();
+  await expect(listPanel).toBeVisible();
 });

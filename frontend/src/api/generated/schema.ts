@@ -588,6 +588,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/browser/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open a page in a tab the user owns (starts the team's browser when it is down); the user's own tabs count against their limit of 5 per team, never against member limits */
+        post: operations["openTeamBrowserTab"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/tabs/{tab}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Close one tab of the team's browser; the user may close their own page and a member's page too. A tab holds no revision, so this DELETE carries its idempotency key but no If-Match */
+        delete: operations["closeTeamBrowserTab"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/tabs/{tab}/viewport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a tab's real window size (page renders at it for the user and every member; last setter wins) */
+        post: operations["setTeamBrowserTabViewport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/browser/stream": {
         parameters: {
             query?: never;
@@ -1180,6 +1231,12 @@ export interface components {
             /** @description Stable machine code */
             code?: string;
             message?: string;
+        };
+        /** @description A tab's real window size as the page renders it; absent on a tab nobody set one for (the browser's default window). */
+        BrowserViewport: {
+            width: number;
+            height: number;
+            mobile?: boolean;
         };
         /** @description A card, one stage of a requirement's route held by one member. */
         Task: {
@@ -2946,14 +3003,144 @@ export interface operations {
                             running: boolean;
                             tabs: {
                                 id: string;
-                                memberId: string;
+                                /**
+                                 * @description member: a member's tab; user: a tab the user opened themselves.
+                                 * @enum {string}
+                                 */
+                                owner: "member" | "user";
+                                /** @description The bot id */
+                                memberId?: string;
                                 url: string;
                                 title: string;
+                                /** @description A member's call is working in this tab right now. */
+                                busy?: boolean;
+                                viewport?: components["schemas"]["BrowserViewport"];
                             }[];
                         };
                     };
                 };
             };
+            404: components["responses"]["Error"];
+        };
+    };
+    openTeamBrowserTab: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    /** @description Initial address (browser-internal schemes refused); omit to open a blank page. */
+                    url?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The opened tab */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            tab: {
+                                id: string;
+                                /** @enum {string} */
+                                owner: "member" | "user";
+                                memberId?: string;
+                                url: string;
+                                title: string;
+                                viewport?: components["schemas"]["BrowserViewport"];
+                            };
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    closeTeamBrowserTab: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                tab: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Closed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            ok: boolean;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setTeamBrowserTabViewport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                tab: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    /**
+                     * @description desktop 1280x744, tablet 768x1024, phone 390x844 (mobile), clear back to the browser's default window; or give width and height.
+                     * @enum {string}
+                     */
+                    preset?: "desktop" | "tablet" | "phone" | "clear";
+                    width?: number;
+                    height?: number;
+                    mobile?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The window size now applied (null after clear) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @description The window size now applied; null after clear. */
+                            viewport: components["schemas"]["BrowserViewport"] | null;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
             404: components["responses"]["Error"];
         };
     };

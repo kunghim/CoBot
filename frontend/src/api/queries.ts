@@ -199,6 +199,33 @@ export function useTeamBrowser(teamId: string, enabled = true) {
   return useQuery({ queryKey: ['teamBrowser', teamId], queryFn: () => api.getTeamBrowser(teamId), enabled, refetchInterval: 2000 });
 }
 
+/** Opens a page in a tab the user owns; the browser comes up when it is down. */
+export function useOpenBrowserTab(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.openBrowserTab(teamId, url),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
+/** Closes one tab of the team's browser, a member's page or the user's own. */
+export function useCloseBrowserTab(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tab: string) => api.closeBrowserTab(teamId, tab),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
+/** Sets the window size the page really renders at, for the user and members alike. */
+export function useSetBrowserTabViewport(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tab, body }: { tab: string; body: import('./client').BrowserViewportRequest }) => api.setBrowserTabViewport(teamId, tab, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
 export function useCreateTeam() {
   const qc = useQueryClient();
   return useMutation({

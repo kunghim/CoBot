@@ -168,8 +168,13 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 				}
 				body["expectedRevision"] = version
 			}
+			// Memories and browser tabs are gone once closed: there is no
+			// stored revision to race against, so a DELETE there carries its
+			// idempotency key but no If-Match.
 			needsRevision := r.Method == http.MethodPatch ||
-				(r.Method == http.MethodDelete && !strings.Contains(r.URL.Path, "/memories/")) ||
+				(r.Method == http.MethodDelete &&
+					!strings.Contains(r.URL.Path, "/memories/") &&
+					!strings.Contains(r.URL.Path, "/browser/tabs/")) ||
 				strings.HasSuffix(r.URL.Path, "/decisions") || strings.HasSuffix(r.URL.Path, "/confirm") ||
 				strings.HasSuffix(r.URL.Path, "/archive") || strings.HasSuffix(r.URL.Path, "/restore") ||
 				strings.HasSuffix(r.URL.Path, "/answers") || strings.Contains(r.URL.Path, "/questions/") ||

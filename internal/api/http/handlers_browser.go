@@ -132,3 +132,62 @@ func (s *Server) handleBrowserInput(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"ok": true})
 }
+
+// handleOpenBrowserTab opens a page in a tab the user owns. The user asked
+// for it, so the team's browser comes up when it is down.
+func (s *Server) handleOpenBrowserTab(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"` // accepted, not needed: an open is not replayed
+		URL       string `json:"url"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	tab, err := s.App.OpenUserTab(r.Context(), principal, r.PathValue("id"), req.URL)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusCreated, map[string]any{"tab": tab})
+}
+
+// handleCloseBrowserTab closes one tab: the user's own page or a member's.
+func (s *Server) handleCloseBrowserTab(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	if err := s.App.CloseBrowserTab(r.Context(), principal, r.PathValue("id"), r.PathValue("tab")); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleBrowserViewport sets a tab's real window size (a preset or an
+// explicit size); the page renders at it for the user and every member.
+func (s *Server) handleBrowserViewport(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"` // accepted, not needed: a viewport is not replayed
+		browser.ViewportRequest
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	viewport, err := s.App.SetBrowserViewport(r.Context(), principal, r.PathValue("id"), r.PathValue("tab"), req.ViewportRequest)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"viewport": viewport})
+}

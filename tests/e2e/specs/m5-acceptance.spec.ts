@@ -84,7 +84,9 @@ test('three approval cards page, process, and keep history', async ({ page }) =>
   await expect(page.getByText(/\/ 3/)).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByText(/\/ 2/).first()).toBeVisible({ timeout: 15000 });
 
-  // The decided record lands in the read-only history (F06).
+  // The decided record lands in the read-only history (F06), which lives in
+  // the info card over the conversation.
+  await page.getByRole('button', { name: /展开信息面板/ }).click();
   await page.getByRole('tab', { name: /^审批$/ }).click();
   await expect(page.getByText(/安全审批|Security approval/).first()).toBeVisible({ timeout: 15000 });
 
@@ -121,6 +123,8 @@ test('home shows only real actions and tabs support arrow keys', async ({ page }
   await expect(page.getByRole('button', { name: /新建团队|create team/i })).toBeVisible();
 
   await selectMember(page, /项目经理/);
+  // The four pages live in the info card; its tabs take the keys.
+  await page.getByRole('button', { name: /展开信息面板/ }).click();
   const firstTab = page.getByRole('tab', { name: /^任务$/ });
   await firstTab.focus();
   await firstTab.press('ArrowRight');
@@ -128,8 +132,7 @@ test('home shows only real actions and tabs support arrow keys', async ({ page }
   await expect(secondTab).toHaveAttribute('aria-selected', 'true');
   await expect(secondTab).toBeFocused();
   await secondTab.press('End');
-  // The work panel's last tab is the live browser page.
-  await expect(page.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: /记忆/ })).toHaveAttribute('aria-selected', 'true');
   await secondTab.press('Home');
   await expect(firstTab).toHaveAttribute('aria-selected', 'true');
 });
