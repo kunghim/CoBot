@@ -85,12 +85,13 @@ AI-assisted contributions are welcome. You remain responsible for
 understanding the change, checking its sources and running the relevant
 tests. Agents follow [AGENTS.md](AGENTS.md) and the [docs](docs/README.md).
 Keep personal notes and drafts in the ignored `.local/` directory of your main
-checkout; it can be its own Git repository pushed to your private repository or
-fork, and never enters a pull request. Never
+checkout. Agents create it as its own Git repository and push it to a `notes`
+branch of your fork, which shares no history with the code and never enters a
+pull request; you can switch it to a private repository at any time. Never
 submit private prompts, account material or model transcripts as evidence.
 
 欢迎 AI 辅助贡献，但贡献者仍要理解改动、核对来源并运行相关测试。智能体遵循 [AGENTS.md](AGENTS.md) 和 [docs/](docs/README.md)。
-个人笔记和草稿放在主检出目录被忽略的 `.local/`，可以作为独立 Git 仓库推到自己的私有仓库或 fork，永远不进 PR。规则见[文档流程](docs/workflows/docs.md)；
+个人笔记和草稿放在主检出目录被忽略的 `.local/`：智能体会自动把它建成独立 Git 仓库，推到你 fork 的 `notes` 分支，永远不进 PR；也可以随时换成自己的私有仓库。规则见[文档流程](docs/workflows/docs.md)；
 不要把私人提示词、账号资料或模型对话记录当作证据提交。
 
 ## Never commit / 不要提交

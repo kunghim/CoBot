@@ -80,6 +80,11 @@ Desktop.ini
 /.*
 !/.github/
 !/.gitignore
+!/.claude/
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/cobot-*/
 !/AGENTS.md
 !/CLAUDE.md
 # END managed public file exceptions

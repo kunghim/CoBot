@@ -8,12 +8,21 @@ const begin = '# BEGIN managed public file exceptions';
 const end = '# END managed public file exceptions';
 const aiInstruction = /(^|\/)(agents?|claude|gemini)\.md$/i;
 const privateDirectory = /(^|\/)(\.claude|\.codex|\.agents|\.cursor|\.zcode|\.deepseek|\.kimi|credentials|traces)(\/|$)/i;
+// Shared project skills are the only part of an assistant directory that may be
+// published, and only those whose name starts with the project prefix (cobot-).
+const publicDirectory = /^\.(claude|agents)\/skills$/;
+const skillPrefix = /^[a-z][a-z0-9]*-$/;
+const directories = policy => policy.publicDirectories ?? [];
 
 export function validatePolicy(policy) {
   if (!Array.isArray(policy.rootDotEntries) || !Array.isArray(policy.publicFiles)) throw new Error('Invalid public-files policy');
   for (const entry of policy.rootDotEntries) {
     if (typeof entry !== 'string' || !/^\.[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/.test(entry) || entry.toLowerCase() === '.git') throw new Error('Invalid root dot entry');
   }
+  for (const dir of directories(policy)) {
+    if (typeof dir !== 'string' || !publicDirectory.test(dir)) throw new Error('Public directories are limited to shared assistant skills');
+  }
+  if (directories(policy).length && !skillPrefix.test(policy.publicSkillPrefix ?? '')) throw new Error('Shared skills need a publicSkillPrefix such as "cobot-"');
   for (const path of policy.publicFiles) {
     if (typeof path !== 'string' || !/^[\p{L}\p{N}_./ -]+$/u.test(path) || path.split('/').some(p => !p || p !== p.trim() || p === '.' || p === '..') || privateDirectory.test(path)) throw new Error('Invalid public file exception');
     if (!aiInstruction.test(path)) throw new Error('Public exceptions must be official AI instructions');
@@ -24,6 +33,10 @@ export function managedIgnore(policy) {
   validatePolicy(policy);
   const lines = [begin, '# Root hidden entries are private unless explicitly listed in the policy.', '/.*'];
   for (const entry of policy.rootDotEntries) lines.push(`!/${entry}${entry === '.github' ? '/' : ''}`);
+  for (const dir of directories(policy)) {
+    const [parent] = dir.split('/');
+    lines.push(`!/${parent}/`, `/${parent}/*`, `!/${dir}/`, `/${dir}/*`, `!/${dir}/${policy.publicSkillPrefix}*/`);
+  }
   const exceptions = new Set();
   for (const path of policy.publicFiles) {
     const parts = path.split('/');
@@ -36,6 +49,12 @@ export function managedIgnore(policy) {
 
 export function privateReason(path, policy) {
   const first = path.split('/')[0];
+  const shared = directories(policy).find(dir => path.startsWith(`${dir}/`));
+  if (shared) {
+    const rest = path.slice(shared.length + 1);
+    if (!rest.startsWith(policy.publicSkillPrefix)) return `skill name must start with ${policy.publicSkillPrefix} to be shared`;
+    return privateDirectory.test(rest) ? 'private data inside a shared directory' : undefined;
+  }
   if (first.startsWith('.') && !policy.rootDotEntries.includes(first)) return 'root hidden entry is not allowed';
   if (privateDirectory.test(path)) return 'private data or assistant directory';
   if (/^experiments\//i.test(path)) return 'retired experiments';

@@ -26,19 +26,16 @@
 方案、讨论、验收记录、个人笔记这些不该进项目的东西，放在**主检出目录**（第一次 clone 出来的目录）的 `.local/`。
 
 - 它被 CoBot 仓库忽略，内容永远不会进入代码提交或 PR。
-- 它自己是一个独立的 Git 仓库，推到**你自己的**私有仓库或 fork 上，有版本记录，换电脑能取回。
+- 它自己是一个独立的 Git 仓库，有版本记录，换电脑能取回。
 - 所有 worktree 都读写主目录这一份，不在 worktree 里另建。
 
-第一次建立：
+**你不需要做任何准备。** 智能体第一次要写笔记时会自动建好 `.local/`；你让它推送时，它会把笔记推到你自己 fork 上的
+`notes` 分支，和代码一起推。这个分支和代码没有共同历史，开不了 PR，CI 也会拒绝它。
 
-```sh
-git init .local
-git -C .local remote add origin <你的私有仓库或 fork 地址>
-```
+换电脑：`git clone -b notes <你的 fork 地址> .local`。
 
-换电脑：`git clone <同一地址> .local`。远端不能是上游 `kunghim/CoBot`。
-
-如果你在 worktree 里用 Claude Code 或 Codex，需要在它们的本机配置里把 `<主目录>/.local` 加为可写目录，否则会被拦。
+第一次设置时智能体会提醒你一次：fork 是公开的，想保密可以另建私有仓库换过去。之后不再提醒。
+在 worktree 里，编码工具写主目录的 `.local/` 时可能会请求批准，同意即可，不需要改任何配置。
 目录结构、命名和归档方式见 [文档流程](workflows/docs.md)。
 
 ## 三、智能体在 Git 上会怎么做
@@ -51,6 +48,9 @@ git -C .local remote add origin <你的私有仓库或 fork 地址>
 - **一次授权只管当时那批改动。** 你让它推送或开 PR 之后，它开始做下一个需求时不会沿用这次授权；
   新需求没经过你明确验收，不会推送、不会开 PR。它自己跑通测试不算验收。
 - 只 `git add` 具体文件，不 reset、stash、rebase 或强推。
+
+用 Claude Code 时，仓库自带的 `cobot-` 开头的项目级 skill（`.claude/skills/cobot-git-*`，共建者共享）会在你说“开分支”“提交”“推送”“提 PR”“清理”“晋级”时，
+自动按这些流程执行。用其他工具时，智能体按 `AGENTS.md` 路由到同样的文档，规则一致。
 
 ## 四、分支与 PR
 

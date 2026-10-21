@@ -1,5 +1,7 @@
 {
   "rootDotEntries": [".github", ".gitignore"],
+  "publicDirectories": [".claude/skills"],
+  "publicSkillPrefix": "cobot-",
   "publicFiles": [
     "AGENTS.md",
     "CLAUDE.md"

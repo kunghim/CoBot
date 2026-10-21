@@ -52,6 +52,17 @@ test('docs are public; only approved official instructions are published', t => 
   assert.throws(() => checkPublicFiles(root), /has not been approved/);
 });
 
+test('only cobot- skills are published; other skills and the rest of the assistant directory stay private', t => {
+  const policy = { ...baseline, publicDirectories: ['.claude/skills'], publicSkillPrefix: 'cobot-' };
+  const { root, put } = fixture(t, policy);
+  put('.claude/skills/cobot-git-sync/SKILL.md');
+  assert.equal(checkPublicFiles(root), 3);
+  const rejected = ['.claude/skills/personal-helper/SKILL.md', '.claude/settings.local.json', '.claude/worktrees/x/README.md', '.claude/skills/cobot-git-sync/traces/run.json'];
+  for (const path of rejected) put(path);
+  assert.throws(() => checkPublicFiles(root), error => rejected.every(path => error.message.includes(path)));
+  for (const dir of ['.claude', '.claude/agents', 'docs/skills', '.cursor/skills']) assert.throws(() => managedIgnore({ ...policy, publicDirectories: [dir] }), /shared assistant skills/);
+  for (const prefix of [undefined, '', 'cobot', 'Cobot-', '../']) assert.throws(() => managedIgnore({ ...policy, publicSkillPrefix: prefix }), /publicSkillPrefix/);
+});
 test('ignore exceptions must match the policy and remain the final block', t => {
   const { root } = fixture(t);
   writeFileSync(resolve(root, '.gitignore'), readFileSync(resolve(root, '.gitignore'), 'utf8') + '!/docs/**\n');
@@ -72,5 +83,7 @@ test('topic/fork PRs target dev; only dev promotions and Dependabot updates targ
   assert.doesNotThrow(() => checkPrRoute(pr('dev', 'feature', 'contributor/CoBot')));
   assert.doesNotThrow(() => checkPrRoute(pr('main', 'dev')));
   assert.doesNotThrow(() => checkPrRoute(pr('main', 'dependabot/go_modules/example', 'kunghim/CoBot', 'dependabot[bot]')));
+  for (const head of ['notes', 'notes/someone', 'Notes']) assert.throws(() => checkPrRoute(pr('dev', head, 'contributor/CoBot')), /notes/i);
+  assert.doesNotThrow(() => checkPrRoute(pr('dev', 'notes-ui', 'contributor/CoBot')));
   for (const event of [pr('main', 'feature'), pr('main', 'dependabot/go_modules/example'), pr('main', 'dependabot/go_modules/example', 'contributor/CoBot', 'dependabot[bot]'), pr('main', 'dev', 'contributor/CoBot'), pr('main', 'dev', null), pr('release', 'dev'), {}]) assert.throws(() => checkPrRoute(event));
 });

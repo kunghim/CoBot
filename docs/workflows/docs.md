@@ -24,7 +24,9 @@
 - 新的产品决定定下来后，在 `product/decisions.md` 加一行；功能实现后同步 `product/overview.md`。
 - 同一条规则只写在一处，其他地方链接。新增、移动或删除文档时，同步 `docs/README.md` 和 AGENTS.md 的路由表；`node scripts/check-docs.mjs` 会检查文件名、索引是否列全和链接是否有效。
 - 智能体指令文件（`AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 等）和助手配置目录默认不提交，目前只公开根目录的
-  `AGENTS.md`、`CLAUDE.md`。要公开其他指令文件，先把路径加入 `scripts/public-files-policy.json` 的 `publicFiles`，
+  `AGENTS.md`、`CLAUDE.md`，以及 `.claude/skills/` 下名字以 `cobot-` 开头的项目级 skill（策略里的 `publicDirectories` 和 `publicSkillPrefix`）。
+  你自己的个人 skill、`.claude/` 的其余内容照样不提交，名字不带 `cobot-` 的 skill 提交会被检查拒绝。
+  skill 只写步骤并指向本目录的文档，规则不在 skill 里重复。要公开其他指令文件，先把路径加入 `scripts/public-files-policy.json` 的 `publicFiles`，
   再运行 `node scripts/check-public-files.mjs --write-ignore`。
 
 ## 私人资料（`.local/`）
@@ -39,23 +41,31 @@
 git rev-parse --path-format=absolute --git-common-dir   # 输出 <主目录>/.git，它的同级 .local/ 就是
 ```
 
-下文的 `<主目录>/.local` 都指这个路径。读写前先确认它存在；不存在说明这位共建者没有私人资料，直接继续，不要创建到 worktree 里。
+下文的 `<主目录>/.local` 都指这个路径。只需要读的时候它不存在就直接继续；需要写笔记而它还不存在时，按下一节自动建立，永远建在主目录，不建在 worktree 里。
 
-worktree 在主目录之外运行时，Codex 沙箱和 Claude Code 权限默认不放行这个路径。各自在本机配置里把 `<主目录>/.local`
-加入可写目录（Codex 的 `writable_roots` 或 `--add-dir`，Claude Code 的 `additionalDirectories`）。
+在 worktree 里写这个路径时，你用来开发的编码工具（Codex、Claude Code 等）可能会请求批准，同意即可；
+不要为了绕过批准去改沙箱。嫌每次批准麻烦，可以自行把 `<主目录>/.local` 加为工具的可写目录，这是可选的。
 
-### 它是一个独立的 Git 仓库
+### 它是一个独立的 Git 仓库，默认存在自己 fork 的 `notes` 分支
 
-和 CoBot 代码没有共同历史；主仓库忽略 `.local/`，所以它的内容不会进入代码提交或 PR。
+`.local/` 自己是一个 Git 仓库，和 CoBot 代码没有共同历史；主仓库忽略 `.local/`，所以笔记不会进入代码提交，
+也无法从 `notes` 分支向上游开 PR（两边历史无关，CI 也会拒绝 `notes` 分支的 PR）。共建者不需要另建仓库。
 
-| 操作 | 命令 |
-| --- | --- |
-| 第一次建立 | `git init <主目录>/.local`，再 `git -C <主目录>/.local remote add origin <私有仓库或自己 fork 的地址>` |
-| 换电脑 | `git clone <同一地址> <主目录>/.local` |
-| 存到自己 fork 的单独分支（不另建仓库时） | `git -C <主目录>/.local push origin HEAD:notes` |
+**智能体第一次需要写笔记时自动建立**，不用问用户：
 
-远端只能是自己的私有仓库或自己的 fork，**不能是上游 `kunghim/CoBot`**。维护者的上游就是自己的仓库，笔记要另建私有仓库存放。
-什么时候提交、拉取、推送笔记，见 [交付流程](deliver.md)。
+1. `git init <主目录>/.local`，写入下面目录结构里的 `README.md` 和 `archive/README.md`，提交一次。
+2. 设置远端：主仓库 `origin` 指向自己的 fork 时（不是 `kunghim/CoBot`），把同一个地址设为笔记的 `origin`：
+   `git -C <主目录>/.local remote add origin <主仓库 origin 的地址>`。
+   主仓库 `origin` 就是 `kunghim/CoBot`（维护者），或者用户想用单独的私有仓库时，不自动设置，推送前请用户给出地址。
+   **只在这一次**提醒用户：公开仓库的 fork 不能改成私有，`notes` 分支谁都能看到；想保密就另建一个私有仓库，给出地址后换成它。
+   笔记已经有远端（建过了）就不再提醒。
+3. 推送随代码一起（见 [交付与同步流程](deliver.md)）。第一次推送用 `git -C <主目录>/.local push -u origin HEAD:notes`，
+   之后的拉取、推送都对应 fork 上的 `notes` 分支。
+
+换电脑：`git clone -b notes <自己 fork 的地址> <主目录>/.local`。
+
+- 远端**永远不能是上游 `kunghim/CoBot`**；发现远端是它，停下告诉用户。
+- 笔记里不写密钥和账号。
 
 ### 并行会话
 

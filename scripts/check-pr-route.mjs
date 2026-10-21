@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 export function checkPrRoute(event) {
   const pr = event.pull_request;
   if (!pr) throw new Error('Missing pull request metadata');
+  if (/^notes(\/|$)/i.test(pr.head?.ref ?? '')) throw new Error('Notes branches hold contributor notes and never open pull requests. / notes 分支只存个人笔记，不能提 PR。');
   if (pr.base.ref === 'dev') return;
   if (pr.base.ref === 'main' && pr.head.ref === 'dev' && pr.head.repo?.full_name?.toLowerCase() === pr.base.repo?.full_name?.toLowerCase() && pr.head.repo?.full_name) return;
   if (pr.base.ref === 'main' && pr.user?.login === 'dependabot[bot]' && pr.head.repo?.full_name?.toLowerCase() === pr.base.repo?.full_name?.toLowerCase() && pr.head.repo?.full_name) return;

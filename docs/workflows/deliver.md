@@ -17,13 +17,13 @@
 ## 代码与私人笔记一起同步
 
 私人笔记在 `<主目录>/.local`，是独立的 Git 仓库（定位方法见 [文档流程](docs.md#私人资料local)）。
-它存在且是 Git 仓库时，代码的每个 Git 动作都顺带处理它；不存在就跳过，不创建、不提示。
+它存在且是 Git 仓库时，代码的每个 Git 动作都顺带处理它；不存在就跳过（笔记仓库在第一次写笔记时建立，不在同步时建立）。
 
 | 用户要求 | 代码 | 同时对笔记 |
 | --- | --- | --- |
 | 提交 | `git add <具体路径>`，`git commit` | 本任务写过的笔记有改动时：`git -C <主目录>/.local add <这些文件>`，`git -C <主目录>/.local commit` |
 | 拉取 | `git pull` | `git -C <主目录>/.local pull --ff-only` |
-| 推送 | `git push` | `git -C <主目录>/.local push`（远端不能是上游 `kunghim/CoBot`，是就停下告诉用户） |
+| 推送 | `git push` | 已有上游分支时 `git -C <主目录>/.local push`；第一次 `git -C <主目录>/.local push -u origin HEAD:notes`。还没设远端时按 [文档流程](docs.md#私人资料local) 设置；远端是上游 `kunghim/CoBot` 就停下告诉用户 |
 | 开 PR | 按 CONTRIBUTING | 不涉及：笔记永远不进 PR |
 
 - 笔记拉取不能快进（两台电脑各自改过）时，停下告诉用户，不自动合并或覆盖。
