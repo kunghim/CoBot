@@ -210,9 +210,9 @@ func providerHasModel(p domain.Provider, id string) bool {
 // SetBotModel sets the model a member runs with. An empty provider puts the
 // member back on the default model the settings name.
 //
-// The change applies from the member's next turn. Moving to another
-// provider makes the engine load the member's thread again with it; the
-// history stays.
+// The change applies from the member's next turn. Another vendor's model
+// starts a new thread handed over from the old one (see needsFreshThread);
+// another model of the same vendor keeps the thread.
 func (a *App) SetBotModel(ctx context.Context, principal auth.Principal, botID, providerID, model string, expectedRevision int64) (domain.Bot, error) {
 	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
 	defer unlock()

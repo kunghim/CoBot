@@ -282,3 +282,33 @@ func TestAStoppedChainSaysWhereTheRequirementStopped(t *testing.T) {
 		t.Fatalf("no notice in the project manager's conversation: %+v", messages)
 	}
 }
+
+// A reminder wakes the member within the chain that brought it the card:
+// the chain's budget counts it like any other wake.
+func TestAReminderCountsAgainstTheChainBudget(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	settings, err := h.app.GetSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := 1
+	if _, err := h.app.UpdateSettings(ctx, h.user, domain.SettingsPatch{ChainLimit: &one}, settings.Revision); err != nil {
+		t.Fatal(err)
+	}
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	pm, dev := bots[0], bots[1]
+
+	h.handCard(t, team, pm, dev, "做页面", "能打开")
+	waitUntil(t, 5*time.Second, "card turn", func() bool { return len(fake.Turns()) == 1 })
+	finishTurn(t, h, fake, fake.Turns()[0], dev.ID)
+	waitUntil(t, 5*time.Second, "budget card", func() bool {
+		pending, err := h.app.PendingApprovals(ctx, h.user, team.ID, "")
+		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
+	})
+	time.Sleep(300 * time.Millisecond)
+	if n := len(fake.Turns()); n != 1 {
+		t.Fatalf("%d turns; the reminder went past the chain's budget", n)
+	}
+}

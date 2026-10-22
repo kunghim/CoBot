@@ -97,8 +97,14 @@ func remindUnhandedCardsLocked(ctx context.Context, tx *sql.Tx, teamID, botID, r
 	}
 	b.WriteString("做完了就调用 handoff 交出（outcome=done）；做不下去或需要项目经理决定，就用 handoff 上报（outcome=escalate）并写明卡在哪里。" +
 		"只在回复里写「已完成」不会交给下一环。")
+	// The reminder wakes the member within the chain that brought it the
+	// card, so the chain's budget counts it and a stopped chain drops it.
+	var chainID string
+	if err := tx.QueryRowContext(ctx, `SELECT chain_id FROM deliveries WHERE run_id = ? AND task_id = ? AND chain_id != '' LIMIT 1`, runID, open[0].ID).Scan(&chainID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
 	return true, enqueueSystemMessageLocked(ctx, tx, systemMessage{
-		teamID: teamID, target: botID, text: b.String(), about: open[0].ID, taskID: open[0].ID, kind: "message",
+		teamID: teamID, target: botID, text: b.String(), about: open[0].ID, taskID: open[0].ID, kind: "message", chainID: chainID,
 	})
 }
 

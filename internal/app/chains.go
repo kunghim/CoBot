@@ -383,6 +383,9 @@ func stoppedRouteNoticeLocked(ctx context.Context, tx *sql.Tx, delivery sqlite.D
 		return nil
 	}
 	name := memberNames(ctx, tx, req.TeamID)[botID]
+	if name == "" {
+		name = "这一环的成员"
+	}
 	text := fmt.Sprintf("已按你的选择停止这条链。需求「%s」停在「%s」：交给%s的这一环没有送达，现在没有人在做。"+
 		"要接着做，给%s发一句话；不做了，可以取消这个需求。", req.Title, stageLabel(req, card), name, name)
 	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})

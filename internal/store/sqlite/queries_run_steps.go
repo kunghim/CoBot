@@ -147,12 +147,13 @@ func scanRunSteps(rows interface {
 }
 
 // LastEndedRun is the member's latest run that has ended, other than the
-// one named (the run being started now).
+// one named (the run being started now). The times are compared as times:
+// RFC3339Nano drops trailing zeros, so as text .12Z sorts before .1Z.
 func LastEndedRun(ctx context.Context, q Queryer, botID, exceptRunID string) (domain.Run, error) {
 	var r domain.Run
 	var started, ended string
 	err := q.QueryRowContext(ctx, `SELECT id, team_id, bot_id, provider_session_id, provider_turn_id, engine_epoch, status, error_key, started_at, ended_at
-		FROM runs WHERE bot_id = ? AND id != ? AND ended_at != '' ORDER BY ended_at DESC, id DESC LIMIT 1`, botID, exceptRunID).
+		FROM runs WHERE bot_id = ? AND id != ? AND ended_at != '' ORDER BY julianday(ended_at) DESC, ended_at DESC, id DESC LIMIT 1`, botID, exceptRunID).
 		Scan(&r.ID, &r.TeamID, &r.BotID, &r.ProviderSessionID, &r.ProviderTurnID, &r.EngineEpoch, &r.Status, &r.ErrorKey, &started, &ended)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
