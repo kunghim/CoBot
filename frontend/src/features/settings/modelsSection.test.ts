@@ -1,8 +1,7 @@
-// The model picker in Settings follows the provider the profile runs with.
-//
-// A gateway offers its own models and not the engine's, and picking one
-// writes that gateway's own default model: the profile's setting is the
-// fallback for a profile that runs with no provider at all.
+// The default model in Settings: the one a member runs with until it is
+// given its own in the conversation. Any enabled provider's model can be the
+// default, and the choice is one write of the provider and the model
+// together.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
@@ -26,7 +25,8 @@ vi.mock('../../api/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/queries')>();
   return {
     ...actual,
-    useEngine: () => ({ data: { status: 'ready' } }),
+    useEngine: () => ({ data: { status: 'ready', loggedIn: true } }),
+    useProviderPresets: () => ({ data: { presets: [] } }),
     useEngineModels: () => ({ data: { models: state.engineModels } }),
     useProviders: () => ({ data: { providers: state.providers }, isPending: state.providersPending }),
     useSaveProvider: () => ({ mutate: state.saveProvider }),
@@ -52,11 +52,14 @@ const gateway = {
   createdAt: '2026-10-20T00:00:00Z',
   updatedAt: '2026-10-20T00:00:00Z',
   hasCredential: true,
+  enabled: true,
 };
+
+const official = { id: 'openai', name: 'OpenAI', kind: 'official', authMode: 'chatgpt', endpoints: [], models: [], enabled: true, revision: 1 };
 
 const engineModel = { id: 'gpt-6.1-sol', displayName: 'GPT 6.1' };
 
-describe('the model picker follows the provider in use', () => {
+describe('the default model can come from any enabled provider', () => {
   let root: Root;
   let host: HTMLDivElement;
   let save: Mock<Save>;
@@ -67,7 +70,7 @@ describe('the model picker follows the provider in use', () => {
     document.body.append(host);
     root = createRoot(host);
     save = vi.fn<Save>();
-    state.providers = [];
+    state.providers = [official, gateway];
     state.providersPending = false;
     state.engineModels = [engineModel];
     state.saveProvider.mockReset();
@@ -97,78 +100,49 @@ describe('the model picker follows the provider in use', () => {
       ([...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes(label)) as HTMLLIElement).click(),
     );
 
-  it('offers the models the gateway brought in, not the engine ones', () => {
-    state.providers = [gateway];
-    render({ defaultProvider: 'cpa' });
+  it('offers the models of every enabled provider, named after their provider', () => {
+    render();
     open();
-    const offered = options();
-    expect(offered.some((text) => text.includes('DeepSeek V4 Pro'))).toBe(true);
-    expect(offered.some((text) => text.includes('Grok 4.6'))).toBe(true);
-    expect(offered.some((text) => text.includes('GPT 6.1'))).toBe(false);
+    const listed = options();
+    expect(listed.some((label) => label.includes('OpenAI') && label.includes('GPT 6.1'))).toBe(true);
+    expect(listed.some((label) => label.includes('公司的中转站') && label.includes('DeepSeek V4 Pro'))).toBe(true);
   });
 
   it('marks a model that failed its check', () => {
-    state.providers = [gateway];
-    render({ defaultProvider: 'cpa' });
-    open();
-    expect(options().find((text) => text.includes('Grok 4.6'))).toContain('不可用');
-    expect(options().find((text) => text.includes('DeepSeek V4 Pro'))).not.toContain('不可用');
-  });
-
-  it('writes the model to the gateway itself, not to the profile', () => {
-    state.providers = [gateway];
-    render({ defaultProvider: 'cpa' });
-    open();
-    pick('Grok 4.6');
-    expect(state.saveProvider).toHaveBeenCalledWith(
-      {
-        id: 'cpa',
-        body: expect.objectContaining({
-          id: 'cpa',
-          name: '公司的中转站',
-          authMode: 'api_key',
-          defaultModel: 'grok-4.6',
-          expectedRevision: 4,
-        }),
-      },
-      expect.anything(),
-    );
-    expect(save).not.toHaveBeenCalled();
-  });
-
-  it('keeps the engine models when no gateway is in use', () => {
     render();
     open();
-    expect(options().some((text) => text.includes('GPT 6.1'))).toBe(true);
-    pick('GPT 6.1');
-    expect(save).toHaveBeenCalledWith('defaultModel', { defaultModel: 'gpt-6.1-sol' }, expect.anything());
+    expect(options().find((label) => label.includes('Grok 4.6'))).toContain('不可用');
+  });
+
+  it('writes the provider and the model together', () => {
+    render();
+    open();
+    pick('DeepSeek V4 Pro');
+    expect(save).toHaveBeenCalledWith('defaultModel', { defaultProvider: 'cpa', defaultModel: 'deepseek-v4-pro' });
     expect(state.saveProvider).not.toHaveBeenCalled();
   });
 
-  it('keeps the engine models for the provider that uses the engine own account', () => {
-    state.providers = [{ ...gateway, id: 'openai', authMode: 'chatgpt', models: [] }];
-    render({ defaultProvider: 'openai' });
-    open();
-    expect(options().some((text) => text.includes('GPT 6.1'))).toBe(true);
+  it('shows the default the settings name', () => {
+    render({ defaultProvider: 'cpa', defaultModel: 'deepseek-v4-pro' });
+    expect(host.querySelector('button[role="combobox"]')?.textContent).toContain('DeepSeek V4 Pro');
   });
 
-  it('shows the model a turn will ask for when the gateway named no default', () => {
-    state.providers = [{ ...gateway, defaultModel: undefined }];
-    render({ defaultProvider: 'cpa' });
-    const chosen = host.querySelector('button[role="combobox"]')?.textContent ?? '';
-    expect(chosen).toContain('DeepSeek V4 Pro');
+  it('leaves a disabled provider out', () => {
+    state.providers = [official, { ...gateway, enabled: false }];
+    render();
+    open();
+    expect(options().some((label) => label.includes('DeepSeek V4 Pro'))).toBe(false);
   });
 
   it('waits for the provider list instead of showing the engine models first', () => {
     state.providersPending = true;
-    render({ defaultProvider: 'cpa' });
-    expect(host.querySelector('button[role="combobox"]')).toBeFalsy();
-    expect(host.textContent).not.toContain('GPT 6.1');
+    render();
+    expect(host.querySelector('button[role="combobox"]')).toBeNull();
   });
 
-  it('says so when the provider named in the settings is gone', () => {
-    state.providers = [];
-    render({ defaultProvider: 'cpa' });
-    expect(host.textContent).toContain('已经不在了');
+  it('says what to do when no model is on offer', () => {
+    state.providers = [{ ...official, enabled: false }];
+    render();
+    expect(host.textContent).toContain('还没有可选的模型');
   });
 });

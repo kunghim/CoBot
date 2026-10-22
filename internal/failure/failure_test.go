@@ -210,3 +210,12 @@ func containsHan(text string) bool {
 	}
 	return false
 }
+
+// The ChatGPT account refuses a model it does not offer with "the model is
+// not supported", which names the model, not the protocol.
+func TestAModelTheAccountDoesNotOfferIsAnUnknownModel(t *testing.T) {
+	body := `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-x' model is not supported when using Codex with a ChatGPT account."}}`
+	if code, _ := ClassifyHTTP(400, body); code != CodeModelUnknown {
+		t.Fatalf("classified as %q, want %q", code, CodeModelUnknown)
+	}
+}

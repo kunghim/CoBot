@@ -78,9 +78,14 @@ type Bot struct {
 	Status       string `json:"status"`
 	CurrentRunID string `json:"currentRunId,omitempty"`
 	// Avatar is the member's own avatar; nil follows its role's.
-	Avatar    *AvatarRef `json:"avatar,omitempty"`
-	Revision  int64      `json:"revision"`
-	CreatedAt time.Time  `json:"createdAt"`
+	Avatar *AvatarRef `json:"avatar,omitempty"`
+	// ProviderID and Model are the model this member runs with, as the
+	// member's own choice. Both empty means the member follows the default
+	// model named in the settings.
+	ProviderID string    `json:"providerId,omitempty"`
+	Model      string    `json:"model,omitempty"`
+	Revision   int64     `json:"revision"`
+	CreatedAt  time.Time `json:"createdAt"`
 	// LastMessage previews the latest message between the user and this
 	// member; only team listings fill it.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
