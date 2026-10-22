@@ -54,6 +54,16 @@ function Row({ name, value }: { name: string; value: string }) {
   );
 }
 
+/** The window closest to running out: the one that will stop the next turn
+ * first. The weekly window is usually the emptier one, so showing it by
+ * default hid a five-hour window that was about to block the account. */
+export function tightestLimit<T extends { usedPercent?: number }>(limits: { primary?: T; secondary?: T }): T | undefined {
+  const { primary, secondary } = limits;
+  if (!primary) return secondary;
+  if (!secondary) return primary;
+  return (secondary.usedPercent ?? 0) > (primary.usedPercent ?? 0) ? secondary : primary;
+}
+
 export default function SessionStatsBar({ botId }: { botId: string }) {
   const { t } = useTranslation();
   const query = useBotStats(botId);
@@ -68,6 +78,10 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
   const limits = (stats.rateLimits ?? {}) as { primary?: Limit; secondary?: Limit };
   const limitText = (limit?: Limit) => (limit?.usedPercent === undefined ? '—' : `${Math.round(limit.usedPercent)}%`);
   const resets = (limit?: Limit) => (limit?.resetsAt ? new Date(limit.resetsAt * 1000).toLocaleString() : '');
+  // Nearly used up reads as a warning, and a window the next turn will
+  // likely not fit in reads as an error.
+  const limitTone = (limit?: Limit) =>
+    (limit?.usedPercent ?? 0) >= 95 ? 'text-red-600 dark:text-red-400' : (limit?.usedPercent ?? 0) >= 80 ? 'text-amber-600 dark:text-amber-400' : undefined;
   const tps = stats.outputTokensPerSecond ? Math.round(stats.outputTokensPerSecond) : 0;
 
   return (
@@ -97,7 +111,7 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
         </Item>
       )}
       {(limits.primary || limits.secondary) && (
-        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<><Gauge size={12} aria-hidden="true" />{t('stats.limitShort', { percent: limitText(limits.secondary ?? limits.primary) })}</>}>
+        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<span className={cx('inline-flex items-center gap-1', limitTone(tightestLimit(limits)))}><Gauge size={12} aria-hidden="true" />{t('stats.limitShort', { percent: limitText(tightestLimit(limits)) })}</span>}>
           <span className="mb-1 block font-semibold">{t('stats.limitsTitle')}</span>
           {limits.primary && <Row name={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} value={limitText(limits.primary)} />}
           {limits.primary?.resetsAt ? <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
