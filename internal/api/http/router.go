@@ -67,6 +67,19 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/models", s.handleModels)
 	mux.HandleFunc("GET /api/v1/bots/{id}/stats", s.handleBotStats)
 
+	// Model providers: the vendors or gateways the engine can call.
+	mux.HandleFunc("GET /api/v1/providers", s.handleListProviders)
+	mux.HandleFunc("POST /api/v1/providers", s.handleCreateProvider)
+	mux.HandleFunc("GET /api/v1/providers/{id}", s.handleGetProvider)
+	mux.HandleFunc("PATCH /api/v1/providers/{id}", s.handleUpdateProvider)
+	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
+	mux.HandleFunc("POST /api/v1/providers/{id}/probe", s.handleReprobeProvider)
+	mux.HandleFunc("PUT /api/v1/providers/{id}/enabled", s.handlePutProviderEnabled)
+	mux.HandleFunc("GET /api/v1/provider-presets", s.handleProviderPresets)
+	mux.HandleFunc("POST /api/v1/providers/detect", s.handleDetectProvider)
+	mux.HandleFunc("POST /api/v1/providers/discover", s.handleDiscoverProviderModels)
+	mux.HandleFunc("POST /api/v1/providers/probe-models", s.handleProbeProviderModels)
+
 	// Teams, roles and members.
 	mux.HandleFunc("GET /api/v1/teams", s.handleListTeams)
 	mux.HandleFunc("POST /api/v1/teams", s.handleCreateTeam)
@@ -76,6 +89,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/archive", s.handleArchiveTeam)
 	mux.HandleFunc("POST /api/v1/teams/{id}/restore", s.handleRestoreTeam)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}", s.handleDeleteBot)
+	mux.HandleFunc("PATCH /api/v1/bots/{id}", s.handlePatchBot)
+	mux.HandleFunc("PUT /api/v1/bots/{id}/model", s.handlePutBotModel)
+	mux.HandleFunc("PUT /api/v1/roles/{id}/avatar", s.handlePutRoleAvatar)
 	mux.HandleFunc("GET /api/v1/teams/{id}/activity", s.handleListActivity)
 	mux.HandleFunc("GET /api/v1/bots/{id}/memories", s.handleListMemories)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)
@@ -87,29 +103,35 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)
 	mux.HandleFunc("POST /api/v1/teams/{id}/open-path", s.handleOpenTeamPath)
 	mux.HandleFunc("POST /api/v1/teams/{id}/warm", s.handleWarmTeam)
+	mux.HandleFunc("GET /api/v1/teams/{id}/browser", s.handleBrowserPanel)
+	mux.HandleFunc("GET /api/v1/teams/{id}/browser/stream", s.handleBrowserStream)
+	mux.HandleFunc("POST /api/v1/teams/{id}/browser/input", s.handleBrowserInput)
+	mux.HandleFunc("POST /api/v1/teams/{id}/browser/tabs", s.handleOpenBrowserTab)
+	mux.HandleFunc("DELETE /api/v1/teams/{id}/browser/tabs/{tab}", s.handleCloseBrowserTab)
+	mux.HandleFunc("POST /api/v1/teams/{id}/browser/tabs/{tab}/viewport", s.handleBrowserViewport)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
+	mux.HandleFunc("GET /api/v1/avatars/catalog", s.handleGetAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/catalog/sync", s.handleSyncAvatarCatalog)
+	mux.HandleFunc("POST /api/v1/avatars/uploads", s.handleSaveAvatarUpload)
+	mux.HandleFunc("GET /api/v1/avatars/uploads/{file}", s.handleGetAvatarUpload)
 
 	// Conversations and runs.
 	mux.HandleFunc("GET /api/v1/bots/{id}/messages", s.handleListMessages)
 	mux.HandleFunc("POST /api/v1/bots/{id}/messages", s.handleSendMessage)
 	mux.HandleFunc("POST /api/v1/messages/{id}/cancel", s.handleCancelMessage)
 	mux.HandleFunc("POST /api/v1/runs/{id}/interrupt", s.handleInterruptRun)
+	mux.HandleFunc("POST /api/v1/runs/{id}/retry", s.handleRetryRun)
 
 	// Approvals.
 	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
 	mux.HandleFunc("POST /api/v1/approvals/{id}/decisions", s.handleDecideApproval)
 
-	// Task board. Status changes and owner changes are separate app calls so
-	// the ownership safety rules cannot be bypassed by a status patch.
+	// Requirements and their cards. Cards move only on the route: members
+	// hand them off, and the user confirms, accepts or cancels.
 	mux.HandleFunc("GET /api/v1/teams/{id}/tasks", s.handleListTasks)
-	mux.HandleFunc("POST /api/v1/teams/{id}/tasks", s.handleCreateTask)
 	mux.HandleFunc("GET /api/v1/tasks/{id}", s.handleGetTask)
-	mux.HandleFunc("PATCH /api/v1/tasks/{id}", s.handlePatchTask)
-	mux.HandleFunc("POST /api/v1/tasks/{id}/evidence", s.handleSubmitEvidence)
-	mux.HandleFunc("POST /api/v1/tasks/{id}/confirm", s.handleConfirmTask)
-	mux.HandleFunc("POST /api/v1/tasks/{id}/transfers", s.handleOfferTransfer)
-	mux.HandleFunc("POST /api/v1/transfers/{id}/accept", s.handleAcceptTransfer)
-	mux.HandleFunc("POST /api/v1/transfers/{id}/cancel", s.handleCancelTransfer)
+	mux.HandleFunc("GET /api/v1/teams/{id}/requirements", s.handleListRequirements)
+	mux.HandleFunc("POST /api/v1/requirements/{id}/cancel", s.handleCancelRequirement)
 
 	// User questions asked by a bot.
 	mux.HandleFunc("GET /api/v1/questions", s.handleListQuestions)

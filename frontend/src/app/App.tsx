@@ -1,38 +1,81 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client';
 import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
+import { AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
+import { ShellProvider, ShellToggle } from './shell';
+import { authStateFrom, type AuthState } from './authState';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
 
-type AuthState = 'checking' | 'authorized' | 'unauthorized';
-
-/** Reads a startup secret from the URL fragment (product flow), asks the
- * desktop bridge, or — in development only — the Vite dev server. */
-async function obtainAndExchangeSecret(): Promise<boolean> {
+/** Redeems a startup secret if there is one: the URL fragment (product
+ * flow), the desktop bridge, or — in development only — the Vite dev
+ * server.
+ *
+ * Getting no secret is not a failure. The core issues the page a session as
+ * it loads, so the ordinary case needs nothing from here. */
+async function obtainAndExchangeSecret(): Promise<void> {
   const params = new URLSearchParams(window.location.hash.slice(1));
   const fragmentSecret = params.get('cobot-bootstrap');
   if (fragmentSecret) {
-    await api.exchangeBootstrap(fragmentSecret);
+    // The fragment is spent either way: a secret that has expired would
+    // otherwise be offered again on every reload, and fail again.
     history.replaceState(null, '', window.location.pathname + window.location.search);
-    return true;
+    await api.exchangeBootstrap(fragmentSecret);
+    return;
   }
   const nativeSecret = await desktopSecret();
-  if (nativeSecret) { await api.exchangeBootstrap(nativeSecret); return true; }
+  if (nativeSecret) { await api.exchangeBootstrap(nativeSecret); return; }
   const devSecret = await devLinkSecret();
-  if (devSecret) {
-    await api.exchangeBootstrap(devSecret);
-    return true;
-  }
-  return false;
+  if (devSecret) { await api.exchangeBootstrap(devSecret); }
 }
 
 export default function App() {
+  const desktop = useDesktopWindow();
+  // The desktop shell hides the system title bar; the app draws its own,
+  // in CoBot's theme, above every screen.
+  return (
+    <ShellProvider titleBar={desktop !== null}>
+      <div className="flex h-full flex-col">
+        {desktop && <TitleBar desktop={desktop} />}
+        <div className="min-h-0 flex-1">
+          <Screens />
+        </div>
+      </div>
+    </ShellProvider>
+  );
+}
+
+function TitleBar({ desktop }: { desktop: DesktopWindow }) {
+  const { t } = useTranslation();
+  // The toggle belongs to the workspace; Settings has no side panels.
+  const workspace = !useLocation().pathname.startsWith('/settings');
+  return (
+    <AppTitleBar
+      platform={desktop.platform}
+      title="CoBot"
+      left={workspace ? <ShellToggle place="titlebar" /> : undefined}
+      windowControls={{
+        minimizeLabel: t('window.minimize'),
+        maximizeLabel: t('window.maximize'),
+        restoreLabel: t('window.restore'),
+        closeLabel: t('window.close'),
+        maximized: desktop.maximized,
+        onMinimize: desktop.minimize,
+        onToggleMaximize: desktop.toggleMaximize,
+        onClose: desktop.close,
+      }}
+    />
+  );
+}
+
+function Screens() {
   const { t, i18n } = useTranslation();
   const status = useStatus();
   const queryClient = useQueryClient();
@@ -56,31 +99,30 @@ export default function App() {
       return;
     }
     if (attemptedRef.current) {
-      setAuthState('unauthorized');
+      setAuthState(authStateFrom({ authorized: status.data?.authorized, failed: status.isError }));
       return;
     }
     attemptedRef.current = true;
     let cancelled = false;
     void (async () => {
+      // A secret that has expired or was already used is no reason to lock
+      // the page out: the core issues this page a session as it loads, and
+      // only the core's answer decides whether the page is in.
       try {
-        const ok = await obtainAndExchangeSecret();
-        if (cancelled) return;
-        if (!ok) {
-          setAuthState('unauthorized');
-          return;
-        }
-        const result = await status.refetch();
-        if (cancelled) return;
-        setAuthState(result.data?.authorized ? 'authorized' : 'unauthorized');
+        await obtainAndExchangeSecret();
       } catch {
-        if (!cancelled) setAuthState('unauthorized');
+        // Ignored on purpose; the status below is the authority.
       }
+      if (cancelled) return;
+      const result = await status.refetch();
+      if (cancelled) return;
+      setAuthState(authStateFrom({ authorized: result.data?.authorized, failed: result.isError }));
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status.isFetched, status.isFetching, status.data?.authorized]);
+  }, [status.isFetched, status.isFetching, status.isError, status.data?.authorized]);
 
   const snapshot = useSnapshot(authState === 'authorized');
   useEffect(() => {
@@ -97,35 +139,46 @@ export default function App() {
   if (authState !== 'authorized') {
     if (authState === 'checking') {
       return (
-        <div className="flex h-full items-center justify-center text-sm text-neutral-500" role="status">
+        <div className="flex h-full items-center justify-center gap-2 bg-neutral-50 text-sm text-neutral-500 dark:bg-neutral-950 dark:text-neutral-400" role="status">
+          <Spinner size={16} />
           {t('auth.authorizing')}
         </div>
       );
     }
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            {t('auth.unauthorizedTitle')}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('auth.unauthorizedBody')}</p>
-          <button
-            type="button"
-            onClick={() => {
-              attemptedRef.current = false;
-              setAuthState('checking');
-              void status.refetch();
-            }}
-            className="mt-4 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            {t('auth.retry')}
-          </button>
-        </div>
+      <div className="flex h-full items-center justify-center bg-neutral-50 p-6 dark:bg-neutral-950">
+        <Card className="w-full max-w-md">
+          <div className="flex items-start gap-3">
+            <BrandMark size={40} label={t('app.title')} />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
+                {t(authState === 'unreachable' ? 'auth.unreachableTitle' : 'auth.unauthorizedTitle')}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                {t(authState === 'unreachable' ? 'auth.unreachableBody' : 'auth.unauthorizedBody')}
+              </p>
+              <div className="mt-5">
+                <Button
+                  variant="primary"
+                  icon={Icons.retry}
+                  onClick={() => {
+                    attemptedRef.current = false;
+                    setAuthState('checking');
+                    void status.refetch();
+                  }}
+                >
+                  {t('auth.retry')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     );
   }
 
   return (
+    <ToastProvider closeLabel={t('common.close')}>
     <SelectedBotProvider>
       <Routes>
         <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
@@ -136,5 +189,6 @@ export default function App() {
         </Route>
       </Routes>
     </SelectedBotProvider>
+    </ToastProvider>
   );
 }

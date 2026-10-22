@@ -9,9 +9,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
+    "gallery": "node scripts/build-gallery.mjs",
     "generate:api": "openapi-typescript ../api/openapi.yaml -o src/api/generated/schema.ts"
   },
   "dependencies": {
+    "@dicebear/core": "10.6.1",
     "@tanstack/react-query": "^5.66.0",
     "i18next": "^24.2.2",
     "lucide-react": "^0.475.0",

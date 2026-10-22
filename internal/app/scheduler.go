@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -34,6 +35,10 @@ type ServerSpec struct {
 type teamRuntime struct {
 	server engine.Server
 	cwd    string
+
+	// lastActive is when the engine last did or was asked for anything
+	// (unix nanoseconds); an engine idle long enough is shut down.
+	lastActive atomic.Int64
 
 	mu     sync.Mutex
 	buffer map[string]*runBuffer // runID -> accumulated agent text
@@ -73,7 +78,15 @@ type Scheduler struct {
 
 	// leaseDone is closed when the lease loop exits, so Stop joins it.
 	leaseDone chan struct{}
+
+	// IdleEngineTimeout is how long a team's engine may sit with nothing to
+	// do before it is shut down; the next turn starts it again and resumes
+	// the members' threads. Zero keeps engines running.
+	IdleEngineTimeout time.Duration
 }
+
+// defaultIdleEngineTimeout frees an unused team's engine process.
+const defaultIdleEngineTimeout = 15 * time.Minute
 
 // NewScheduler creates a scheduler bound to one app.
 func NewScheduler(a *App, factory ServerFactory) *Scheduler {
@@ -86,8 +99,10 @@ func NewScheduler(a *App, factory ServerFactory) *Scheduler {
 		teams:     map[string]*teamRuntime{},
 		leaseDone: make(chan struct{}),
 		wake:      make(chan string, 256),
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+
+		IdleEngineTimeout: defaultIdleEngineTimeout,
+		stop:              make(chan struct{}),
+		done:              make(chan struct{}),
 	}
 }
 
@@ -118,6 +133,7 @@ func (s *Scheduler) Start() {
 				return
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(s.ctx)
+				s.stopIdleEngines(s.ctx)
 			}
 		}
 	}()
@@ -131,17 +147,19 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+	// Both loops must be gone before the caller closes the database: a late
+	// lease write racing DB.Close would be swallowed or worse (review B). The
+	// lease loop goes first: it may still hand an idle engine's shutdown to a
+	// worker, which the wait below then joins.
+	select {
+	case <-s.leaseDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	joined := make(chan struct{})
 	go func() { s.workers.Wait(); close(joined) }()
 	select {
 	case <-joined:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	// Both loops must be gone before the caller closes the database: a late
-	// lease write racing DB.Close would be swallowed or worse (review B).
-	select {
-	case <-s.leaseDone:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -334,6 +352,14 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
+	// The model is the one this member runs with, not the engine's own
+	// default: that default names a model of a vendor the member may not
+	// be talking to.
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
+	if err != nil {
+		return err
+	}
+	model := choice.Model
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
 	// settings; it never interrupts work that already started (G07/G08).
@@ -388,7 +414,10 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 			tx.Rollback()
 			return err
 		}
-		if errors.Is(err, sqlite.ErrNotFound) || task.Status == domain.TaskCancelled || task.Status == domain.TaskDone || (delivery.Kind == "task_assignment" && task.OwnerID != bot.ID) {
+		// A card is stale once it was handed off in another turn (the member
+		// saw it among its cards and did it) or its requirement was
+		// cancelled: the turn it would cost would hear nothing new.
+		if errors.Is(err, sqlite.ErrNotFound) || task.IsTerminal() {
 			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
 				tx.Rollback()
 				return err
@@ -501,16 +530,25 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// since (see turnContext), then the incoming messages.
 	text := message.RenderText()
 	if len(batch) > 0 {
-		text = s.batchInput(ctx, append([]domain.Message{message}, batch...))
+		text = s.batchInput(ctx, delivery.Kind, append([]domain.Message{message}, batch...))
 	}
 	update, told := s.app.turnContext(ctx, bot, run.ID, parseDigest(sqlite.SessionContextDigest(ctx, s.app.DB, bot.ID)))
 	input := text
 	if update != "" {
 		input = update + "\n\n" + text
 	}
+	// A thread that took over from another hears about it first, once.
+	handedOver := false
+	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.Handover != nil && session.ProviderThreadID == threadID {
+		input = s.app.handoverText(ctx, bot, run.ID, *session.Handover, session) + "\n\n" + input
+		handedOver = true
+	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
-	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: settings.DefaultModel, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	if model == "" {
+		model = turnModel(turnCtx, choice, server)
+	}
+	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
 		// The engine answered with a refusal, so no turn exists: the run
@@ -538,6 +576,11 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	// The thread has now heard this turn's update.
 	if err := sqlite.SetSessionContextDigest(ctx, tx, bot.ID, told.String()); err != nil {
 		return err
+	}
+	if handedOver {
+		if err := sqlite.SetSessionHandover(ctx, tx, bot.ID, nil); err != nil {
+			return err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return err
@@ -665,11 +708,13 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.mu.Lock()
 	if rt, ok := s.teams[teamID]; ok {
 		s.mu.Unlock()
+		rt.touch()
 		return rt.server, nil
 	}
 	s.mu.Unlock()
 
 	rt := &teamRuntime{cwd: cwd, buffer: map[string]*runBuffer{}}
+	rt.touch()
 	var err error
 	rt.server, err = s.factory(ServerSpec{
 		Context: ctx,
@@ -677,11 +722,13 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 		Cwd:     cwd,
 		Callbacks: engine.Callbacks{
 			OnApproval: func(req engine.ApprovalRequest) {
+				rt.touch()
 				if s.runtime(teamID) == rt {
 					s.onApproval(teamID, rt, req)
 				}
 			},
 			OnNotification: func(n engine.Notification) {
+				rt.touch()
 				if s.runtime(teamID) == rt {
 					s.onNotification(teamID, rt, n)
 				}
@@ -703,6 +750,66 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.teams[teamID] = rt
 	s.mu.Unlock()
 	return rt.server, nil
+}
+
+func (rt *teamRuntime) touch() { rt.lastActive.Store(time.Now().UnixNano()) }
+
+// stopIdleEngines shuts down the engines of teams that have had nothing to do
+// for IdleEngineTimeout: no turn running, starting, waiting or unverified.
+// Holding the team lock keeps a dispatch from claiming a turn between the
+// check and the shutdown; a later turn simply starts a fresh engine.
+func (s *Scheduler) stopIdleEngines(ctx context.Context) {
+	if s.IdleEngineTimeout <= 0 || ctx.Err() != nil {
+		return
+	}
+	cutoff := time.Now().Add(-s.IdleEngineTimeout).UnixNano()
+	s.mu.Lock()
+	var idle []string
+	for teamID, rt := range s.teams {
+		if rt.lastActive.Load() < cutoff {
+			idle = append(idle, teamID)
+		}
+	}
+	s.mu.Unlock()
+	for _, teamID := range idle {
+		s.stopIfIdle(ctx, teamID, cutoff)
+	}
+}
+
+func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64) {
+	lock := s.teamLock(teamID)
+	lock.Lock()
+	s.mu.Lock()
+	rt := s.teams[teamID]
+	if rt == nil || rt.lastActive.Load() >= cutoff {
+		s.mu.Unlock()
+		lock.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	runs, err := sqlite.ListActiveRunsByTeam(ctx, s.app.DB, teamID)
+	if err != nil || len(runs) > 0 {
+		lock.Unlock()
+		return
+	}
+	s.mu.Lock()
+	if s.teams[teamID] == rt {
+		delete(s.teams, teamID)
+	}
+	s.mu.Unlock()
+	lock.Unlock()
+	s.logger.Info("idle team engine stopped", "teamId", teamID, "idleFor", s.IdleEngineTimeout.String())
+	// The shutdown waits for the process; off the lease loop, so leases keep
+	// their 2-second refresh (H06). Stop joins it like any worker.
+	s.workers.Add(1)
+	go func() {
+		defer s.workers.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		if err := rt.server.Shutdown(shutdownCtx); err != nil {
+			s.logger.Warn("idle team engine shutdown", "teamId", teamID, "error", err)
+		}
+	}()
 }
 
 func (s *Scheduler) teamLock(teamID string) *sync.Mutex {
@@ -787,56 +894,91 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	settings, err := s.app.GetSettings(ctx)
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
 	if err != nil {
 		return "", err
 	}
+	providerID, model := choice.EngineProvider, choice.Model
 	config, err := s.threadConfig(ctx, team, bot, server.Epoch(), runID)
 	if err != nil {
 		return "", err
 	}
-	instructions, told := s.app.threadInstructions(ctx, team, bot, role)
+	if providerID != officialEngineProvider {
+		// Web search is a tool OpenAI runs on its own side. The engine
+		// offers it with every request, and a provider that does not run
+		// it may refuse the whole turn over it (Xiaomi MiMo does, with
+		// responses_feature_not_supported), so a member on any provider
+		// but the ChatGPT account goes without it.
+		if config == nil {
+			config = map[string]any{}
+		}
+		config["web_search"] = "disabled"
+	}
+	// A thread is started for one vendor (see needsFreshThread), so the way
+	// it is told to call the tools is fixed with it.
+	instructions, told := s.app.threadInstructions(ctx, team, bot, role, providerID == officialEngineProvider)
 	spec := engine.ThreadSpec{
 		Cwd:                   cwd,
 		Permission:            permissionMode(team),
 		ApprovalsReviewer:     "user",
-		Model:                 settings.DefaultModel,
+		Model:                 model,
+		ModelProvider:         providerID,
 		DeveloperInstructions: instructions,
 		Config:                config,
 	}
-	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.ProviderThreadID != "" {
-		// Resuming is for a thread this app-server does not have, after an
-		// engine restart or once Codex unloaded it. A thread that is still
-		// loaded here takes the turn directly.
-		if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
-			return session.ProviderThreadID, nil
-		}
-		if err := server.ResumeThread(ctx, session.ProviderThreadID, spec); err == nil {
-			// The thread now belongs to this connection, so rebind it: thread
-			// ids are only unique inside one engine, and every later lookup
-			// (approval routing, turn completion) resolves the bot by
-			// (thread, epoch). A resume on a new connection without this
-			// update would silently drop that connection's events.
-			if session.EngineEpoch != server.Epoch() {
-				tx, txErr := s.app.DB.BeginTx(ctx, nil)
-				if txErr != nil {
-					return "", txErr
-				}
-				if uerr := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
-					BotID: bot.ID, ProviderThreadID: session.ProviderThreadID,
-					EngineEpoch: server.Epoch(), Model: session.Model, ModelProvider: session.ModelProvider,
-				}); uerr != nil {
-					tx.Rollback()
-					return "", uerr
-				}
-				if cerr := tx.Commit(); cerr != nil {
-					return "", cerr
-				}
+	var handover *domain.ThreadHandover
+	session, sessionErr := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID)
+	if sessionErr == nil && session.ProviderThreadID == "" && session.Handover != nil {
+		// CoBot let go of the thread itself (a card the member kept failing
+		// to hand on); the new thread is handed over from it.
+		handover = session.Handover
+	}
+	if sessionErr == nil && session.ProviderThreadID != "" {
+		if s.app.needsFreshThread(ctx, session, choice) {
+			// Another vendor's model cannot take this thread's history as
+			// its input. The thread is left as it is, so its record stays
+			// where it is, and the new thread is pointed at it.
+			handover = handoverFrom(ctx, server, session)
+		} else {
+			// Resuming is for a thread this app-server does not have, after
+			// an engine restart or once Codex unloaded it. A thread that is
+			// still loaded here takes the turn directly.
+			if loaded, ok := server.(threadLoadedChecker); ok && session.EngineEpoch == server.Epoch() && loaded.ThreadLoaded(session.ProviderThreadID) {
+				return session.ProviderThreadID, nil
 			}
-			return session.ProviderThreadID, nil
+			resumed, rerr := server.ResumeThread(ctx, session.ProviderThreadID, spec)
+			if rerr == nil {
+				// The thread now belongs to this connection, so rebind it:
+				// thread ids are only unique inside one engine, and every
+				// later lookup (approval routing, turn completion) resolves
+				// the bot by (thread, epoch). A resume on a new connection
+				// without this update would silently drop that connection's
+				// events. The model and the provider are the engine's own
+				// answer.
+				if session.EngineEpoch != server.Epoch() || session.ModelProvider != resumed.ModelProvider || (resumed.Path != "" && resumed.Path != session.TranscriptPath) {
+					tx, txErr := s.app.DB.BeginTx(ctx, nil)
+					if txErr != nil {
+						return "", txErr
+					}
+					if uerr := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
+						BotID: bot.ID, ProviderThreadID: session.ProviderThreadID,
+						EngineEpoch: server.Epoch(), Model: resumed.Model, ModelProvider: resumed.ModelProvider,
+						TranscriptPath: resumed.Path,
+					}); uerr != nil {
+						tx.Rollback()
+						return "", uerr
+					}
+					if cerr := tx.Commit(); cerr != nil {
+						return "", cerr
+					}
+				}
+				return session.ProviderThreadID, nil
+			}
+			// A resume failure falls through to a fresh thread; the old
+			// thread is never deleted, so product messages stay intact, and
+			// the new thread is pointed at its record.
+			handover = handoverFrom(ctx, server, session)
 		}
-		// A resume failure falls through to a fresh thread; the old thread is
-		// never deleted, so product messages stay intact.
 	}
 	info, err := server.StartThread(ctx, spec)
 	if err != nil {
@@ -849,8 +991,11 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	defer tx.Rollback()
 	if err := sqlite.UpsertProviderSession(ctx, tx, domain.ProviderSession{
 		BotID: bot.ID, ProviderThreadID: info.ThreadID, EngineEpoch: server.Epoch(),
-		Model: info.Model, ModelProvider: info.ModelProvider,
+		Model: info.Model, ModelProvider: info.ModelProvider, TranscriptPath: info.Path,
 	}); err != nil {
+		return "", err
+	}
+	if err := sqlite.SetSessionHandover(ctx, tx, bot.ID, handover); err != nil {
 		return "", err
 	}
 	// A new thread knows exactly what its instructions told it.
@@ -931,14 +1076,11 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 }
 
 // bridgeRole is the tool set a member's bridge offers: "leader" for the
-// team's leader, "reviewer" for a reviewer member, "member" for everyone
-// else.
+// team's leader, "member" for everyone else. A reviewer is a member like
+// any other: what it reviews comes to it on cards.
 func bridgeRole(team domain.Team, bot domain.Bot) string {
 	if bot.IsLeader || team.LeaderID == bot.ID {
 		return "leader"
-	}
-	if bot.RoleID == roles.ReviewerRoleID {
-		return "reviewer"
 	}
 	return "member"
 }

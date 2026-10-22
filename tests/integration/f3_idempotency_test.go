@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/kunghim/CoBot/internal/app"
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/events"
 )
@@ -23,7 +24,7 @@ func TestConcurrentTeamReservationRetryReturnsSameTeam(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	input := app.CreateTeamInput{Name: "one team", Directory: dir, InitialRoleIDs: []string{"backend-dev"}, RequestID: "team-reservation"}
+	input := app.CreateTeamInput{Name: "one team", Directory: dir, InitialRoleIDs: []string{"fullstack-engineer"}, RequestID: "team-reservation"}
 	var wg sync.WaitGroup
 	ids := make(chan string, 8)
 	failures := make(chan error, 8)
@@ -66,7 +67,7 @@ func TestConcurrentTeamReservationRetryReturnsSameTeam(t *testing.T) {
 
 func TestHTTPRequiresRevisionAndDeleteHeaders(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	for _, test := range []struct {
 		method, path string
 		body         map[string]any
@@ -74,7 +75,6 @@ func TestHTTPRequiresRevisionAndDeleteHeaders(t *testing.T) {
 		{"PATCH", "/api/v1/teams/" + team.ID, map[string]any{"name": "bad write"}},
 		{"POST", "/api/v1/teams/" + team.ID + "/archive", nil},
 		{"POST", "/api/v1/approvals/missing/decisions", map[string]any{"optionId": "accept"}},
-		{"POST", "/api/v1/transfers/missing/accept", nil},
 	} {
 		body := test.body
 		if body == nil {
@@ -107,15 +107,12 @@ func TestHTTPRequiresRevisionAndDeleteHeaders(t *testing.T) {
 	}
 }
 
-func TestConcurrentHTTPTaskAndMemberRetriesCreateOneResource(t *testing.T) {
-	for _, action := range []string{"tasks", "bots"} {
+func TestConcurrentHTTPMemberRetriesCreateOneResource(t *testing.T) {
+	for _, action := range []string{"bots"} {
 		t.Run(action, func(t *testing.T) {
 			h := newM2Harness(t)
-			team, bots := h.createTeam(t, []string{"backend-dev"})
+			team, _ := h.createTeam(t, []string{"fullstack-engineer"})
 			body := map[string]any{"requestId": "same-operation", "roleId": "qa-engineer"}
-			if action == "tasks" {
-				body = map[string]any{"requestId": "same-operation", "ownerId": bots[1].ID, "title": "one task", "acceptanceCriteria": "exactly once"}
-			}
 			raw, _ := json.Marshal(body)
 			var wg sync.WaitGroup
 			ids := make(chan string, 12)
@@ -162,16 +159,9 @@ func TestConcurrentHTTPTaskAndMemberRetriesCreateOneResource(t *testing.T) {
 				}
 			}
 			var count int
-			if action == "tasks" {
-				h.app.DB.QueryRow("SELECT count(*) FROM tasks").Scan(&count)
-				if count != 1 {
-					t.Fatal("duplicated tasks", count)
-				}
-			} else {
-				h.app.DB.QueryRow("SELECT count(*) FROM bots").Scan(&count)
-				if count != 3 {
-					t.Fatal("duplicated members", count)
-				}
+			h.app.DB.QueryRow("SELECT count(*) FROM bots").Scan(&count)
+			if count != 3 {
+				t.Fatal("duplicated members", count)
 			}
 		})
 	}
@@ -180,38 +170,37 @@ func TestConcurrentHTTPTaskAndMemberRetriesCreateOneResource(t *testing.T) {
 func TestReplayRecordFailureRollsBackBusinessAndDelivery(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
 	_, err := h.app.DB.Exec(`CREATE TRIGGER fail_replay BEFORE INSERT ON idempotency BEGIN SELECT RAISE(ABORT,'simulated replay persistence failure'); END`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "atomic task", AcceptanceCriteria: "no orphan writes", RequestID: "atomic-key"}
-	if _, err := h.app.CreateTask(ctx, h.user, false, input); err == nil {
+	user := h.user
+	user.Write = &auth.WriteRequest{Scope: "bots.add", Key: "atomic-key", ArgsHash: "qa"}
+	if _, err := h.app.AddBot(ctx, user, team.ID, "qa-engineer"); err == nil {
 		t.Fatal("write accepted without its durable retry record")
 	}
-	for _, table := range []string{"tasks", "messages", "deliveries"} {
-		var count int
-		h.app.DB.QueryRow("SELECT count(*) FROM " + table).Scan(&count)
-		if count != 0 {
-			t.Fatalf("rollback left %d %s", count, table)
-		}
+	var count int
+	h.app.DB.QueryRow("SELECT count(*) FROM bots").Scan(&count)
+	if count != 2 {
+		t.Fatalf("rollback left %d bots", count)
 	}
 	if _, err := h.app.DB.Exec(`DROP TRIGGER fail_replay`); err != nil {
 		t.Fatal(err)
 	}
-	created, err := h.app.CreateTask(ctx, h.user, false, input)
+	created, err := h.app.AddBot(ctx, user, team.ID, "qa-engineer")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A different App has no in-memory retry locks or cache. It still replays
 	// the committed fact, including when the original response was lost.
 	fresh := &app.App{DB: h.app.DB, Paths: h.app.Paths, Hub: events.NewHub(), Logger: h.app.Logger}
-	replayed, err := fresh.CreateTask(ctx, h.user, false, input)
+	replayed, err := fresh.AddBot(ctx, user, team.ID, "qa-engineer")
 	if err != nil || replayed.ID != created.ID {
 		t.Fatalf("durable replay failed: %+v / %v", replayed, err)
 	}
-	input.OwnerID = bots[0].ID
-	if _, err := fresh.CreateTask(ctx, h.user, false, input); err == nil || domain.AsError(err).Code != domain.CodeIdempotencyConflict {
+	user.Write = &auth.WriteRequest{Scope: "bots.add", Key: "atomic-key", ArgsHash: "reviewer"}
+	if _, err := fresh.AddBot(ctx, user, team.ID, "code-reviewer"); err == nil || domain.AsError(err).Code != domain.CodeIdempotencyConflict {
 		t.Fatal("changed target reused retry key", err)
 	}
 }

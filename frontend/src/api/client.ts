@@ -164,6 +164,33 @@ export const api = {
       ...(expectedRevision !== undefined ? { expectedRevision } : {}),
     }),
   getSnapshot: () => request<import('./types').Snapshot>('GET', '/api/v1/snapshot'),
+  listProviders: () => request<import('./types').ProviderListResult>('GET', '/api/v1/providers'),
+  listProviderPresets: () => request<import('./types').ProviderPresetListResult>('GET', '/api/v1/provider-presets'),
+  getProvider: (id: string) => request<import('./types').Provider>('GET', `/api/v1/providers/${id}`),
+  createProvider: (body: import('./types').ProviderRequest) =>
+    request<import('./types').Provider>('POST', '/api/v1/providers', body),
+  updateProvider: (id: string, body: import('./types').ProviderRequest) =>
+    request<import('./types').Provider>('PATCH', `/api/v1/providers/${id}`, body),
+  deleteProvider: (id: string) => request<{ deleted: boolean }>('DELETE', `/api/v1/providers/${id}`),
+  setProviderEnabled: (id: string, enabled: boolean, expectedRevision?: number) =>
+    request<import('./types').Provider>('PUT', `/api/v1/providers/${id}/enabled`, { enabled, expectedRevision }),
+  reprobeProvider: (id: string) =>
+    request<import('./types').ProviderProbeResults>('POST', `/api/v1/providers/${id}/probe`),
+  detectProvider: (apiKey: string) =>
+    request<{ presetId: string }>('POST', '/api/v1/providers/detect', { apiKey }),
+  // Without a typed key, providerId names a stored provider whose own key
+  // the server uses; baseUrl has to be one of that provider's endpoints.
+  discoverProviderModels: (baseUrl: string, apiKey?: string, providerId?: string) =>
+    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', {
+      baseUrl,
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
+    }),
+  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string, providerId?: string) =>
+    request<import('./types').ProviderProbeResults>('POST', '/api/v1/providers/probe-models', {
+      baseUrl,
+      modelIds,
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
+    }),
   exchangeBootstrap: async (secret: string) => {
     const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string; csrfCookieName: string }>(
       'POST',
@@ -193,6 +220,8 @@ export const api = {
   getBotStats: (botId: string) => request<import('./types').SessionStats>('GET', `/api/v1/bots/${botId}/stats`),
   setTeamReasoningEffort: (teamId: string, reasoningEffort: string, expectedRevision?: number) =>
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { reasoningEffort, expectedRevision }),
+  setBotModel: (botId: string, providerId: string, model: string, expectedRevision?: number) =>
+    request<import('./types').Bot>('PUT', `/api/v1/bots/${botId}/model`, { providerId, model, expectedRevision }),
   addBot: (teamId: string, roleId: string) =>
     request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
   listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),
@@ -219,6 +248,7 @@ export const api = {
     request<import('./types').SendMessageResult>('POST', `/api/v1/bots/${botId}/messages`, { text }),
   cancelMessage: (messageId: string) =>
     request<import('./types').Message>('POST', `/api/v1/messages/${messageId}/cancel`, {}),
+  retryRun: (runId: string) => request<{ runId: string; requeued: number }>('POST', `/api/v1/runs/${runId}/retry`, {}),
   interruptRun: (runId: string) =>
     request<import('./types').InterruptRunResult>('POST', `/api/v1/runs/${runId}/interrupt`, {}),
 
@@ -238,12 +268,39 @@ export const api = {
   // Engine account and models (M2).
   getEngine: () => request<import('./types').EngineStatus>('GET', '/api/v1/engine'),
   checkEngine: () => request<import('./types').EngineStatus>('POST', '/api/v1/engine/check', {}),
+  getAvatarCatalog: () => request<import('./types').AvatarCatalog>('GET', '/api/v1/avatars/catalog'),
+  syncAvatarCatalog: () => request<import('./types').AvatarCatalog>('POST', '/api/v1/avatars/catalog/sync', {}),
+  setBotAvatar: (botId: string, avatar: import('./types').AvatarRef | null, expectedRevision: number) =>
+    request<import('./types').Bot>('PATCH', `/api/v1/bots/${botId}`, { avatar, expectedRevision }),
+  saveAvatarUpload: (data: string) => request<{ file: string }>('POST', '/api/v1/avatars/uploads', { data }),
+  /** A stored picture as a blob URL; fetched with the session like any call,
+   * which a plain <img src> cannot do in the desktop shell. */
+  getAvatarUpload: async (file: string) => {
+    const token = bearerToken();
+    const resp = await fetch(apiUrl(`/api/v1/avatars/uploads/${encodeURIComponent(file)}`), {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+      credentials: token ? 'omit' : 'include',
+    });
+    if (!resp.ok) throw new Error(`avatar picture ${resp.status}`);
+    return URL.createObjectURL(await resp.blob());
+  },
+  setRoleAvatar: (roleId: string, avatar: import('./types').AvatarRef | null) =>
+    request<{ roleId: string }>('PUT', `/api/v1/roles/${encodeURIComponent(roleId)}/avatar`, { avatar }),
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
+  // sessionLogout ends this page's session on the core. The interface is told
+  // right away, so it shows the sign-in screen instead of waiting for the
+  // next request to come back unauthorized.
+  sessionLogout: async () => {
+    const result = await request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {});
+    clearBearer();
+    notifyUnauthorized();
+    return result;
+  },
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
-  // Tasks, transfers and questions (M3).
+  // Requirements, cards and questions.
   listTasks: (params: { teamId: string; ownerId?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.ownerId) query.set('ownerId', params.ownerId);
@@ -252,27 +309,11 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').TaskListResult>('GET', `/api/v1/teams/${params.teamId}/tasks?${query.toString()}`);
   },
-  createTask: (
-    teamId: string,
-    body: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; parentId?: string; dependencyIds?: string[] },
-  ) => request<import('./types').Task>('POST', `/api/v1/teams/${teamId}/tasks`, body),
   getTask: (taskId: string) => request<import('./types').TaskDetailResult>('GET', `/api/v1/tasks/${taskId}`),
-  patchTask: (
-    taskId: string,
-    body: { status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number },
-  ) => request<import('./types').Task>('PATCH', `/api/v1/tasks/${taskId}`, body),
-  submitEvidence: (
-    taskId: string,
-    body: { summary: string; artifactRefs?: string[]; candidateRef?: string; testResult?: string; reviewResult?: string },
-  ) => request<import('./types').Evidence>('POST', `/api/v1/tasks/${taskId}/evidence`, body),
-  confirmTask: (taskId: string, body: { evidenceIds?: string[]; expectedRevision: number }) =>
-    request<import('./types').Task>('POST', `/api/v1/tasks/${taskId}/confirm`, body),
-  offerTransfer: (taskId: string, body: { toBotId: string; note?: string }) =>
-    request<import('./types').Transfer>('POST', `/api/v1/tasks/${taskId}/transfers`, body),
-  acceptTransfer: (transferId: string, expectedRevision: number) =>
-    request<import('./types').Task>('POST', `/api/v1/transfers/${transferId}/accept`, { expectedRevision }),
-  cancelTransfer: (transferId: string) =>
-    request<import('./types').Transfer>('POST', `/api/v1/transfers/${transferId}/cancel`, {}),
+  listRequirements: (teamId: string) =>
+    request<import('./types').RequirementListResult>('GET', `/api/v1/teams/${teamId}/requirements`),
+  cancelRequirement: (requirementId: string) =>
+    request<import('./types').Requirement>('POST', `/api/v1/requirements/${requirementId}/cancel`, {}),
   listQuestions: (params: { teamId: string; status?: string; viewBotId?: string; cursor?: string; limit?: number }) => {
     const query = new URLSearchParams({ teamId: params.teamId });
     if (params.status) query.set('status', params.status);
@@ -281,7 +322,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
   },
-  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise'; expectedRevision: number }) =>
+  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise'; mode?: 'rerun' | 'return_to_me'; expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
@@ -309,6 +350,13 @@ export const api = {
   warmTeam: (teamId: string) => request<{ warming: boolean }>('POST', `/api/v1/teams/${teamId}/warm`, {}),
   openTeamPath: (teamId: string, path: string, reveal = false) =>
     request<{ path: string }>('POST', `/api/v1/teams/${teamId}/open-path`, { path, reveal }),
+  getTeamBrowser: (teamId: string) => request<BrowserPanelState>('GET', `/api/v1/teams/${teamId}/browser`),
+  openBrowserTab: (teamId: string, url: string) =>
+    request<{ tab: BrowserTab }>('POST', `/api/v1/teams/${teamId}/browser/tabs`, { url }),
+  closeBrowserTab: (teamId: string, tab: string) =>
+    request<{ ok: boolean }>('DELETE', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}`),
+  setBrowserTabViewport: (teamId: string, tab: string, body: BrowserViewportRequest) =>
+    request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
   listAuthorizations: () =>
@@ -318,6 +366,91 @@ export const api = {
 };
 
 import { desktopBridge } from '../platform/native-bridge';
+
+export interface BrowserViewport { width: number; height: number; mobile?: boolean }
+export interface BrowserTab {
+  id: string;
+  /** "member": a member's page; "user": a tab the user opened themselves. */
+  owner: 'member' | 'user';
+  /** The bot id, present for a member's tab only. */
+  memberId?: string;
+  url: string;
+  title: string;
+  /** A member's call is working in this tab right now. */
+  busy?: boolean;
+  /** The window size the page renders at, once someone set one. */
+  viewport?: BrowserViewport;
+}
+export interface BrowserPanelState { available: boolean; running: boolean; tabs: BrowserTab[] }
+/** One set-viewport call: a preset or an explicit size; see POST .../viewport. */
+export interface BrowserViewportRequest { preset?: 'desktop' | 'tablet' | 'phone' | 'clear'; width?: number; height?: number; mobile?: boolean }
+export interface BrowserFrame { tab: string; width: number; height: number; data: string }
+/** One thing the user did in the live view; see POST /teams/{id}/browser/input. */
+export interface BrowserInput {
+  kind: 'mouse' | 'wheel' | 'key' | 'text' | 'nav';
+  action?: string; x?: number; y?: number; button?: string; clickCount?: number; dx?: number; dy?: number;
+  key?: string; code?: string; vk?: number; text?: string; modifiers?: number; to?: string;
+}
+
+function authHeaders(writing: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = bearerToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
+  else if (writing) headers['X-CSRF-Token'] = csrfToken();
+  return headers;
+}
+
+/** Applies one input to a tab of the team's browser. Inputs are never retried:
+ * replaying a click would click twice. */
+export async function sendBrowserInput(teamId: string, tab: string, input: BrowserInput): Promise<void> {
+  await initializeTransport();
+  const resp = await fetch(apiUrl(`/api/v1/teams/${teamId}/browser/input`), {
+    method: 'POST',
+    headers: { ...authHeaders(true), 'Content-Type': 'application/json' },
+    credentials: bearerToken() ? 'omit' : 'include',
+    // Every write names itself; an input is never replayed, so each is new.
+    body: JSON.stringify({ ...input, tab, requestId: newRequestId() }),
+  });
+  if (resp.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!resp.ok) {
+    const envelope = (await resp.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(resp.status, envelope?.error?.code ?? 'internal', envelope?.error?.messageKey ?? 'error.internal', envelope?.error?.params ?? {});
+  }
+}
+
+/** Follows a tab's pictures until the signal aborts or the stream ends.
+ * Resolves with the reason the server gave when it ended the stream. */
+export async function streamBrowserTab(teamId: string, tab: string, onFrame: (frame: BrowserFrame) => void, signal: AbortSignal): Promise<string | null> {
+  await initializeTransport();
+  const resp = await fetch(apiUrl(`/api/v1/teams/${teamId}/browser/stream?tab=${encodeURIComponent(tab)}`), {
+    headers: { ...authHeaders(false), Accept: 'text/event-stream' },
+    credentials: bearerToken() ? 'omit' : 'include',
+    signal,
+  });
+  if (resp.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!resp.ok || !resp.body) {
+    const envelope = (await resp.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(resp.status, envelope?.error?.code ?? 'internal', envelope?.error?.messageKey ?? 'error.internal', envelope?.error?.params ?? {});
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return null;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf('\n\n');
+    while (idx >= 0) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const lines = block.split('\n');
+      const data = lines.find((line) => line.startsWith('data: '))?.slice(6);
+      if (data && lines.includes('event: frame')) onFrame(JSON.parse(data) as BrowserFrame);
+      else if (data && lines.includes('event: ended')) return JSON.parse(data) as string;
+      idx = buffer.indexOf('\n\n');
+    }
+  }
+}
 
 /** Dev-only: ask the Vite dev server to mint a bootstrap secret via the
  * same-user runtime credential handed to it by scripts/dev.*. */

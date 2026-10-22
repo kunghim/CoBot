@@ -1,100 +1,128 @@
-// ReasoningEffortSelect is the composer's thinking-effort switch, like
-// Codex's: a pill that opens the efforts the current model offers, plus the
-// model's own default. The effort belongs to the team and applies from each
-// member's next turn.
+// ReasoningEffortSelect is the composer's model and thinking-effort picker,
+// like Codex's: a compact trigger opens the current effort and model, a
+// stepped slider for the efforts the model offers, a model list and a reset
+// to the model's own default. The effort belongs to the team and applies from
+// each member's next turn; the model belongs to the member and can come from
+// any enabled provider.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Brain, Check, ChevronDown } from 'lucide-react';
-import { useEngineModels, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
-import type { EngineModel, Team } from '../../api/types';
+import { useEngine, useEngineModels, useProviders, useSetBotModel, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
+import type { Bot, EngineModel, Team } from '../../api/types';
+import { ModelEffortPicker, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import { choiceKey, engineDefaultModel, isOfficial, memberChoice, selectableModels } from '../providers/providerModels';
+import { useProviderName } from '../providers/useProviderName';
+import { createSettledSave, type SettledSave } from './settledSave';
 
-/** The model members run on: the configured default model, else the
+/** The model members run with: the configured default model, else the
  * engine's own default. */
 export function currentModel(models: EngineModel[], configured: string | undefined): EngineModel | undefined {
   return models.find((m) => configured && (m.slug === configured || m.id === configured)) ?? models.find((m) => m.isDefault) ?? models[0];
 }
 
-export default function ReasoningEffortSelect({ team, disabled }: { team: Team; disabled?: boolean }) {
+export default function ReasoningEffortSelect({ team, bot, disabled }: { team: Team; bot: Bot; disabled?: boolean }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const settings = useSettings(true);
+  const providers = useProviders();
+  const engine = useEngine();
   const models = useEngineModels(true);
   const setEffort = useSetTeamReasoningEffort();
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState('');
-  const rootRef = useRef<HTMLDivElement>(null);
-  const model = currentModel(models.data?.models ?? [], settings.data?.defaultModel);
-  const options = model?.reasoningEfforts ?? [];
-  const current = team.reasoningEffort ?? '';
+  const setModel = useSetBotModel();
+  const providerName = useProviderName();
+  const engineList = models.data?.models ?? [];
+  const providerList = providers.data?.providers;
+
+  const unavailable = t('settings.modelUnavailable');
+  const offered = selectableModels(providerList, engineList, engine.data?.loggedIn ?? false, providerName);
+  const choice = memberChoice(bot, team, settings.data, providerList, engineDefaultModel(engineList), engine.data?.loggedIn ?? false);
+  const selected = choiceKey(choice.providerId, choice.model);
+  const options = offered.map((entry) => ({
+    id: entry.key,
+    label: entry.unavailable ? `${entry.label} · ${unavailable}` : entry.label,
+    group: entry.group,
+    disabled: entry.unavailable,
+  }));
+  // The efforts CoBot can send are the ones the engine knows. On the
+  // ChatGPT account that is the chosen model's own list; another provider's
+  // model does not change what the engine accepts, so it is the engine's
+  // default model's list.
+  const chosenProvider = providerList?.find((entry) => entry.id === choice.providerId);
+  const effortModel = chosenProvider && isOfficial(chosenProvider) ? currentModel(engineList, choice.model) : currentModel(engineList, undefined);
+  const levels = effortModel?.reasoningEfforts ?? [];
+  const stored = team.reasoningEffort ?? '';
   const label = (effort: string) => t(`effort.level.${effort}`, { defaultValue: effort });
 
+  // Dragging the slider moves it here at once; the save follows once the
+  // value settles, one at a time, each from the revision the last returned,
+  // so a drag across several steps never sends conflicting saves.
+  const [chosen, setChosen] = useState<string | null>(null);
+  const revision = useRef(team.revision);
   useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === 'Escape' : !rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [open]);
+    revision.current = Math.max(revision.current, team.revision);
+  }, [team.revision]);
+  useEffect(() => {
+    if (chosen !== null && chosen === stored && !setEffort.isPending) setChosen(null);
+  }, [chosen, stored, setEffort.isPending]);
+  const latest = useRef({ teamId: team.id, mutateAsync: setEffort.mutateAsync, toast, t });
+  latest.current = { teamId: team.id, mutateAsync: setEffort.mutateAsync, toast, t };
+  const saver = useRef<SettledSave<string> | null>(null);
+  if (!saver.current) {
+    saver.current = createSettledSave(async (effort: string) => {
+      const { teamId, mutateAsync, toast: show, t: tr } = latest.current;
+      try {
+        const updated = await mutateAsync({ teamId, effort, expectedRevision: revision.current });
+        revision.current = updated.revision;
+      } catch (err) {
+        setChosen(null);
+        show.show({ tone: 'danger', title: tr('effort.saveFailed'), description: apiErrorMessage(tr, err) });
+      }
+    });
+  }
+  // Leaving the conversation must submit its last choice, including one
+  // queued behind an in-flight save. Flushing also keeps the same saver
+  // usable when StrictMode replays effect cleanup during development.
+  useEffect(() => () => saver.current?.flush(), []);
 
-  // Without a model list there is nothing to choose from; a chosen effort
-  // still shows so it is never hidden from the user.
-  if (options.length === 0 && current === '') return null;
+  // Without a model on offer there is nothing to choose from.
+  if (options.length === 0) return null;
 
-  const choose = (effort: string) => {
-    setOpen(false);
+  const current = chosen ?? stored;
+  // Following the model's default shows the model's default level.
+  const shown = current || effortModel?.defaultReasoningEffort || levels[0]?.effort || '';
+  const chooseEffort = (effort: string, now = false) => {
     if (effort === current) return;
-    setError('');
-    setEffort.mutate({ teamId: team.id, effort, expectedRevision: team.revision }, { onError: (err) => setError(apiErrorMessage(t, err)) });
+    setChosen(effort);
+    saver.current?.set(effort);
+    if (now) saver.current?.flush();
   };
-  const pill = current ? label(current) : t('effort.default');
-  const items: Array<{ effort: string; title: string; hint?: string }> = [
-    { effort: '', title: t('effort.default'), hint: model?.defaultReasoningEffort ? t('effort.modelDefault', { level: label(model.defaultReasoningEffort) }) : undefined },
-    ...options.map((o) => ({ effort: o.effort, title: label(o.effort), hint: o.description })),
-  ];
+
+  const chosenLabel = offered.find((entry) => entry.key === selected)?.label ?? choice.model;
 
   return (
-    <div ref={rootRef} className="relative flex min-w-0 items-center gap-2">
-      <button
-        type="button"
-        disabled={disabled || setEffort.isPending}
-        onClick={() => setOpen(!open)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`${t('effort.label')}：${pill}`}
-        title={t('effort.label')}
-        className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-      >
-        <Brain size={14} aria-hidden="true" />
-        {pill}
-        <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
-      </button>
-      {open && (
-        <div role="menu" aria-label={t('effort.label')} className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-          {items.map((item) => (
-            <button
-              key={item.effort || 'default'}
-              type="button"
-              role="menuitemradio"
-              aria-checked={item.effort === current}
-              onClick={() => choose(item.effort)}
-              className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            >
-              <span className="mt-0.5 w-4 shrink-0">{item.effort === current && <Check size={14} aria-hidden="true" />}</span>
-              <span className="min-w-0">
-                <span className="block font-medium text-neutral-900 dark:text-neutral-100">{item.title}</span>
-                {item.hint && <span className="block text-xs text-neutral-500 dark:text-neutral-400">{item.hint}</span>}
-              </span>
-            </button>
-          ))}
-          <p className="px-2.5 pb-1.5 pt-1 text-[11px] text-neutral-400">{t('effort.note')}</p>
-        </div>
-      )}
-      {error && <span role="alert" className="truncate text-xs text-red-600">{error}</span>}
-    </div>
+    <ModelEffortPicker
+      disabled={disabled}
+      triggerLabel={`${t('effort.label')}：${current ? label(current) : t('effort.default')} · ${chosenLabel}`}
+      models={options}
+      model={selected}
+      onModel={(key) => {
+        const next = offered.find((entry) => entry.key === key);
+        if (!next || key === selected) return;
+        setModel.mutate(
+          { botId: bot.id, providerId: next.providerId, model: next.model, expectedRevision: bot.revision },
+          {
+            onSuccess: () => toast.show({ tone: 'success', title: t('effort.modelSwitched', { name: bot.name, model: next.label, provider: next.group }) }),
+            onError: (error) => toast.show({ tone: 'danger', title: t('effort.saveFailed'), description: apiErrorMessage(t, error) }),
+          },
+        );
+      }}
+      levels={levels.map((option) => ({ value: option.effort, label: label(option.effort) }))}
+      effort={shown}
+      onEffort={chooseEffort}
+      isDefault={current === ''}
+      onReset={() => chooseEffort('', true)}
+      labels={{ effort: t('effort.label'), reset: t('effort.reset'), chooseModel: t('effort.chooseModel'), back: t('effort.back') }}
+      note={`${t('effort.note')} ${t('effort.modelNote')}`}
+    />
   );
 }

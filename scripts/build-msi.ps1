@@ -53,8 +53,8 @@ try {
     $rtfText = $license.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}').Replace([string][char]13, '').Replace([string][char]10, '\par ')
     $rtfPath = Join-Path $build "license.rtf"
     [IO.File]::WriteAllText($rtfPath, '{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}\f0\fs18 ' + $rtfText + '}')
-    $icon = Join-Path $root ".tmp/wails/windows/icon.ico"
-    if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) { throw "Build the desktop once to generate its application icon" }
+    $icon = Join-Path $root "assets/branding/appicon-windows.ico"
+    if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) { throw "Tracked CoBot application icon is missing" }
     $msi = Join-Path $out ("CoBot-" + $Version + "-windows-x64.msi")
     $arguments = @("build", "packaging/windows/CoBot.wxs", "-arch", "x64",
         "-ext", "WixToolset.UI.wixext/6.0.2", "-culture", "en-us",

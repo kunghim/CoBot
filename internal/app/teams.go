@@ -375,13 +375,32 @@ func listTeamsOn(ctx context.Context, q sqlite.Queryer) ([]TeamWithBots, error) 
 	}
 	out := make([]TeamWithBots, 0, len(teams))
 	for _, team := range teams {
-		bots, err := sqlite.ListBots(ctx, q, team.ID)
+		item, err := teamWithBotsOn(ctx, q, team)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, TeamWithBots{Team: team, Bots: bots})
+		out = append(out, item)
 	}
 	return out, nil
+}
+
+// teamWithBotsOn lists a team's members for the team list, each with a
+// preview of its latest message.
+func teamWithBotsOn(ctx context.Context, q sqlite.Queryer, team domain.Team) (TeamWithBots, error) {
+	bots, err := sqlite.ListBots(ctx, q, team.ID)
+	if err != nil {
+		return TeamWithBots{}, err
+	}
+	previews, err := sqlite.LatestMessagePreviews(ctx, q, team.ID)
+	if err != nil {
+		return TeamWithBots{}, err
+	}
+	for i := range bots {
+		if preview, ok := previews[bots[i].ID]; ok {
+			bots[i].LastMessage = &preview
+		}
+	}
+	return TeamWithBots{Team: team, Bots: bots}, nil
 }
 
 // TeamWithBots is the list projection.

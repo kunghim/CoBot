@@ -21,7 +21,7 @@ func TestScenariosReferenceLibraryRoles(t *testing.T) {
 			}
 		}
 	}
-	if got := ScenariosOf("frontend-dev"); len(got) != 1 || got[0] != "software" {
+	if got := ScenariosOf(FullstackRoleID); len(got) != 1 || got[0] != "software" {
 		t.Fatal(got)
 	}
 	if got := ScenariosOf(LeaderRoleID); len(got) != 0 {

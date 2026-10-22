@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/auth"
@@ -107,7 +108,7 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if question.Status != domain.QuestionOpen {
 		return domain.Question{}, domain.Conflict("error.question.already_answered", map[string]any{"status": question.Status})
 	}
-	if question.Kind == domain.QuestionKindAcceptance {
+	if question.Kind != domain.QuestionKindAsk {
 		return domain.Question{}, domain.InvalidRequest("error.question.acceptance_decision", nil)
 	}
 	if strings.TrimSpace(answerText) == "" {
@@ -147,6 +148,14 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 		TaskID: question.TaskID, Kind: "question_answer",
 	}); err != nil {
 		return domain.Question{}, err
+	}
+	// A member asks the user only what only the user can decide; the
+	// project manager reads the answer with its next turn, without a wake.
+	if team, _, terr := sqlite.GetTeam(ctx, tx, question.TeamID); terr == nil && team.LeaderID != "" && team.LeaderID != question.RequesterBotID {
+		note := fmt.Sprintf("用户回答了成员的提问。问：%s\n答：%s", question.Question, answerText)
+		if err := noteLocked(ctx, tx, question.TeamID, team.LeaderID, question.RequesterBotID, question.ID, note); err != nil {
+			return domain.Question{}, err
+		}
 	}
 	// The asking member keeps its working projection if it is mid-run
 	// (review B13): answering enqueues, it never clears a live run.

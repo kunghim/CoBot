@@ -112,10 +112,21 @@ func Probe(ctx context.Context, binary, version string) engine.Status {
 // EngineEnv builds the child process environment: the private per-profile
 // CODEX_HOME and SQLite state root, never the user's daily Codex state. The
 // returned slice replaces the child's environment entirely.
-func EngineEnv(paths platform.Paths) []string {
+//
+// secrets carries the API keys of the configured model providers, keyed by
+// the environment variable name the provider's configuration refers to (see
+// ProviderEnvKey). The key itself never reaches config.toml — only the
+// variable name does.
+func EngineEnv(paths platform.Paths, secrets map[string]string) []string {
 	overrides := map[string]string{
 		"CODEX_HOME":        paths.CodexHome(),
 		"CODEX_SQLITE_HOME": paths.CodexSQLiteDir(),
+	}
+	for name, value := range secrets {
+		if name == "" || value == "" {
+			continue
+		}
+		overrides[name] = value
 	}
 	base := platformEngineEnv(os.Environ())
 	out := make([]string, 0, len(base)+len(overrides))
@@ -125,7 +136,7 @@ func EngineEnv(paths platform.Paths) []string {
 			continue
 		}
 		if _, isOverride := overrides[strings.ToUpper(key)]; isOverride {
-			continue // never leak a pre-existing CODEX_HOME into the engine
+			continue // never leak a pre-existing CODEX_HOME or provider key
 		}
 		out = append(out, kv)
 	}

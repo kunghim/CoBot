@@ -1,59 +1,31 @@
-// taskFlow mirrors the server's task lifecycle rules for the board UI. The
-// server stays authoritative; these helpers only decide which buttons exist,
-// never whether an action succeeds.
-import type { Bot, Task, TaskStatus } from '../../api/types';
+// taskFlow holds the pure rules of the requirement board: where a requirement
+// stands on its route and how its cards are shown. The server moves the work;
+// these helpers only describe it.
+import type { Tone } from '../../components/ui';
+import type { Bot, Requirement, Task, TaskStatus } from '../../api/types';
 
-const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  todo: ['doing', 'cancelled'],
-  doing: ['review', 'cancelled'],
-  // review: done only through confirm (evidence-backed), so the status
-  // patch menu never offers it.
-  review: ['cancelled'],
-  done: [],
-  cancelled: [],
+// Each card status's tone in the component library (Badge, StatusDot).
+const TONE: Record<TaskStatus, Tone> = {
+  todo: 'neutral',
+  doing: 'success',
+  done: 'neutral',
+  cancelled: 'danger',
 };
 
-/** Statuses the user may request by patching; done is excluded everywhere. */
-export function nextStatuses(status: TaskStatus): TaskStatus[] {
-  return TRANSITIONS[status] ?? [];
+export function statusTone(status: string): Tone {
+  return TONE[status as TaskStatus] ?? TONE.todo;
 }
 
-/** Moving to review requires recorded evidence; the server rejects it
- * without, so the board only offers the button once evidence exists. */
-export function canRequestReview(task: Task, hasEvidence: boolean): boolean {
-  return task.status === 'doing' && hasEvidence;
-}
-
-/** Confirm is the only path to done, and only a review task with evidence
- * can be confirmed. */
-export function canConfirm(task: Task, hasEvidence: boolean): boolean {
-  return task.status === 'review' && hasEvidence;
-}
-
-/** Evidence may be added while the task is still open; terminal tasks keep
- * their record unchanged. */
-export function canSubmitEvidence(status: TaskStatus): boolean {
-  return status === 'todo' || status === 'doing' || status === 'review';
-}
-
-/** A transfer offer only makes sense while the task is still open; the
- * user may arrange any hand-over, the server enforces the rest. */
-export function canOfferTransfer(task: Task): boolean {
-  return task.status !== 'done' && task.status !== 'cancelled';
-}
-
-const TONE: Record<TaskStatus, string> = {
-  todo: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
-  doing: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  review: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-  done: 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+const REQUIREMENT_TONE: Record<string, Tone> = {
+  active: 'success',
+  accepting: 'info',
+  done: 'neutral',
+  cancelled: 'danger',
 };
 
-export function statusTone(status: TaskStatus): string {
-  return TONE[status] ?? TONE.todo;
+export function requirementTone(status: string): Tone {
+  return REQUIREMENT_TONE[status] ?? 'neutral';
 }
-
 /** Display name for an owner id: member name when it is a bot of the team,
  * the user marker for the literal "user", otherwise a short id. */
 export function ownerLabel(ownerId: string, bots: Bot[], userLabel: string): string {
@@ -62,21 +34,44 @@ export function ownerLabel(ownerId: string, bots: Bot[], userLabel: string): str
   return bot ? bot.name : ownerId.slice(0, 8);
 }
 
-/** Dependency chips: resolved titles first (same board), raw short ids for
- * anything the list does not contain. */
-export function dependencyLabels(task: Task, tasks: Task[]): string[] {
-  return (task.dependencyIds ?? []).map((id) => {
-    const found = tasks.find((candidate) => candidate.id === id);
-    return found ? found.title : id.slice(0, 8);
+/** A requirement's cards in the order they were handed out. */
+export function cardsOf(requirementId: string, cards: Task[]): Task[] {
+  return cards
+    .filter((card) => card.requirementId === requirementId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Where the work of a requirement is: the stage of its newest open card,
+ * the stage after the newest finished one (a confirmation waiting for the
+ * user), the last stage while the user accepts, or -1 for none (a cancelled
+ * requirement, or its document being reworked). */
+export function currentStage(requirement: Requirement, cards: Task[]): number {
+  const last = requirement.stages.length - 1;
+  if (requirement.status === 'cancelled') return -1;
+  if (requirement.status === 'accepting' || requirement.status === 'done') return last;
+  const own = cardsOf(requirement.id, cards);
+  for (let i = own.length - 1; i >= 0; i--) {
+    if (own[i].status === 'todo' || own[i].status === 'doing') return own[i].stageIndex;
+  }
+  for (let i = own.length - 1; i >= 0; i--) {
+    if (own[i].status !== 'done') continue;
+    const next = own[i].returnTo >= 0 ? own[i].returnTo : own[i].stageIndex + 1;
+    return Math.min(next, last);
+  }
+  return 0;
+}
+
+/** The board order: requirements still running first, newest first. */
+export function requirementOrder(requirements: Requirement[]): Requirement[] {
+  const weight = (status: string) => (status === 'done' || status === 'cancelled' ? 1 : 0);
+  return [...requirements].sort((a, b) => {
+    const byWeight = weight(a.status) - weight(b.status);
+    if (byWeight !== 0) return byWeight;
+    return b.createdAt.localeCompare(a.createdAt);
   });
 }
 
-/** The board order: open work first by creation, finished work after. */
-export function boardOrder(tasks: Task[]): Task[] {
-  const weight = (status: TaskStatus) => (status === 'done' || status === 'cancelled' ? 1 : 0);
-  return [...tasks].sort((a, b) => {
-    const byWeight = weight(a.status) - weight(b.status);
-    if (byWeight !== 0) return byWeight;
-    return a.createdAt.localeCompare(b.createdAt);
-  });
+/** Whether the user may still cancel a requirement. */
+export function canCancel(requirement: Requirement): boolean {
+  return requirement.status === 'active' || requirement.status === 'accepting';
 }

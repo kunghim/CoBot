@@ -62,8 +62,8 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 				t.Fatal(err)
 			}
 			actual, err := current.CurrentVersion(ctx)
-			if err != nil || actual != 21 {
-				t.Fatalf("version = %d, error = %v; want 21", actual, err)
+			if err != nil || actual != MaxSupportedVersion {
+				t.Fatalf("version = %d, error = %v; want %d", actual, err, MaxSupportedVersion)
 			}
 			saved, err := GetSettings(ctx, db)
 			if err != nil {
@@ -73,7 +73,13 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 			if version == 20 {
 				limit = 5
 			}
-			if saved.ColorMode != "system" || saved.Theme != "graphite" || saved.ReviewRejectLimit != limit {
+			// A new profile starts on classic; an upgraded one keeps the
+			// palette it had (graphite, the earlier default).
+			theme := "classic"
+			if version > 0 {
+				theme = "graphite"
+			}
+			if saved.ColorMode != "system" || saved.Theme != theme || saved.ReviewRejectLimit != limit {
 				t.Fatalf("combined settings not preserved: %+v", saved)
 			}
 			if version > 0 && (saved.Language != "en" || saved.DefaultModel != "kept-model" || saved.Revision != 7) {
@@ -95,7 +101,7 @@ func TestReviewAndAppearanceUpgrade(t *testing.T) {
 			if saved.ColorMode != dark || saved.Theme != harbor || saved.ReviewRejectLimit != newLimit {
 				t.Fatalf("review update overwrote appearance: %+v", saved)
 			}
-			rows, err := db.QueryContext(ctx, `SELECT review_type, reviewer_id, reject_count, requirement_id FROM tasks LIMIT 0`)
+			rows, err := db.QueryContext(ctx, `SELECT review_type, requirement_id, stage_index, stage_kind, return_to FROM tasks LIMIT 0`)
 			if err != nil {
 				t.Fatal(err)
 			}

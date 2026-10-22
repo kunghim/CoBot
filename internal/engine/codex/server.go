@@ -16,6 +16,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/failure"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 )
 
@@ -151,7 +152,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	// along with how it was started and how it ended.
 	peer := fmt.Sprintf("codex#%d", cmd.Process.Pid)
 	if opts.Trace != nil {
-		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": cmd.Env})
+		started, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "path": cmd.Path, "args": cmd.Args, "dir": cmd.Dir, "env": tracedEnv(cmd.Env)})
 		opts.Trace.Record("codex.process", "start", peer, started)
 	}
 	stderrLines.SetPeer(peer)
@@ -470,7 +471,27 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		}
 		if err := json.Unmarshal(params, &p); err == nil {
 			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
-			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: errorCode(p.Error.CodexErrorInfo), WillRetry: p.WillRetry}
+			code := errorCode(p.Error.CodexErrorInfo)
+			failureCode := ""
+			if root, _, ok := failure.FromCodexErrorInfo(p.Error.CodexErrorInfo); ok {
+				// The vendor's status is the root cause: an empty balance
+				// and a rejected key both arrive as "the request failed",
+				// and only the status tells them apart. The engine's own
+				// message is kept as it is — the caller decides what is
+				// safe to store, and the retry attempt count is read
+				// from it.
+				failureCode = root
+			} else if status, ok := httpErrorStatus(p.Error.Message); ok {
+				// Without structured detail the engine passes the
+				// vendor's own error body on as its message; the status
+				// and the body's wording are the same evidence.
+				failureCode, _ = failure.ClassifyHTTP(status, p.Error.Message)
+			} else if body, ok := vendorErrorBody(p.Error.Message); ok {
+				// A body the vendor streamed back has no status in it,
+				// only its own error code.
+				failureCode, _ = failure.ClassifyBody(body)
+			}
+			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: code, FailureCode: failureCode, WillRetry: p.WillRetry}
 		}
 	case "warning":
 		var p struct {
@@ -502,6 +523,38 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 	}
 }
 
+// tracedEnv records the environment the engine was started with, with the
+// values of credential-looking variables left out. A provider's API key
+// rides in that environment, and a recording is a file the user can copy
+// around; the name still says whether the variable was set.
+func tracedEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			out = append(out, entry)
+			continue
+		}
+		if secretEnvName(name) {
+			out = append(out, name+"=<redacted>")
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// secretEnvName reports whether an environment variable holds a credential.
+func secretEnvName(name string) bool {
+	upper := strings.ToUpper(name)
+	for _, marker := range []string{"KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"} {
+		if strings.Contains(upper, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // Epoch identifies this app-server lifetime (leases/requests reference it).
 func (s *Server) Epoch() string { return s.epoch }
 
@@ -515,6 +568,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		ApprovalPolicy:        spec.ApprovalPolicy,
 		ApprovalsReviewer:     spec.ApprovalsReviewer,
 		Model:                 spec.Model,
+		ModelProvider:         spec.ModelProvider,
 		DeveloperInstructions: spec.DeveloperInstructions,
 		Config:                spec.Config,
 	}, &res)
@@ -525,21 +579,61 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		return engine.ThreadInfo{}, errors.New("thread/start returned no thread id")
 	}
 	s.setLoaded(res.Thread.ID, true)
-	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider}, nil
+	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
 }
 
 // ResumeThread reattaches a previously created thread.
-func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+//
+// It reports the model and the provider the thread runs with, as the engine
+// answered it: the engine ignores a provider for a thread that is already
+// loaded here, and a record CoBot kept itself cannot say which of the two
+// happened.
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
+	res := ThreadResumeResult{}
 	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-		Model: spec.Model, DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+		Model: spec.Model, ModelProvider: spec.ModelProvider,
+		DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
 		ExcludeTurns: true,
-	}, nil); err != nil {
-		return fmt.Errorf("thread/resume: %w", err)
+	}, &res); err != nil {
+		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)
+	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
+}
+
+// ThreadPath is the file the engine keeps a thread's full record in, for a
+// thread CoBot did not learn it of when it started or resumed it.
+func (s *Server) ThreadPath(ctx context.Context, threadID string) (string, error) {
+	var res struct {
+		Thread ThreadRef `json:"thread"`
+	}
+	if err := s.client.Call(ctx, "thread/read", map[string]any{"threadId": threadID, "includeTurns": false}, &res); err != nil {
+		return "", fmt.Errorf("thread/read: %w", err)
+	}
+	return res.Thread.Path, nil
+}
+
+// ArchiveThread sets a thread aside in the engine.
+//
+// This is how a thread lets go of the provider it was started with: the
+// engine ignores a provider for a thread it already holds, so a thread that
+// has to run with another one is archived and then loaded again.
+func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/archive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/archive: %w", err)
+	}
+	return nil
+}
+
+// UnarchiveThread takes a thread back out of the engine's archive, so it can
+// be loaded again.
+func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
+	if err := s.client.Call(ctx, "thread/unarchive", map[string]any{"threadId": threadID}, nil); err != nil {
+		return fmt.Errorf("thread/unarchive: %w", err)
+	}
 	return nil
 }
 
@@ -906,6 +1000,27 @@ func isExitError(err error) bool {
 // protocol stream. Lines are emitted at warn level: the engine writes its
 // diagnostics to stderr, and hiding them below the default info threshold
 // means a failing engine leaves no trace in the product log.
+// stderrLevel reads the level Codex gave a log line ("<time>  INFO target: ..."),
+// so its own errors and warnings stay visible while its info and debug
+// output (a recording turns those on) stays out of the core's log; the
+// recording keeps every line. A line without a level, such as a panic
+// message, is kept as a warning.
+func stderrLevel(line string) slog.Level {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return slog.LevelWarn
+	}
+	switch fields[1] {
+	case "ERROR":
+		return slog.LevelError
+	case "WARN":
+		return slog.LevelWarn
+	case "INFO", "DEBUG", "TRACE":
+		return slog.LevelDebug
+	}
+	return slog.LevelWarn
+}
+
 type stderrLog struct {
 	logger *slog.Logger
 	mu     sync.Mutex
@@ -932,7 +1047,7 @@ func (w *stderrLog) Write(p []byte) (int, error) {
 		if len(w.buf) > 8*1024 {
 			w.buf = w.buf[len(w.buf)-8*1024:]
 		}
-		w.logger.Warn("codex stderr", "line", line)
+		w.logger.Log(context.Background(), stderrLevel(line), "codex stderr", "line", line)
 	}
 	return len(p), nil
 }
@@ -962,4 +1077,45 @@ func (s *Server) Ping(ctx context.Context) error {
 // (for example account/logout).
 func (s *Server) Call(ctx context.Context, method string, params any, out any) error {
 	return s.client.Call(ctx, method, params, out)
+}
+
+// httpErrorStatus reads the HTTP status out of an error message that is a
+// vendor's JSON error body, as the engine passes one on when it has nothing
+// structured to say, for example
+// {"type":"error","status":400,"error":{"message":"..."}}.
+func httpErrorStatus(message string) (int, bool) {
+	raw, ok := vendorErrorBody(message)
+	if !ok {
+		return 0, false
+	}
+	var body struct {
+		Status int `json:"status"`
+	}
+	if json.Unmarshal([]byte(raw), &body) != nil || body.Status < 400 || body.Status > 599 {
+		return 0, false
+	}
+	return body.Status, true
+}
+
+// vendorErrorBody reports whether an error message is a vendor's JSON error
+// body, and returns it. A vendor that refuses a streamed request answers
+// with one server-sent event, so the body may come as "data:{...}".
+func vendorErrorBody(message string) (string, bool) {
+	trimmed := strings.TrimSpace(message)
+	if strings.HasPrefix(trimmed, "{") {
+		return trimmed, json.Valid([]byte(trimmed))
+	}
+	// Server-sent events: the error is the first data line that holds a
+	// JSON object; an event: line or a second event may come with it.
+	for _, line := range strings.Split(trimmed, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if strings.HasPrefix(data, "{") && json.Valid([]byte(data)) {
+			return data, true
+		}
+	}
+	return "", false
 }

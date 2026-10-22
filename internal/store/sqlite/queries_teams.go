@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,7 +18,7 @@ func GetTeam(ctx context.Context, q Queryer, id string) (domain.Team, string, er
 		FROM teams t LEFT JOIN directory_bindings b ON b.team_id = t.id WHERE t.id = ?`, id)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, "", ErrNotFound
 	}
@@ -43,7 +44,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 	for rows.Next() {
 		var t domain.Team
 		var created, updated, directory string
-		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory); err != nil {
 			return nil, fmt.Errorf("scan team row: %w", err)
 		}
 		t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
@@ -56,7 +57,7 @@ func ListTeams(ctx context.Context, q Queryer) ([]domain.Team, error) {
 
 func prefixedTeamColumns(prefix string) string {
 	return prefix + `.id, ` + prefix + `.name, ` + prefix + `.profile_instance, ` + prefix + `.leader_id, ` +
-		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at, ` + prefix + `.archived_at, ` + prefix + `.permission_mode, ` + prefix + `.reasoning_effort`
+		prefix + `.status, ` + prefix + `.status_detail, ` + prefix + `.revision, ` + prefix + `.created_at, ` + prefix + `.updated_at, ` + prefix + `.archived_at, ` + prefix + `.permission_mode, ` + prefix + `.reasoning_effort, ` + prefix + `.provider_id`
 }
 
 // FindActiveTeamByDirectoryKey returns the binding for a canonical directory.
@@ -66,7 +67,7 @@ func FindActiveTeamByDirectoryKey(ctx context.Context, q Queryer, key string) (d
 		WHERE b.directory_key = ? AND t.status != ?`, key, domain.TeamStatusDeleted)
 	var t domain.Team
 	var created, updated, directory string
-	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &directory)
+	err := row.Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID, &directory)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -166,16 +167,17 @@ func InsertBotTx(ctx context.Context, tx *sql.Tx, bot domain.Bot) error {
 	return nil
 }
 
-const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, revision, created_at`
+const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, avatar, provider_id, model, revision, created_at`
 
 func scanBot(rows *sql.Rows) (domain.Bot, error) {
 	var b domain.Bot
 	var isLeader int
-	var created string
-	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &b.Revision, &created); err != nil {
+	var created, avatar string
+	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &avatar, &b.ProviderID, &b.Model, &b.Revision, &created); err != nil {
 		return domain.Bot{}, err
 	}
 	b.IsLeader = isLeader != 0
+	b.Avatar = domain.DecodeAvatar(avatar)
 	b.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	return b, nil
 }
@@ -218,14 +220,49 @@ func GetBot(ctx context.Context, q Queryer, botID string) (domain.Bot, error) {
 // UpsertProviderSession stores the bot<->thread mapping.
 func UpsertProviderSession(ctx context.Context, tx *sql.Tx, session domain.ProviderSession) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := tx.ExecContext(ctx, `INSERT INTO provider_sessions (bot_id, provider_thread_id, engine_epoch, model, model_provider, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+	// A path the engine did not repeat is kept: the record stays where it was.
+	_, err := tx.ExecContext(ctx, `INSERT INTO provider_sessions (bot_id, provider_thread_id, engine_epoch, model, model_provider, transcript_path, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(bot_id) DO UPDATE SET provider_thread_id = excluded.provider_thread_id,
 			engine_epoch = excluded.engine_epoch, model = excluded.model,
-			model_provider = excluded.model_provider, updated_at = excluded.updated_at`,
-		session.BotID, session.ProviderThreadID, session.EngineEpoch, session.Model, session.ModelProvider, now)
+			model_provider = excluded.model_provider,
+			transcript_path = CASE WHEN excluded.transcript_path != '' THEN excluded.transcript_path
+				WHEN provider_sessions.provider_thread_id = excluded.provider_thread_id THEN provider_sessions.transcript_path
+				ELSE '' END,
+			updated_at = excluded.updated_at`,
+		session.BotID, session.ProviderThreadID, session.EngineEpoch, session.Model, session.ModelProvider, session.TranscriptPath, now)
 	if err != nil {
 		return fmt.Errorf("upsert provider session: %w", err)
+	}
+	return nil
+}
+
+// RetireSessionThread lets go of a member's thread: its next turn starts a
+// new one, handed over from this one.
+func RetireSessionThread(ctx context.Context, tx *sql.Tx, botID string, handover domain.ThreadHandover) error {
+	data, err := json.Marshal(handover)
+	if err != nil {
+		return fmt.Errorf("encode handover: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE provider_sessions SET provider_thread_id = '', handover = ? WHERE bot_id = ?`, string(data), botID); err != nil {
+		return fmt.Errorf("retire session thread: %w", err)
+	}
+	return nil
+}
+
+// SetSessionHandover records (or, with nil, clears) the thread a member's
+// thread took over from.
+func SetSessionHandover(ctx context.Context, tx *sql.Tx, botID string, handover *domain.ThreadHandover) error {
+	raw := ""
+	if handover != nil {
+		data, err := json.Marshal(handover)
+		if err != nil {
+			return fmt.Errorf("encode handover: %w", err)
+		}
+		raw = string(data)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE provider_sessions SET handover = ? WHERE bot_id = ?`, raw, botID); err != nil {
+		return fmt.Errorf("set session handover: %w", err)
 	}
 	return nil
 }
@@ -234,9 +271,10 @@ func UpsertProviderSession(ctx context.Context, tx *sql.Tx, session domain.Provi
 func GetProviderSession(ctx context.Context, q Queryer, botID string) (domain.ProviderSession, error) {
 	var s domain.ProviderSession
 	var updated string
-	err := q.QueryRowContext(ctx, `SELECT bot_id, provider_thread_id, engine_epoch, model, model_provider, updated_at
+	var handover string
+	err := q.QueryRowContext(ctx, `SELECT bot_id, provider_thread_id, engine_epoch, model, model_provider, transcript_path, handover, updated_at
 		FROM provider_sessions WHERE bot_id = ?`, botID).
-		Scan(&s.BotID, &s.ProviderThreadID, &s.EngineEpoch, &s.Model, &s.ModelProvider, &updated)
+		Scan(&s.BotID, &s.ProviderThreadID, &s.EngineEpoch, &s.Model, &s.ModelProvider, &s.TranscriptPath, &handover, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ProviderSession{}, ErrNotFound
 	}
@@ -244,6 +282,12 @@ func GetProviderSession(ctx context.Context, q Queryer, botID string) (domain.Pr
 		return domain.ProviderSession{}, err
 	}
 	s.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
+	if handover != "" {
+		var h domain.ThreadHandover
+		if json.Unmarshal([]byte(handover), &h) == nil {
+			s.Handover = &h
+		}
+	}
 	return s, nil
 }
 
@@ -454,7 +498,7 @@ func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error)
 	var t domain.Team
 	var created, updated string
 	err := q.QueryRowContext(ctx, `SELECT `+prefixedTeamColumns("t")+` FROM teams t WHERE t.id = ?`, id).
-		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort)
+		Scan(&t.ID, &t.Name, &t.ProfileInstance, &t.LeaderID, &t.Status, &t.StatusDetail, &t.Revision, &created, &updated, &t.ArchivedAt, &t.PermissionMode, &t.ReasoningEffort, &t.ProviderID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Team{}, ErrNotFound
 	}
@@ -472,9 +516,12 @@ type OpenWorkCounts struct {
 	OpenQuestions    int64 `json:"openQuestions"`
 	ActiveRuns       int64 `json:"activeRuns"`
 	PendingApprovals int64 `json:"pendingApprovals"`
-	OfferedTransfers int64 `json:"offeredTransfers"`
 	OpenTasks        int64 `json:"openTasks"`
 	QueuedDeliveries int64 `json:"queuedDeliveries"`
+	// RouteStages counts the running requirements whose route names the
+	// member for a stage, done or still ahead: a send-back or the next stage
+	// would hand it a card.
+	RouteStages int64 `json:"routeStages"`
 }
 
 // TeamOpenWork counts a team's blocking work.
@@ -483,14 +530,13 @@ func TeamOpenWork(ctx context.Context, q Queryer, teamID string) (OpenWorkCounts
 	err := q.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM runs WHERE team_id = ? AND status IN (?, ?, ?, ?, ?)),
 		(SELECT COUNT(*) FROM approvals WHERE team_id = ? AND request_state = 'pending'),
-		(SELECT COUNT(*) FROM transfers t JOIN tasks k ON k.id = t.task_id WHERE k.team_id = ? AND t.status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE team_id = ? AND status NOT IN ('done', 'cancelled')),
 		(SELECT COUNT(*) FROM deliveries WHERE team_id = ? AND status IN (?, ?)),
         (SELECT COUNT(*) FROM questions WHERE team_id = ? AND status = 'open')`,
 		teamID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
-		teamID, teamID, teamID, teamID,
+		teamID, teamID, teamID,
 		domain.DeliveryQueued, domain.DeliveryWaitingDependency, teamID).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
+		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}
@@ -503,14 +549,16 @@ func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, 
 	err := q.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM runs WHERE bot_id = ? AND status IN (?, ?, ?, ?, ?)),
 		(SELECT COUNT(*) FROM approvals WHERE requester_bot_id = ? AND request_state = 'pending'),
-		(SELECT COUNT(*) FROM transfers WHERE (from_bot_id = ? OR to_bot_id = ?) AND status = 'offered'),
 		(SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND status NOT IN ('done', 'cancelled')),
 		(SELECT COUNT(*) FROM deliveries WHERE target_bot_id = ? AND status IN (?, ?)),
-        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open')`,
+        (SELECT COUNT(*) FROM questions WHERE requester_bot_id = ? AND status = 'open'),
+		(SELECT COUNT(*) FROM requirements r WHERE r.status = ? AND EXISTS (
+			SELECT 1 FROM json_each(r.stages) s WHERE json_extract(s.value, '$.ownerId') = ?))`,
 		botID, domain.RunStarting, domain.RunRunning, domain.RunWaitingApproval, domain.RunWaitingInput, domain.RunUnknown,
-		botID, botID, botID, botID,
-		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID).Scan(
-		&c.ActiveRuns, &c.PendingApprovals, &c.OfferedTransfers, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions)
+		botID, botID,
+		botID, domain.DeliveryQueued, domain.DeliveryWaitingDependency, botID,
+		domain.RequirementActive, botID).Scan(
+		&c.ActiveRuns, &c.PendingApprovals, &c.OpenTasks, &c.QueuedDeliveries, &c.OpenQuestions, &c.RouteStages)
 	if err != nil {
 		return OpenWorkCounts{}, err
 	}
@@ -587,10 +635,9 @@ func PurgeTeamTx(ctx context.Context, tx *sql.Tx, teamID string) error {
 		`DELETE FROM chain_wakes WHERE chain_id IN (SELECT id FROM chains WHERE team_id = ?)`,
 		`DELETE FROM chains WHERE team_id = ?`,
 		`DELETE FROM deliveries WHERE team_id = ?`,
-		`DELETE FROM task_dependencies WHERE task_id IN (` + teamTasks + `) OR depends_on_task_id IN (` + teamTasks + `)`,
 		`DELETE FROM task_evidence WHERE task_id IN (` + teamTasks + `)`,
-		`DELETE FROM transfers WHERE task_id IN (` + teamTasks + `)`,
 		`DELETE FROM tasks WHERE team_id = ?`,
+		`DELETE FROM requirements WHERE team_id = ?`,
 		`DELETE FROM questions WHERE team_id = ?`,
 		`DELETE FROM memories WHERE team_id = ?`,
 		`DELETE FROM messages WHERE team_id = ?`,
@@ -635,7 +682,7 @@ func BotThreadIDs(ctx context.Context, q Queryer, botID string) ([]string, error
 
 // PurgeBotTx removes one member and what is its own in its team: its
 // conversation and deliveries, runs, memories, the approvals and questions
-// it raised, the finished tasks it owned with their hand-overs, its events
+// it raised, the finished cards it held with their handoff records, its events
 // and its engine session. Messages it sent into other members'
 // conversations stay as their history, and the usage ledger stays because
 // team budgets are counted from it. Role definitions are never touched.
@@ -649,8 +696,6 @@ func PurgeBotTx(ctx context.Context, tx *sql.Tx, botID string) error {
 		`DELETE FROM approval_responses WHERE approval_id IN (` + ownApprovals + `)`,
 		`DELETE FROM approvals WHERE requester_bot_id = ?`,
 		`DELETE FROM deliveries WHERE target_bot_id = ? OR message_id IN (` + ownMessages + `)`,
-		`DELETE FROM transfers WHERE from_bot_id = ? OR to_bot_id = ? OR task_id IN (` + ownTasks + `)`,
-		`DELETE FROM task_dependencies WHERE task_id IN (` + ownTasks + `) OR depends_on_task_id IN (` + ownTasks + `)`,
 		`DELETE FROM task_evidence WHERE task_id IN (` + ownTasks + `)`,
 		`DELETE FROM questions WHERE requester_bot_id = ? OR task_id IN (` + ownTasks + `)`,
 		`DELETE FROM tasks WHERE owner_id = ?`,
@@ -703,6 +748,27 @@ func SetSessionUsageSnapshot(ctx context.Context, q Queryer, botID, snapshot str
 		return fmt.Errorf("set session usage snapshot: %w", err)
 	}
 	return nil
+}
+
+// UpdateTeamProviderTx sets which model provider a team runs with. An empty
+// id puts the team back on the profile's default.
+func UpdateTeamProviderTx(ctx context.Context, tx *sql.Tx, teamID, providerID string, expectedRevision int64) (domain.Team, error) {
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM teams WHERE id = ?`, teamID).Scan(&revision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Team{}, ErrNotFound
+		}
+		return domain.Team{}, err
+	}
+	if expectedRevision > 0 && revision != expectedRevision {
+		return domain.Team{}, domain.RevisionConflict("error.team.revision_conflict", map[string]any{"expected": expectedRevision, "actual": revision})
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `UPDATE teams SET provider_id = ?, revision = revision + 1, updated_at = ? WHERE id = ?`, providerID, now, teamID); err != nil {
+		return domain.Team{}, err
+	}
+	team, _, err := GetTeam(ctx, tx, teamID)
+	return team, err
 }
 
 // UpdateTeamReasoningEffortTx sets how hard the team's members think.

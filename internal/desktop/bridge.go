@@ -100,6 +100,7 @@ func (b *Bridge) StartCore(ctx context.Context, dataRoot string) error {
 		ExtraOrigins:    b.extraOrigins,
 		HelperBinary:    resolveHelperBinary(dir),
 		EngineSelfCheck: true,
+		AvatarSync:      true,
 	})
 	if err == nil {
 		b.core = core

@@ -28,7 +28,16 @@ export function toolArguments(detail: Record<string, unknown>): Record<string, u
 }
 
 // CoBot's own collaboration tools, described as what the member did.
-const collaborationTools = new Set(['deliver_task', 'review_task', 'view_tasks', 'send_message', 'create_task', 'ask_user']);
+const collaborationTools = new Set(['start_requirement', 'handoff', 'view_tasks', 'send_message', 'ask_user', 'browser']);
+
+/** The address a browser call opens, when it is in one of its steps. */
+function browserTarget(steps: unknown): string {
+  if (!Array.isArray(steps)) return '';
+  for (const step of steps) {
+    if (step && typeof step === 'object' && typeof (step as { url?: unknown }).url === 'string') return (step as { url: string }).url;
+  }
+  return '';
+}
 
 // Codex sub-agent tools and activity kinds with their own wording; anything
 // newer reads as the generic sub-agent line instead of a raw key.
@@ -39,6 +48,15 @@ const agentActivities = new Set(['started', 'interacted', 'completed', 'interrup
 const knownErrorCodes = new Set([
   'serverOverloaded', 'usageLimitExceeded', 'rateLimitExceeded', 'contextWindowExceeded', 'unauthorized',
   'httpConnectionFailed', 'responseStreamConnectionFailed', 'responseStreamDisconnected', 'internalServerError',
+]);
+
+// Root causes taken from a gateway's own HTTP status. They say what the
+// provider refused and why, which the engine's symptom codes cannot: a
+// balance that ran out, a key that was refused and a model that does not
+// exist all reach the engine as "the request failed".
+const providerFailureCodes = new Set([
+  'quota', 'rate_limit', 'auth_invalid', 'model_unknown', 'model_unavailable', 'context_exceeded',
+  'protocol_unsupported', 'request_rejected', 'network', 'engine_internal',
 ]);
 
 /** One-line description of a step. */
@@ -77,6 +95,14 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       // Known engine error codes read in the user's language; the engine's
       // own text stays available in the step's detail.
       const code = text(d.code);
+      // A third-party gateway answers with its own status, and that status
+      // is the root cause: an empty balance and a rejected key both arrive
+      // as "the request failed". It comes first because it names the reason
+      // rather than the symptom.
+      const failureCode = text(d.failureCode);
+      if (d.level !== 'warning' && providerFailureCodes.has(failureCode)) {
+        return { key: `conversation.providerError.${failureCode}` };
+      }
       if (d.level !== 'warning' && knownErrorCodes.has(code)) return { key: `conversation.engineError.${code}` };
       return { key: d.level === 'warning' ? 'conversation.step.warning' : 'conversation.step.error', params: { message: text(d.message) } };
     }
@@ -87,9 +113,9 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
         const recipients = Array.isArray(args.targetBotIds) ? args.targetBotIds.filter((id): id is string => typeof id === 'string') : [];
         const target = text(args.targetBotId) || text(args.ownerId) || text(args.toBotId);
         const names = (recipients.length ? recipients : target ? [target] : []).map(nameOf).join('、');
+        const outcome = text(args.outcome);
         const key =
-          tool === 'send_message' && args.notifyOnly === true ? 'conversation.step.cobot.notify'
-          : tool === 'review_task' ? (args.decision === 'reject' ? 'conversation.step.cobot.review_reject' : 'conversation.step.cobot.review_accept')
+          tool === 'handoff' ? `conversation.step.cobot.handoff_${['back', 'escalate', 'resume'].includes(outcome) ? outcome : 'done'}`
           : `conversation.step.cobot.${tool}`;
         return {
           key: collaborationTools.has(tool) ? key : 'conversation.step.tool',
@@ -99,6 +125,7 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
             status: text(args.status),
             question: text(args.question),
             query: text(args.query),
+            url: text(args.url) || browserTarget(args.steps),
             tool,
           },
         };

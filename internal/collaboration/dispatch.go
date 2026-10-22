@@ -10,6 +10,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/domain"
 )
 
@@ -18,15 +19,12 @@ import (
 // database itself.
 type App interface {
 	ValidateToolRun(ctx context.Context, principal auth.Principal) error
-	ViewTasks(ctx context.Context, principal auth.Principal, taskID string) (map[string]any, error)
-	DeliverTask(ctx context.Context, principal auth.Principal, taskID, summary string, artifactRefs []string) (domain.Task, error)
-	ReviewTask(ctx context.Context, principal auth.Principal, taskID string, accept bool, comment string) (domain.Task, error)
-	WaitingTasksOf(ctx context.Context, teamID, botID string) []string
-	SendMessageFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
+	ViewTasks(ctx context.Context, principal auth.Principal, requirementID, cardID string) (map[string]any, error)
+	StartRequirement(ctx context.Context, principal auth.Principal, in app.StartRequirementInput) (domain.Requirement, error)
+	Handoff(ctx context.Context, principal auth.Principal, in app.HandoffInput) (domain.Task, error)
 	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
-	CreateTask(ctx context.Context, principal auth.Principal, captainOnly bool, in app.CreateTaskInput) (domain.Task, error)
 	AskUser(ctx context.Context, principal auth.Principal, in app.AskUserInput) (domain.Question, error)
-	BotOf(ctx context.Context, botID string) (domain.Bot, error)
+	UseBrowser(ctx context.Context, principal auth.Principal, req browser.Request) (browser.Result, error)
 	// Write idempotency (E05): a retried side-effect call replays its stored
 	// result; the same key with different arguments is a conflict.
 	WriteReplay(ctx context.Context, scope, principal, key, argsHash string) (string, bool, error)
@@ -60,6 +58,10 @@ func (d *Dispatcher) ResolveToken(token string) (auth.Principal, auth.BotBinding
 // dispatchTimeout bounds every bridge-driven call so a stuck application call
 // can never hang the engine's tool loop.
 const dispatchTimeout = 30 * time.Second
+
+// browserTimeout fits inside the bridge's 60 seconds: a page may take a while,
+// and the browser's own budget (50s) ends the call first.
+const browserTimeout = 55 * time.Second
 
 // ToolCall is one MCP tool invocation arriving from the bridge.
 type ToolCall struct {
@@ -182,28 +184,60 @@ func canonicalArgsHash(raw json.RawMessage) string {
 
 // callToolOnce is the routing switch itself (pre-idempotency behavior).
 func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
-	ctx, cancel := context.WithTimeout(ctx, dispatchTimeout)
+	timeout := dispatchTimeout
+	if call.Name == "browser" {
+		timeout = browserTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	if principal.SubAgent && handoffOnly[call.Name] {
+		return rejected("forbidden", "error.tool.subagent_forbidden", map[string]any{"tool": call.Name})
+	}
 	switch call.Name {
 	case "view_tasks":
 		var args struct {
-			TaskID string `json:"taskId"`
+			RequirementID string `json:"requirementId"`
+			CardID        string `json:"cardId"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
 			return rejected("invalid_request", "error.invalid_json", nil)
 		}
-		data, err := d.app.ViewTasks(ctx, principal, args.TaskID)
+		data, err := d.app.ViewTasks(ctx, principal, args.RequirementID, args.CardID)
 		if err != nil {
 			return errorResult(err)
 		}
 		return ToolResult{Status: StatusOK, Data: data}
 
-	case "deliver_task":
+	case "start_requirement":
 		var args struct {
-			TaskID       string   `json:"taskId"`
+			Title     string         `json:"title"`
+			Document  string         `json:"document"`
+			Stages    []domain.Stage `json:"stages"`
+			RequestID string         `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		req, err := d.app.StartRequirement(ctx, principal, app.StartRequirementInput{Title: args.Title, Document: args.Document, Stages: args.Stages})
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"requirementId": req.ID,
+			"note": "已提交，系统会把需求文档和链路交给用户确认。现在结束这一轮。"}}
+
+	case "handoff":
+		var args struct {
+			CardID       string   `json:"cardId"`
+			Outcome      string   `json:"outcome"`
 			Summary      string   `json:"summary"`
 			ArtifactRefs []string `json:"artifactRefs"`
+			Mode         string   `json:"mode"`
+			Suggestions  string   `json:"suggestions"`
+			Document     string   `json:"document"`
 			RequestID    string   `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
@@ -212,41 +246,21 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
-		task, err := d.app.DeliverTask(ctx, principal, args.TaskID, args.Summary, args.ArtifactRefs)
+		card, err := d.app.Handoff(ctx, principal, app.HandoffInput{
+			CardID: args.CardID, Outcome: args.Outcome, Summary: args.Summary, ArtifactRefs: args.ArtifactRefs,
+			Mode: args.Mode, Suggestions: args.Suggestions, Document: args.Document,
+		})
 		if err != nil {
 			return errorResult(err)
 		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
-
-	case "review_task":
-		var args struct {
-			TaskID    string `json:"taskId"`
-			Decision  string `json:"decision"`
-			Comment   string `json:"comment"`
-			RequestID string `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		if args.Decision != "accept" && args.Decision != "reject" {
-			return rejected("invalid_request", "error.task.review_decision", nil)
-		}
-		task, err := d.app.ReviewTask(ctx, principal, args.TaskID, args.Decision == "accept", args.Comment)
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"cardId": card.ID, "status": card.Status,
+			"note": "已交接，系统会按链路继续。这张卡片处理完了；手上没有别的卡片就结束这一轮。"}}
 
 	case "send_message":
 		var args struct {
 			TargetBotID  string   `json:"targetBotId"`
 			TargetBotIDs []string `json:"targetBotIds"`
 			Text         string   `json:"text"`
-			TaskID       string   `json:"taskId"`
-			NotifyOnly   bool     `json:"notifyOnly"`
 			RequestID    string   `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
@@ -259,68 +273,30 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if len(targets) == 0 {
 			return rejected("invalid_request", "error.message.target_required", nil)
 		}
-		send := d.app.SendMessageFromBot
-		if args.NotifyOnly {
-			send = d.app.NotifyFromBot
-		}
 		if len(targets) == 1 {
-			result, err := send(ctx, principal, targets[0], args.Text, args.TaskID, args.RequestID)
+			result, err := d.app.NotifyFromBot(ctx, principal, targets[0], args.Text, "", args.RequestID)
 			if err != nil {
 				return errorResult(err)
 			}
-			d.noteWaiting(ctx, principal, targets[0], result)
 			return ToolResult{Status: StatusAccepted, Data: result}
 		}
 		// One message per recipient, each its own idempotent write so a
 		// retried broadcast neither duplicates nor drops a recipient.
 		results := make([]map[string]any, 0, len(targets))
 		for _, target := range targets {
-			result, err := send(ctx, perRecipient(principal, target), target, args.Text, args.TaskID, recipientKey(args.RequestID, target))
+			result, err := d.app.NotifyFromBot(ctx, perRecipient(principal, target), target, args.Text, "", recipientKey(args.RequestID, target))
 			if err != nil {
 				return errorResult(err)
 			}
 			result["targetBotId"] = target
-			d.noteWaiting(ctx, principal, target, result)
 			results = append(results, result)
 		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"status": "accepted", "recipients": results}}
-
-	case "create_task":
-		var args struct {
-			Title              string   `json:"title"`
-			Description        string   `json:"description"`
-			AcceptanceCriteria string   `json:"acceptanceCriteria"`
-			OwnerID            string   `json:"ownerId"`
-			ParentID           string   `json:"parentId"`
-			DependencyIDs      []string `json:"dependencyIds"`
-			ReviewType         string   `json:"reviewType"`
-			RequestID          string   `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		bot, err := d.requireBot(ctx, principal)
-		if err != nil {
-			return errorResult(err)
-		}
-		task, err := d.app.CreateTask(ctx, principal, true, app.CreateTaskInput{
-			TeamID: bot.TeamID, OwnerID: args.OwnerID, Title: args.Title,
-			Description: args.Description, AcceptanceCriteria: args.AcceptanceCriteria,
-			ParentID: args.ParentID, DependencyIDs: args.DependencyIDs, ReviewType: args.ReviewType, RequestID: args.RequestID,
-		})
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"task": task}}
+		return ToolResult{Status: StatusAccepted, Data: map[string]any{"status": "notified", "recipients": results}}
 
 	case "ask_user":
 		var args struct {
 			Question  string   `json:"question"`
 			Options   []string `json:"options"`
-			TaskID    string   `json:"taskId"`
 			RequestID string   `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
@@ -329,13 +305,29 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		if args.RequestID == "" {
 			return rejected("invalid_request", "error.idempotency.required", nil)
 		}
-		question, err := d.app.AskUser(ctx, principal, app.AskUserInput{
-			Question: args.Question, Options: args.Options, TaskID: args.TaskID,
-		})
+		question, err := d.app.AskUser(ctx, principal, app.AskUserInput{Question: args.Question, Options: args.Options})
 		if err != nil {
 			return errorResult(err)
 		}
 		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID}}
+
+	case "browser":
+		var req browser.Request
+		if err := decodeArgs(call.Arguments, &req); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		result, err := d.app.UseBrowser(ctx, principal, req)
+		if err != nil {
+			return errorResult(err)
+		}
+		// The member reads this back as JSON; round-trip it into the wire map.
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return errorResult(err)
+		}
+		data := map[string]any{}
+		_ = json.Unmarshal(raw, &data)
+		return ToolResult{Status: StatusOK, Data: data}
 
 	default:
 		return rejected("invalid_request", "error.tool.unknown", map[string]any{"tool": call.Name})
@@ -349,15 +341,6 @@ func rejected(code, messageKey string, params map[string]any) ToolResult {
 func errorResult(err error) ToolResult {
 	te := withHint(toolError(err))
 	return ToolResult{Status: te.Status, Error: te}
-}
-
-// requireBot resolves the caller's bot row, proving the token still maps to a
-// live member.
-func (d *Dispatcher) requireBot(ctx context.Context, principal auth.Principal) (domain.Bot, error) {
-	if principal.Kind != auth.KindBot {
-		return domain.Bot{}, domain.Forbidden("error.forbidden.bot_only", nil)
-	}
-	return d.app.BotOf(ctx, principal.BotID)
 }
 
 // uniqueTargets is the send_message recipient list: targetBotIds, or the
@@ -397,12 +380,4 @@ func perRecipient(p auth.Principal, target string) auth.Principal {
 	write.Key = recipientKey(write.Key, target)
 	p.Write = &write
 	return p
-}
-
-// noteWaiting tells the sender when the recipient's task still waits for
-// another one, so nobody is set to work before its task has reached it.
-func (d *Dispatcher) noteWaiting(ctx context.Context, principal auth.Principal, target string, result map[string]any) {
-	if waiting := d.app.WaitingTasksOf(ctx, principal.TeamID, target); len(waiting) > 0 {
-		result["note"] = "对方的任务还没送到它手上：" + strings.Join(waiting, "；") + "。前置任务完成后系统会自动把任务送过去，不必现在叫它开工。"
-	}
 }

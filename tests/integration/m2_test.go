@@ -24,6 +24,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/platform"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
@@ -279,6 +280,14 @@ func newM2Harness(t *testing.T) *m2Harness {
 		DB: db, Paths: paths, Hub: events.NewHub(), Live: events.NewLiveHub(), InstanceID: "test-instance",
 		ServiceEpoch: "epoch-0", Version: "test", Logger: logger,
 	}
+	// The credential store holds the model providers' keys, and the binder
+	// stands in for the engine that takes a provider.
+	store, err := secrets.New(paths.CredentialsDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Credentials = store
+	a.ProviderBinderFactory = func(context.Context) (engine.ProviderBinder, error) { return newProviderBinder(), nil }
 	tokens := auth.NewTokenStore(time.Hour)
 	a.CollaborationTokens = tokens
 	bearer := auth.NewBearerStore(time.Hour)
@@ -434,12 +443,12 @@ func TestTeamCreationValidation(t *testing.T) {
 	ctx := context.Background()
 
 	// Same directory twice is refused even after status changes.
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	if team.Status != domain.TeamStatusActive {
 		t.Fatalf("team status = %s, want active", team.Status)
 	}
 	if len(bots) != 2 || !bots[0].IsLeader {
-		t.Fatalf("expected leader + backend-dev, got %+v", bots)
+		t.Fatalf("expected leader + fullstack-engineer, got %+v", bots)
 	}
 	// The marker and the Git-exclude path behaviour: plain dir has no Git,
 	// but the marker must exist.
@@ -472,7 +481,7 @@ func TestTeamCreationValidation(t *testing.T) {
 	limit, _ := h.app.GetSettings(ctx)
 	members := make([]string, 0, limit.MemberLimit)
 	for i := 1; i < limit.MemberLimit+2; i++ {
-		members = append(members, "backend-dev")
+		members = append(members, "fullstack-engineer")
 	}
 	dir2 := filepath.Join(filepath.Dir(h.teamDir), "team-2")
 	if err := os.MkdirAll(dir2, 0o755); err != nil {

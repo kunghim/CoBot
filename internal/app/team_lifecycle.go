@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,8 +24,9 @@ import (
 func openWorkError(scope string, c sqlite.OpenWorkCounts) error {
 	return domain.Conflict("error."+scope+".open_work", map[string]any{
 		"activeRuns": c.ActiveRuns, "pendingApprovals": c.PendingApprovals,
-		"offeredTransfers": c.OfferedTransfers, "openTasks": c.OpenTasks,
+		"openTasks":        c.OpenTasks,
 		"queuedDeliveries": c.QueuedDeliveries, "openQuestions": c.OpenQuestions,
+		"routeStages": c.RouteStages,
 	})
 }
 
@@ -109,6 +111,54 @@ func (a *App) PatchTeamPermissionMode(ctx context.Context, principal auth.Princi
 	return team, nil
 }
 
+// PatchTeamProvider names the model provider a team runs with. An empty id
+// puts the team back on the profile's default.
+//
+// The change takes effect from the team's next turn: a thread that is
+// already running keeps the provider it was started with, and the engine is
+// asked to load the thread again with the new one.
+func (a *App) PatchTeamProvider(ctx context.Context, principal auth.Principal, teamID, providerID string, expectedRevision int64) (domain.Team, error) {
+	cached, unlock, writeErr := beginWrite[domain.Team](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, writeErr
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	if principal.Kind != auth.KindUser {
+		return domain.Team{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if providerID != "" {
+		// A provider that does not exist would leave the team pointing at
+		// nothing, and the engine refuses an id it does not know.
+		if _, err := sqlite.GetProvider(ctx, a.DB, providerID); err != nil {
+			if errors.Is(err, sqlite.ErrNotFound) {
+				return domain.Team{}, domain.InvalidRequest("error.provider.not_found", map[string]any{"id": providerID})
+			}
+			return domain.Team{}, sqlite.NormalizeError(err)
+		}
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Team{}, err
+	}
+	defer tx.Rollback()
+	team, err := sqlite.UpdateTeamProviderTx(ctx, tx, teamID, providerID, expectedRevision)
+	if err != nil {
+		return domain.Team{}, sqlite.NormalizeError(err)
+	}
+	if err := a.saveWriteResult(ctx, tx, principal, team); err != nil {
+		return domain.Team{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Team{}, err
+	}
+	a.recordEvent(ctx, domain.Event{Type: domain.EventTeamUpdated, TeamID: teamID, ResourceID: teamID, Revision: team.Revision})
+	a.Hub.Publish()
+	return team, nil
+}
+
 // PatchTeamReasoningEffort changes how hard the team's members think; it
 // applies from each member's next turn.
 func (a *App) PatchTeamReasoningEffort(ctx context.Context, principal auth.Principal, teamID, effort string, expectedRevision int64) (domain.Team, error) {
@@ -148,11 +198,12 @@ func (a *App) PatchTeamReasoningEffort(ctx context.Context, principal auth.Princ
 
 // archiveBlockers is the one census for archiving. A team may be archived
 // only when it is completely idle: no running member, no queued message, no
-// pending approval, no open question, no offered hand-over and no unfinished
-// task. Passing it is what makes an archived team safe to delete outright.
+// pending approval, no open question, no unfinished card and, for a member,
+// no stage on a running requirement's route. Passing it is what makes an
+// archived team safe to delete outright.
 func archiveBlockers(c sqlite.OpenWorkCounts) bool {
 	return c.ActiveRuns > 0 || c.QueuedDeliveries > 0 || c.PendingApprovals > 0 ||
-		c.OpenQuestions > 0 || c.OfferedTransfers > 0 || c.OpenTasks > 0
+		c.OpenQuestions > 0 || c.OpenTasks > 0 || c.RouteStages > 0
 }
 
 // ArchiveTeam sets an idle team aside. It leaves the sidebar for the
@@ -310,6 +361,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 	}
 	a.deleteEngineThreads(ctx, teamID, threads)
 	a.removeTeamFolderData(directory, teamID)
+	a.releaseTeamBrowser(teamID, true)
 	a.Hub.Publish()
 	return team, nil
 }
@@ -317,6 +369,7 @@ func (a *App) DeleteTeam(ctx context.Context, principal auth.Principal, teamID s
 // releaseTeamRuntime shuts the team's engine down and revokes nothing else;
 // archive and delete both leave no idle process behind.
 func (a *App) releaseTeamRuntime(ctx context.Context, teamID string) {
+	a.releaseTeamBrowser(teamID, false)
 	if a.Scheduler == nil {
 		return
 	}

@@ -33,20 +33,17 @@ func TestEveryToolAdvertisesItsArguments(t *testing.T) {
 }
 
 func TestEachRoleIsOfferedOnlyItsTools(t *testing.T) {
-	if got := ToolsForRole(RoleLeader); !slices.Equal(got, []string{"send_message", "ask_user", "create_task", "review_task", "view_tasks"}) {
+	if got := ToolsForRole(RoleLeader); !slices.Equal(got, []string{"start_requirement", "handoff", "view_tasks", "send_message", "ask_user"}) {
 		t.Fatalf("leader tools = %v", got)
 	}
-	if got := ToolsForRole(RoleMember); !slices.Equal(got, []string{"send_message", "ask_user", "deliver_task", "view_tasks"}) {
+	// A reviewer is a member like any other: its reviews come on cards.
+	if got := ToolsForRole(RoleMember); !slices.Equal(got, []string{"handoff", "view_tasks", "send_message", "ask_user", "browser"}) {
 		t.Fatalf("member tools = %v", got)
-	}
-	// A reviewer is a member who also gives verdicts.
-	if got := ToolsForRole(RoleReviewer); !slices.Equal(got, []string{"send_message", "ask_user", "deliver_task", "review_task", "view_tasks"}) {
-		t.Fatalf("reviewer tools = %v", got)
 	}
 }
 
 func TestWritesDeriveTheirKeyFromTheCallID(t *testing.T) {
-	call := withDerivedKey(ToolCall{Name: "deliver_task", Arguments: json.RawMessage(`{"taskId":"t1","summary":"done"}`), CallID: "exec-1"})
+	call := withDerivedKey(ToolCall{Name: "handoff", Arguments: json.RawMessage(`{"cardId":"t1","summary":"done"}`), CallID: "exec-1"})
 	var args map[string]any
 	_ = json.Unmarshal(call.Arguments, &args)
 	key, _ := args["idempotencyKey"].(string)
@@ -55,8 +52,8 @@ func TestWritesDeriveTheirKeyFromTheCallID(t *testing.T) {
 	}
 	// A retry of the same call gets the same key; other arguments in the same
 	// code cell (same call id) get another.
-	again := withDerivedKey(ToolCall{Name: "deliver_task", Arguments: json.RawMessage(`{"summary":"done","taskId":"t1"}`), CallID: "exec-1"})
-	other := withDerivedKey(ToolCall{Name: "deliver_task", Arguments: json.RawMessage(`{"taskId":"t2","summary":"done"}`), CallID: "exec-1"})
+	again := withDerivedKey(ToolCall{Name: "handoff", Arguments: json.RawMessage(`{"summary":"done","cardId":"t1"}`), CallID: "exec-1"})
+	other := withDerivedKey(ToolCall{Name: "handoff", Arguments: json.RawMessage(`{"cardId":"t2","summary":"done"}`), CallID: "exec-1"})
 	keyOf := func(c ToolCall) string {
 		var m map[string]any
 		_ = json.Unmarshal(c.Arguments, &m)

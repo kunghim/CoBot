@@ -83,7 +83,16 @@ func (p Paths) CodexDir() string       { return p.join("engines", "codex") }
 func (p Paths) CodexHome() string      { return p.join("engines", "codex", "home") }
 func (p Paths) CodexSQLiteDir() string { return p.join("engines", "codex", "sqlite") }
 func (p Paths) RolesDir() string       { return p.join("roles") }
-func (p Paths) WorkspacesDir() string  { return p.join("workspaces") }
+
+// AvatarUploadsDir keeps the pictures the user chose as avatars.
+func (p Paths) AvatarUploadsDir() string { return p.join("avatars", "uploads") }
+
+// AvatarsDir caches the downloaded avatar catalog of this profile.
+func (p Paths) AvatarsDir() string    { return p.join("assets", "avatars") }
+func (p Paths) WorkspacesDir() string { return p.join("workspaces") }
+
+// BrowserDir keeps the teams' browser profiles (their login state).
+func (p Paths) BrowserDir() string     { return p.join("browser") }
 func (p Paths) RuntimeDir() string     { return p.join("runtime") }
 func (p Paths) LockFile() string       { return p.join("runtime", "instance.lock") }
 func (p Paths) InstanceFile() string   { return p.join("runtime", "instance.json") }

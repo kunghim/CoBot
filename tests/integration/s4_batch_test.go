@@ -19,7 +19,7 @@ import (
 func TestQueuedMemberMessagesMergeIntoOneTurn(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	captain, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
@@ -48,7 +48,7 @@ func TestQueuedMemberMessagesMergeIntoOneTurn(t *testing.T) {
 	if merged.ThreadID != memberTurn.ThreadID {
 		t.Fatalf("third turn is not the member's: %+v", merged)
 	}
-	for _, want := range []string{"收到了 3 条消息", "【来自 队长】", "接口定了", "记得写测试", "完成后告诉我"} {
+	for _, want := range []string{"收到了 3 条消息", "【来自 项目经理】", "接口定了", "记得写测试", "完成后告诉我"} {
 		if !strings.Contains(merged.Text, want) {
 			t.Fatalf("merged input lacks %q:\n%s", want, merged.Text)
 		}
@@ -145,16 +145,16 @@ func TestRefusedSteerQueuesAndUserMessagesMerge(t *testing.T) {
 	}
 }
 
-// One send_message reaches several members; a notify-only message is left
-// for the recipient's next turn and wakes nobody.
-func TestBroadcastAndNotifyOnly(t *testing.T) {
+// One send_message reaches several members; it is left for each
+// recipient's next turn and wakes nobody.
+func TestBroadcastNotesWakeNobody(t *testing.T) {
 	h := newM2Harness(t)
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	captain, backend, qa := bots[0], bots[1], bots[2]
 	token := h.botToken(t, captain)
 	fake := h.ensureFake(t, team.ID)
 
-	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID}, "text": "接口文档已更新", "notifyOnly": true, "idempotencyKey": "s4-note"}); status != 200 {
+	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID}, "text": "接口文档已更新", "idempotencyKey": "s4-note"}); status != 200 {
 		t.Fatalf("notify = %d %v", status, body)
 	}
 	time.Sleep(300 * time.Millisecond)
@@ -169,9 +169,14 @@ func TestBroadcastAndNotifyOnly(t *testing.T) {
 	if status, body := h.callTool(t, token, "send_message", map[string]any{"targetBotIds": []string{backend.ID, qa.ID, backend.ID}, "text": "开始联调", "idempotencyKey": "s4-all"}); status != 200 {
 		t.Fatalf("broadcast = %d %v", status, body)
 	}
+	// The user wakes both; the notes reach each with its turn.
+	for _, bot := range []domain.Bot{backend, qa} {
+		if _, err := h.app.SendMessage(context.Background(), h.user, app.SendMessageInput{BotID: bot.ID, Text: "看下留言"}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	waitUntil(t, 5*time.Second, "both woken", func() bool { return len(fake.Turns()) == 2 })
 	for _, turn := range fake.Turns() {
-		// The note left earlier reaches each recipient with its next turn.
 		if !strings.Contains(turn.Text, "开始联调") || !strings.Contains(turn.Text, "接口文档已更新") {
 			t.Fatalf("turn input lacks the message or the earlier note:\n%s", turn.Text)
 		}
@@ -213,56 +218,53 @@ func TestWarmTeamStartsEngineAhead(t *testing.T) {
 	}
 }
 
-// A member delivering its task wakes the leader with a notice,
-// whatever the member itself told the leader; the leader's own move does not.
-func TestReviewWakesTheLeader(t *testing.T) {
+// A member handing its card off wakes the next stage's owner with the next
+// card, sent in the member's name; the member's own reply does not.
+func TestHandoffWakesTheNextStage(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	leader, member := bots[0], bots[1]
 	fake := h.ensureFake(t, team.ID)
 
-	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: member.ID, Title: "登录接口", AcceptanceCriteria: "返回 200"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, 5*time.Second, "member assigned", func() bool { return len(fake.Turns()) == 1 })
+	card, _ := h.handCard(t, team, leader, member, "登录接口", "返回 200")
+	waitUntil(t, 5*time.Second, "member handed the card", func() bool { return len(fake.Turns()) == 1 })
 	memberTurn := fake.Turns()[0]
 	as := auth.NewPrincipalBot(member.ID, team.ID)
-	// Picking the task up marks it as started; the member does not.
-	waitUntil(t, 5*time.Second, "task started", func() bool {
-		started, _ := sqlite.GetTask(ctx, h.app.DB, task.ID)
+	// Picking the card up marks it as started; the member does not.
+	waitUntil(t, 5*time.Second, "card started", func() bool {
+		started, _ := sqlite.GetTask(ctx, h.app.DB, card.ID)
 		return started.Status == domain.TaskDoing
 	})
-	if _, err := h.app.DeliverTask(ctx, as, task.ID, "接口已实现，go test ./... 通过", nil); err != nil {
+	if _, err := h.app.Handoff(ctx, as, app.HandoffInput{CardID: card.ID, Outcome: domain.HandoffDone, Summary: "接口已实现，go test ./... 通过"}); err != nil {
 		t.Fatal(err)
 	}
-	fake.EmitTurnCompleted(memberTurn.ThreadID, memberTurn.TurnID, "completed", "已提交验收")
+	fake.EmitTurnCompleted(memberTurn.ThreadID, memberTurn.TurnID, "completed", "已交接")
 
 	waitUntil(t, 5*time.Second, "leader woken", func() bool { return len(fake.Turns()) == 2 })
-	notice := fake.Turns()[1]
-	if !strings.Contains(notice.Text, "交付了任务「登录接口」") || !strings.Contains(notice.Text, "review_task") || !strings.Contains(notice.Text, "返回 200") {
-		t.Fatalf("leader input:\n%s", notice.Text)
+	next := fake.Turns()[1]
+	if !strings.Contains(next.Text, "【接力卡片】验收汇报") || !strings.Contains(next.Text, "接口已实现，go test ./... 通过") || !strings.Contains(next.Text, "handoff") {
+		t.Fatalf("leader input:\n%s", next.Text)
 	}
 	var leaderMessages int
 	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system'`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
-		t.Fatalf("leader notices = %d (%v)", leaderMessages, err)
+		t.Fatalf("leader cards = %d (%v)", leaderMessages, err)
 	}
-	// The leader's conversation shows the notice as coming from the member.
+	// The leader's conversation shows the card as coming from the member.
 	page, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "messages", BotID: leader.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var sawNotice bool
+	var sawCard bool
 	for _, item := range page["messages"].([]any) {
 		if message := item.(domain.Message); message.Kind == domain.MessageKindSystem {
-			sawNotice = message.SourceBotID == member.ID
+			sawCard = message.SourceBotID == member.ID
 		}
 	}
-	if !sawNotice {
-		t.Fatal("leader page: review notice does not name the member")
+	if !sawCard {
+		t.Fatal("leader page: the card does not name the member")
 	}
-	// The record between the two members carries the notice.
+	// The record between the two members carries the card.
 	record, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "collaboration", TeamID: team.ID, BotID: member.ID, PeerBotID: leader.ID})
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"fmt"
 	"hash/fnv"
 	"net"
 	"os"
@@ -41,4 +42,26 @@ func rememberPort(paths platform.Paths, addr net.Addr) {
 		return
 	}
 	_ = os.WriteFile(portFile(paths), []byte(strconv.Itoa(tcp.Port)+"\n"), 0o600)
+}
+
+// loopbackOnly refuses an address other machines can reach.
+//
+// The core's authority is the Host header and the session cookie, and it
+// only accepts a loopback Host — a protection that a listener on a public
+// address would let anyone on the network walk around. CoBot serves this
+// machine and nothing else, so an address that is not loopback is refused
+// instead of quietly opening the door.
+func loopbackOnly(listen string) error {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return fmt.Errorf("listen address %q is not host:port: %w", listen, err)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("listen address %q is not a loopback address; CoBot only serves this machine", listen)
+	}
+	return nil
 }

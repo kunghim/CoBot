@@ -32,6 +32,8 @@ const (
 	// EventLogQuarantined records that a corrupt ledger file was isolated
 	// after its valid lines were imported (H08).
 	EventLogQuarantined = "log.quarantined"
+	// EventAvatarsUpdated records that a newer avatar catalog was downloaded.
+	EventAvatarsUpdated = "avatars.updated"
 )
 
 // Scope filters an event query by team and/or bot. Empty means "all visible

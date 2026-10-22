@@ -14,6 +14,9 @@ type File struct {
 	DataRoot string `json:"dataRoot,omitempty"`
 	Listen   string `json:"listen,omitempty"`
 	LogLevel string `json:"logLevel,omitempty"`
+	// AssetsBaseURL is where downloadable assets (the avatar catalog) are
+	// published; empty means the CoBot repository.
+	AssetsBaseURL string `json:"assetsBaseUrl,omitempty"`
 }
 
 // Load reads config.json; a missing file yields zero values (all defaults).
@@ -32,6 +35,7 @@ func Load(path string) (File, error) {
 	f.DataRoot = strings.TrimSpace(f.DataRoot)
 	f.Listen = strings.TrimSpace(f.Listen)
 	f.LogLevel = strings.TrimSpace(f.LogLevel)
+	f.AssetsBaseURL = strings.TrimSpace(f.AssetsBaseURL)
 	return f, nil
 }
 

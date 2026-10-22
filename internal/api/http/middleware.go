@@ -106,6 +106,28 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 			writeError(w, r, err)
 			return
 		}
+		// A page that arrives holding no credential is given one here. The
+		// listener is bound to loopback, and the checks above have already
+		// turned away a non-loopback host and any site the origin allowlist
+		// does not name. What is left is the user's own machine opening its
+		// own address, and that is the moment to issue the session.
+		//
+		// Issuing it here rather than handing out a one-time link is what
+		// makes a bookmarked page keep working. The link expires in a
+		// minute, so a tab that was closed and opened again later had
+		// nothing left to present, and the app could only ask for a new one.
+		//
+		// This is deliberately not a boundary against a program running as
+		// the same user: such a program could already read the admin secret
+		// and mint a session of its own. What the session gate is for is
+		// other sites in the user's own browser, and the origin check above
+		// is what stops them.
+		if principal.Kind == "" && s.opensSessionFor(r, asset) && !s.holdsLiveSession(r) {
+			if sess, mintErr := s.Sessions.Create(auth.LocalUserID); mintErr == nil {
+				s.setSessionCookies(w, sess, false)
+				principal = auth.NewPrincipalUser(sess.ID)
+			}
+		}
 		if principal.SessionID != "" {
 			// A session in use stays signed in: past half its lifetime it is
 			// extended and the browser gets cookies with the new expiry.
@@ -168,8 +190,13 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 				}
 				body["expectedRevision"] = version
 			}
+			// Memories and browser tabs are gone once closed: there is no
+			// stored revision to race against, so a DELETE there carries its
+			// idempotency key but no If-Match.
 			needsRevision := r.Method == http.MethodPatch ||
-				(r.Method == http.MethodDelete && !strings.Contains(r.URL.Path, "/memories/")) ||
+				(r.Method == http.MethodDelete &&
+					!strings.Contains(r.URL.Path, "/memories/") &&
+					!strings.Contains(r.URL.Path, "/browser/tabs/")) ||
 				strings.HasSuffix(r.URL.Path, "/decisions") || strings.HasSuffix(r.URL.Path, "/confirm") ||
 				strings.HasSuffix(r.URL.Path, "/archive") || strings.HasSuffix(r.URL.Path, "/restore") ||
 				strings.HasSuffix(r.URL.Path, "/answers") || strings.Contains(r.URL.Path, "/questions/") ||
@@ -262,6 +289,39 @@ func (s *Server) originAllowed(origin string) bool {
 		}
 	}
 	return false
+}
+
+// holdsLiveSession reports whether the request already carries a session
+// that is still good. A page that reloads keeps the session it has instead
+// of being issued a new one on every load.
+func (s *Server) holdsLiveSession(r *http.Request) bool {
+	c, err := r.Cookie(s.sessionCookieName())
+	if err != nil || c.Value == "" {
+		return false
+	}
+	_, ok := s.Sessions.Get(c.Value)
+	return ok
+}
+
+// opensSessionFor reports whether a request that carries no credential may
+// be issued one. A document request is the user's own browser opening the
+// address; a request from an allowed origin is a page that is already running
+// (the development server, the desktop shell) talking to the core.
+//
+// An API request with no origin is left anonymous: it is a program on the
+// machine rather than a page, and a program that wants a session can ask for
+// one the way it always did.
+func (s *Server) opensSessionFor(r *http.Request, asset bool) bool {
+	if origin := r.Header.Get("Origin"); origin != "" {
+		return s.originAllowed(origin)
+	}
+	if !asset {
+		return false
+	}
+	// Only a document load opens a session. The page asks for its scripts
+	// and images with other Accept values, and each of those would
+	// otherwise mint a session of its own.
+	return r.Method == http.MethodGet && strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 
 // resolvePrincipal maps credentials onto a principal. Exactly one credential

@@ -1,30 +1,23 @@
-import LoadMore from '../../components/LoadMore';
 // TeamList is the left panel: the "+ new team" action plus the two-level
 // team tree (leader first, then members). Selecting a member makes it the
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Crown, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
+import LoadMore from '../../components/LoadMore';
+import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, MemberRow, Skeleton } from '../../components/ui';
 import CreateTeamDialog from './CreateTeamDialog';
 import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
-import { MemberMark } from './roleTone';
+import Avatar from '../avatars/Avatar';
 
-const DOT_CLASS: Record<string, string> = {
-  idle: 'bg-neutral-300 dark:bg-neutral-600',
-  queued: 'bg-sky-500',
-  working: 'bg-emerald-500',
-  waiting_approval: 'bg-amber-500',
-  waiting_input: 'bg-orange-500',
-  interrupted: 'bg-red-400',
-  unknown: 'bg-neutral-400',
-};
+// States that want the user: the row carries a dot that stays loud on purpose.
+const ATTENTION = new Set(['waiting_approval', 'waiting_input']);
 
-export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
+export default function TeamList() {
   const { t } = useTranslation();
   const { botId, setBotId } = useSelectedBot();
   const navigate = useNavigate();
@@ -62,47 +55,32 @@ export default function TeamList({ onCollapse }: { onCollapse: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-3 py-3">
-        <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
+      <div className="flex min-h-14 items-center justify-between px-3 py-2">
+        <span className="px-1 text-2xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
           {t('nav.teamList')}
         </span>
-        <button
-          type="button"
-          onClick={onCollapse}
-          title={t('nav.toggleTeamList')}
-          aria-label={t('nav.toggleTeamList')}
-          aria-expanded={true}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
       </div>
 
       <div className="px-3 pb-2">
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-neutral-700 shadow-sm ring-1 ring-neutral-200 transition-colors hover:text-neutral-900 hover:ring-neutral-300 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700 dark:hover:text-white"
-        >
-          <Plus size={16} aria-hidden="true" />
+        <Button block variant="ghost" icon={Icons.add} onClick={() => setCreateOpen(true)} className="justify-start text-neutral-600 dark:text-neutral-300">
           {t('team.new')}
-        </button>
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {teams.isPending && (
-          <p className="px-2 py-1 text-sm text-neutral-500 dark:text-neutral-400" role="status">
-            {t('team.loading')}
-          </p>
+          <div className="space-y-2 px-2 py-1" role="status" aria-label={t('team.loading')}>
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
         )}
         {teams.isError && (
-          <p className="px-2 py-1 text-sm text-red-600" role="alert">
-            {t('team.loadFailed')}
-          </p>
+          <div className="px-1">
+            <Alert tone="danger">{t('team.loadFailed')}</Alert>
+          </div>
         )}
-        {teams.isSuccess && items.length === 0 && (
-          <p className="px-2 py-1 text-sm text-neutral-500 dark:text-neutral-400">{t('home.noTeams')}</p>
-        )}
+        {teams.isSuccess && items.length === 0 && <EmptyState icon={<Icons.team size={20} aria-hidden />} title={t('home.noTeams')} />}
         <ul className="space-y-3">
           {items.map((item) => (
             <TeamRow
@@ -147,14 +125,13 @@ function TeamRow({
   const { t } = useTranslation();
   const { team, bots } = item;
   const badgeKey = teamBadgeKey(team.status);
-  const leader = bots.find((bot) => bot.isLeader);
-  const leaderDirectory = leader ? team.directory : '';
   // A team whose folder is gone stays visible, greyed and read-only.
   const missing = team.status === 'directory_missing';
+  const Chevron = expanded ? Icons.expand : Icons.next;
 
   return (
-    <li className={`rounded-md ${missing ? 'opacity-60' : ''}`}>
-      <div className="flex flex-wrap items-center gap-1">
+    <li className={missing ? 'opacity-60' : undefined}>
+      <div className="flex items-center gap-1">
         {/* The whole row toggles the team; only the trailing menu does
             something else. */}
         <button
@@ -162,30 +139,25 @@ function TeamRow({
           onClick={onToggle}
           aria-expanded={expanded}
           title={expanded ? t('team.collapse', { name: team.name }) : t('team.expand', { name: team.name })}
-          className="flex min-w-0 flex-1 items-center gap-1 rounded-md py-1 pr-1 text-left hover:bg-neutral-200/60 dark:hover:bg-neutral-800"
+          className={cx('flex min-w-0 flex-1 items-center gap-1 rounded-lg py-1 pr-1 text-left transition-colors', interactive.hover)}
         >
           <span className="flex h-5 w-5 shrink-0 items-center justify-center text-neutral-400" aria-hidden="true">
-            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <Chevron size={14} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-neutral-800 dark:text-neutral-100">{team.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">{team.name}</span>
           {badgeKey && (
-            <span
-              className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-              title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}
-            >
-              {t(badgeKey)}
+            <span title={missing ? `${t(badgeKey)} · ${team.directory}` : t(badgeKey)}>
+              <Badge tone="warning">{t(badgeKey)}</Badge>
             </span>
           )}
         </button>
         <TeamMenu item={item} />
       </div>
       {expanded && (
-        <ul className="mt-1 space-y-px pl-1">
+        <ul className="mt-1 space-y-px">
           {orderBotsLeaderFirst(bots).map((bot) => (
-            <li key={bot.id} className="flex flex-wrap items-center">
-              <span className="min-w-0 flex-1">
-                <BotRow bot={bot} directory={bot.isLeader ? leaderDirectory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
-              </span>
+            <li key={bot.id}>
+              <BotRow bot={bot} directory={bot.isLeader ? team.directory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
             </li>
           ))}
         </ul>
@@ -194,53 +166,41 @@ function TeamRow({
   );
 }
 
-function BotRow({
-  bot,
-  directory,
-  selected,
-  onSelect,
-}: {
-  bot: Bot;
-  directory: string;
-  selected: boolean;
-  onSelect: (botId: string) => void;
-}) {
-  const { t } = useTranslation();
+function BotRow({ bot, directory, selected, onSelect }: { bot: Bot; directory: string; selected: boolean; onSelect: (botId: string) => void }) {
+  const { t, i18n } = useTranslation();
   const statusLabel = t(`team.status.${bot.status}`, { defaultValue: t(`team.status.unknown`) });
-
+  const busy = bot.status !== 'idle';
+  const last = bot.lastMessage;
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(bot.id)}
-      aria-current={selected}
-      title={directory || undefined}
-      className={`flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors ${
-        selected
-          ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-50 dark:ring-neutral-700'
-          : 'text-neutral-600 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60'
-      }`}
-    >
-      <span className="relative">
-        <MemberMark bot={bot} />
-        <span
-          role="img"
-          aria-label={statusLabel}
-          title={statusLabel}
-          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-neutral-100 dark:ring-neutral-900 ${DOT_CLASS[bot.status] ?? DOT_CLASS.unknown} ${bot.status === 'working' ? 'animate-pulse' : ''}`}
-        />
-      </span>
-      <span className={`min-w-0 flex-1 truncate ${selected ? 'font-medium' : ''}`}>{bot.name}</span>
-      {/* The leader is marked by a badge, not a second "leader" label next
-          to a name that usually already says so. */}
-      {bot.isLeader && (
-        <span
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300"
-          title={t('team.leader')}
-        >
-          <Crown size={10} aria-hidden="true" />
-          <span className="sr-only">{t('team.leader')}</span>
-        </span>
-      )}
-    </button>
+    <span title={directory || undefined} className="block">
+      <MemberRow
+        // The avatar shows the state (moving while working, wide eyes while
+        // waiting); a dot stays only for waiting on the user.
+        avatar={<Avatar bot={bot} showState />}
+        name={
+          <>
+            {bot.name}
+            {/* The leader's avatar marks it; screen readers hear it. */}
+            {bot.isLeader && <span className="sr-only">{t('team.leader')}</span>}
+          </>
+        }
+        statusLabel={statusLabel}
+        status={busy ? statusLabel : undefined}
+        time={last ? <time dateTime={last.createdAt}>{shortTime(last.createdAt, i18n.language)}</time> : undefined}
+        preview={last ? (last.kind === 'user' ? `${t('team.previewYou')}${last.text}` : last.text) : undefined}
+        current={selected}
+        attention={ATTENTION.has(bot.status)}
+        onSelect={() => onSelect(bot.id)}
+      />
+    </span>
   );
+}
+
+/** Today's messages show the time; older ones the date. */
+function shortTime(value: string, language: string): string {
+  const date = new Date(value);
+  const today = new Date();
+  return date.toDateString() === today.toDateString()
+    ? date.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString(language, { month: 'numeric', day: 'numeric' });
 }

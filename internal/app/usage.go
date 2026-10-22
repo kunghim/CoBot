@@ -91,7 +91,10 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 		EngineEpoch: epoch, ThreadID: p.ThreadID, TurnID: p.TurnID, Status: domain.UsageStatusRecorded,
 		CreatedAt: time.Now().UTC(),
 	}
-	if existing, err := sqlite.GetUsage(ctx, a.DB, epoch, p.ThreadID, p.TurnID); err == nil && existing.Status == domain.UsageStatusRecorded {
+	replacesUnknown := false
+	if existing, err := sqlite.GetUsage(ctx, a.DB, epoch, p.ThreadID, p.TurnID); err == nil && existing.Status == domain.UsageStatusUnknown {
+		replacesUnknown = true
+	} else if err == nil && existing.Status == domain.UsageStatusRecorded {
 		entry.ID, entry.CreatedAt = existing.ID, existing.CreatedAt
 		entry.InputTokens, entry.OutputTokens, entry.CachedInputTokens = existing.InputTokens, existing.OutputTokens, existing.CachedInputTokens
 		entry.CacheWriteInputTokens, entry.ReasoningOutputTokens = existing.CacheWriteInputTokens, existing.ReasoningOutputTokens
@@ -111,7 +114,16 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 			return err
 		}
 	}
-	return a.RecordUsage(ctx, entry)
+	if err := a.RecordUsage(ctx, entry); err != nil {
+		return err
+	}
+	// Real numbers for a turn recorded as unknown can lift a budget pause
+	// that only that unknown caused. It is the one usage update that can, so
+	// it is the only one that re-wakes held work.
+	if replacesUnknown {
+		a.ResumeBudgetPausedBots(ctx)
+	}
+	return nil
 }
 
 // RecordUsage stores a usage snapshot and publishes the change. Repeated
@@ -130,9 +142,9 @@ func (a *App) RecordUsage(ctx context.Context, entry domain.UsageEntry) error {
 	}
 	_ = a.recordEvent(ctx, domain.Event{Type: domain.EventUsageUpdated, TeamID: entry.TeamID, BotID: entry.BotID, ResourceID: entry.ThreadID})
 	a.Hub.Publish()
-	// Fresh numbers may make a paused budget determinable again (the unknown
-	// row they replace was what held the queue), so held work is re-woken.
-	a.ResumeBudgetPausedBots(ctx)
+	// No wake here: usage arrives with every model call, and the budget is
+	// checked again before each new turn anyway. Held work resumes when the
+	// budget settings change or new input wakes the member.
 	return nil
 }
 
@@ -148,9 +160,13 @@ func (a *App) MarkUsageUnknownIfMissing(ctx context.Context, tx *sql.Tx, teamID,
 	})
 }
 
+// reserveTurns is how many of a member's recent turns estimate the cost of
+// its next one.
+const reserveTurns = 5
+
 // BudgetPause describes why new turns for a bot are held.
 type BudgetPause struct {
-	Reason string // exceeded | usage_unknown
+	Reason string // exceeded | usage_unknown | reserve
 }
 
 // budgetPaused evaluates the configured budget against the ledger. With no
@@ -175,6 +191,16 @@ func (a *App) budgetPaused(ctx context.Context, teamID, botID string, settings d
 	}
 	if billable >= settings.BudgetTokens {
 		return &BudgetPause{Reason: "exceeded"}, nil
+	}
+	// A turn cannot be stopped once it runs, so a new one only starts when
+	// what is left covers about what this member's recent turns cost. It is
+	// an estimate: a turn may still cost more than its predecessors.
+	estimate, _, err := sqlite.AverageTurnUsage(ctx, a.DB, botID, reserveTurns)
+	if err != nil {
+		return nil, err
+	}
+	if estimate > 0 && billable+estimate > settings.BudgetTokens {
+		return &BudgetPause{Reason: "reserve"}, nil
 	}
 	return nil, nil
 }

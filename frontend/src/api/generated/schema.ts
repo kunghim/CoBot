@@ -107,6 +107,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/roles/{id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a role's avatar (null returns it to the catalog default); members without their own follow it */
+        put: operations["setRoleAvatar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep a local picture (already cropped to a 256×256 PNG) for use as an avatar; it stays in the data root */
+        post: operations["saveAvatarUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/uploads/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A stored avatar picture */
+        get: operations["getAvatarUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The avatar catalog cached in this profile, and its last sync */
+        get: operations["getAvatarCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status */
+        post: operations["syncAvatarCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/engine/check": {
         parameters: {
             query?: never;
@@ -192,6 +277,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Configured model providers */
+        get: operations["listProviders"];
+        put?: never;
+        /** Add a model provider */
+        post: operations["createProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One model provider */
+        get: operations["getProvider"];
+        put?: never;
+        post?: never;
+        /** Remove a model provider */
+        delete: operations["deleteProvider"];
+        options?: never;
+        head?: never;
+        /** Change a model provider */
+        patch: operations["updateProvider"];
+        trace?: never;
+    };
+    "/api/v1/providers/{id}/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a stored provider's models again
+         * @description The key is read from the encrypted credential store, so the user never has to paste it twice. The outcome is recorded on the stored models.
+         */
+        post: operations["reprobeProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/{id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Offer a provider's models to members, or stop offering them
+         * @description A disabled provider keeps its configuration and is out of every model picker; members that ran on it fall back to the default model from their next turn.
+         */
+        put: operations["setProviderEnabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provider-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Built-in vendor catalogue */
+        get: operations["listProviderPresets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Guess the vendor a pasted key belongs to
+         * @description Matches the key against local patterns only; never calls the network. An unknown key returns an empty id.
+         */
+        post: operations["detectProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List the models an endpoint offers
+         * @description Stateless: the endpoint and key the user just typed are used, so the models can be seen before the provider is stored.
+         */
+        post: operations["discoverProviderModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/probe-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check that models can run on an endpoint
+         * @description One minimal request per model; a model that cannot run is reported with a stable failure code.
+         */
+        post: operations["probeProviderModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/session/logout": {
         parameters: {
             query?: never;
@@ -260,8 +499,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change exactly one of a team's name, permission mode or reasoning effort
-         * @description The body carries exactly one of name, permissionMode or reasoningEffort (otherwise 400 error.team.patch_one_field). Permission mode and reasoning effort apply from each member's next turn.
+         * Change exactly one of a team's name, permission mode, reasoning effort or model provider
+         * @description The body carries exactly one of name, permissionMode, reasoningEffort or providerId (otherwise 400 error.team.patch_one_field). Permission mode and reasoning effort apply from each member's next turn.
          */
         patch: operations["patchTeam"];
         trace?: never;
@@ -314,7 +553,8 @@ export interface paths {
         delete: operations["deleteBot"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Set or clear a member's own avatar */
+        patch: operations["patchBot"];
         trace?: never;
     };
     "/api/v1/teams/{id}/bots": {
@@ -351,6 +591,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tabs of the team's browser, for the live view; never starts a browser */
+        get: operations["getTeamBrowser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open a page in a tab the user owns (starts the team's browser when it is down); the user's own tabs count against their limit of 5 per team, never against member limits */
+        post: operations["openTeamBrowserTab"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/tabs/{tab}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Close one tab of the team's browser; the user may close their own page and a member's page too. A tab holds no revision, so this DELETE carries its idempotency key but no If-Match */
+        delete: operations["closeTeamBrowserTab"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/tabs/{tab}/viewport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a tab's real window size (page renders at it for the user and every member; last setter wins) */
+        post: operations["setTeamBrowserTabViewport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pictures of one tab as server-sent events (event frame, data {tab, width, height, data}); width and height are the page's CSS pixels, data a base64 JPEG */
+        get: operations["streamTeamBrowserTab"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/browser/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply one thing the user did in the live view (mouse, wheel, key, text or navigation) to a tab */
+        post: operations["sendTeamBrowserInput"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/open-path": {
         parameters: {
             query?: never;
@@ -362,6 +704,26 @@ export interface paths {
         put?: never;
         /** Open (or reveal) a file inside the team folder with the system's default program */
         post: operations["openTeamPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose the model a member runs with
+         * @description Any model an enabled provider serves can be chosen. An empty providerId puts the member back on the default model. Applies from the member's next turn; moving to another provider loads the member's thread again with it, and the history stays.
+         */
+        put: operations["setBotModel"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -420,6 +782,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run again what a failed turn was started for (the member's latest turn, while the member is idle) */
+        post: operations["retryRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/approvals": {
         parameters: {
             query?: never;
@@ -461,11 +840,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Project a team's task board */
+        /** Project a team's cards */
         get: operations["listTasks"];
         put?: never;
-        /** Create a task with a unique owner */
-        post: operations["createTask"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -479,35 +857,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One task with its evidence and transfer history */
+        /** One card with its handoff records */
         get: operations["getTask"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Change status, or change owner through the transfer safety rules */
-        patch: operations["patchTask"];
+        patch?: never;
         trace?: never;
     };
-    "/api/v1/tasks/{id}/evidence": {
+    "/api/v1/teams/{id}/requirements": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** A team's requirements with their documents and routes, newest first */
+        get: operations["listRequirements"];
         put?: never;
-        /** Record a proof reference for a task */
-        post: operations["submitTaskEvidence"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tasks/{id}/confirm": {
+    "/api/v1/requirements/{id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -516,59 +893,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm a review task as done against evidence */
-        post: operations["confirmTask"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tasks/{id}/transfers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Offer a two-phase hand-over; the owner is unchanged until accepted */
-        post: operations["offerTaskTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/transfers/{id}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Accept and swap the owner atomically */
-        post: operations["acceptTaskTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/transfers/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Withdraw a live offer */
-        post: operations["cancelTaskTransfer"];
+        /** Cancel a requirement; its open cards and confirmations end */
+        post: operations["cancelRequirement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -857,29 +1183,125 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A model vendor or gateway the engine can call. The secret is never part of it. */
+        Provider: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "custom";
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            credentialRef?: string;
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            /** @description The models the user kept, not the vendor's full catalogue. */
+            models: components["schemas"]["ProviderModel"][];
+            defaultModel?: string;
+            retries?: components["schemas"]["ProviderRetries"];
+            presetId?: string;
+            /** @description Whether members may pick this provider's models. */
+            enabled: boolean;
+            /** Format: int64 */
+            revision: number;
+            /** @description Whether a key is stored for this provider. */
+            hasCredential?: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description One wire dialect the provider offers. */
+        ProviderEndpoint: {
+            /** @enum {string} */
+            dialect: "openai-responses" | "anthropic-messages";
+            baseUrl: string;
+        };
+        ProviderModel: {
+            id: string;
+            displayName?: string;
+            contextWindow?: number;
+            defaultEffort?: string;
+            supportedEfforts?: string[];
+            inputModalities?: string[];
+            /** @enum {string} */
+            status?: "ok" | "failed" | "unknown";
+            /** @description Stable machine code of the last check. */
+            failure?: string;
+            /** @description Human-readable detail of the last check. */
+            message?: string;
+        };
+        /** @description How often the engine may retry a request to this provider. */
+        ProviderRetries: {
+            request?: number;
+            stream?: number;
+        };
+        ProviderRequest: {
+            /** Format: uuid */
+            requestId: string;
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "official" | "custom";
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            models?: components["schemas"]["ProviderModel"][];
+            defaultModel?: string;
+            retries?: components["schemas"]["ProviderRetries"];
+            presetId?: string;
+            /** @description Written straight to the encrypted credential store; never stored in the provider record and never returned. */
+            apiKey?: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+        };
+        /** @description One built-in vendor. */
+        ProviderPreset: {
+            id: string;
+            name: string;
+            short: string;
+            color: string;
+            keyUrl?: string;
+            official: boolean;
+            /** @enum {string} */
+            authMode: "chatgpt" | "api_key";
+            endpoints: components["schemas"]["ProviderEndpoint"][];
+            /** @description Fallback catalogue, used when discovery fails. */
+            models?: components["schemas"]["ProviderModel"][];
+            keyPatterns?: string[];
+        };
+        ProviderProbeResult: {
+            ok: boolean;
+            /** @description Stable machine code */
+            code?: string;
+            message?: string;
+        };
+        /** @description A tab's real window size as the page renders it; absent on a tab nobody set one for (the browser's default window). */
+        BrowserViewport: {
+            width: number;
+            height: number;
+            mobile?: boolean;
+        };
+        /** @description A card, one stage of a requirement's route held by one member. */
         Task: {
             id: string;
             teamId: string;
             ownerId: string;
-            parentId?: string;
             title: string;
             description?: string;
             acceptanceCriteria?: string;
             /** @enum {string} */
-            status: "todo" | "doing" | "review" | "done" | "cancelled";
-            blockedReason?: string;
-            dependencyIds: string[];
+            status: "todo" | "doing" | "done" | "cancelled";
             /**
-             * @description The checklist a reviewer member applies; absent when the leader accepts the delivery.
+             * @description The checklist of a review stage's card.
              * @enum {string}
              */
             reviewType?: "requirements" | "design" | "test_plan" | "code" | "general";
-            /** @description The reviewer member whose verdict decides the task. */
-            reviewerId?: string;
-            /** @description The reviewer's send-backs since the leader last decided. */
-            rejectCount: number;
-            /** @description Groups the tasks one confirmed plan created. */
             requirementId?: string;
+            /** @description The card's stage on the route; -1 for a requirement-document card. */
+            stageIndex: number;
+            /** @enum {string} */
+            stageKind?: "confirm" | "design" | "review" | "test_cases" | "implement" | "test" | "accept" | "draft" | "escalation";
+            /** @description The stage a return-to-me rework card goes back to; -1 runs the route on. */
+            returnTo: number;
             /** Format: int64 */
             revision: number;
             createdBy: string;
@@ -888,28 +1310,51 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @description A handoff record. */
         Evidence: {
             id: string;
             taskId: string;
             authorId: string;
             summary: string;
             artifactRefs: string[];
-            candidateRef?: string;
-            testResult?: string;
-            reviewResult?: string;
+            /** @enum {string} */
+            outcome?: "done" | "back" | "escalate" | "resume";
+            /** @enum {string} */
+            mode?: "rerun" | "return_to_me";
+            suggestions?: string;
+            execution?: components["schemas"]["Execution"];
             /** Format: date-time */
             createdAt: string;
         };
-        Transfer: {
-            id: string;
-            taskId: string;
-            fromBotId: string;
-            toBotId: string;
-            /** Format: int64 */
-            taskRevision: number;
-            note?: string;
+        /** @description What the engine reported a member ran and changed while it held the card. */
+        Execution: {
+            commands: {
+                command: string;
+                exitCode?: number;
+            }[];
+            files: string[];
+        };
+        Stage: {
+            name: string;
             /** @enum {string} */
-            status: "offered" | "accepted" | "cancelled" | "stale";
+            kind: "confirm" | "design" | "review" | "test_cases" | "implement" | "test" | "accept";
+            ownerId?: string;
+            /** @enum {string} */
+            reviewType?: "requirements" | "design" | "test_plan" | "code" | "general";
+            criteria?: string;
+        };
+        Requirement: {
+            id: string;
+            teamId: string;
+            title: string;
+            /** @description The project manager's requirement document (Markdown). */
+            document: string;
+            stages: components["schemas"]["Stage"][];
+            /** @enum {string} */
+            status: "active" | "accepting" | "done" | "cancelled";
+            createdBy: string;
+            /** Format: int64 */
+            revision: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -918,11 +1363,12 @@ export interface components {
         Question: {
             id: string;
             /**
-             * @description acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
              * @enum {string}
              */
-            kind: "" | "acceptance";
+            kind: "" | "confirm" | "acceptance";
             requirementId?: string;
+            stageIndex?: number;
             teamId: string;
             requesterBotId: string;
             taskId?: string;
@@ -1008,51 +1454,21 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        CreateTaskRequest: {
-            /** Format: uuid */
-            requestId: string;
-            title: string;
-            description?: string;
-            acceptanceCriteria?: string;
-            ownerId: string;
-            parentId?: string;
-            dependencyIds?: string[];
-        };
-        PatchTaskRequest: {
-            /** Format: uuid */
-            requestId: string;
-            /** @enum {string} */
-            status?: "todo" | "doing" | "review" | "cancelled";
-            blockedReason?: string;
-            ownerId?: string;
-            /** Format: int64 */
-            expectedRevision: number;
-        };
-        SubmitEvidenceRequest: {
-            /** Format: uuid */
-            requestId: string;
-            summary: string;
-            artifactRefs?: string[];
-            candidateRef?: string;
-            testResult?: string;
-            reviewResult?: string;
-        };
-        OfferTransferRequest: {
-            /** Format: uuid */
-            requestId: string;
-            toBotId: string;
-            note?: string;
-        };
         AnswerQuestionRequest: {
             /** Format: uuid */
             requestId: string;
-            /** @description The answer; for an acceptance question */
+            /** @description The answer; for a confirmation or acceptance */
             answerText: string;
             /**
-             * @description Required for an acceptance question, refused for any other.
+             * @description Required for a confirmation or acceptance question, refused for any other.
              * @enum {string}
              */
             decision?: "accept" | "revise";
+            /**
+             * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
+             * @enum {string}
+             */
+            mode?: "rerun" | "return_to_me";
             /** Format: int64 */
             expectedRevision: number;
         };
@@ -1060,7 +1476,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "deliver_task" | "review_task" | "send_message" | "create_task" | "ask_user";
+            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "browser";
             arguments?: {
                 [key: string]: unknown;
             };
@@ -1147,6 +1563,37 @@ export interface components {
             /** Format: date-time */
             bearerExpiresAt?: string;
         };
+        AvatarCatalog: {
+            series: components["schemas"]["AvatarSeries"][];
+            status: {
+                syncing: boolean;
+                /** Format: date-time */
+                lastSyncAt?: string;
+                lastError?: string;
+            };
+        };
+        /** @description An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image. */
+        AvatarRef: {
+            /** @enum {string} */
+            kind: "catalog" | "upload";
+            series?: string;
+            shape?: string;
+            eyes?: string;
+            color?: string;
+            file?: string;
+        };
+        AvatarSeries: {
+            id: string;
+            name: {
+                [key: string]: string;
+            };
+            kind: string;
+            version: number;
+            /** @description The series file as published (format in assets/avatars) */
+            data: {
+                [key: string]: unknown;
+            };
+        };
         Settings: {
             /** Format: int64 */
             revision: number;
@@ -1155,8 +1602,10 @@ export interface components {
             /** @enum {string} */
             colorMode: "system" | "light" | "dark";
             /** @enum {string} */
-            theme: "graphite" | "harbor" | "dusk";
+            theme: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel: string;
+            /** @description The model provider the profile runs with; empty means the engine's own. */
+            defaultProvider?: string;
             memberLimit: number;
             chainLimit: number;
             reviewRejectLimit: number;
@@ -1172,8 +1621,10 @@ export interface components {
             /** @enum {string} */
             colorMode?: "system" | "light" | "dark";
             /** @enum {string} */
-            theme?: "graphite" | "harbor" | "dusk";
+            theme?: "graphite" | "harbor" | "dusk" | "classic";
             defaultModel?: string;
+            /** @description The model provider to run with; must name a configured provider. */
+            defaultProvider?: string;
             memberLimit?: number;
             chainLimit?: number;
             reviewRejectLimit?: number;
@@ -1215,6 +1666,8 @@ export interface components {
             permissionMode?: "read_only" | "default" | "full";
             /** @description How hard members think each turn; absent follows the model's default. */
             reasoningEffort?: string;
+            /** @description The model provider this team runs with; absent follows the profile's default. */
+            providerId?: string;
         };
         Bot: {
             id: string;
@@ -1226,8 +1679,22 @@ export interface components {
             /** @enum {string} */
             status: "idle" | "queued" | "working" | "waiting_approval" | "waiting_input" | "interrupted" | "unknown";
             currentRunId?: string;
+            avatar?: components["schemas"]["AvatarRef"];
+            /** @description The provider of the model this member chose; absent means the member follows the default model. */
+            providerId?: string;
+            /** @description The model this member chose, one its provider serves. */
+            model?: string;
             /** Format: int64 */
             revision: number;
+            /** Format: date-time */
+            createdAt: string;
+            lastMessage?: components["schemas"]["MessagePreview"];
+        };
+        /** @description The start of the latest message between the user and a member, for the team list. */
+        MessagePreview: {
+            /** @enum {string} */
+            kind: "user" | "assistant";
+            text: string;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1344,7 +1811,6 @@ export interface components {
         TaskDetail: {
             task: components["schemas"]["Task"];
             evidence: components["schemas"]["Evidence"][];
-            transfers: components["schemas"]["Transfer"][];
         };
         /** @description One engine model, reduced to non-secret identifier fields. */
         Model: {
@@ -1564,6 +2030,157 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
+    setRoleAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Role avatar set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            roleId: string;
+                            avatar?: components["schemas"]["AvatarRef"];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    saveAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /**
+                     * Format: byte
+                     * @description Base64 PNG
+                     */
+                    data: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored picture */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            file: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getAvatarUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached catalog; empty until a sync succeeds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    syncAvatarCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Catalog after the check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
     checkEngine: {
         parameters: {
             query?: never;
@@ -1703,6 +2320,340 @@ export interface operations {
             503: components["responses"]["Error"];
         };
     };
+    listProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Providers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            providers: components["schemas"]["Provider"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updateProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    reprobeProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-model results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            results: {
+                                [key: string]: components["schemas"]["ProviderProbeResult"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setProviderEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listProviderPresets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Presets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            presets: components["schemas"]["ProviderPreset"][];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    detectProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    apiKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Detected preset id, empty when unknown */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            presetId: string;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    discoverProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    baseUrl: string;
+                    apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Model ids */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            models: string[];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+        };
+    };
+    probeProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    baseUrl: string;
+                    apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
+                    modelIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Per-model results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            results: {
+                                [key: string]: components["schemas"]["ProviderProbeResult"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
     sessionLogout: {
         parameters: {
             query?: never;
@@ -1746,6 +2697,7 @@ export interface operations {
                                 name?: string;
                                 contentVersion?: string;
                                 scenarios?: string[];
+                                avatar?: components["schemas"]["AvatarRef"];
                             }[];
                             scenarios?: {
                                 id: string;
@@ -1897,6 +2849,8 @@ export interface operations {
                     permissionMode?: "read_only" | "default" | "full";
                     /** @description How hard members think from their next turn (an effort the model lists); empty follows the model's default. */
                     reasoningEffort?: string;
+                    /** @description The model provider this team runs with; empty follows the profile's default. Applies from the team's next turn. */
+                    providerId?: string;
                     /** Format: int64 */
                     expectedRevision: number;
                 };
@@ -2017,6 +2971,43 @@ export interface operations {
             409: components["responses"]["Error"];
         };
     };
+    patchBot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision: number;
+                    /** @description The avatar to use; null follows the default again */
+                    avatar: components["schemas"]["AvatarRef"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
     addBot: {
         parameters: {
             query?: never;
@@ -2074,6 +3065,244 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
+    getTeamBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether a browser is installed and running, and its tabs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @description A Chromium-based browser is installed on this computer. */
+                            available: boolean;
+                            running: boolean;
+                            tabs: {
+                                id: string;
+                                /**
+                                 * @description member: a member's tab; user: a tab the user opened themselves.
+                                 * @enum {string}
+                                 */
+                                owner: "member" | "user";
+                                /** @description The bot id */
+                                memberId?: string;
+                                url: string;
+                                title: string;
+                                /** @description A member's call is working in this tab right now. */
+                                busy?: boolean;
+                                viewport?: components["schemas"]["BrowserViewport"];
+                            }[];
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    openTeamBrowserTab: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    /** @description Initial address (browser-internal schemes refused); omit to open a blank page. */
+                    url?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The opened tab */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            tab: {
+                                id: string;
+                                /** @enum {string} */
+                                owner: "member" | "user";
+                                memberId?: string;
+                                url: string;
+                                title: string;
+                                viewport?: components["schemas"]["BrowserViewport"];
+                            };
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    closeTeamBrowserTab: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                tab: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Closed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            ok: boolean;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setTeamBrowserTabViewport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                tab: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    /**
+                     * @description desktop 1280x744, tablet 768x1024, phone 390x844 (mobile), clear back to the browser's default window; or give width and height.
+                     * @enum {string}
+                     */
+                    preset?: "desktop" | "tablet" | "phone" | "clear";
+                    width?: number;
+                    height?: number;
+                    mobile?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The window size now applied (null after clear) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @description The window size now applied; null after clear. */
+                            viewport: components["schemas"]["BrowserViewport"] | null;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    streamTeamBrowserTab: {
+        parameters: {
+            query: {
+                tab: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    sendTeamBrowserInput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId?: string;
+                    tab: string;
+                    /** @enum {string} */
+                    kind: "mouse" | "wheel" | "key" | "text" | "nav";
+                    /** @description mouse: move, down, up. key: down, up. */
+                    action?: string;
+                    x?: number;
+                    y?: number;
+                    /** @enum {string} */
+                    button?: "left" | "middle" | "right";
+                    clickCount?: number;
+                    dx?: number;
+                    dy?: number;
+                    key?: string;
+                    code?: string;
+                    vk?: number;
+                    text?: string;
+                    /** @description Bit mask: 1 alt, 2 control, 4 meta, 8 shift. */
+                    modifiers?: number;
+                    /** @description nav: back, forward, reload or an address. */
+                    to?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+        };
+    };
     openTeamPath: {
         parameters: {
             query?: never;
@@ -2105,6 +3334,44 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             404: components["responses"]["Error"];
+        };
+    };
+    setBotModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                    providerId: string;
+                    model: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     listMessages: {
@@ -2225,6 +3492,35 @@ export interface operations {
             409: components["responses"]["Error"];
         };
     };
+    retryRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The work is queued again */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     listApprovals: {
         parameters: {
             query: {
@@ -2327,36 +3623,6 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
-    createTask: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateTaskRequest"];
-            };
-        };
-        responses: {
-            /** @description Created task */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Task"];
-                    };
-                };
-            };
-            400: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
     getTask: {
         parameters: {
             query?: never;
@@ -2382,7 +3648,7 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
-    patchTask: {
+    listRequirements: {
         parameters: {
             query?: never;
             header?: never;
@@ -2391,53 +3657,25 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchTaskRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Updated task */
+            /** @description Requirements */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    submitTaskEvidence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubmitEvidenceRequest"];
-            };
-        };
-        responses: {
-            /** @description Evidence recorded */
-            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Evidence"];
+                        data?: {
+                            items: components["schemas"]["Requirement"][];
+                        };
                     };
                 };
             };
-            400: components["responses"]["Error"];
-            404: components["responses"]["Error"];
+            401: components["responses"]["Error"];
         };
     };
-    confirmTask: {
+    cancelRequirement: {
         parameters: {
             query?: never;
             header?: never;
@@ -2451,112 +3689,23 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
-                    evidenceIds?: string[];
-                    /** Format: int64 */
-                    expectedRevision: number;
+                    /**
+                     * Format: int64
+                     * @description Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
+                     */
+                    expectedRevision?: number;
                 };
             };
         };
         responses: {
-            /** @description Confirmed task */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    offerTaskTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OfferTransferRequest"];
-            };
-        };
-        responses: {
-            /** @description Offered transfer */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Transfer"];
-                    };
-                };
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    acceptTaskTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                    /** Format: int64 */
-                    expectedRevision: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Transferred task */
+            /** @description Cancelled requirement */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Task"];
-                    };
-                };
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    cancelTaskTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    requestId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Cancelled transfer */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data?: components["schemas"]["Transfer"];
+                        data?: components["schemas"]["Requirement"];
                     };
                 };
             };

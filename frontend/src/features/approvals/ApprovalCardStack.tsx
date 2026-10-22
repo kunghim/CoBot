@@ -1,13 +1,17 @@
 // ApprovalCardStack shows pending approvals of the current team one card at
-// a time above the composer. There is no autoplay: the pager only moves on
-// explicit user input, and a decided card disappears from the stack while the
-// right panel keeps the history. Cards arrive oldest-first from the API.
-import { useEffect, useState } from 'react';
+// a time above the composer, in the waiting-card frame Codex uses: who asks
+// and what, then the answers as pill buttons on the right, the recommended
+// one last. There is no autoplay: the pager only moves on explicit user
+// input, and a decided card disappears from the stack while the right panel
+// keeps the history. Cards arrive oldest-first from the API.
+import { useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApprovals, useDecideApproval } from '../../api/queries';
 import type { ApprovalOption } from '../../api/types';
+import { Alert, Button, Icons, WaitingCard } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import { TeamMembersContext } from '../conversations/ExchangeLine';
+import Avatar from '../avatars/Avatar';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 import NativeApprovalBody from './NativeApprovalBody';
 
@@ -21,6 +25,7 @@ export default function ApprovalCardStack({
   botNameById: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
+  const members = useContext(TeamMembersContext);
   const approvals = useApprovals(teamId, 'pending', true, viewBotId);
   const decide = useDecideApproval();
   const [index, setIndex] = useState(0);
@@ -29,10 +34,11 @@ export default function ApprovalCardStack({
   const items = approvals.data?.items ?? [];
   const selectedId = items[clampPagerIndex(index, items.length)]?.id;
   useEffect(() => setDecideError(''), [selectedId]);
-  if (approvals.isError && !approvals.data) return <p role="alert" className="text-xs text-red-600">{t('approvals.loadFailed')}</p>;
+  if (approvals.isError && !approvals.data) return <Alert tone="danger">{t('approvals.loadFailed')}</Alert>;
   if (items.length === 0) return null;
   const current = clampPagerIndex(index, items.length);
   const approval = items[current];
+  const total = approvals.data?.total ?? items.length;
 
   const decideOption = (option: ApprovalOption) => {
     setDecideError('');
@@ -42,94 +48,71 @@ export default function ApprovalCardStack({
     );
   };
 
-  const requesterName = botNameById.get(approval.requesterBotId) ?? approval.requesterBotId;
+  const requester = members.get(approval.requesterBotId);
+  const requesterName = requester?.name ?? botNameById.get(approval.requesterBotId) ?? approval.requesterBotId;
   const typeLabel = t(`approvals.type.${approval.type}`, { defaultValue: t('approvals.title') });
+  // The API lists the recommended answer first; it goes last, on the right.
+  const answers = [...approval.options].reverse();
+  const unavailable = [...new Set(approval.options.map((option) => option.disabledReasonKey).filter(Boolean))];
 
   return (
-    <section
-      aria-label={typeLabel}
-      className="rounded-xl border border-amber-200 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/40"
+    <WaitingCard
+      icon={<Icons.permission size={16} />}
+      title={typeLabel}
+      position={{ index: current + 1, total }}
+      onPrevious={() => setIndex(current - 1)}
+      onNext={() => {
+        if (current < items.length - 1) setIndex(current + 1);
+        else if (approvals.hasNextPage) void approvals.fetchNextPage().then((result) => { if (!result.isError) setIndex(current + 1); });
+      }}
+      previousLabel={t('approvals.prev')}
+      nextLabel={t('approvals.next')}
+      actions={answers.map((option) => (
+        <Button
+          key={option.id}
+          shape="pill"
+          size="sm"
+          variant={option === approval.options[0] ? 'primary' : 'secondary'}
+          disabled={decide.isPending || option.disabled}
+          title={option.disabledReasonKey ? t(`errors.${option.disabledReasonKey}`, { defaultValue: t('approvals.optionUnavailable') }) : undefined}
+          onClick={() => decideOption(option)}
+        >
+          {t(optionLabelKeys(option), { defaultValue: optionFallbackText(option) })}
+        </Button>
+      ))}
     >
-      <header className="flex items-center gap-2 border-b border-amber-200 px-3 py-1.5 dark:border-amber-800">
-        <h3 className="text-xs font-semibold text-amber-900 dark:text-amber-100">{typeLabel}</h3>
-        {(approvals.data?.total ?? items.length) > 1 && (
-          <div className="ml-auto flex items-center gap-0.5 text-xs text-amber-800 dark:text-amber-200">
-            <button
-              type="button"
-              onClick={() => setIndex(current - 1)}
-              disabled={current === 0}
-              title={t('approvals.prev')}
-              aria-label={t('approvals.prev')}
-              className="flex h-6 w-6 items-center justify-center rounded hover:bg-amber-200 disabled:opacity-40 dark:hover:bg-amber-900"
-            >
-              <ChevronLeft size={14} aria-hidden="true" />
-            </button>
-            <span aria-live="polite">{t('approvals.position', { index: current + 1, total: approvals.data?.total ?? items.length })}</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (current < items.length - 1) setIndex(current + 1);
-                else if (approvals.hasNextPage) void approvals.fetchNextPage().then((result) => { if (!result.isError) setIndex(current + 1); });
-              }}
-              disabled={approvals.isFetchingNextPage || (current === items.length - 1 && !approvals.hasNextPage)}
-              title={t('approvals.next')}
-              aria-label={t('approvals.next')}
-              className="flex h-6 w-6 items-center justify-center rounded hover:bg-amber-200 disabled:opacity-40 dark:hover:bg-amber-900"
-            >
-              <ChevronRight size={14} aria-hidden="true" />
-            </button>
-          </div>
-        )}
-      </header>
-
-      <div className="space-y-2 px-3 py-2 text-sm">
-        <p className="text-xs text-amber-800 dark:text-amber-200">
-          {t('approvals.requester', { name: requesterName })}
+      <p className="flex flex-wrap items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-50">
+          {requester && <Avatar bot={requester} size="sm" />}
+          {requesterName}
+        </span>
+        <span>{t('approvals.requesterAsks')}</span>
+      </p>
+      {approval.type === 'native_tool' ? (
+        <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />
+      ) : (
+        <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-xl bg-neutral-900/[0.04] px-3 py-2 font-mono text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">
+          {approvalSummaryText(t, approval.summary)}
+        </pre>
+      )}
+      {approval.reason && (
+        <p>
+          <span className="text-neutral-500 dark:text-neutral-400">{t('approvals.reason')}: </span>
+          <span className="whitespace-pre-wrap">{approval.reason}</span>
         </p>
-        {approval.type === 'native_tool' ? (
-          <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />
-        ) : (
-          <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2 py-1.5 font-mono text-xs text-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
-            {approvalSummaryText(t, approval.summary)}
-          </pre>
-        )}
-        {approval.reason && (
-          <p className="text-sm">
-            <span className="text-neutral-500 dark:text-neutral-400">{t('approvals.reason')}: </span>
-            <span className="whitespace-pre-wrap">{approval.reason}</span>
-          </p>
-        )}
-        {decideError && (
-          <p className="text-sm text-red-600" role="alert">
-            {decideError}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          {approval.options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              disabled={decide.isPending || option.disabled}
-              title={option.disabledReasonKey ? t(`errors.${option.disabledReasonKey}`, { defaultValue: t('approvals.optionUnavailable') }) : undefined}
-              onClick={() => decideOption(option)}
-              className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
-                option.id === 'cancel'
-                  ? 'border-red-300 bg-white text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-neutral-900 dark:text-red-300 dark:hover:bg-red-950'
-                  : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-neutral-900 dark:text-amber-100 dark:hover:bg-amber-900'
-              }`}
-            >
-              {t(optionLabelKeys(option), { defaultValue: optionFallbackText(option) })}
-            </button>
-          ))}
-        </div>
-        {[...new Set(approval.options.map((option) => option.disabledReasonKey).filter(Boolean))].map((reason) => <p className="text-xs text-amber-800 dark:text-amber-200" key={reason}>{t(`errors.${reason}`, { defaultValue: t('approvals.optionUnavailable') })}</p>)}
-        {approvals.isFetchNextPageError && <p role="alert" className="text-xs text-red-600">{t('paging.failed')}</p>}
-        {decide.isPending && (
-          <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
-            {t('approvals.deciding')}
-          </p>
-        )}
-      </div>
-    </section>
+      )}
+      {unavailable.map((reason) => (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400" key={reason}>
+          {t(`errors.${reason}`, { defaultValue: t('approvals.optionUnavailable') })}
+        </p>
+      ))}
+      {decideError && <Alert tone="danger">{decideError}</Alert>}
+      {approvals.isFetchNextPageError && <Alert tone="danger">{t('paging.failed')}</Alert>}
+      {decide.isPending && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">
+          {t('approvals.deciding')}
+        </p>
+      )}
+    </WaitingCard>
   );
 }

@@ -20,6 +20,8 @@ import (
 	apihttp "github.com/kunghim/CoBot/internal/api/http"
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/avatars"
+	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/collaboration"
 	"github.com/kunghim/CoBot/internal/config"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -31,6 +33,7 @@ import (
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
+	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 	"github.com/kunghim/CoBot/internal/webui"
 	"github.com/kunghim/CoBot/internal/wiretrace"
@@ -51,6 +54,9 @@ type Options struct {
 	// hook trust, so users never configure either by hand. Product entry
 	// points enable it; tests leave it off and drive the engine themselves.
 	EngineSelfCheck bool
+	// AvatarSync checks for a newer avatar catalog right after startup.
+	// Product entry points enable it; tests stay offline.
+	AvatarSync bool
 }
 
 // Core is a running product instance.
@@ -115,6 +121,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		// Without an explicit address the profile keeps one port across
 		// restarts, so a bookmarked page and its session keep working.
 		listen = net.JoinHostPort("127.0.0.1", strconv.Itoa(preferredPort(paths)))
+	}
+	if err := loopbackOnly(listen); err != nil {
+		return nil, err
 	}
 
 	lock, err := platform.AcquireLock(paths, 2*time.Second)
@@ -213,6 +222,25 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		Version:      opts.Version,
 		Logger:       logger,
 	}
+	// The avatar catalog is downloaded, not bundled. A bad address in
+	// config.json falls back to the published one instead of failing startup.
+	catalog, catalogErr := avatars.New(paths.AvatarsDir(), cfg.AssetsBaseURL)
+	if catalogErr != nil {
+		logger.Warn("assetsBaseUrl ignored", "error", catalogErr)
+		catalog, _ = avatars.New(paths.AvatarsDir(), "")
+	}
+	application.Avatars = catalog
+	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
+
+	// The credential store holds the model providers' API keys, encrypted
+	// with the platform's key protection. A store that cannot be opened is
+	// not fatal: the product still works, only the provider secrets do not.
+	store, credErr := secrets.New(paths.CredentialsDir())
+	if credErr != nil {
+		logger.Warn("credential store unavailable", "error", credErr)
+	} else {
+		application.Credentials = store
+	}
 
 	// Engine composition: production uses the real Codex adapter; tests
 	// replace the factories through the App fields before Start.
@@ -233,10 +261,17 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		if err != nil {
 			return nil, err
 		}
+		// The provider secrets ride in the child's environment; the
+		// configuration only names the variables, so the key itself never
+		// reaches a file the user might open.
+		secrets, err := application.ProviderEnv(startCtx)
+		if err != nil {
+			return nil, err
+		}
 		return codex.Start(startCtx, codex.ServerOptions{
 			Binary:    binary,
 			Cwd:       cwd,
-			Env:       codex.EngineEnv(paths),
+			Env:       codex.EngineEnv(paths, secrets),
 			Client:    codex.ClientInfo{Name: "cobot", Title: "CoBot", Version: opts.Version},
 			Callbacks: callbacks,
 			Logger:    logger,
@@ -246,6 +281,16 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
 		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
 	})
+	// A developer can shorten the idle engine shutdown to watch it happen
+	// (for example COBOT_IDLE_ENGINE_TIMEOUT=30s); it is not a user setting.
+	if raw := os.Getenv("COBOT_IDLE_ENGINE_TIMEOUT"); raw != "" {
+		if timeout, err := time.ParseDuration(raw); err == nil {
+			scheduler.IdleEngineTimeout = timeout
+			logger.Info("idle engine timeout overridden", "timeout", timeout.String())
+		} else {
+			logger.Warn("ignoring COBOT_IDLE_ENGINE_TIMEOUT", "value", raw, "error", err)
+		}
+	}
 	application.Scheduler = scheduler
 	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
 		return newServer(startCtx, cwd, engine.Callbacks{
@@ -365,6 +410,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// no dispatch worker may outlive a failed Start call.
 	startupComplete = true
 	scheduler.Start()
+	if opts.AvatarSync {
+		application.StartAvatarSync()
+	}
+	go application.CleanAvatarUploads(context.Background())
 	if opts.EngineSelfCheck {
 		go func() {
 			info := application.EngineStatus(ctx)
@@ -409,6 +458,9 @@ func (c *Core) Shutdown(ctx context.Context) error {
 		if err := c.scheduler.Stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("scheduler shutdown: %w", err))
 		}
+	}
+	if c.App != nil && c.App.Browser != nil {
+		c.App.Browser.Shutdown()
 	}
 	if c.App != nil {
 		if err := c.App.ShutdownControl(ctx); err != nil {

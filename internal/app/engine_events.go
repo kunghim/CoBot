@@ -322,20 +322,22 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 			nextStatus = domain.BotStatusWaitingInput
 		}
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
-		return err
+	// A turn that ended with the member's card still open, and nothing else
+	// coming, gets one reminder to hand it on.
+	if st.status == domain.RunCompleted && nextStatus == domain.BotStatusIdle {
+		reminded, err := remindUnhandedCardsLocked(ctx, tx, teamID, botID, run.ID)
+		if err != nil {
+			return err
+		}
+		if reminded {
+			nextStatus = domain.BotStatusQueued
+		}
 	}
-	// A leader's turn that reported a finished requirement hands its reply
-	// to the user for acceptance.
-	acceptances, err := s.app.createAcceptanceLocked(ctx, tx, run, st.text)
-	if err != nil {
+	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err
-	}
-	for _, id := range acceptances {
-		s.app.recordEvent(ctx, domain.Event{Type: domain.EventQuestionCreated, TeamID: teamID, BotID: botID, ResourceID: id})
 	}
 	if s.app.CollaborationTokens != nil {
 		s.app.CollaborationTokens.RevokeRun(run.ID)

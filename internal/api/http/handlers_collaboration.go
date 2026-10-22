@@ -73,10 +73,12 @@ func (s *Server) handleCollaboration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if binding.NativeMetadata {
-		if err := s.App.ValidateNativeToolSource(r.Context(), principal, req.ProviderThreadID, req.ProviderTurnID); err != nil {
+		subAgent, err := s.App.ValidateNativeToolSource(r.Context(), principal, req.ProviderThreadID, req.ProviderTurnID)
+		if err != nil {
 			writeCollabError(w, r, collaboration.Reject("error.unauthorized.stale_execution", "error.tool.no_active_run", nil))
 			return
 		}
+		principal.SubAgent = subAgent
 	}
 	result := s.Dispatcher.CallTool(r.Context(), principal, collaboration.ToolCall{
 		Name:      req.Tool,

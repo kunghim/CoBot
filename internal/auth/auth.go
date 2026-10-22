@@ -371,6 +371,9 @@ type Principal struct {
 	SessionID string
 	RunID     string        // host-bound source execution; never accepted from model args
 	Write     *WriteRequest // normalized host request, never decoded as identity
+	// SubAgent marks a tool call made by a sub-agent the member spawned,
+	// which acts within the member's run but may not hand its work off.
+	SubAgent bool
 }
 
 type WriteRequest struct {

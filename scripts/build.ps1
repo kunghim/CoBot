@@ -42,6 +42,8 @@ switch ($Target) {
         if (-not (Get-Command wails -ErrorAction SilentlyContinue)) {
             throw "wails CLI not found; install Wails v2.15.0 to build the desktop shell (server target stays available)"
         }
+        node scripts/prepare-branding.mjs
+        if ($LASTEXITCODE -ne 0) { throw "application icon preparation failed" }
         Write-Host "==> wails build (desktop, production, $Version)"
         Push-Location cmd\cobot-desktop
         # -skipbindings: the shell's bindings phase compiles cmd/cobot-desktop

@@ -11,8 +11,8 @@ var SupportedLanguages = []string{"zh-CN", "en"}
 // ColorModes choose light or dark; system follows the operating system.
 var ColorModes = []string{"system", "light", "dark"}
 
-// Themes are the interface's palettes; graphite is the default.
-var Themes = []string{"graphite", "harbor", "dusk"}
+// Themes are the interface's palettes; classic is the default for new profiles.
+var Themes = []string{"graphite", "harbor", "dusk", "classic"}
 
 // BudgetScopes select which entity a token budget applies to.
 const (
@@ -30,8 +30,21 @@ type Settings struct {
 	ColorMode    string `json:"colorMode"`
 	Theme        string `json:"theme"`
 	DefaultModel string `json:"defaultModel"`
-	MemberLimit  int    `json:"memberLimit"`
-	ChainLimit   int    `json:"chainLimit"`
+	// DefaultProvider is the model provider the profile runs with. Empty
+	// means the engine's own official provider, which is what a fresh
+	// profile uses.
+	//
+	// The model actually used is resolved in this order:
+	//
+	//	team.model > provider.DefaultModel > settings.defaultModel > engine default
+	//
+	// Settings.DefaultModel is the last CoBot-level fallback; it is not
+	// yet scoped to the selected provider, because the provider UI that
+	// would scope it arrives with the same change that starts reading
+	// this field.
+	DefaultProvider string `json:"defaultProvider"`
+	MemberLimit     int    `json:"memberLimit"`
+	ChainLimit      int    `json:"chainLimit"`
 	// ReviewRejectLimit is how often a reviewer may send one task back
 	// before the leader decides.
 	ReviewRejectLimit int    `json:"reviewRejectLimit"`
@@ -50,7 +63,7 @@ func DefaultSettings() Settings {
 		ChainLimit:        10,
 		ReviewRejectLimit: 3,
 		ColorMode:         "system",
-		Theme:             "graphite",
+		Theme:             "classic",
 		BudgetScope:       BudgetScopeNone,
 	}
 }
@@ -111,6 +124,7 @@ type SettingsPatch struct {
 	Theme             *string `json:"theme"`
 	Language          *string `json:"language"`
 	DefaultModel      *string `json:"defaultModel"`
+	DefaultProvider   *string `json:"defaultProvider"`
 	MemberLimit       *int    `json:"memberLimit"`
 	ChainLimit        *int    `json:"chainLimit"`
 	ReviewRejectLimit *int    `json:"reviewRejectLimit"`
@@ -133,6 +147,9 @@ func (s Settings) Apply(p SettingsPatch) Settings {
 	}
 	if p.DefaultModel != nil {
 		out.DefaultModel = strings.TrimSpace(*p.DefaultModel)
+	}
+	if p.DefaultProvider != nil {
+		out.DefaultProvider = strings.TrimSpace(*p.DefaultProvider)
 	}
 	if p.MemberLimit != nil {
 		out.MemberLimit = *p.MemberLimit

@@ -57,7 +57,7 @@ type WaitResult struct {
 // local lease is stale must not run these; read tools always pass (H06).
 func IsSideEffectTool(name string) bool {
 	switch name {
-	case "deliver_task", "review_task", "send_message", "create_task", "ask_user":
+	case "handoff", "start_requirement", "send_message", "ask_user", "browser":
 		return true
 	default:
 		return false

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/desktop"
@@ -19,6 +20,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -65,6 +67,11 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 250, A: 1},
+		// The page draws its own title bar in CoBot's theme (see the
+		// frontend's AppTitleBar): Windows drops the system frame, macOS keeps
+		// only the traffic lights over the page. Linux keeps its system bar.
+		Frameless: runtime.GOOS == "windows",
+		Mac:       &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
 		OnStartup: func(ctx context.Context) {
 			bridge.SetContext(ctx)
 			if err := bridge.StartCore(ctx, *dataRoot); err != nil {

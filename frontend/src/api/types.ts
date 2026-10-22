@@ -4,6 +4,9 @@ import type { components } from './generated/schema';
 
 export type Status = components['schemas']['Status'];
 export type Settings = components['schemas']['Settings'];
+export type AvatarCatalog = components['schemas']['AvatarCatalog'];
+export type AvatarSeries = components['schemas']['AvatarSeries'];
+export type AvatarRef = components['schemas']['AvatarRef'];
 export type SettingsPatch = components['schemas']['SettingsPatch'];
 export type Event = components['schemas']['Event'];
 export type ErrorEnvelope = components['schemas']['ErrorEnvelope'];
@@ -29,6 +32,44 @@ export interface EngineStatus {
 }
 
 export type EngineLogin = components['schemas']['EngineLogin'];
+
+// ---------------------------------------------------------------------------
+// Model providers
+// ---------------------------------------------------------------------------
+
+/** A model vendor or gateway the engine can call. */
+export type Provider = components['schemas']['Provider'];
+export type ProviderEndpoint = components['schemas']['ProviderEndpoint'];
+export type ProviderModel = components['schemas']['ProviderModel'];
+export type ProviderRetries = components['schemas']['ProviderRetries'];
+/** The body of a provider write. The request id is not part of it: the api
+ * client adds one to every write, the way it does for every other endpoint. */
+export type ProviderRequest = Omit<components['schemas']['ProviderRequest'], 'requestId'>;
+export type ProviderPreset = components['schemas']['ProviderPreset'];
+export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
+
+/** The dialects an engine can speak. */
+export type ProviderDialect = 'openai-responses' | 'anthropic-messages';
+
+/** GET /providers */
+export interface ProviderListResult {
+  providers: Provider[];
+}
+
+/** GET /provider-presets */
+export interface ProviderPresetListResult {
+  presets: ProviderPreset[];
+}
+
+/** POST /providers/probe-models */
+export interface ProviderProbeResults {
+  results: Record<string, ProviderProbeResult>;
+}
+
+/** POST /providers/discover */
+export interface ProviderDiscoverResult {
+  models: string[];
+}
 
 export interface EngineModel {
   slug?: string;
@@ -81,6 +122,8 @@ export interface Role {
   name: string;
   contentVersion?: string;
   scenarios?: string[];
+  /** The avatar the user chose for the role; absent follows the catalog. */
+  avatar?: AvatarRef;
 }
 
 /** A built-in scenario groups roles and preselects its usual members. */
@@ -241,18 +284,29 @@ export interface AuthorizationBinding {
 export type Snapshot = components['schemas']['Snapshot'];
 
 // ---------------------------------------------------------------------------
-// M3: tasks, evidence, transfers, questions
+// Requirements, cards, handoff records, questions
 // ---------------------------------------------------------------------------
 
-/** done only through confirm (evidence-backed); a chat message never changes
- * status by itself. */
-export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'cancelled';
+/** A card turns doing when its holder's turn takes it up and done when the
+ * holder hands it off; a cancelled requirement cancels its open cards. */
+export type TaskStatus = 'todo' | 'doing' | 'done' | 'cancelled';
 
 export type Task = components['schemas']['Task'];
 
 export type Evidence = components['schemas']['Evidence'];
 
-export type Transfer = components['schemas']['Transfer'];
+/** What the engine reported a member ran and changed while it held a card. */
+export type Execution = components['schemas']['Execution'];
+
+export type Stage = components['schemas']['Stage'];
+
+/** The project manager's requirement document and the route the user confirmed. */
+export type Requirement = components['schemas']['Requirement'];
+
+/** GET /teams/{id}/requirements */
+export interface RequirementListResult {
+  items: Requirement[];
+}
 
 /** GET /teams/{id}/tasks */
 export interface TaskListResult {
@@ -264,7 +318,6 @@ export interface TaskListResult {
 export interface TaskDetailResult {
   task: Task;
   evidence: Evidence[];
-  transfers: Transfer[];
 }
 
 /** ask_user output: user input, never a security authorization. */

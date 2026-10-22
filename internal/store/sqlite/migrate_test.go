@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -84,7 +86,7 @@ func TestDeliveryContextUpgradePreservesV7WorkAndBacksUp(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	current, err := NewMigrator(db)
+	current, err := migratorBefore(t, db, "00023")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,8 +320,8 @@ func TestUpdateSettingsConcurrencyAndValidation(t *testing.T) {
 
 	// Appearance starts at the system mode with the default palette and
 	// takes only the listed values.
-	if saved.ColorMode != "system" || saved.Theme != "graphite" {
-		t.Fatalf("appearance defaults = %q/%q, want system/graphite", saved.ColorMode, saved.Theme)
+	if saved.ColorMode != "system" || saved.Theme != "classic" {
+		t.Fatalf("appearance defaults = %q/%q, want system/classic", saved.ColorMode, saved.Theme)
 	}
 	dark, harbor := "dark", "harbor"
 	saved, err = UpdateSettings(ctx, db, domain.SettingsPatch{ColorMode: &dark, Theme: &harbor}, 2)
@@ -428,7 +430,7 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	current, err := NewMigrator(db)
+	current, err := migratorBefore(t, db, "00023")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,5 +461,185 @@ func TestUpgradePurgesSoftDeletedTeams(t *testing.T) {
 		if n := count(query, "kept"); n != 1 {
 			t.Fatalf("%s kept %d rows of the live team, want 1", query, n)
 		}
+	}
+}
+
+// Frontend and backend members become full-stack engineers: role, shipped
+// instructions, and a default name renamed per team; names the user chose
+// stay, and a leader named 队长 becomes 项目经理.
+func TestFullstackMigrationRenamesDefaultMembers(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open(filepath.Join(dir, "cobot.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := map[string]string{}
+	for _, path := range files {
+		name := strings.TrimPrefix(path, "migrations/")
+		if name < "00022" {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before[name] = string(raw)
+		}
+	}
+	old, err := NewMigratorWithFS(db, testutil.NewMapFS(before))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := old.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, team := range []string{"t1", "t2"} {
+		if _, err := db.ExecContext(ctx, `INSERT INTO teams (id, name, leader_id, profile_instance, status, created_at, updated_at) VALUES (?, ?, ?, 'i', 'active', ?, ?)`, team, team, team+"-lead", now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bots := []struct {
+		id, team, name, role string
+		leader               int
+		at                   string
+	}{
+		{"t1-lead", "t1", "队长", "leader", 1, "1"},
+		{"t1-fe", "t1", "前端开发", "frontend-dev", 0, "2"},
+		{"t1-be", "t1", "后端开发", "backend-dev", 0, "3"},
+		{"t1-qa", "t1", "测试工程师", "qa-engineer", 0, "4"},
+		{"t2-lead", "t2", "老大", "leader", 1, "1"},
+		{"t2-be", "t2", "小王", "backend-dev", 0, "2"},
+	}
+	for _, b := range bots {
+		if _, err := db.ExecContext(ctx, `INSERT INTO bots (id, team_id, name, role_id, role_version, is_leader, created_at) VALUES (?, ?, ?, ?, 'old', ?, ?)`, b.id, b.team, b.name, b.role, b.leader, "2026-10-18T00:00:0"+b.at+"Z"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current, err := NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := current.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][3]string{
+		"t1-lead": {"项目经理", "leader", "old"},
+		"t1-fe":   {"全栈工程师", "fullstack-engineer", ""},
+		"t1-be":   {"全栈工程师 2", "fullstack-engineer", ""},
+		"t1-qa":   {"测试工程师", "qa-engineer", "old"},
+		"t2-lead": {"老大", "leader", "old"},
+		"t2-be":   {"小王", "fullstack-engineer", ""},
+	}
+	for id, w := range want {
+		var name, role, version string
+		if err := db.QueryRowContext(ctx, `SELECT name, role_id, role_version FROM bots WHERE id = ?`, id).Scan(&name, &role, &version); err != nil {
+			t.Fatal(err)
+		}
+		if name != w[0] || role != w[1] || version != w[2] {
+			t.Errorf("%s = %s/%s/%q, want %v", id, name, role, version, w)
+		}
+	}
+}
+
+// migratorBefore migrates with the shipped migrations older than one, for
+// upgrade tests whose data a later migration (here the relay's removal of the
+// earlier task model) would legitimately discard.
+func migratorBefore(t *testing.T, db *sql.DB, first string) (*Migrator, error) {
+	t.Helper()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		return nil, err
+	}
+	source := map[string]string{}
+	for _, path := range files {
+		name := strings.TrimPrefix(path, "migrations/")
+		if name < first {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				return nil, err
+			}
+			source[name] = string(raw)
+		}
+	}
+	return NewMigratorWithFS(db, testutil.NewMapFS(source))
+}
+
+// Version 23 drops the tasks of the old collaboration model. A team that
+// had some is told in its project manager's conversation how many went and
+// where the snapshot taken before the upgrade is.
+func TestDroppedTasksAreToldToTheirTeam(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open(filepath.Join(dir, "cobot.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := map[string]string{}
+	for _, path := range files {
+		if name := strings.TrimPrefix(path, "migrations/"); name < "00023" {
+			raw, err := fs.ReadFile(migrationsFS, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before[name] = string(raw)
+		}
+	}
+	old, err := NewMigratorWithFS(db, testutil.NewMapFS(before))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := old.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, team := range []string{"busy", "idle"} {
+		if _, err := db.ExecContext(ctx, `INSERT INTO teams (id, name, leader_id, profile_instance, status, created_at, updated_at) VALUES (?, ?, ?, 'i', 'active', ?, ?)`, team, team, team+"-lead", now, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO bots (id, team_id, name, role_id, role_version, is_leader, created_at) VALUES (?, ?, '项目经理', 'leader', 'old', 1, ?)`, team+"-lead", team, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, status := range []string{"doing", "todo", "done"} {
+		if _, err := db.ExecContext(ctx, `INSERT INTO tasks (id, team_id, owner_id, title, status, created_at, updated_at) VALUES (?, 'busy', 'busy-lead', '旧任务', ?, ?, ?)`, fmt.Sprintf("task-%d", i), status, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current, err := NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := current.MigrateToLatest(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	notes := map[string]string{}
+	rows, err := db.QueryContext(ctx, `SELECT team_id, blocks FROM messages WHERE kind = ?`, domain.MessageKindSystem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var team, blocks string
+		if err := rows.Scan(&team, &blocks); err != nil {
+			t.Fatal(err)
+		}
+		notes[team] = blocks
+	}
+	note, ok := notes["busy"]
+	if !ok || !strings.Contains(note, "共 3 个任务，其中 2 个还没完成") || !strings.Contains(note, "cobot-v22-") {
+		t.Fatalf("the busy team was not told: %q", note)
+	}
+	if _, told := notes["idle"]; told {
+		t.Fatal("a team without tasks was told about dropped ones")
 	}
 }

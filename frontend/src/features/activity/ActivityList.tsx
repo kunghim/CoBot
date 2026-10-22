@@ -9,6 +9,7 @@ import { useSelectedBot } from '../../app/SelectedBotContext';
 import { showInWorkPanel } from '../../app/workPanelNav';
 import LoadMore from '../../components/LoadMore';
 import { describeActivity } from './describe';
+import { Alert, cx, EmptyState, Icons, interactive, Skeleton } from '../../components/ui';
 
 export default function ActivityList({ teamId, viewBotId, bots }: { teamId: string; viewBotId?: string; bots: Bot[] }) {
   const { t, i18n } = useTranslation();
@@ -16,14 +17,14 @@ export default function ActivityList({ teamId, viewBotId, bots }: { teamId: stri
   const { setBotId } = useSelectedBot();
 
   if (activity.isPending) {
-    return <p className="px-3 py-2 text-sm text-neutral-500" role="status">{t('status.loading')}</p>;
+    return <div className="space-y-2 px-3 py-3" role="status" aria-label={t('status.loading')}><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>;
   }
   if (activity.isError && !activity.data) {
-    return <p className="px-3 py-2 text-sm text-red-600" role="alert">{t('activity.loadFailed')}</p>;
+    return <div className="px-3 py-3"><Alert tone="danger">{t('activity.loadFailed')}</Alert></div>;
   }
   const items = activity.data?.items ?? [];
   if (items.length === 0) {
-    return <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">{t('activity.empty')}</p>;
+    return <EmptyState icon={<Icons.activity size={20} aria-hidden />} title={t('activity.empty')} />;
   }
   const names = new Map(bots.map((bot) => [bot.id, bot.name]));
   const nameOf = (id: unknown) => (typeof id === 'string' && id ? names.get(id) ?? t('activity.someone') : t('activity.someone'));
@@ -35,7 +36,7 @@ export default function ActivityList({ teamId, viewBotId, bots }: { teamId: stri
 
   return (
     <>
-      <ul className="divide-y divide-neutral-100 px-3 py-1 dark:divide-neutral-800">
+      <ul className="divide-y divide-neutral-200 px-3 py-1 dark:divide-neutral-800">
         {items.map((item) => (
           <ActivityRow
             key={item.id}
@@ -75,7 +76,7 @@ function ActivityRow({
     <>
       <span className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 text-neutral-800 dark:text-neutral-200">{line.text}</span>
-        <span className="shrink-0 text-[11px] text-neutral-400">{time}</span>
+        <span className="shrink-0 text-2xs text-neutral-500 dark:text-neutral-400">{time}</span>
       </span>
       {line.quote && <span className="mt-0.5 line-clamp-2 break-all text-neutral-500 dark:text-neutral-400">{line.quote}</span>}
     </>
@@ -83,7 +84,7 @@ function ActivityRow({
   return (
     <li className="py-2 text-xs">
       {target ? (
-        <button type="button" onClick={target} className="block w-full rounded text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/60">
+        <button type="button" onClick={target} className={cx('-mx-1.5 block w-[calc(100%+0.75rem)] rounded-lg px-1.5 py-1 text-left transition-colors', interactive.hover)}>
           {body}
         </button>
       ) : (

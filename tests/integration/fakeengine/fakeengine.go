@@ -42,6 +42,13 @@ type Server struct {
 	steers            []Steer
 	replied           []Reply
 	ShutdownCalls     int
+	// ThreadProviders records the provider each thread was started or
+	// resumed with, so a test can see which one CoBot asked for.
+	ThreadProviders []string
+	// ThreadConfigs records the config each thread was started or resumed
+	// with, in the same order.
+	ThreadConfigs []map[string]any
+	archived      []string
 }
 
 func (s *Server) SetTurnFact(threadID, turnID, status string) {
@@ -147,21 +154,77 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.threads[id] = true
 	s.loaded[id] = true
 	s.instructions = append(s.instructions, spec.DeveloperInstructions)
-	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: "fake-model", ModelProvider: "fake"}, nil
+	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
+	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: answeredModel(spec.Model), ModelProvider: answeredProvider(spec.ModelProvider), Path: TranscriptPath(id)}, nil
 }
 
-func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) error {
+func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resumes++
 	if s.ResumeErr != nil {
-		return s.ResumeErr
+		return engine.ThreadInfo{}, s.ResumeErr
 	}
 	if !s.threads[threadID] {
-		return fmt.Errorf("unknown thread %s", threadID)
+		return engine.ThreadInfo{}, fmt.Errorf("unknown thread %s", threadID)
 	}
 	s.loaded[threadID] = true
+	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
+	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
+	return engine.ThreadInfo{ThreadID: threadID, Model: answeredModel(spec.Model), ModelProvider: answeredProvider(spec.ModelProvider), Path: TranscriptPath(threadID)}, nil
+}
+
+// answeredProvider is the provider the engine reports for a thread. Codex
+// names its own account "openai" when a thread asks for none.
+func answeredProvider(asked string) string {
+	if asked == "" {
+		return "openai"
+	}
+	return asked
+}
+
+// ArchiveThread plays the engine setting a thread aside, so it can be loaded
+// again with another provider.
+// TranscriptPath is where the fake engine says a thread's record is.
+func TranscriptPath(threadID string) string {
+	return "C:/fake-codex/sessions/rollout-" + threadID + ".jsonl"
+}
+
+// answeredModel is the model the engine reports for a thread: the one asked
+// for, or its own default.
+func answeredModel(model string) string {
+	if model == "" {
+		return "fake-model"
+	}
+	return model
+}
+
+// ThreadPath reads a thread's record path back, as thread/read does.
+func (s *Server) ThreadPath(ctx context.Context, threadID string) (string, error) {
+	return TranscriptPath(threadID), nil
+}
+
+func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.archived = append(s.archived, threadID)
+	delete(s.loaded, threadID)
 	return nil
+}
+
+// UnarchiveThread plays the engine taking a thread back out of its archive.
+func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil
+}
+
+// Archived lists the threads the engine was asked to set aside.
+func (s *Server) Archived() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.archived...)
 }
 
 func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engine.TurnOptions) (string, error) {

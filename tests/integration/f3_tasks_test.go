@@ -13,21 +13,18 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-func TestCancelledTaskCannotDispatchItsQueuedAssignment(t *testing.T) {
+func TestCancelledRequirementCannotDispatchItsQueuedCard(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	owner := bots[1]
 	fake := h.ensureFake(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: owner.ID, Text: "hold"}); err != nil {
 		t.Fatal(err)
 	}
 	waitUntil(t, 3*time.Second, "busy owner", func() bool { return h.runStatus(t, owner.ID) == domain.RunRunning })
-	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: owner.ID, Title: "must not run", AcceptanceCriteria: "cancel before start"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.UpdateTaskStatus(ctx, h.user, task.ID, domain.TaskCancelled, "", task.Revision); err != nil {
+	task, req := h.handCard(t, team, bots[0], owner, "must not run", "cancel before start")
+	if _, err := h.app.CancelRequirement(ctx, h.user, req.ID); err != nil {
 		t.Fatal(err)
 	}
 	var delivery, message string
@@ -41,24 +38,21 @@ func TestCancelledTaskCannotDispatchItsQueuedAssignment(t *testing.T) {
 	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "held turn ended")
 	waitUntil(t, 3*time.Second, "stale assignment cancelled", func() bool { return h.deliveryStatusOf(t, task.ID) == domain.DeliveryCancelled })
 	if len(fake.Turns()) != 1 {
-		t.Fatal("cancelled task started a provider turn")
+		t.Fatal("a cancelled card started a provider turn")
 	}
 }
 
 func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	owner := bots[1]
 	fake := h.ensureFake(t, team.ID)
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: owner.ID, Text: "hold"}); err != nil {
 		t.Fatal(err)
 	}
 	waitUntil(t, 3*time.Second, "first turn", func() bool { return h.runStatus(t, owner.ID) == domain.RunRunning })
-	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: owner.ID, Title: "blocked by question", AcceptanceCriteria: "wait for answer"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	task, _ := h.handCard(t, team, bots[0], owner, "blocked by question", "wait for answer")
 	question, err := h.app.AskUser(ctx, auth.NewPrincipalBot(owner.ID, team.ID), app.AskUserInput{Question: "Which output?", TaskID: task.ID})
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +79,7 @@ func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) 
 		t.Fatal(err)
 	}
 	waitUntil(t, 3*time.Second, "answer releases original assignment", func() bool { return len(fake.Turns()) == 3 })
-	if text := fake.Turns()[2].Text; !strings.Contains(text, "你被指派了任务：blocked by question") || !strings.Contains(text, task.ID) || !strings.HasSuffix(text, "完成标准：wait for answer") {
+	if text := fake.Turns()[2].Text; !strings.Contains(text, "【接力卡片】blocked by question") || !strings.Contains(text, task.ID) || !strings.Contains(text, "wait for answer") {
 		t.Fatal("answer failed to release original task")
 	}
 }
@@ -93,7 +87,7 @@ func TestOpenQuestionParksRelatedWorkButDoesNotConsumeUserMessage(t *testing.T) 
 func TestQuestionCountsBlockMemberDeleteAndArchive(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	member := bots[1]
 	question, err := h.app.AskUser(ctx, auth.NewPrincipalBot(member.ID, team.ID), app.AskUserInput{Question: "Still waiting"})
 	if err != nil {
@@ -117,31 +111,10 @@ func TestQuestionCountsBlockMemberDeleteAndArchive(t *testing.T) {
 	}
 }
 
-func TestTerminalTaskCannotReopenOrAcceptUnknownStatus(t *testing.T) {
-	h := newM2Harness(t)
-	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev"})
-	task, err := h.app.CreateTask(ctx, h.user, false, app.CreateTaskInput{TeamID: team.ID, OwnerID: bots[1].ID, Title: "cancel", AcceptanceCriteria: "no reopening"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, status := range []string{"arbitrary", domain.TaskDone, domain.TaskReview} {
-		if _, err := h.app.UpdateTaskStatus(ctx, h.user, task.ID, status, "", 0); err == nil {
-			t.Fatalf("invalid todo transition accepted: %s", status)
-		}
-	}
-	if _, err := h.app.UpdateTaskStatus(ctx, h.user, task.ID, domain.TaskCancelled, "", 0); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.app.UpdateTaskStatus(ctx, h.user, task.ID, domain.TaskDoing, "", 0); err == nil {
-		t.Fatal("terminal task reopened")
-	}
-}
-
 func TestMessageRetryCannotChangeRecipientOrSender(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
-	team, bots := h.createTeam(t, []string{"backend-dev", "qa-engineer"})
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: bots[1].ID, Text: "same", RequestID: "user-key"}); err != nil {
 		t.Fatal(err)
 	}

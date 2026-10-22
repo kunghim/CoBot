@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { applyLiveSignal } from './live';
-import type { Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
+import type { AvatarRef, Event, LiveSignal, PermissionMode, Settings, SettingsPatch } from './types';
 import { api, apiUrl, bearerToken, reportUnauthorized } from './client';
 
 export const queryKeys = {
@@ -11,12 +11,16 @@ export const queryKeys = {
   teams: ['teams'] as const,
   roles: ['roles'] as const,
   engine: ['engine'] as const,
+  avatarCatalog: ['avatarCatalog'] as const,
   models: ['models'] as const,
+  providers: ['providers'] as const,
+  providerPresets: ['providerPresets'] as const,
   messages: (botId: string) => ['messages', botId] as const,
   exchanges: (botId: string, peerBotId: string) => ['exchanges', botId, peerBotId] as const,
   approvals: (teamId: string, state: 'pending' | 'history') => ['approvals', teamId, state] as const,
   tasks: (teamId: string) => ['tasks', teamId] as const,
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
+  requirements: (teamId: string) => ['requirements', teamId] as const,
   questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
 };
 
@@ -190,6 +194,38 @@ export function useTeams(enabled = true) {
   return usePagedItems(queryKeys.teams, (cursor) => api.listTeams(cursor), enabled);
 }
 
+/** The tabs of a team's browser; polled, because tabs open and close as members work. */
+export function useTeamBrowser(teamId: string, enabled = true) {
+  return useQuery({ queryKey: ['teamBrowser', teamId], queryFn: () => api.getTeamBrowser(teamId), enabled, refetchInterval: 2000 });
+}
+
+/** Opens a page in a tab the user owns; the browser comes up when it is down. */
+export function useOpenBrowserTab(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.openBrowserTab(teamId, url),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
+/** Closes one tab of the team's browser, a member's page or the user's own. */
+export function useCloseBrowserTab(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tab: string) => api.closeBrowserTab(teamId, tab),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
+/** Sets the window size the page really renders at, for the user and members alike. */
+export function useSetBrowserTabViewport(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tab, body }: { tab: string; body: import('./client').BrowserViewportRequest }) => api.setBrowserTabViewport(teamId, tab, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['teamBrowser', teamId] }),
+  });
+}
+
 export function useCreateTeam() {
   const qc = useQueryClient();
   return useMutation({
@@ -204,6 +240,69 @@ export function useCreateTeam() {
 
 export function useRoles(enabled = true) {
   return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
+}
+
+/**
+ * The model providers of this profile. The list is small and changes rarely,
+ * so it is cached until something writes to it.
+ */
+export function useProviders(enabled = true) {
+  return useQuery({ queryKey: queryKeys.providers, queryFn: api.listProviders, enabled });
+}
+
+/** The built-in vendor catalogue the settings page offers. */
+export function useProviderPresets(enabled = true) {
+  return useQuery({ queryKey: queryKeys.providerPresets, queryFn: api.listProviderPresets, enabled, staleTime: Infinity });
+}
+
+export function useSaveProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: import('./types').ProviderRequest }) =>
+      id ? api.updateProvider(id, body) : api.createProvider(body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
+export function useDeleteProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteProvider(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
+/** Offers a provider's models to members, or stops offering them. */
+export function useSetProviderEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled, expectedRevision }: { id: string; enabled: boolean; expectedRevision?: number }) =>
+      api.setProviderEnabled(id, enabled, expectedRevision),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
+/**
+ * Checks a stored provider's models again. The key is read on the server, so
+ * this works long after the provider was set up.
+ */
+export function useReprobeProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.reprobeProvider(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+    },
+  });
 }
 
 /** GET /bots/{id}/messages: one conversation plus queue depth and run state. */
@@ -247,6 +346,17 @@ export function useCancelMessage(botId: string) {
   });
 }
 
+export function useRetryRun(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.retryRun(runId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
 export function useInterruptRun(botId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -278,6 +388,56 @@ export function useDecideApproval() {
 
 /** GET /engine: the real engine projection; the snapshot copy is only a
  * cheap cached hint. */
+/** The avatar catalog cached by the core. While a sync runs it is re-read
+ * until the sync ends; a finished download also arrives as an event. */
+export function useAvatarCatalog(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.avatarCatalog,
+    queryFn: api.getAvatarCatalog,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: (query) => (query.state.data?.status.syncing ? 2_000 : false),
+  });
+}
+
+/** A stored avatar picture as a blob URL; pictures never change. */
+export function useAvatarUpload(file: string | undefined) {
+  return useQuery({
+    queryKey: ['avatarUpload', file ?? ''],
+    queryFn: () => api.getAvatarUpload(file!),
+    enabled: !!file,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
+/** Sets or clears a member's own avatar. */
+export function useSetBotAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, avatar, expectedRevision }: { botId: string; avatar: AvatarRef | null; expectedRevision: number }) =>
+      api.setBotAvatar(botId, avatar, expectedRevision),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.teams }),
+  });
+}
+
+/** Sets or clears a role's avatar. */
+export function useSetRoleAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, avatar }: { roleId: string; avatar: AvatarRef | null }) => api.setRoleAvatar(roleId, avatar),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.roles }),
+  });
+}
+
+export function useSyncAvatarCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.syncAvatarCatalog(),
+    onSuccess: (catalog) => qc.setQueryData(queryKeys.avatarCatalog, catalog),
+  });
+}
+
 export function useEngine(enabled = true) {
   return useQuery({ queryKey: queryKeys.engine, queryFn: api.getEngine, enabled, staleTime: 0 });
 }
@@ -312,6 +472,17 @@ export function useEngineLogout() {
   });
 }
 
+/** POST /session/logout: ends the page session on the core. */
+export function useSessionLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.sessionLogout(),
+    onSuccess: () => {
+      void qc.clear();
+    },
+  });
+}
+
 /** POST /engine/check: re-runs the self-check, including native hook trust,
  * and replaces the cached engine projection with the fresh one. */
 export function useEngineCheck() {
@@ -332,17 +503,17 @@ export function useEngineModels(enabled: boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// M3: tasks, transfers, questions
+// Requirements, cards, questions
 // ---------------------------------------------------------------------------
 
-/** GET /teams/{id}/tasks: the team board; the server narrows a member's
+/** GET /teams/{id}/tasks: the team's cards; the server narrows a member's
  * scope, the page never decides who sees what. */
 export function useTasks(teamId: string | null, enabled = true, viewBotId?: string) {
   return usePagedItems([...queryKeys.tasks(teamId ?? ''), viewBotId ?? ''], (cursor) => api.listTasks({ teamId: teamId as string, viewBotId, cursor }), teamId !== null && enabled);
 }
 
-/** GET /tasks/{id}: one task with evidence and transfer history, loaded only
- * while the row is expanded. */
+/** GET /tasks/{id}: one card with its handoff records, loaded only while the
+ * row is expanded. */
 export function useTaskDetail(taskId: string | null, enabled = true) {
   return useQuery({
     queryKey: queryKeys.taskDetail(taskId ?? ''),
@@ -351,73 +522,27 @@ export function useTaskDetail(taskId: string | null, enabled = true) {
   });
 }
 
-function useInvalidateTasks() {
+/** GET /teams/{id}/requirements: the team's requirements with their routes. */
+export function useRequirements(teamId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.requirements(teamId ?? ''),
+    queryFn: () => api.listRequirements(teamId as string),
+    enabled: teamId !== null && enabled,
+  });
+}
+
+/** POST /requirements/{id}/cancel: the user stops a requirement. */
+export function useCancelRequirement() {
   const qc = useQueryClient();
-  return () => {
-    void qc.invalidateQueries({ queryKey: ['tasks'] });
-    void qc.invalidateQueries({ queryKey: ['taskDetail'] });
-    void qc.invalidateQueries({ queryKey: queryKeys.teams });
-  };
-}
-
-export function useCreateTask(teamId: string) {
-  const invalidate = useInvalidateTasks();
   return useMutation({
-    mutationFn: (input: { title: string; description?: string; acceptanceCriteria?: string; ownerId: string; dependencyIds?: string[] }) =>
-      api.createTask(teamId, input),
-    onSuccess: invalidate,
-  });
-}
-
-export function usePatchTask() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, ...body }: { taskId: string; status?: string; blockedReason?: string; ownerId?: string; expectedRevision: number }) =>
-      api.patchTask(taskId, body),
-    onSuccess: invalidate,
-  });
-}
-
-export function useSubmitEvidence() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, ...body }: { taskId: string; summary: string; artifactRefs?: string[]; testResult?: string; reviewResult?: string }) =>
-      api.submitEvidence(taskId, body),
-    onSuccess: invalidate,
-  });
-}
-
-export function useConfirmTask() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, evidenceIds, expectedRevision }: { taskId: string; evidenceIds?: string[]; expectedRevision: number }) =>
-      api.confirmTask(taskId, { evidenceIds, expectedRevision }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useOfferTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ taskId, toBotId, note }: { taskId: string; toBotId: string; note?: string }) =>
-      api.offerTransfer(taskId, { toBotId, note }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useAcceptTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: ({ transferId, expectedRevision }: { transferId: string; expectedRevision: number }) => api.acceptTransfer(transferId, expectedRevision),
-    onSuccess: invalidate,
-  });
-}
-
-export function useCancelTransfer() {
-  const invalidate = useInvalidateTasks();
-  return useMutation({
-    mutationFn: (transferId: string) => api.cancelTransfer(transferId),
-    onSuccess: invalidate,
+    mutationFn: (requirementId: string) => api.cancelRequirement(requirementId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['requirements'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['taskDetail'] });
+      void qc.invalidateQueries({ queryKey: ['questions'] });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
   });
 }
 
@@ -433,13 +558,16 @@ export function useAnswerQuestion() {
       questionId,
       answerText,
       decision,
+      mode,
       expectedRevision,
     }: {
       questionId: string;
       answerText: string;
       decision?: 'accept' | 'revise';
+      /** For revise on a confirmation: where the fixed work goes. */
+      mode?: 'rerun' | 'return_to_me';
       expectedRevision: number;
-    }) => api.answerQuestion(questionId, { answerText, decision, expectedRevision }),
+    }) => api.answerQuestion(questionId, { answerText, decision, mode, expectedRevision }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['questions'] });
       void qc.invalidateQueries({ queryKey: queryKeys.teams });
@@ -536,6 +664,16 @@ export function useSetTeamReasoningEffort() {
   return useMutation({
     mutationFn: ({ teamId, effort, expectedRevision }: { teamId: string; effort: string; expectedRevision?: number }) =>
       api.setTeamReasoningEffort(teamId, effort, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+/** Chooses the model a member runs with; an empty provider follows the default. */
+export function useSetBotModel() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ botId, providerId, model, expectedRevision }: { botId: string; providerId: string; model: string; expectedRevision?: number }) =>
+      api.setBotModel(botId, providerId, model, expectedRevision),
     onSuccess: invalidate,
   });
 }
