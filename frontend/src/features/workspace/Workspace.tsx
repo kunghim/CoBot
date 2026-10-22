@@ -25,17 +25,25 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
   const browser = useTeamBrowser(teamId);
 
   // A page a member opens shows up as a tab (its title follows the page);
-  // the view stays where the user put it.
+  // the view stays where the user put it. A page the user opened keeps its
+  // tab's title in step with the page too, but is never opened here: it
+  // already has its tab, or the user closed it.
+  const openIds = state.tabs.map((tab) => tab.id).join('|');
   useEffect(() => {
     const tabs = browser.data?.tabs;
     if (!tabs) return;
+    const open = new Set(openIds.split('|'));
     const memberName = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
     for (const page of tabs) {
-      if (page.owner !== 'member') continue;
-      const title = `${memberName(page.memberId ?? '')} · ${page.title || page.url || t('browser.blank')}`;
-      openTab({ id: `browser:${page.id}`, kind: 'browser', title, ref: page.id });
+      const id = `browser:${page.id}`;
+      if (page.owner === 'member') {
+        const title = `${memberName(page.memberId ?? '')} · ${page.title || page.url || t('browser.blank')}`;
+        openTab({ id, kind: 'browser', title, ref: page.id });
+      } else if (open.has(id) && (page.title || page.url)) {
+        openTab({ id, kind: 'browser', title: page.title || page.url, ref: page.id });
+      }
     }
-  }, [browser.data, bots, openTab, t]);
+  }, [browser.data, bots, openTab, openIds, t]);
 
   const active = state.tabs.find((tab) => tab.id === state.activeId) ?? null;
 
