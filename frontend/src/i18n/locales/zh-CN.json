@@ -864,6 +864,7 @@
     "error.team.archived": "团队已归档，无法发送消息",
     "error.team.not_active": "团队当前状态为 {{status}}，无法操作",
     "error.team.prepare_failed": "无法在该目录写入 CoBot 数据，团队没有创建：{{detail}}",
+    "error.requirement.revision_conflict": "需求已被其他入口修改，请刷新后重试",
     "error.team.revision_conflict": "团队已被其他入口修改，请刷新后重试",
     "error.message.text_required": "消息不能为空",
     "error.message.request_reused": "请求 ID 已被使用",

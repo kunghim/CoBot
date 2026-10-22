@@ -734,6 +734,10 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	if err != nil {
 		return domain.Requirement{}, sqlite.NormalizeError(err)
 	}
+	if principal.Write != nil && principal.Write.ExpectedRevision > 0 && req.Revision != principal.Write.ExpectedRevision {
+		expected := principal.Write.ExpectedRevision
+		return domain.Requirement{}, domain.RevisionConflict("error.requirement.revision_conflict", map[string]any{"expected": expected, "actual": req.Revision})
+	}
 	if req.Status == domain.RequirementDone || req.Status == domain.RequirementCancelled {
 		return domain.Requirement{}, domain.Conflict("error.requirement.not_active", map[string]any{"status": req.Status})
 	}

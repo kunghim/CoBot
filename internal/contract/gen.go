@@ -1442,7 +1442,9 @@ type CancelQuestionJSONBody struct {
 
 // CancelRequirementJSONBody defines parameters for CancelRequirement.
 type CancelRequirementJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
+	// ExpectedRevision Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // SetRoleAvatarJSONBody defines parameters for SetRoleAvatar.
