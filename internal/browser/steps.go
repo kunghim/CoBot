@@ -332,7 +332,9 @@ const findByTextJS = `(function(){return function(text){
 }})()`
 
 // callOn runs a function with the element as this and returns its value.
-func (r *callRun) callOn(ctx context.Context, objectID, function string, out any) error {
+// callOn runs a function on a page object. Values the function needs go in
+// as arguments, never spliced into its source.
+func (r *callRun) callOn(ctx context.Context, objectID, function string, out any, args ...any) error {
 	var res struct {
 		Result struct {
 			Value json.RawMessage `json:"value"`
@@ -344,9 +346,17 @@ func (r *callRun) callOn(ctx context.Context, objectID, function string, out any
 			} `json:"exception"`
 		} `json:"exceptionDetails"`
 	}
-	err := r.cur.cdp(ctx, "Runtime.callFunctionOn", map[string]any{
+	params := map[string]any{
 		"objectId": objectID, "functionDeclaration": function, "returnByValue": true, "awaitPromise": true,
-	}, &res)
+	}
+	if len(args) > 0 {
+		callArgs := make([]map[string]any, len(args))
+		for i, arg := range args {
+			callArgs[i] = map[string]any{"value": arg}
+		}
+		params["arguments"] = callArgs
+	}
+	err := r.cur.cdp(ctx, "Runtime.callFunctionOn", params, &res)
 	if err != nil {
 		return err
 	}
@@ -513,18 +523,16 @@ func (r *callRun) selectOption(ctx context.Context, st Step) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	want, _ := json.Marshal(st.Value)
 	var chosen string
-	err = r.callOn(ctx, id, `function(){
+	err = r.callOn(ctx, id, `function(want){
 	  if(this.tagName!=='SELECT') throw new Error('不是下拉框');
-	  const want=`+string(want)+`;
 	  const opts=Array.from(this.options);
 	  const hit=opts.find(o=>o.value===want)||opts.find(o=>o.textContent.trim()===want)||opts.find(o=>o.textContent.trim().includes(want));
 	  if(!hit) throw new Error('没有这个选项，可选：'+opts.map(o=>JSON.stringify(o.textContent.trim())).join('、'));
 	  this.value=hit.value;
 	  this.dispatchEvent(new Event('input',{bubbles:true}));this.dispatchEvent(new Event('change',{bubbles:true}));
 	  return hit.textContent.trim();
-	}`, &chosen)
+	}`, &chosen, st.Value)
 	if err != nil {
 		return "", err
 	}

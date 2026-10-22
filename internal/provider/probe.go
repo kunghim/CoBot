@@ -68,6 +68,12 @@ func (d *Discoverer) Probe(ctx context.Context, baseURL, apiKey string, modelIDs
 	// The engine speaks the Responses dialect and nothing else, so the check
 	// has to speak it too: a gateway that serves only /responses would be
 	// told its model does not exist if the probe asked /chat/completions.
+	if checkBaseURL(baseURL) != nil {
+		for _, id := range dedupe(modelIDs) {
+			results[id] = failureResult(CodeNetwork, failure.Text(CodeNetwork))
+		}
+		return results
+	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/responses"
 
 	ids := dedupe(modelIDs)
