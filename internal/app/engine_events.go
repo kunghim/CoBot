@@ -82,7 +82,18 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 			}
 		}
 		s.finishRun(ctx, teamID, source, n)
-	case "account/updated", "account/login/completed":
+	case "account/updated":
+		// The notification names the account's auth mode, null once signed
+		// out; keeping it means a member's model never depends on whether
+		// someone reopened the settings since.
+		var p struct {
+			AuthMode *string `json:"authMode"`
+		}
+		if json.Unmarshal(n.Raw, &p) == nil {
+			s.app.noteOfficialLogin(p.AuthMode != nil && *p.AuthMode != "")
+		}
+		s.app.invalidateEngineStatus()
+	case "account/login/completed":
 		s.app.invalidateEngineStatus()
 	case "account/rateLimits/updated":
 		s.app.recordRateLimits(n.Raw)

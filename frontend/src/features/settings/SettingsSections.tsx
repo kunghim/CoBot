@@ -214,7 +214,9 @@ function AvatarCatalogCard() {
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">{t('settings.avatarCatalogSyncing')}</p>
         ) : status?.lastError ? (
           <Alert tone="warning">
-            <span className="break-all">{t('settings.avatarCatalogFailed', { error: status.lastError })}</span>
+            <span title={status.lastError}>
+              {t(status.lastErrorKind === 'unreachable' ? 'settings.avatarCatalogUnreachable' : 'settings.avatarCatalogRejected')}
+            </span>
           </Alert>
         ) : status?.lastSyncAt ? (
           <p className="text-xs text-neutral-500 dark:text-neutral-400" role="status">{t('settings.avatarCatalogChecked', { time: new Date(status.lastSyncAt).toLocaleString(i18n.language) })}</p>

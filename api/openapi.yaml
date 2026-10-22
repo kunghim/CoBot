@@ -2981,6 +2981,7 @@ components:
             syncing: { type: boolean }
             lastSyncAt: { type: string, format: date-time }
             lastError: { type: string }
+            lastErrorKind: { type: string, enum: [unreachable, rejected] }
     AvatarRef:
       type: object
       description: >-

@@ -418,6 +418,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		go func() {
 			info := application.EngineStatus(ctx)
 			logger.Info("engine self-check", "status", info.Status, "version", info.Version, "binary", info.BinaryPath, "loggedIn", info.LoggedIn, "errorKey", info.ErrorKey, "capabilities", info.Capabilities)
+			if info.Status == "ready" {
+				application.RebindProviders(ctx)
+			}
 		}()
 	}
 	go func() {

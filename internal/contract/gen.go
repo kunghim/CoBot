@@ -50,6 +50,12 @@ const (
 	Recovery   ApprovalType = "recovery"
 )
 
+// Defines values for AvatarCatalogStatusLastErrorKind.
+const (
+	AvatarCatalogStatusLastErrorKindRejected    AvatarCatalogStatusLastErrorKind = "rejected"
+	AvatarCatalogStatusLastErrorKindUnreachable AvatarCatalogStatusLastErrorKind = "unreachable"
+)
+
 // Defines values for AvatarRefKind.
 const (
 	Catalog AvatarRefKind = "catalog"
@@ -390,12 +396,12 @@ const (
 
 // Defines values for ToolResultStatus.
 const (
-	Accepted    ToolResultStatus = "accepted"
-	Duplicate   ToolResultStatus = "duplicate"
-	Ok          ToolResultStatus = "ok"
-	Rejected    ToolResultStatus = "rejected"
-	Unavailable ToolResultStatus = "unavailable"
-	Waiting     ToolResultStatus = "waiting"
+	ToolResultStatusAccepted    ToolResultStatus = "accepted"
+	ToolResultStatusDuplicate   ToolResultStatus = "duplicate"
+	ToolResultStatusOk          ToolResultStatus = "ok"
+	ToolResultStatusRejected    ToolResultStatus = "rejected"
+	ToolResultStatusUnavailable ToolResultStatus = "unavailable"
+	ToolResultStatusWaiting     ToolResultStatus = "waiting"
 )
 
 // Defines values for ListApprovalsParamsState.
@@ -510,11 +516,15 @@ type ApprovalOption struct {
 type AvatarCatalog struct {
 	Series []AvatarSeries `json:"series"`
 	Status struct {
-		LastError  *string    `json:"lastError,omitempty"`
-		LastSyncAt *time.Time `json:"lastSyncAt,omitempty"`
-		Syncing    bool       `json:"syncing"`
+		LastError     *string                           `json:"lastError,omitempty"`
+		LastErrorKind *AvatarCatalogStatusLastErrorKind `json:"lastErrorKind,omitempty"`
+		LastSyncAt    *time.Time                        `json:"lastSyncAt,omitempty"`
+		Syncing       bool                              `json:"syncing"`
 	} `json:"status"`
 }
+
+// AvatarCatalogStatusLastErrorKind defines model for AvatarCatalog.Status.LastErrorKind.
+type AvatarCatalogStatusLastErrorKind string
 
 // AvatarRef An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image.
 type AvatarRef struct {

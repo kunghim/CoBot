@@ -54,6 +54,9 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	if err != nil {
 		info.Status = "not_configured"
 		info.ErrorKey = "error.engine.not_found"
+		if runtime.GOOS == "darwin" {
+			info.ErrorKey = "error.engine.not_found_macos"
+		}
 		a.cacheEngineStatus(info)
 		return info
 	}
@@ -96,6 +99,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	}
 	info.LoggedIn = account.LoggedIn
 	info.AuthMode = account.AuthMode
+	a.noteOfficialLogin(account.LoggedIn)
 	if info.LoggedIn {
 		a.engineLoginMu.Lock()
 		a.engineLogin = nil
@@ -173,6 +177,25 @@ func (a *App) withHookFailures(info EngineStatusInfo) EngineStatusInfo {
 	}
 	info.Capabilities = append(info.Capabilities, "codexHook:failed")
 	return info
+}
+
+// noteOfficialLogin records what the engine just said about its own account.
+func (a *App) noteOfficialLogin(signedIn bool) {
+	a.engineStatusMu.Lock()
+	a.officialLogin = -1
+	if signedIn {
+		a.officialLogin = 1
+	}
+	a.engineStatusMu.Unlock()
+}
+
+// officialLoginState reports whether the engine's own account is signed in,
+// and whether that is known at all: before the first check it is not, which
+// is different from signed out.
+func (a *App) officialLoginState() (signedIn, known bool) {
+	a.engineStatusMu.Lock()
+	defer a.engineStatusMu.Unlock()
+	return a.officialLogin > 0, a.officialLogin != 0
 }
 
 func (a *App) cacheEngineStatus(info EngineStatusInfo) {
