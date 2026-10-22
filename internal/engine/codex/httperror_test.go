@@ -46,4 +46,17 @@ func TestAStreamedVendorErrorIsClassified(t *testing.T) {
 	if _, ok := vendorErrorBody("stream disconnected before completion"); ok {
 		t.Fatal("plain text is not a vendor body")
 	}
+	// An event line, or a second event, may come with the error.
+	for _, raw := range []string{
+		"event: error\ndata: {\"error\":{\"code\":\"rate_limit_exceeded\"}}\n\n",
+		"data:{\"error\":{\"code\":\"rate_limit_exceeded\"}}\n\ndata:[DONE]\n\n",
+	} {
+		body, ok := vendorErrorBody(raw)
+		if !ok {
+			t.Fatalf("%q is not recognized", raw)
+		}
+		if code, _ := failure.ClassifyBody(body); code != failure.CodeRateLimit {
+			t.Fatalf("%q classified as %q", raw, code)
+		}
+	}
 }
