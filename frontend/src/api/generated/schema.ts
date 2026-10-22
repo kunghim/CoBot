@@ -3685,6 +3685,11 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
+                    /**
+                     * Format: int64
+                     * @description Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
+                     */
+                    expectedRevision?: number;
                 };
             };
         };
