@@ -137,8 +137,8 @@ const (
 
 // Recovery option ids on the unresolved-execution card. This build cannot
 // reattach to a previous process's execution — a live PID or a resumable
-// thread is never a takeover (H04) — so the card offers exactly the
-// capabilities that exist: continue, rerun, abandon (H05).
+// thread is never a takeover — so the card offers exactly the
+// capabilities that exist: continue, rerun, abandon.
 const (
 	RecoveryOptionContinue = "continue"
 	RecoveryOptionRerun    = "rerun"

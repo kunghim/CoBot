@@ -10,7 +10,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Startup reconciliation and the recovery card (H03/H04/H05/H09).
+// Startup reconciliation and the recovery card.
 //
 // After a restart nothing is taken over: a live PID or a resumable thread is
 // not proof that CoBot still controls an execution. Instead the previous
@@ -70,7 +70,7 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 	for _, run := range runs {
 		// Keep the dead connection's turn id and epoch: they document which
 		// engine the run belonged to, which is exactly what "unknown after
-		// restart" must not lose (H09 keeps both known and unknown facts).
+		// restart" must not lose: both the known and the unknown facts are kept.
 		if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunUnknown,
 			run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", false); err != nil {
 			return err
@@ -91,8 +91,8 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 			approvalIDs = append(approvalIDs, cardID)
 		}
 	}
-	// Approvals bound to the previous connection can never be answered (F04
-	// proves a new connection refuses old request ids); invalidating them at
+	// Approvals bound to the previous connection can never be answered (a new
+	// connection refuses old request ids); invalidating them at
 	// startup keeps dead cards out of the pager instead of letting them fail
 	// decision by decision.
 	for _, approval := range native {
@@ -116,15 +116,15 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 	// A chain decision whose side effect never landed (the process died
 	// between the approval CAS and the effect) would strand the chain in
 	// awaiting_approval with only a decided card — nobody could decide it
-	// again. Replay the recorded decision now (H09: preserve the known fact,
-	// complete the effect).
+	// again. Replay the recorded decision now: keep the known fact and
+	// complete the effect.
 	if err := a.replayStuckChainDecisions(ctx); err != nil {
 		return err
 	}
 
 	// A risk evaluation interrupted by the restart must not strand its chain
 	// in evaluating: the chains return to active and held deliveries are
-	// re-woken, so the gate can evaluate again (G03).
+	// re-woken, so the gate can evaluate again.
 	if evaluating, rerr := sqlite.ResetEvaluatingChains(ctx, a.DB); rerr == nil {
 		for _, chainID := range evaluating {
 			_ = a.recordEvent(ctx, domain.Event{Type: domain.EventChainUpdated, ResourceID: chainID})
@@ -227,7 +227,7 @@ func (a *App) replayStuckChainDecisions(ctx context.Context) error {
 // The exact provider execution must be proven terminal before any choice
 // releases the bot; what happens to the triggering delivery depends on the
 // choice — and "continue" deliberately changes nothing else, preserving the
-// unknown delivery as a fact rather than pretending it succeeded (H09).
+// unknown delivery as a fact rather than pretending it succeeded.
 func (a *App) ApplyRecoveryDecision(ctx context.Context, approval domain.Approval, optionID string) error {
 	status, err := a.verifyRecoveryTurn(ctx, approval)
 	if err != nil {
@@ -314,7 +314,7 @@ func (a *App) applyVerifiedRecoveryDecisionLocked(ctx context.Context, tx *sql.T
 		return domain.Run{}, domain.Conflict("error.recovery.not_unknown", map[string]any{"status": run.Status})
 	}
 	// Confirming the old execution ended is the precondition for any of the
-	// three choices; without it nothing may rerun (H05).
+	// three choices; without it nothing may rerun.
 	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, terminalStatus,
 		run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", true); err != nil {
 		return domain.Run{}, err

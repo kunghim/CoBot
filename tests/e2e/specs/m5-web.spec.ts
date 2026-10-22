@@ -127,7 +127,7 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   await expect(page.getByRole('complementary', { name: /团队列表|team list/i }).getByText(label)).toBeVisible({ timeout: 15000 });
 });
 
-// I05: on a narrow screen the team list stays in the layout, beside the
+// On a narrow screen the team list stays in the layout, beside the
 // page and never over it: it folds away through its toggle and nothing
 // modal opens. The workspace yields to the conversation on narrow windows
 // by never taking more than its share.

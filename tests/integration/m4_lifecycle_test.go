@@ -15,7 +15,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// TestBotDeleteRefusesOpenWorkAndPurges walks B08: the captain and any
+// TestBotDeleteRefusesOpenWorkAndPurges: the captain and any
 // member with unfinished work are refused by name; a member that finished and
 // handed over its work is removed completely — its conversation, runs and
 // engine session — while the task it handed over stays with its new owner
@@ -125,7 +125,7 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	fake.StartTurnErr = nil
 }
 
-// TestArchiveOnlyIdleTeam walks B09: archiving is the one gate. A pending
+// TestArchiveOnlyIdleTeam: archiving is the one gate. A pending
 // approval, an unfinished task, a running member and a queued message each
 // refuse it; once the team is idle the archive succeeds, records its time,
 // shuts the team engine down and refuses new work. Restore brings it back.
@@ -282,7 +282,7 @@ func TestDeleteRemovesTeamCompletely(t *testing.T) {
 	}
 }
 
-// TestClaimedFolderIsRefused pins B04: one project belongs to one team for
+// TestClaimedFolderIsRefused: one project belongs to one team for
 // life. A folder whose marker names a team this instance cannot see is
 // refused by name and never taken over, while a stale marker left by a team
 // this instance deleted claims nothing.

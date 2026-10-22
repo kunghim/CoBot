@@ -11,7 +11,7 @@ import (
 // RefreshLeases rewrites the local lease of every live member of every active
 // team. The scheduler ticks it at platform.LeaseInterval while the core runs,
 // so a lease that stops being refreshed is exactly the fact external helpers
-// use to refuse side effects (H06).
+// use to refuse side effects.
 func (a *App) RefreshLeases(ctx context.Context) int {
 	if a.Paths.Root == "" {
 		return 0
@@ -45,7 +45,7 @@ func (a *App) RefreshLeases(ctx context.Context) int {
 }
 
 // TouchLease refreshes one member's lease immediately, so a bridge spawned
-// for a just-claimed turn never races the scheduler's ticker (H06).
+// for a just-claimed turn never races the scheduler's ticker.
 func (a *App) TouchLease(ctx context.Context, botID string) {
 	if a.Paths.Root == "" {
 		return

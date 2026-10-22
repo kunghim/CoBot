@@ -10,7 +10,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Memories hold working methods and preferences per member (G04/G05):
+// Memories hold working methods and preferences per member:
 // ownership is filtered in the store, retrieval is bounded, deletion is a
 // tombstone so the same fact is never recreated automatically, and the write
 // path refuses secret-shaped bodies and oversized entries.
@@ -31,7 +31,7 @@ var memorySecretGuards = []*regexp.Regexp{
 
 // memorySearchResult is the bounded retrieval handed to the caller: at most
 // MemorySearchMaxItems items and MemorySearchMaxChars characters in total,
-// with the overflow reported instead of silently dropped (G05).
+// with the overflow reported instead of silently dropped.
 type memorySearchResult struct {
 	Items   []domain.Memory `json:"items"`
 	Dropped int             `json:"dropped"`
@@ -96,7 +96,7 @@ func teamOfMemoryTarget(ctx context.Context, a *App, botID string) string {
 }
 
 // DeleteMemory tombstones one memory. The row survives so its dedupe key
-// keeps blocking the same fact from being recreated automatically (G04).
+// keeps blocking the same fact from being recreated automatically.
 func (a *App) DeleteMemory(ctx context.Context, principal auth.Principal, memoryID string) error {
 	cached, unlock, writeErr := beginWrite[bool](ctx, a, principal)
 	defer unlock()

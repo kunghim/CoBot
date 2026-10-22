@@ -15,7 +15,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// TestChainBudgetGatesBotWakes walks the whole G01/G02 accounting loop with a
+// TestChainBudgetGatesBotWakes walks the whole wake accounting loop with a
 // chain limit of 3: bot-caused wakes count against one shared budget, the
 // wake past it waits for the user, a continue grants a fresh budget of the
 // configured size, and stopping cancels the chain's undelivered work.
@@ -125,7 +125,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 }
 
 // TestUserMessageOpensNewChainWithoutClearingOld proves a second user message
-// starts its own budget and never resets the chain still in flight (G02).
+// starts its own budget and never resets the chain still in flight.
 func TestUserMessageOpensNewChainWithoutClearingOld(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
@@ -163,7 +163,7 @@ func TestUserMessageOpensNewChainWithoutClearingOld(t *testing.T) {
 	}
 }
 
-// TestChainWakeDeduplicatesDispatchKey pins the store rule behind G01: the
+// TestChainWakeDeduplicatesDispatchKey pins the store rule behind wake counting: the
 // same dispatch key can never count twice on one chain.
 func TestChainWakeDeduplicatesDispatchKey(t *testing.T) {
 	h := newM2Harness(t)
@@ -206,7 +206,7 @@ func TestChainWakeDeduplicatesDispatchKey(t *testing.T) {
 	}
 }
 
-// TestUsageLedgerSnapshotsAndDedupes pins G06: one row per engine turn
+// TestUsageLedgerSnapshotsAndDedupes: one row per engine turn
 // updated in place (never summed), cached input never counted twice, unknown
 // markers resolve when real numbers arrive, and system sessions count only
 // toward the team.
@@ -289,7 +289,7 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 
 }
 
-// TestBudgetPausesNewTurnsAndResumes walks G07/G08 end to end: a budget
+// TestBudgetPausesNewTurnsAndResumes walks the budget end to end: a budget
 // stops only new turns, fixing the budget resumes them, a turn without usage
 // pauses the queue as unknown, and real numbers arriving resume it.
 func TestBudgetPausesNewTurnsAndResumes(t *testing.T) {
@@ -365,7 +365,7 @@ func TestBudgetPausesNewTurnsAndResumes(t *testing.T) {
 	waitUntil(t, 5*time.Second, "turn 3 after raise", func() bool { return len(fake.Turns()) == 3 })
 
 	// This turn never reports usage: at completion the ledger records an
-	// unknown, and the enabled budget must pause the next turn (G08).
+	// unknown, and the enabled budget must pause the next turn.
 	turn3 := fake.Turns()[2]
 	fake.EmitTurnCompleted(turn3.ThreadID, turn3.TurnID, "completed", "好的")
 	waitUntil(t, 5*time.Second, "turn 3 done", func() bool {
@@ -406,7 +406,7 @@ func seedMemory(t *testing.T, h *m2Harness, teamID, botID, body string) domain.M
 	return m
 }
 
-// TestMemoriesStayWithTheirOwner pins G04: a member's memories are listed for
+// TestMemoriesStayWithTheirOwner: a member's memories are listed for
 // it alone, and a deletion hides one immediately.
 func TestMemoriesStayWithTheirOwner(t *testing.T) {
 	h := newM2Harness(t)
@@ -429,7 +429,7 @@ func TestMemoriesStayWithTheirOwner(t *testing.T) {
 	}
 }
 
-// TestThreadInstructionsCarryOwnMemories pins G05: a member's new thread is
+// TestThreadInstructionsCarryOwnMemories: a member's new thread is
 // told its own memories, never a teammate's, within the item and character
 // bounds.
 func TestThreadInstructionsCarryOwnMemories(t *testing.T) {

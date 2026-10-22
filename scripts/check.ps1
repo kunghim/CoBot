@@ -12,8 +12,12 @@ Set-Location $root
 Write-Host "==> public file policy"
 node scripts/check-public-files.mjs
 if ($LASTEXITCODE -ne 0) { throw "public file policy failed" }
-node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs
+node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs
 if ($LASTEXITCODE -ne 0) { throw "repository policy tests failed" }
+
+Write-Host "==> docs and locale keys"
+node scripts/check-docs.mjs
+if ($LASTEXITCODE -ne 0) { throw "docs or locale keys check failed" }
 
 Write-Host "==> avatar catalog"
 node assets/avatars/build.mjs --check

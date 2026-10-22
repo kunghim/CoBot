@@ -117,7 +117,7 @@ func (b *Bridge) callTool(ctx context.Context, name string, args json.RawMessage
 	if token == "" {
 		return toolFailure(StatusUnavailable, "error.unauthorized.missing_token", nil), nil, nil
 	}
-	// H06: this process may outlive the core that spawned it (an orphaned
+	// This process may outlive the core that spawned it (an orphaned
 	// engine keeps its bridge). Side effects then depend on a local lease
 	// the core stops refreshing; reads still work so the model can inspect
 	// state and report honestly.

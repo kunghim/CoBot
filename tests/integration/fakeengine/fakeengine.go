@@ -282,7 +282,7 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 }
 
 // ReplyErr (set by tests) simulates a failed RPC delivery so the product's
-// "decision kept, response unknown" path (F03) is exercised for real.
+// "decision kept, response unknown" path is exercised for real.
 func (s *Server) ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error {
 	s.mu.Lock()
 	if s.ReplyErr != nil {

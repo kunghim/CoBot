@@ -3,14 +3,14 @@
 - 核对日期：2026-10-20。
 - 对照代码：`6b7530c`。版本以当前 `go.mod`、`go.sum` 和 `frontend/package-lock.json` 为准。
 - 本文是依赖范围和直接依赖的维护说明，不是完整、机器可读的 SBOM。
-- CoBot 自身采用 [Apache-2.0](../LICENSE)。
+- CoBot 自身采用 [Apache-2.0](../../LICENSE)。
 
 ## 维护依据
 
 Go 直接依赖表依据 `go.mod` 和对应版本的模块 LICENSE 核对；前端表中的确切版本来自锁文件，
 并核对了匹配版本的包内许可证。旧验收中的版本号、当次审计结果不能替代当前锁文件。
 
-完整发行包的第三方正文由 [third-party-notices.mjs](../scripts/third-party-notices.mjs)
+完整发行包的第三方正文由 [third-party-notices.mjs](../../scripts/third-party-notices.mjs)
 在目标平台、安装锁定依赖后生成 `THIRD-PARTY-NOTICES.txt`。
 该脚本按桌面构建标签收集程序、助手及传递模块，并包含 Go 标准库/运行时声明；Windows 另收集 WiX UI 资源声明。
 前端遍历锁文件中的生产依赖，而非只收集第一层包。
@@ -57,19 +57,19 @@ Vite、TypeScript、Tailwind、Vitest、Playwright 和接口生成工具等开�
 - `@dicebear/core` 是前端代码依赖，见上表。
 - 团子系列使用来自 `@dicebear/styles` 10.6.0 的 Gaze 素材，其声明为 CC0 1.0。
 - CoBot 补充的形状、色板和角色默认值采用仓库许可证 Apache-2.0。
-- 来源及许可证见 [Dango LICENSE](../assets/avatars/dango/LICENSE.md)。
+- 来源及许可证见 [Dango LICENSE](../../assets/avatars/dango/LICENSE.md)。
   `dist/dango.json` 自带素材声明；头像系列由核心下载和缓存，不应被误记为内嵌的完整素材包。
 - Windows MSI 中的 WiX UI 模板和资源另有随包声明，来源保存在
-  [packaging/licenses/wix](../packaging/licenses/wix)。
+  [packaging/licenses/wix](../../packaging/licenses/wix)。
 - 应用图标、界面标识与 favicon 随程序打包，来源和导出方式见
-  [品牌资源说明](../assets/branding/README.md)，不通过头像库下载。
+  [品牌资源说明](../../assets/branding/README.md)，不通过头像库下载。
   Python/Pillow 只用于重新导出品牌图像，日常构建复用已提交的图标，不要求安装 Python。
 
 升级头像系列、替换素材或改变下载/内嵌方式时，要同时检查素材来源和声明，不能只更新 npm 依赖表。
 
 ## 外部运行条件
 
-Codex CLI 由用户安装，CoBot 不将其放入发行包。当前兼容性下限按平台区分，见[开发指南](development.md)。
+Codex CLI 由用户安装，CoBot 不将其放入发行包。当前兼容性下限按平台区分，见[引擎适配规则](../rules/engine.md)。
 Windows 桌面依赖已有 WebView2 Runtime；macOS 原生构建依赖平台工具链。
 这些外部条件与内嵌依赖分开说明，不将“需要用户安装”写成“由 CoBot 分发”。
 

@@ -10,7 +10,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// ImportEventFiles drains the local ledger into the events table (H08):
+// ImportEventFiles drains the local ledger into the events table:
 // every line is inserted by its event id, so an event that already arrived
 // live is never duplicated; a corrupt file is quarantined as evidence after
 // its valid lines are imported; a clean file is renamed imported-* and kept
