@@ -352,13 +352,14 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil {
 		return err
 	}
-	// The model comes from the provider the profile runs with, not from the
-	// engine's own default: that default names a model of a vendor this
-	// profile may no longer be talking to.
-	_, model, err := s.app.ThreadProvider(ctx, team.ID)
+	// The model is the one this member runs with, not the engine's own
+	// default: that default names a model of a vendor the member may not
+	// be talking to.
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
 	if err != nil {
 		return err
 	}
+	model := choice.Model
 	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
 	// product cannot judge, holds the queue and asks the user through
 	// settings; it never interrupts work that already started (G07/G08).
@@ -538,6 +539,9 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	}
 	s.app.TouchLease(ctx, bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
+	if model == "" {
+		model = turnModel(turnCtx, choice, server)
+	}
 	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
@@ -886,13 +890,25 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 			}
 		}
 	}
-	providerID, model, err := s.app.ThreadProvider(ctx, team.ID)
+	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
 	if err != nil {
 		return "", err
 	}
+	providerID, model := choice.EngineProvider, choice.Model
 	config, err := s.threadConfig(ctx, team, bot, server.Epoch(), runID)
 	if err != nil {
 		return "", err
+	}
+	if providerID != officialEngineProvider {
+		// Web search is a tool OpenAI runs on its own side. The engine
+		// offers it with every request, and a provider that does not run
+		// it may refuse the whole turn over it (Xiaomi MiMo does, with
+		// responses_feature_not_supported), so a member on any provider
+		// but the ChatGPT account goes without it.
+		if config == nil {
+			config = map[string]any{}
+		}
+		config["web_search"] = "disabled"
 	}
 	instructions, told := s.app.threadInstructions(ctx, team, bot, role)
 	spec := engine.ThreadSpec{
@@ -908,7 +924,7 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		// A thread that was started with another provider has to let go of
 		// it: the engine ignores a provider for a thread it already holds.
 		// Archiving and unarchiving is how it lets go, and the resume below
-		// loads it again with the provider the team runs with.
+		// loads it again with the provider the member runs with.
 		switching := session.ModelProvider != "" && session.ModelProvider != providerID
 		if switching {
 			if reloader, ok := server.(threadReloader); ok {

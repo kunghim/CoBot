@@ -84,9 +84,10 @@ func TestThreadNamesTheProfileProviderAndItsModel(t *testing.T) {
 	}
 }
 
-// Without a provider the thread names none, so the engine keeps its own
-// account, and the model falls back to the profile's own setting.
-func TestThreadWithoutAProviderNamesNone(t *testing.T) {
+// Without a provider of its own the thread runs on the ChatGPT account, and
+// names it: the engine reports that name back for the thread, so naming
+// anything else would make every turn look like a provider switch.
+func TestThreadWithoutAProviderRunsOnTheOfficialAccount(t *testing.T) {
 	h := newM2Harness(t)
 	ctx := context.Background()
 
@@ -99,7 +100,7 @@ func TestThreadWithoutAProviderNamesNone(t *testing.T) {
 	}
 	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
 
-	if got := fake.ThreadProviders; len(got) == 0 || got[0] != "" {
-		t.Fatalf("the thread named %v, want none", got)
+	if got := fake.ThreadProviders; len(got) == 0 || got[0] != "openai" {
+		t.Fatalf("the thread named %v, want openai", got)
 	}
 }
