@@ -351,7 +351,7 @@ func SetTeamStatusTx(ctx context.Context, tx *sql.Tx, teamID, status, detail str
 }
 
 // UnbindTeamDirectory removes the directory binding rows of a team being
-// deleted. User files on disk are never touched here (B09).
+// deleted. User files on disk are never touched here.
 func UnbindTeamDirectory(ctx context.Context, tx *sql.Tx, teamID string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM directory_bindings WHERE team_id = ?`, teamID); err != nil {
 		return fmt.Errorf("unbind directory: %w", err)
@@ -360,7 +360,7 @@ func UnbindTeamDirectory(ctx context.Context, tx *sql.Tx, teamID string) error {
 }
 
 // SoftDeleteBotsOfTeam tombstones every member of a deleted team; rows stay
-// for audit and history (B09).
+// for audit and history.
 func SoftDeleteBotsOfTeam(ctx context.Context, tx *sql.Tx, teamID string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if _, err := tx.ExecContext(ctx, `UPDATE bots SET deleted_at = ? WHERE team_id = ? AND deleted_at = ''`, now, teamID); err != nil {
@@ -511,7 +511,7 @@ func GetTeamByID(ctx context.Context, q Queryer, id string) (domain.Team, error)
 }
 
 // OpenWorkCounts is the "unfinished work" census that gates archive and
-// delete decisions (B08/B09).
+// delete decisions.
 type OpenWorkCounts struct {
 	OpenQuestions    int64 `json:"openQuestions"`
 	ActiveRuns       int64 `json:"activeRuns"`
@@ -543,7 +543,7 @@ func TeamOpenWork(ctx context.Context, q Queryer, teamID string) (OpenWorkCounts
 	return c, nil
 }
 
-// BotOpenWork counts the blocking work of one member (B08).
+// BotOpenWork counts the blocking work of one member.
 func BotOpenWork(ctx context.Context, q Queryer, botID string) (OpenWorkCounts, error) {
 	var c OpenWorkCounts
 	err := q.QueryRowContext(ctx, `SELECT
@@ -572,7 +572,7 @@ type LeaseBot struct {
 }
 
 // ListLeaseBots returns every live member of an active team — exactly the
-// members whose leases the running core keeps fresh (H06).
+// members whose leases the running core keeps fresh.
 func ListLeaseBots(ctx context.Context, q Queryer) ([]LeaseBot, error) {
 	rows, err := q.QueryContext(ctx, `SELECT b.id, b.team_id FROM bots b
 		JOIN teams t ON t.id = b.team_id

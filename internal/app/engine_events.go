@@ -284,7 +284,7 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 		return err
 	}
 	// A finished turn that never reported tokens is an unknown spend, not a
-	// zero one: a budget must pause rather than trust it (G08). A usage row
+	// zero one: a budget must pause rather than trust it. A usage row
 	// that already arrived keeps its real numbers.
 	epoch := run.EngineEpoch
 	if epoch == "" {
@@ -573,7 +573,7 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 	}
 	// Pending approvals bound to the dead connection can never be answered
 	// from it; invalidate them now instead of leaving cards that only fail
-	// later (review B14, F04).
+	// later.
 	if rt != nil && rt.server != nil {
 		epoch := rt.server.Epoch()
 		// Collect this connection's pending cards first — the invalidate step

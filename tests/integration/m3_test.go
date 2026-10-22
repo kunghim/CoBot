@@ -121,7 +121,7 @@ func TestCardPermissionEdges(t *testing.T) {
 
 var de *domain.Error
 
-// TestWriteIdempotencyReplaysAndRejectsKeyReuse pins E05 for the MCP write
+// TestWriteIdempotencyReplaysAndRejectsKeyReuse covers the MCP write
 // path: a retried start_requirement with the same key and same arguments
 // replays the stored result (one requirement, same id), and the same key
 // with different arguments is rejected instead of creating a second one.

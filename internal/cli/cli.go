@@ -66,7 +66,7 @@ Usage:
               [--log-level debug|info|warn|error] [--no-open]
   cobot version
   cobot mcp                      # MCP stdio bridge for one bot (spawned by the engine)
-  cobot hook                     # run one configured hook from stdin JSON (H07)
+  cobot hook                     # run one configured hook from stdin JSON
   cobot trace on|off|status|view|protocol [--data-root <path>]
                                  # developer recording of raw exchanges (never commit it)
 
@@ -263,7 +263,7 @@ func runMCP(args []string) int {
 	return 0
 }
 
-// runHook executes one user-configured hook from a stdin JSON request (H07).
+// runHook executes one user-configured hook from a stdin JSON request.
 // It never invents hook names: an unconfigured name is reported uncovered,
 // and only commands present in the team's .cobot/hooks.json run. Side-effect
 // hooks additionally require a fresh local lease for the member they act

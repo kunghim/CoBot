@@ -732,13 +732,12 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 		return err == nil && r.Status == domain.RunUnknown
 	})
 
-	// The bot is locked by the unknown run (H04): dispatch must not restart
+	// The bot is locked by the unknown run: dispatch must not restart
 	// it, so the decision records truthfully that no reply was delivered.
 	if len(fake.Turns()) != 1 {
 		t.Fatal("locked bot must not start new turns after connection loss")
 	}
-	// Connection death invalidates the undecided card immediately (F04:
-	// 未决失效) and marks its response honestly expired — the dead engine can
+	// Connection death invalidates the undecided card immediately and marks its response honestly expired — the dead engine can
 	// never answer its request id. A later decision is therefore refused
 	// instead of recording a decision that could not be delivered.
 	invalidated, err := sqlite.GetApproval(ctx, h.app.DB, pending[0].ID)
@@ -757,7 +756,7 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	// Decided history rules still hold for cards decided before the crash:
 	// nothing else to assert here beyond the refusal above.
 
-	// F04: once the run is resolved (recovery does this in M4; here we
+	// Once the run is resolved (recovery does this in M4; here we
 	// simulate the resolved state) and a NEW server generation exists, the
 	// old request id must expire instead of being answered on the new
 	// connection.
@@ -787,7 +786,7 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The app-server died. The unknown run keeps the bot locked until a human
-	// verifies it (H04), so resolve it first — this is what recovery does.
+	// verifies it, so resolve it first — this is what recovery does.
 	h.resolveUnknownRun(t, bot.ID)
 	decided2, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
 	if err == nil {
@@ -869,7 +868,7 @@ func TestTurnStartUnknownLocksBot(t *testing.T) {
 	if detail["queuedCount"].(int) != 0 {
 		t.Fatal("queue must reflect the failed dispatch")
 	}
-	// C10: the failure lands as an actionable reason on the run, and the
+	// The failure lands as an actionable reason on the run, and the
 	// engine error never rewrites the user's configuration.
 	if run, ok := detail["activeRun"].(domain.Run); !ok || run.ErrorKey != "error.engine.turn_unknown" {
 		t.Fatalf("unknown run must carry error.engine.turn_unknown, got %+v", detail["activeRun"])

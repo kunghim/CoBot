@@ -67,7 +67,7 @@ type App struct {
 	// thread belongs to, so a recording can name both ends. Nil records nothing.
 	Trace *wiretrace.Recorder
 
-	// Events is the local durable event ledger (H08). Nil disables file
+	// Events is the local durable event ledger. Nil disables file
 	// appending; the database stays the primary store either way.
 	Events        *eventsink.Sink
 	eventGapNoted atomic.Bool
@@ -247,7 +247,7 @@ func (a *App) ListEvents(ctx context.Context, principal auth.Principal, scope do
 }
 
 // recordEvent appends a durable event in its own short transaction, then
-// mirrors it into the local ledger file (H08). Subscribers never observe
+// mirrors it into the local ledger file. Subscribers never observe
 // uncommitted state; a saturated ledger records one gap event instead of
 // deleting un-imported evidence.
 func (a *App) recordEvent(ctx context.Context, ev domain.Event) error {
@@ -262,7 +262,7 @@ func (a *App) recordEvent(ctx context.Context, ev domain.Event) error {
 		if errors.Is(appendErr, eventsink.ErrOverCapacity) && a.eventGapNoted.CompareAndSwap(false, true) {
 			// The file budget is spent on un-imported evidence: the gap is
 			// recorded in the database (the durable store), never by
-			// deleting the evidence that is still only on disk (H08).
+			// deleting the evidence that is still only on disk.
 			if _, gapErr := a.insertEvent(ctx, domain.Event{
 				ID: domain.NewID(), Type: domain.EventLogGap, ResourceID: "events",
 				Payload: mustJSON(map[string]any{"reason": "over_capacity"}),

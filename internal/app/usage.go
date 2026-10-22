@@ -10,7 +10,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Usage ledger and budget gate (G06/G07/G08). The ledger stores one row per
+// Usage ledger and budget gate. The ledger stores one row per
 // engine turn, updated in place; the gate blocks only NEW turns once a
 // budget is exhausted or usage cannot be judged, and it never pretends the
 // limit is a precise hard cap.
@@ -127,7 +127,7 @@ func (a *App) ingestTokenUsage(ctx context.Context, teamID, epoch string, raw js
 }
 
 // RecordUsage stores a usage snapshot and publishes the change. Repeated
-// snapshots for one turn replace the row; they never accumulate (G06).
+// snapshots for one turn replace the row; they never accumulate.
 func (a *App) RecordUsage(ctx context.Context, entry domain.UsageEntry) error {
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -172,8 +172,8 @@ type BudgetPause struct {
 // budgetPaused evaluates the configured budget against the ledger. With no
 // budget configured nothing is paused (the default). An unknown usage row in
 // the scope pauses too: a budget cannot be trusted without knowing the spend,
-// and the product says so instead of guessing (G08). The sum may overshoot
-// under concurrency; no precise hard cap is promised (G07).
+// and the product says so instead of guessing. The sum may overshoot
+// under concurrency; no precise hard cap is promised.
 func (a *App) budgetPaused(ctx context.Context, teamID, botID string, settings domain.Settings) (*BudgetPause, error) {
 	if settings.BudgetScope == domain.BudgetScopeNone || settings.BudgetTokens <= 0 {
 		return nil, nil

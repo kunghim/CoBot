@@ -117,7 +117,7 @@ func escapeLike(s string) string {
 }
 
 // TombstoneMemory marks a memory deleted. The row survives so its dedupe key
-// keeps blocking an automatic re-creation of the same fact (G04).
+// keeps blocking an automatic re-creation of the same fact.
 func TombstoneMemory(ctx context.Context, tx *sql.Tx, id string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	res, err := tx.ExecContext(ctx, `UPDATE memories SET deleted_at = ? WHERE id = ? AND deleted_at = ''`, now, id)

@@ -1,4 +1,4 @@
-// Package hookrun implements CoBot's hook adapter (H07). A hook process is
+// Package hookrun implements CoBot's hook adapter. A hook process is
 // given one JSON request on stdin and answers with one JSON result on
 // stdout. Only commands the user configured in the team's .cobot/hooks.json
 // ever run — the adapter never invents hook names and never trusts an
@@ -83,7 +83,7 @@ func Run(ctx context.Context, stdin io.Reader, stdout io.Writer, teamDir, leaseD
 	spec, covered := config.Hooks[req.Name]
 	if !covered {
 		// Skipping is not protection; the result says the hook is simply not
-		// covered by this installation (H07 reports real coverage).
+		// covered by this installation, so the reported coverage stays real.
 		return writeResult(stdout, Result{Status: "skipped", Covered: false, Reason: "hook_not_configured"}, ExitOK)
 	}
 	if len(spec.Command) == 0 {

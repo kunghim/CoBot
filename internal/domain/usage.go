@@ -4,14 +4,14 @@ import "time"
 
 // Usage row status. A turn that ended without ever reporting tokens is an
 // unknown, not a zero: a budget may rely on it, so the product must say it
-// cannot know (G08).
+// cannot know.
 const (
 	UsageStatusRecorded = "recorded"
 	UsageStatusUnknown  = "unknown"
 )
 
 // Usage purpose separates business turns from system sessions; every row
-// today is a member's turn. Both count toward their team (G06); only
+// today is a member's turn. Both count toward their team; only
 // business turns count toward a per-bot budget.
 const (
 	UsagePurposeRun = "run"
@@ -40,7 +40,7 @@ type UsageEntry struct {
 
 // BillableTokens is what the budget measures: input plus output. The cached
 // input portion is already inside the input figure and is never added a
-// second time (G06).
+// second time.
 func (u UsageEntry) BillableTokens() int64 {
 	return u.InputTokens + u.OutputTokens
 }

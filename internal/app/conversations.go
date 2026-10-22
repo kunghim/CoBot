@@ -107,7 +107,7 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 		}
 		return SendMessageResult{}, err
 	}
-	// A user message opens a new causal chain (G02). It never clears a chain
+	// A user message opens a new causal chain. It never clears a chain
 	// that is still running; that one keeps its own budget.
 	chain, err := a.openChainLocked(ctx, tx, team.ID, message.ID, "")
 	if err != nil {

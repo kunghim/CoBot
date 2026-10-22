@@ -96,7 +96,7 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	}
 
 	// One project belongs to one team for its whole life: a folder another
-	// team still claims is refused, never taken over (B04).
+	// team still claims is refused, never taken over.
 	if err := a.refuseClaimedDirectory(ctx, canon.Display); err != nil {
 		return domain.Team{}, nil, err
 	}
