@@ -74,7 +74,11 @@ type App struct {
 
 	engineStatusMu    sync.Mutex
 	engineStatusCache *EngineStatusInfo
-	hookFailures      sync.Map // team ID -> observed failure of this profile's native guard
+	// officialLogin is the engine account's sign-in as last learned: 0 not
+	// yet known, 1 signed in, -1 signed out. It outlives the status cache,
+	// which every account change empties until someone asks again.
+	officialLogin int
+	hookFailures  sync.Map // team ID -> observed failure of this profile's native guard
 
 	engineControlMu sync.Mutex
 	engineControl   *controlServer

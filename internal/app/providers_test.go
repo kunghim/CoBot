@@ -505,3 +505,65 @@ func withoutOfficial(list []ProviderView) []ProviderView {
 	}
 	return out
 }
+
+func TestAMemberWithNoModelStaysOnTheSignedInAccount(t *testing.T) {
+	ctx := context.Background()
+	a := providerTestApp(t, &fakeBinder{})
+	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// An account change empties the status cache; the sign-in learned
+	// before it still holds, so the member does not drift to the gateway.
+	a.noteOfficialLogin(true)
+	a.invalidateEngineStatus()
+	choice, err := a.MemberModel(ctx, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.EngineProvider != officialEngineProvider {
+		t.Fatalf("signed-in account lost to %+v", choice)
+	}
+
+	// Known to be signed out, the next provider that can run takes over.
+	a.noteOfficialLogin(false)
+	choice, err = a.MemberModel(ctx, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.ProviderID != "cobot_deepseek" {
+		t.Fatalf("signed-out account still chosen: %+v", choice)
+	}
+}
+
+func TestAnUncheckedAccountWithNoAlternativeIsNotProbed(t *testing.T) {
+	a := providerTestApp(t, &fakeBinder{})
+	// No other provider could run the turn, so there is nothing to ask the
+	// engine: the account is the choice either way.
+	choice, err := a.MemberModel(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.EngineProvider != officialEngineProvider {
+		t.Fatalf("choice = %+v", choice)
+	}
+	if _, known := a.officialLoginState(); known {
+		t.Fatal("the account was probed although nothing else could run")
+	}
+}
+
+func TestRebindProvidersHandsStoredKeyProvidersToTheEngineAgain(t *testing.T) {
+	ctx := context.Background()
+	binder := &fakeBinder{}
+	a := providerTestApp(t, binder)
+	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
+		t.Fatal(err)
+	}
+	// An engine home reset apart from the database knows nothing.
+	binder.bound = nil
+
+	a.RebindProviders(ctx)
+	if len(binder.bound) != 1 || binder.bound[0].ID != "cobot_deepseek" {
+		t.Fatalf("bound after rebind = %+v, want only the key provider", binder.bound)
+	}
+}

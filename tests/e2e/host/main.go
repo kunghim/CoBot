@@ -303,7 +303,10 @@ func runTurn(threadID, turnID, userText string) {
 // requestApproval simulates a native command approval, waits for the product
 // decision (routed by request id) and returns the engine decision string.
 func requestApproval(threadID, turnID string) string {
-	approvalID := fmt.Sprintf("fake-approval-%d", turnSeq)
+	// Named after its own turn: the shared counter has moved on by the time
+	// this goroutine runs when several members start at once, and two
+	// requests under one id leave one of them waiting forever.
+	approvalID := "fake-approval-" + turnID
 	key := `"` + approvalID + `"`
 	decision := make(chan string, 1)
 	pendingMu.Lock()

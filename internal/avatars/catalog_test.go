@@ -127,8 +127,21 @@ func TestSyncKeepsCacheWhenContentDoesNotMatch(t *testing.T) {
 	if got := versions(t, catalog); got["dango"] != 1 {
 		t.Fatalf("cache after failed sync = %v, want version 1 kept", got)
 	}
-	if catalog.Status().LastError == "" {
-		t.Fatal("failed sync must be reported")
+	if status := catalog.Status(); status.LastError == "" || status.LastErrorKind != "rejected" {
+		t.Fatalf("failed sync must be reported as rejected content: %+v", status)
+	}
+}
+
+func TestSyncReportsAnUnreachableCatalogAsSuch(t *testing.T) {
+	catalog, err := New(t.TempDir(), "http://127.0.0.1:1/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Sync(context.Background()); err == nil {
+		t.Fatal("sync against a closed port succeeded")
+	}
+	if status := catalog.Status(); status.LastErrorKind != "unreachable" {
+		t.Fatalf("status = %+v", status)
 	}
 }
 

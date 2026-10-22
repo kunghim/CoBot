@@ -1570,6 +1570,8 @@ export interface components {
                 /** Format: date-time */
                 lastSyncAt?: string;
                 lastError?: string;
+                /** @enum {string} */
+                lastErrorKind?: "unreachable" | "rejected";
             };
         };
         /** @description An avatar the user chose: catalog parts (kind catalog: series, shape, eyes, color) or a local picture (kind upload: file). Never an image. */

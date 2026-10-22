@@ -70,7 +70,15 @@ type Status struct {
 	LastSyncAt time.Time `json:"lastSyncAt,omitzero"`
 	// LastError is a short reason when the last sync did not complete.
 	LastError string `json:"lastError,omitempty"`
+	// LastErrorKind is what the interface tells the user about it:
+	// "unreachable" when the catalog could not be downloaded, "rejected"
+	// when what was downloaded could not be used.
+	LastErrorKind string `json:"lastErrorKind,omitempty"`
 }
+
+// errUnreachable marks a failure to download at all, as opposed to a
+// download whose content was refused.
+var errUnreachable = errors.New("avatar catalog unreachable")
 
 // Catalog is one profile's cached avatar catalog.
 type Catalog struct {
@@ -146,9 +154,12 @@ func (c *Catalog) Sync(ctx context.Context) (changed bool, err error) {
 		c.setStatus(func(s *Status) {
 			s.Syncing = false
 			s.LastSyncAt = time.Now().UTC()
-			s.LastError = ""
+			s.LastError, s.LastErrorKind = "", ""
 			if err != nil {
-				s.LastError = err.Error()
+				s.LastError, s.LastErrorKind = err.Error(), "rejected"
+				if errors.Is(err, errUnreachable) {
+					s.LastErrorKind = "unreachable"
+				}
 			}
 		})
 	}()
@@ -174,10 +185,10 @@ func (c *Catalog) Sync(ctx context.Context) (changed bool, err error) {
 	}
 
 	next := index{SchemaVersion: SchemaVersion}
-	var problems []string
+	var problems []error
 	for _, entry := range published.Series {
 		if err := checkEntry(entry); err != nil {
-			problems = append(problems, err.Error())
+			problems = append(problems, err)
 			if old, ok := have[entry.ID]; ok {
 				next.Series = append(next.Series, old)
 			}
@@ -188,7 +199,7 @@ func (c *Catalog) Sync(ctx context.Context) (changed bool, err error) {
 			continue
 		}
 		if err := c.download(ctx, entry); err != nil {
-			problems = append(problems, err.Error())
+			problems = append(problems, err)
 			if old, ok := have[entry.ID]; ok {
 				next.Series = append(next.Series, old)
 			}
@@ -215,7 +226,7 @@ func (c *Catalog) Sync(ctx context.Context) (changed bool, err error) {
 		c.prune(next)
 	}
 	if len(problems) > 0 {
-		return changed, errors.New(strings.Join(problems, "; "))
+		return changed, errors.Join(problems...)
 	}
 	return changed, nil
 }
@@ -278,15 +289,15 @@ func (c *Catalog) fetch(ctx context.Context, rel string, limit int64) ([]byte, e
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", rel, err)
+		return nil, fmt.Errorf("download %s: %w: %w", rel, errUnreachable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download %s: HTTP %d", rel, resp.StatusCode)
+		return nil, fmt.Errorf("download %s: %w: HTTP %d", rel, errUnreachable, resp.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", rel, err)
+		return nil, fmt.Errorf("download %s: %w: %w", rel, errUnreachable, err)
 	}
 	if int64(len(data)) > limit {
 		return nil, fmt.Errorf("download %s: larger than %d bytes", rel, limit)

@@ -6,6 +6,9 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
+# .NET resolves relative paths against the process directory, which Set-Location
+# does not move; without this a call from another directory checks the wrong files.
+[Environment]::CurrentDirectory = (Get-Location).ProviderPath
 if ($env:OS -ne "Windows_NT") { throw "Windows release packaging requires Windows" }
 
 if ($PreviousMsi) {
