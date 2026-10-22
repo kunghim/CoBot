@@ -218,3 +218,36 @@ func TestAMemberBackOnTheDefaultLeavesItsOwnModel(t *testing.T) {
 		t.Fatalf("the turn after going back asked for %q, want the engine's default", got)
 	}
 }
+
+// The default model is a model of the default provider. With that provider
+// switched off, a member falls back to the engine's own account, which must
+// not be asked for the other vendor's model.
+func TestADefaultModelDoesNotFollowAMemberToAnotherProvider(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+
+	saveProvider(t, h, "first", "first-model")
+	setDefaultModel(t, h, "first", "first-model")
+	first, err := h.app.GetProvider(ctx, "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.app.SetProviderEnabled(ctx, "first", false, first.Revision); err != nil {
+		t.Fatal(err)
+	}
+
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{
+		BotID: bots[1].ID, Text: "hi", RequestID: "default-elsewhere",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn", func() bool { return len(fake.Turns()) == 1 })
+	if got := fake.ThreadProviders; len(got) == 0 || got[0] != "openai" {
+		t.Fatalf("the thread named %v, want the engine's own account", got)
+	}
+	if got := fake.Turns()[0].Model; got == "first-model" {
+		t.Fatal("the engine's own account was asked for the disabled provider's model")
+	}
+}

@@ -93,20 +93,24 @@ export function memberChoice(
   engineDefault = '',
   officialSignedIn = true,
 ): ModelChoice {
-  const fallback = settings?.defaultModel ?? '';
+  // The default model is a model of the default provider, not a fallback
+  // for another one; a default with no provider is the older form, a model
+  // of the engine's own.
+  const fallbackFor = (providerId: string) =>
+    !settings?.defaultProvider || settings.defaultProvider === providerId ? (settings?.defaultModel ?? '') : '';
   const candidates: ModelChoice[] = [];
   if (bot?.providerId) candidates.push({ providerId: bot.providerId, model: bot.model ?? '' });
   if (team?.providerId) candidates.push({ providerId: team.providerId, model: '' });
-  if (settings?.defaultProvider) candidates.push({ providerId: settings.defaultProvider, model: fallback });
+  if (settings?.defaultProvider) candidates.push({ providerId: settings.defaultProvider, model: settings.defaultModel ?? '' });
   for (const candidate of candidates) {
     const provider = providers?.find((entry) => entry.id === candidate.providerId);
-    if (provider?.enabled) return { providerId: provider.id, model: modelOf(provider, candidate.model, fallback, engineDefault) };
+    if (provider?.enabled) return { providerId: provider.id, model: modelOf(provider, candidate.model, fallbackFor(provider.id), engineDefault) };
   }
   // With nothing named, the first enabled provider that can run a turn:
   // the ChatGPT account only once it is signed in.
   const first = providers?.find((entry) => entry.enabled && (!isOfficial(entry) || officialSignedIn));
-  if (first) return { providerId: first.id, model: modelOf(first, '', fallback, engineDefault) };
-  return { providerId: '', model: fallback || engineDefault };
+  if (first) return { providerId: first.id, model: modelOf(first, '', fallbackFor(first.id), engineDefault) };
+  return { providerId: '', model: fallbackFor('openai') || engineDefault };
 }
 
 /** The default model the settings name, as a picker shows it. */

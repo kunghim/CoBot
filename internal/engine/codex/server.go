@@ -1090,9 +1090,20 @@ func httpErrorStatus(message string) (int, bool) {
 // with one server-sent event, so the body may come as "data:{...}".
 func vendorErrorBody(message string) (string, bool) {
 	trimmed := strings.TrimSpace(message)
-	trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
-	if !strings.HasPrefix(trimmed, "{") || !json.Valid([]byte(trimmed)) {
-		return "", false
+	if strings.HasPrefix(trimmed, "{") {
+		return trimmed, json.Valid([]byte(trimmed))
 	}
-	return trimmed, true
+	// Server-sent events: the error is the first data line that holds a
+	// JSON object; an event: line or a second event may come with it.
+	for _, line := range strings.Split(trimmed, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if strings.HasPrefix(data, "{") && json.Valid([]byte(data)) {
+			return data, true
+		}
+	}
+	return "", false
 }
