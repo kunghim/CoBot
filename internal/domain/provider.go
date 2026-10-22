@@ -61,6 +61,10 @@ type Provider struct {
 	DefaultModel  string             `json:"defaultModel,omitempty"`
 	Retries       ProviderRetries    `json:"retries"`
 	PresetID      string             `json:"presetId,omitempty"`
+	// Enabled says whether members may pick this provider's models. A
+	// disabled provider keeps its configuration but is out of every picker,
+	// and a member that ran on it falls back to the default model.
+	Enabled bool `json:"enabled"`
 	// Revision guards concurrent writes of the same provider.
 	Revision  int64     `json:"revision"`
 	CreatedAt time.Time `json:"createdAt"`

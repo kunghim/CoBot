@@ -152,10 +152,13 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const addedIds = useMemo(() => new Set(providers.map((entry) => entry.presetId).filter((id): id is string => !!id)), [providers]);
 
+  // The ChatGPT account is always in the provider list, so it is not one
+  // of the vendors to add.
   const visiblePresets = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return presets;
-    return presets.filter((entry) => {
+    const addable = presets.filter((entry) => !entry.official);
+    if (!needle) return addable;
+    return addable.filter((entry) => {
       const label = presetName(entry, t).toLowerCase();
       return label.includes(needle) || entry.id.includes(needle);
     });
@@ -182,11 +185,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const choosePreset = (entry: ProviderPreset) => {
     if (addedIds.has(entry.id)) {
       toast.show({ tone: 'info', title: t('providers.dialog.alreadyAdded') });
-      return;
-    }
-    if (entry.official) {
-      onClose();
-      toast.show({ tone: 'info', title: t('providers.dialog.officialHint') });
       return;
     }
     setPreset(entry);
@@ -357,14 +355,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
                   {added && <Badge>{t('providers.dialog.addedBadge')}</Badge>}
                 </span>
                 <span className="mt-1 flex flex-wrap items-center gap-1">
-                  {entry.official ? (
-                    <span className="text-2xs text-neutral-600 dark:text-neutral-300">{t('providers.dialog.officialBadge')}</span>
-                  ) : (
-                    <>
-                      {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
-                      {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
-                    </>
-                  )}
+                  {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
+                  {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
                 </span>
               </span>
             </button>

@@ -278,6 +278,19 @@ export function useDeleteProvider() {
   });
 }
 
+/** Offers a provider's models to members, or stops offering them. */
+export function useSetProviderEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled, expectedRevision }: { id: string; enabled: boolean; expectedRevision?: number }) =>
+      api.setProviderEnabled(id, enabled, expectedRevision),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.providers });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+    },
+  });
+}
+
 /**
  * Checks a stored provider's models again. The key is read on the server, so
  * this works long after the provider was set up.
@@ -651,6 +664,16 @@ export function useSetTeamReasoningEffort() {
   return useMutation({
     mutationFn: ({ teamId, effort, expectedRevision }: { teamId: string; effort: string; expectedRevision?: number }) =>
       api.setTeamReasoningEffort(teamId, effort, expectedRevision),
+    onSuccess: invalidate,
+  });
+}
+
+/** Chooses the model a member runs with; an empty provider follows the default. */
+export function useSetBotModel() {
+  const invalidate = useInvalidateTeamScope();
+  return useMutation({
+    mutationFn: ({ botId, providerId, model, expectedRevision }: { botId: string; providerId: string; model: string; expectedRevision?: number }) =>
+      api.setBotModel(botId, providerId, model, expectedRevision),
     onSuccess: invalidate,
   });
 }
