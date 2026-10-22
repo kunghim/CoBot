@@ -84,6 +84,11 @@ type App struct {
 	// into the engine's own configuration, so two quick changes cannot
 	// arrive out of order.
 	providerSyncMu sync.Mutex
+	// engineDefault caches the model the engine marks as its default, the
+	// one a member on the ChatGPT account runs with when nothing names one.
+	engineDefaultMu    sync.Mutex
+	engineDefault      string
+	engineDefaultUntil time.Time
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
 	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)

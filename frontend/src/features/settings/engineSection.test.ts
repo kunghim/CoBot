@@ -1,17 +1,13 @@
-// The engine section reports whether the engine is usable. With a
-// third-party provider the ChatGPT account is not part of the setup, so
-// asking to sign in would be noise.
+// The engine section reports whether the engine is usable, and nothing
+// about accounts: the engine runs whichever provider a member chose, and the
+// ChatGPT account signs in on its own provider card.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import '../../i18n';
+import i18n from '../../i18n';
 import { EngineSection } from './SettingsSections';
 
-const state = vi.hoisted(() => ({
-  providers: [] as unknown[],
-  defaultProvider: '',
-  loggedIn: false,
-}));
+const state = vi.hoisted(() => ({ loggedIn: false, status: 'ready' }));
 
 vi.mock('../../api/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/queries')>();
@@ -19,7 +15,7 @@ vi.mock('../../api/queries', async (importOriginal) => {
     ...actual,
     useEngine: () => ({
       data: {
-        status: 'ready',
+        status: state.status,
         version: '0.161.0',
         loggedIn: state.loggedIn,
         capabilities: ['app-server', 'codexHook:trusted'],
@@ -27,25 +23,10 @@ vi.mock('../../api/queries', async (importOriginal) => {
       refetch: vi.fn(),
     }),
     useEngineCheck: () => ({ mutate: vi.fn() }),
-    useEngineLogin: () => ({ mutate: vi.fn(), isPending: false }),
-    useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
-    useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
-    useProviders: () => ({ data: { providers: state.providers }, isPending: false }),
-    useSettings: () => ({ data: { defaultProvider: state.defaultProvider }, isPending: false }),
   };
 });
 
-const gateway = {
-  id: 'cpa',
-  name: '公司的中转站',
-  kind: 'custom',
-  authMode: 'api_key',
-  endpoints: [{ dialect: 'openai-responses', baseUrl: 'https://cpa.example.invalid/v1' }],
-  models: [{ id: 'deepseek-v4-pro' }],
-  revision: 1,
-};
-
-describe('the engine section under a third-party provider', () => {
+describe('the engine section', () => {
   let root: Root;
   let host: HTMLDivElement;
 
@@ -54,9 +35,8 @@ describe('the engine section under a third-party provider', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
-    state.providers = [];
-    state.defaultProvider = '';
     state.loggedIn = false;
+    state.status = 'ready';
   });
 
   afterEach(() => {
@@ -65,26 +45,25 @@ describe('the engine section under a third-party provider', () => {
   });
 
   const render = () => act(() => root.render(h(EngineSection, {})));
+  const buttons = () => [...host.querySelectorAll('button')].map((button) => button.textContent);
 
-  it('asks for a ChatGPT sign-in when the engine runs on its own account', () => {
+  it('reads ready when the engine is ready, signed in or not', () => {
     render();
-    expect(host.textContent).toContain('请先登录后再使用');
-    expect([...host.querySelectorAll('button')].some((b) => b.textContent?.includes('登录'))).toBe(true);
+    const status = host.querySelector('[role="status"]')!;
+    expect(status.textContent).toContain(i18n.t('settings.engineReady'));
+    expect(status.querySelector('.bg-emerald-500')).not.toBeNull();
   });
 
-  it('does not ask for a sign-in when a gateway is the provider in use', () => {
-    state.providers = [gateway];
-    state.defaultProvider = 'cpa';
+  it('offers no sign-in and points to the provider list for the account', () => {
     render();
-    expect(host.textContent).toContain('不需要 ChatGPT 登录');
-    expect(host.textContent).not.toContain('请先登录后再使用');
-    expect([...host.querySelectorAll('button')].some((b) => b.textContent?.includes('登录'))).toBe(false);
+    expect(buttons()).not.toContain(i18n.t('engine.login'));
+    expect(buttons()).not.toContain(i18n.t('engine.logout'));
+    expect(host.textContent).toContain(i18n.t('settings.engineAccountHint'));
   });
 
-  it('keeps asking for a sign-in when the official provider is the one in use', () => {
-    state.providers = [{ ...gateway, id: 'openai', authMode: 'chatgpt' }];
-    state.defaultProvider = 'openai';
+  it('offers a recheck when the engine is not ready', () => {
+    state.status = 'error';
     render();
-    expect(host.textContent).toContain('请先登录后再使用');
+    expect(buttons()).toContain(i18n.t('engine.recheck'));
   });
 });

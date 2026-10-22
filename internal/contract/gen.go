@@ -562,12 +562,18 @@ type Bot struct {
 
 	// LastMessage The start of the latest message between the user and a member, for the team list.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
-	Name        string          `json:"name"`
-	Revision    int64           `json:"revision"`
-	RoleId      string          `json:"roleId"`
-	RoleVersion *string         `json:"roleVersion,omitempty"`
-	Status      BotStatus       `json:"status"`
-	TeamId      string          `json:"teamId"`
+
+	// Model The model this member chose, one its provider serves.
+	Model *string `json:"model,omitempty"`
+	Name  string  `json:"name"`
+
+	// ProviderId The provider of the model this member chose; absent means the member follows the default model.
+	ProviderId  *string   `json:"providerId,omitempty"`
+	Revision    int64     `json:"revision"`
+	RoleId      string    `json:"roleId"`
+	RoleVersion *string   `json:"roleVersion,omitempty"`
+	Status      BotStatus `json:"status"`
+	TeamId      string    `json:"teamId"`
 }
 
 // BotStatus defines model for Bot.Status.
@@ -760,11 +766,14 @@ type Model struct {
 
 // Provider A model vendor or gateway the engine can call. The secret is never part of it.
 type Provider struct {
-	AuthMode      ProviderAuthMode   `json:"authMode"`
-	CreatedAt     time.Time          `json:"createdAt"`
-	CredentialRef *string            `json:"credentialRef,omitempty"`
-	DefaultModel  *string            `json:"defaultModel,omitempty"`
-	Endpoints     []ProviderEndpoint `json:"endpoints"`
+	AuthMode      ProviderAuthMode `json:"authMode"`
+	CreatedAt     time.Time        `json:"createdAt"`
+	CredentialRef *string          `json:"credentialRef,omitempty"`
+	DefaultModel  *string          `json:"defaultModel,omitempty"`
+
+	// Enabled Whether members may pick this provider's models.
+	Enabled   bool               `json:"enabled"`
+	Endpoints []ProviderEndpoint `json:"endpoints"`
 
 	// HasCredential Whether a key is stored for this provider.
 	HasCredential *bool        `json:"hasCredential,omitempty"`
@@ -1336,6 +1345,14 @@ type SendMessageJSONBody struct {
 	Text      string             `json:"text"`
 }
 
+// SetBotModelJSONBody defines parameters for SetBotModel.
+type SetBotModelJSONBody struct {
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	Model            string             `json:"model"`
+	ProviderId       string             `json:"providerId"`
+	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
 // ListDirectoriesParams defines parameters for ListDirectories.
 type ListDirectoriesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
@@ -1388,6 +1405,13 @@ type ProbeProviderModelsJSONBody struct {
 	BaseUrl   string             `json:"baseUrl"`
 	ModelIds  *[]string          `json:"modelIds,omitempty"`
 	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// SetProviderEnabledJSONBody defines parameters for SetProviderEnabled.
+type SetProviderEnabledJSONBody struct {
+	Enabled          bool               `json:"enabled"`
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // ListQuestionsParams defines parameters for ListQuestions.
@@ -1639,6 +1663,9 @@ type PatchBotJSONRequestBody PatchBotJSONBody
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
 
+// SetBotModelJSONRequestBody defines body for SetBotModel for application/json ContentType.
+type SetBotModelJSONRequestBody SetBotModelJSONBody
+
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
 
@@ -1665,6 +1692,9 @@ type ProbeProviderModelsJSONRequestBody ProbeProviderModelsJSONBody
 
 // UpdateProviderJSONRequestBody defines body for UpdateProvider for application/json ContentType.
 type UpdateProviderJSONRequestBody = ProviderRequest
+
+// SetProviderEnabledJSONRequestBody defines body for SetProviderEnabled for application/json ContentType.
+type SetProviderEnabledJSONRequestBody SetProviderEnabledJSONBody
 
 // AnswerQuestionJSONRequestBody defines body for AnswerQuestion for application/json ContentType.
 type AnswerQuestionJSONRequestBody = AnswerQuestionRequest

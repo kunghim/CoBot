@@ -51,7 +51,7 @@ var bodyClues = []bodyClue{
 	{CodeQuota, []string{"insufficient_quota", "billing", "payment_required"}},
 	{CodeRateLimit, []string{"rate_limit", "too_many_requests"}},
 	{CodeAuthInvalid, []string{"invalid_api_key", "unauthorized", "permission_denied", "authentication"}},
-	{CodeModelUnknown, []string{"model_not_found", "does not exist", "unknown model"}},
+	{CodeModelUnknown, []string{"model_not_found", "does not exist", "unknown model", "model is not supported"}},
 	{CodeContextExceeded, []string{"context_length", "too many tokens", "maximum context"}},
 	{CodeProtocolUnsupported, []string{"not supported", "unsupported"}},
 }
@@ -73,6 +73,13 @@ func ClassifyHTTP(status int, body string) (string, string) {
 		return code, Text(code)
 	}
 	return classifyStatus(status)
+}
+
+// ClassifyBody maps a vendor's error body that came without an HTTP status
+// to a machine code, and reports false when the body names nothing it
+// knows. Like ClassifyHTTP, it never returns body text.
+func ClassifyBody(body string) (string, bool) {
+	return classifyBody(body)
 }
 
 // classifyBody looks for a well-known vendor error code in the response body.
