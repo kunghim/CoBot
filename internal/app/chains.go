@@ -11,7 +11,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Chains implement G01/G02's accounting half: every bot-caused wake (a
+// Chains do the accounting for bot wakes: every bot-caused wake (a
 // bot-to-bot message or a hand-over) spends from one shared budget per causal
 // chain. A user message opens a new chain and never clears a running one. A
 // model can never extend the budget; past the limit the chain waits for the
@@ -81,7 +81,7 @@ const (
 
 // EvaluateChainGate applies the chain budget inside the caller's claim
 // transaction: counting and dispatch eligibility are decided together, so a
-// crash between them can never lose or double-count a wake (G01). Events are
+// crash between them can never lose or double-count a wake. Events are
 // returned instead of written: the pool is a single connection, and writing
 // an event from inside an open transaction would deadlock. The caller emits
 // them after committing.
@@ -111,7 +111,7 @@ func (a *App) EvaluateChainGate(ctx context.Context, tx *sql.Tx, delivery sqlite
 	}
 	if delivery.MessageID == chain.OriginMessageID {
 		// The chain's root is user-caused input; only bot-caused wakes spend
-		// the budget (G01).
+		// the budget.
 		return ChainGateAllowed, ChainActionNone, nil, nil
 	}
 	key := delivery.DispatchKey

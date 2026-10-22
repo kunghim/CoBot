@@ -33,7 +33,7 @@ func (a *App) ListTeamActivity(ctx context.Context, principal auth.Principal, te
 }
 
 // ListAuthorizations reports the live bridge credentials of this instance,
-// without their token values; revoking one really invalidates it (I08).
+// without their token values; revoking one really invalidates it.
 func (a *App) ListAuthorizations() []auth.PublicBinding {
 	if a.CollaborationTokens == nil {
 		return nil
@@ -82,7 +82,7 @@ func (a *App) RevokeAuthorization(ctx context.Context, principal auth.Principal,
 // CheckDirectory validates a directory for team creation without
 // touching anything: canonical form, existence, reserved paths, duplicate
 // and nested bindings, and a marker of a team this instance cannot see,
-// which creation refuses the same way (B04).
+// which creation refuses the same way.
 func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw string) (map[string]any, error) {
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)

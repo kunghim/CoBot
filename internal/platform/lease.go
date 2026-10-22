@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Local leases (H06): the core refreshes one file per member every
+// Local leases: the core refreshes one file per member every
 // LeaseInterval while it runs; anything acting on that member's behalf from
 // outside the core — the spawned MCP bridge, a hook process — checks the
 // lease locally and refuses side effects when it is stale, missing, corrupt,

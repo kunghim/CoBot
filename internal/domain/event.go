@@ -27,10 +27,10 @@ const (
 	EventSettingsUpdated = "settings.updated"
 	// EventLogGap records that local event files ran past their budget with
 	// un-imported evidence: the evidence stays on disk and the gap is
-	// visible instead of silent (H08).
+	// visible instead of silent.
 	EventLogGap = "log.gap"
 	// EventLogQuarantined records that a corrupt ledger file was isolated
-	// after its valid lines were imported (H08).
+	// after its valid lines were imported.
 	EventLogQuarantined = "log.quarantined"
 	// EventAvatarsUpdated records that a newer avatar catalog was downloaded.
 	EventAvatarsUpdated = "avatars.updated"

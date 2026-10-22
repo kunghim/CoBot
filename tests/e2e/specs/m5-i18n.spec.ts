@@ -5,7 +5,7 @@ test.beforeEach(async ({ context }) => {
   await authorize(context);
 });
 
-// I04: the language setting really switches the whole UI between zh-CN and
+// The language setting really switches the whole UI between zh-CN and
 // en, and the saved choice persists. Model output is never translated by the
 // product, so only chrome labels change.
 test('language setting switches the UI and persists', async ({ page }) => {

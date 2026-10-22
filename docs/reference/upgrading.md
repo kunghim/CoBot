@@ -2,7 +2,7 @@
 
 - 核对日期：2026-10-20；代码基线：`6b7530c`。
 - 适用范围：Windows MSI/ZIP、macOS 应用包和独立 server。
-- 下载与平台验证范围以 [README](../README.md) 及对应版本的发布说明为准。
+- 下载与平台验证范围以 [README](../../README.md) 及对应版本的发布说明为准。
 
 ## 升级前
 
@@ -36,7 +36,7 @@ MSI 卸载或删除 ZIP 目录不会自动删除用户数据。更换安装形�
 迁移失败时不继续提供业务，也不自动降级。程序会拒绝打开高于其 `MaxSupportedVersion` 的数据库。
 
 **从旧任务模型跨入接力模型时存在数据清理，不能视为保留全部旧任务的无损升级。**
-[迁移 00023](../internal/store/sqlite/migrations/00023_relay_requirements.sql) 会：
+[迁移 00023](../../internal/store/sqlite/migrations/00023_relay_requirements.sql) 会：
 
 - 删除旧任务依赖表和转交表。
 - 清空旧任务及交付证据。
@@ -46,8 +46,8 @@ MSI 卸载或删除 ZIP 目录不会自动删除用户数据。更换安装形�
 这是迁移的实际 SQL 行为，不只针对某台机器的测试数据。若需要保留旧任务历史，升级前保存完整备份；
 当前没有将旧任务自动转成新需求链路的转换程序。此影响应在跨越该迁移的版本发布说明中明确列出。
 
-[迁移 00022](../internal/store/sqlite/migrations/00022_fullstack_and_project_manager.sql)
-调整内置成员角色，[迁移 00024](../internal/store/sqlite/migrations/00024_avatars.sql)
+[迁移 00022](../../internal/store/sqlite/migrations/00022_fullstack_and_project_manager.sql)
+调整内置成员角色，[迁移 00024](../../internal/store/sqlite/migrations/00024_avatars.sql)
 增加头像字段与角色头像设置。后续升级继续逐项核对新增迁移，不能用本文替代具体版本的变更说明。
 
 ## 首次启动后检查
@@ -56,7 +56,7 @@ MSI 卸载或删除 ZIP 目录不会自动删除用户数据。更换安装形�
 浏览器会话在有效期内可跨服务重启保留；失效时使用本次启动输出的一次性授权链接。
 核对与本次升级相关的业务路径；不要把能打开界面当成全部验收通过。
 
-原生 hook 的路径可能随程序版本变化。CoBot 会按[开发指南](development.md)中的所有权与内容匹配规则处理授权，
+原生 hook 的路径可能随程序版本变化。CoBot 会按[原生 hook 手动审查](hook-review.md)中的所有权与内容匹配规则处理授权，
 授权失败时检查设置状态，必要时手动审查；不能通过关闭守卫或绕过信任让升级检查通过。
 
 `runtime/instance.lock.guard` 由操作系统锁定，正常退出后空文件可能仍在。

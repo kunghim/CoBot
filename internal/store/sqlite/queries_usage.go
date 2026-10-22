@@ -13,7 +13,7 @@ import (
 // UpsertUsage records one turn's token snapshot. Repeated events for the same
 // (engine epoch, thread, turn) replace the row with the newest snapshot —
 // they never add to it, which is how cumulative engine values stay a single
-// truth instead of being summed again on every update (G06).
+// truth instead of being summed again on every update.
 func UpsertUsage(ctx context.Context, tx *sql.Tx, e domain.UsageEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	created := e.CreatedAt.UTC()
@@ -76,7 +76,7 @@ func MarkUnknownUsageIfMissing(ctx context.Context, tx *sql.Tx, e domain.UsageEn
 // SumUsage totals billable tokens (input+output, cached never double counted)
 // over a scope and counts unknown rows. botID == "" scopes the whole team
 // including system sessions; a bot scope counts only that bot's business
-// turns (G06).
+// turns.
 func SumUsage(ctx context.Context, q Queryer, teamID, botID string) (billable int64, unknown int, err error) {
 	query := `SELECT
 		COALESCE(SUM(input_tokens + output_tokens), 0),

@@ -234,7 +234,7 @@ func NormalizeError(err error) error {
 
 // ImportEventRow inserts an event by its explicit id, ignoring duplicates:
 // the same event arriving from the live stream and again from a ledger file
-// is one row (H08). It reports whether the row was new.
+// is one row. It reports whether the row was new.
 func ImportEventRow(ctx context.Context, db *sql.DB, ev domain.Event) (bool, error) {
 	payload := ev.Payload
 	if len(payload) == 0 {

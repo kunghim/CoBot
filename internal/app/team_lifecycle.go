@@ -14,7 +14,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Team and member lifecycle (B08/B09): only an idle team can be archived,
+// Team and member lifecycle: only an idle team can be archived,
 // restore brings it back, and deleting an archived team (or one whose folder
 // is gone) removes it completely. An idle member is deleted completely; a
 // member with unfinished work is refused.
@@ -427,7 +427,7 @@ func (a *App) removeTeamFolderData(dir, teamID string) {
 // blocker named. What is its own in this team goes with it (see
 // sqlite.PurgeBotTx) together with its engine thread; messages it sent to
 // other members stay as their history. Its role definition is untouched and
-// stays available to every team. The leader cannot be deleted (B08).
+// stays available to every team. The leader cannot be deleted.
 func (a *App) DeleteBot(ctx context.Context, principal auth.Principal, botID string, expectedRevision int64) (domain.Bot, error) {
 	cached, unlock, writeErr := beginWrite[domain.Bot](ctx, a, principal)
 	defer unlock()
@@ -505,7 +505,7 @@ func (a *App) deleteMemberThreads(ctx context.Context, teamID string, threads []
 
 // readTeamMarker loads an on-disk identification marker, reporting presence
 // separately from parse errors: any parseable or not, a marker file is a
-// claim on the folder (B04).
+// claim on the folder.
 func readTeamMarker(dir string) (TeamMarker, bool, error) {
 	data, err := os.ReadFile(filepath.Join(dir, ".cobot", "team.json"))
 	if err != nil {

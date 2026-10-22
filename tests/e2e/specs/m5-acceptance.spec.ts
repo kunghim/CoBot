@@ -41,7 +41,7 @@ async function sendCurrent(page: Page, text: string) {
   await composer.press('Enter');
 }
 
-// F05 + F06 (browser half): three live turns raise three pending requests;
+// Three live turns raise three pending requests;
 // paging moves between them without side effects, processing the current one
 // shrinks the total, and the decided record stays in the read-only history.
 test('three approval cards page, process, and keep history', async ({ page }) => {
@@ -84,7 +84,7 @@ test('three approval cards page, process, and keep history', async ({ page }) =>
   await expect(page.getByText(/\/ 3/)).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByText(/\/ 2/).first()).toBeVisible({ timeout: 15000 });
 
-  // The decided record lands in the read-only history (F06), which lives in
+  // The decided record lands in the read-only history, which lives in
   // the info card over the conversation.
   await page.getByRole('button', { name: /展开信息面板/ }).click();
   await page.getByRole('tab', { name: /^审批$/ }).click();
@@ -100,7 +100,7 @@ test('three approval cards page, process, and keep history', async ({ page }) =>
   setEngineMode('reply', teamDir);
 });
 
-// I06: dangerous markup renders as inert text, never executes.
+// Dangerous markup renders as inert text, never executes.
 test('dangerous markup renders as inert text', async ({ page }) => {
   await createTeam(page, 'm5-xss-' + Date.now(), '注入测试');
   await selectMember(page, /项目经理/);
@@ -115,7 +115,7 @@ test('dangerous markup renders as inert text', async ({ page }) => {
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 
-// I10 + I05 (keyboard half): only real actions on home, and arrow-key tab
+// Only real actions on home, and arrow-key tab
 // navigation with focus following the selection.
 test('home shows only real actions and tabs support arrow keys', async ({ page }) => {
   await createTeam(page, 'm5-home-' + Date.now(), '首页诚实性');

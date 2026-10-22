@@ -54,7 +54,7 @@ type WaitResult struct {
 
 // IsSideEffectTool reports whether a tool changes product state. From
 // outside the core — the spawned bridge, a hook process — an executor whose
-// local lease is stale must not run these; read tools always pass (H06).
+// local lease is stale must not run these; read tools always pass.
 func IsSideEffectTool(name string) bool {
 	switch name {
 	case "handoff", "start_requirement", "send_message", "ask_user", "browser":

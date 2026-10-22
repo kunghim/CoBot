@@ -25,7 +25,7 @@ type App interface {
 	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	AskUser(ctx context.Context, principal auth.Principal, in app.AskUserInput) (domain.Question, error)
 	UseBrowser(ctx context.Context, principal auth.Principal, req browser.Request) (browser.Result, error)
-	// Write idempotency (E05): a retried side-effect call replays its stored
+	// Write idempotency: a retried side-effect call replays its stored
 	// result; the same key with different arguments is a conflict.
 	WriteReplay(ctx context.Context, scope, principal, key, argsHash string) (string, bool, error)
 }
@@ -134,7 +134,7 @@ func asToolError(err error, target **ToolError) bool {
 	return ok
 }
 
-// CallTool routes one tool by name with write idempotency (E05): a retried
+// CallTool routes one tool by name with write idempotency: a retried
 // side-effect call carrying the same key and the same arguments replays the
 // stored result instead of creating a second resource, and the same key with
 // different arguments is rejected. Read tools and keyless calls pass through
