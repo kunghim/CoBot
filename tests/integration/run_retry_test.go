@@ -59,14 +59,22 @@ func TestRetryRunPutsAFailedCardTurnBack(t *testing.T) {
 		t.Fatalf("retry of an old failed turn = %v, want conflict", err)
 	}
 
+	// The card was left open, so the member is reminded once.
+	waitUntil(t, 5*time.Second, "reminder turn", func() bool { return len(fake.Turns()) == 3 })
+	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "completed", "好")
+	waitUntil(t, 5*time.Second, "reminder ended", func() bool { return h.runStatus(t, owner.ID) != "running" })
+	waitUntil(t, 5*time.Second, "second reminder turn", func() bool { return len(fake.Turns()) == 4 })
+	fake.EmitTurnCompleted(fake.Turns()[3].ThreadID, fake.Turns()[3].TurnID, "completed", "好")
+	waitUntil(t, 5*time.Second, "second reminder ended", func() bool { return h.runStatus(t, owner.ID) != "running" })
+
 	// A cancelled card has nothing left to run.
 	_, other := h.handCard(t, team, leader, owner, "取消前失败的卡", "做完")
-	waitUntil(t, 5*time.Second, "third turn", func() bool { return len(fake.Turns()) == 3 })
+	waitUntil(t, 5*time.Second, "third card turn", func() bool { return len(fake.Turns()) == 5 })
 	third, err := sqlite.FindActiveRun(ctx, h.app.DB, owner.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fake.EmitTurnCompleted(fake.Turns()[2].ThreadID, fake.Turns()[2].TurnID, "failed", "usageLimitExceeded")
+	fake.EmitTurnCompleted(fake.Turns()[4].ThreadID, fake.Turns()[4].TurnID, "failed", "usageLimitExceeded")
 	waitUntil(t, 5*time.Second, "third run failed", func() bool {
 		r, err := sqlite.GetRun(ctx, h.app.DB, third.ID)
 		return err == nil && r.Status == domain.RunFailed

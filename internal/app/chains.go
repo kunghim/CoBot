@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -311,6 +312,9 @@ func (a *App) applyChainDecisionLocked(ctx context.Context, tx *sql.Tx, approval
 		if err := sqlite.SetChainStatus(ctx, tx, chain.ID, domain.ChainStopped, "user_stopped"); err != nil {
 			return effect, err
 		}
+		if err := stoppedRouteNoticeLocked(ctx, tx, delivery, binding.BotID); err != nil {
+			return effect, err
+		}
 		if _, err := sqlite.CancelChainDeliveries(ctx, tx, chain.ID); err != nil {
 			return effect, err
 		}
@@ -358,4 +362,39 @@ func chainOfRunLocked(ctx context.Context, q sqlite.Queryer, botID string) strin
 		return ""
 	}
 	return chainID
+}
+
+// stoppedRouteNoticeLocked tells the user where a requirement stands once
+// they stop its chain. The handoff that was waiting is cancelled with the
+// chain, so the requirement stays open at that step with nobody working on
+// it, and nothing else would say so. The notice goes into the conversation
+// of the member the step was for; it wakes nobody and the model never reads
+// it.
+func stoppedRouteNoticeLocked(ctx context.Context, tx *sql.Tx, delivery sqlite.DeliveryRecord, botID string) error {
+	if delivery.TaskID == "" {
+		return nil
+	}
+	card, err := sqlite.GetTask(ctx, tx, delivery.TaskID)
+	if err != nil || card.RequirementID == "" {
+		return nil
+	}
+	req, err := sqlite.GetRequirement(ctx, tx, card.RequirementID)
+	if err != nil || req.Status != domain.RequirementActive {
+		return nil
+	}
+	name := memberNames(ctx, tx, req.TeamID)[botID]
+	if name == "" {
+		name = "这一环的成员"
+	}
+	text := fmt.Sprintf("已按你的选择停止这条链。需求「%s」停在「%s」：交给%s的这一环没有送达，现在没有人在做。"+
+		"要接着做，给%s发一句话；不做了，可以取消这个需求。", req.Title, stageLabel(req, card), name, name)
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return err
+	}
+	return sqlite.InsertMessage(ctx, tx, domain.Message{
+		ID: domain.NewID(), TeamID: req.TeamID, BotID: botID,
+		Kind: domain.MessageKindSystem, Blocks: blocks, RunID: card.ID,
+		CreatedAt: time.Now().UTC(),
+	})
 }

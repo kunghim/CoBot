@@ -732,7 +732,7 @@
       "roles": "Each role's default avatar. Members without an avatar of their own follow it; click a member's avatar in its conversation to change just that member.",
       "engine": "CoBot detects Codex and authorizes its safety hook at startup; this page shows the result. The engine is not tied to an account.",
       "models": "Used by a member until it is given its own model in the conversation; applies to work that starts afterwards.",
-      "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, and switching keeps the history.",
+      "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
       "archived": "Archived teams leave the team list; restore them or delete them for good here.",
       "security": "Bridge authorizations members currently hold; revoke them at any time.",

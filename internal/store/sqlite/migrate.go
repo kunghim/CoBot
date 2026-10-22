@@ -24,7 +24,7 @@ func Migrations() fs.FS { return migrationsFS }
 
 // MaxSupportedVersion is the highest migration this build understands. A
 // database ahead of it must be refused instead of silently downgraded.
-const MaxSupportedVersion = 27
+const MaxSupportedVersion = 28
 
 // Migrator wraps the goose provider bound to the product connection.
 type Migrator struct {
@@ -99,6 +99,16 @@ func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error
 		return err
 	}
 	fresh := false
+	backupPath := ""
+	// Version 23 replaced tasks with requirements and their cards; the old
+	// ones cannot be carried over and are dropped (see that migration).
+	// Count them first, so the teams that had some are told.
+	var dropped map[string]droppedTasks
+	if version > 0 && version < 23 {
+		if dropped, err = countLegacyTasks(ctx, m.db); err != nil {
+			return err
+		}
+	}
 	if version < targetVersion(m.provider) {
 		// Any pre-existing business table (old library seed or earlier
 		// version) earns a consistent snapshot before schema changes.
@@ -107,7 +117,7 @@ func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error
 			return fmt.Errorf("inspect existing tables: %w", err)
 		}
 		if tables > 0 {
-			if err := backup(ctx, m.db, backupsDir); err != nil {
+			if backupPath, err = backup(ctx, m.db, backupsDir); err != nil {
 				return fmt.Errorf("backup before migration: %w", err)
 			}
 		}
@@ -119,6 +129,16 @@ func (m *Migrator) MigrateToLatest(ctx context.Context, backupsDir string) error
 	if fresh {
 		if err := applyFirstRunDefaults(ctx, m.db); err != nil {
 			return err
+		}
+	}
+	if len(dropped) > 0 {
+		// Only an upgrade that ran version 23 dropped them.
+		if now, err := m.CurrentVersion(ctx); err != nil {
+			return err
+		} else if now >= 23 {
+			if err := tellDroppedTasks(ctx, m.db, dropped, backupPath); err != nil {
+				return err
+			}
 		}
 	}
 	pruneBackups(backupsDir, 3)
@@ -159,9 +179,9 @@ func targetVersion(p *goose.Provider) int64 {
 
 // backup writes a consistent snapshot with VACUUM INTO, which includes WAL
 // content; copying the main file alone would lose recent commits.
-func backup(ctx context.Context, db *sql.DB, backupsDir string) error {
+func backup(ctx context.Context, db *sql.DB, backupsDir string) (string, error) {
 	if err := os.MkdirAll(backupsDir, 0o700); err != nil {
-		return fmt.Errorf("create backups dir: %w", err)
+		return "", fmt.Errorf("create backups dir: %w", err)
 	}
 	version, err := func() (int64, error) {
 		var v sql.NullInt64
@@ -175,14 +195,14 @@ func backup(ctx context.Context, db *sql.DB, backupsDir string) error {
 		return v.Int64, nil
 	}()
 	if err != nil {
-		return fmt.Errorf("read version for backup name: %w", err)
+		return "", fmt.Errorf("read version for backup name: %w", err)
 	}
 	name := fmt.Sprintf("cobot-v%d-%s.sqlite", version, time.Now().UTC().Format("20060102T150405.000Z"))
 	target := filepath.Join(backupsDir, name)
 	if _, err := db.ExecContext(ctx, `VACUUM INTO ?`, target); err != nil {
-		return fmt.Errorf("vacuum into backup: %w", err)
+		return "", fmt.Errorf("vacuum into backup: %w", err)
 	}
-	return nil
+	return target, nil
 }
 
 func pruneBackups(dir string, keep int) {

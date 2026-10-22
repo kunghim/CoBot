@@ -579,7 +579,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		return engine.ThreadInfo{}, errors.New("thread/start returned no thread id")
 	}
 	s.setLoaded(res.Thread.ID, true)
-	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider}, nil
+	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
 }
 
 // ResumeThread reattaches a previously created thread.
@@ -601,7 +601,19 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)
-	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider}, nil
+	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
+}
+
+// ThreadPath is the file the engine keeps a thread's full record in, for a
+// thread CoBot did not learn it of when it started or resumed it.
+func (s *Server) ThreadPath(ctx context.Context, threadID string) (string, error) {
+	var res struct {
+		Thread ThreadRef `json:"thread"`
+	}
+	if err := s.client.Call(ctx, "thread/read", map[string]any{"threadId": threadID, "includeTurns": false}, &res); err != nil {
+		return "", fmt.Errorf("thread/read: %w", err)
+	}
+	return res.Thread.Path, nil
 }
 
 // ArchiveThread sets a thread aside in the engine.

@@ -75,9 +75,23 @@ func (a *App) memoriesText(ctx context.Context, teamID, botID string) string {
 // toolGuide names the collaboration tools of a role with their arguments,
 // so the model calls them directly instead of first searching the tool list
 // (in Codex's code mode the tool schemas are not part of the prompt).
-func toolGuide(role string) string {
+//
+// Code mode is what Codex gives OpenAI's models: they call a tool from
+// code, as tools.mcp__cobot__<name>(...). Other vendors' models get the
+// tools as plain calls in the mcp__cobot namespace, and told the code-mode
+// spelling they copy it: they join the namespace into the name
+// (mcp__cobot__handoff) or wrap the call in an exec tool they do not have,
+// and the engine refuses both ("unsupported call").
+func toolGuide(role string, codeMode bool) string {
 	var b strings.Builder
-	b.WriteString("\n# 协作工具\n你通过 CoBot 的工具协作。工具名是 mcp__cobot__<名字>，在代码里调用时写作 tools.mcp__cobot__<名字>(参数)，不需要先搜索工具列表。\n")
+	b.WriteString("\n# 协作工具\n")
+	if codeMode {
+		b.WriteString("你通过 CoBot 的工具协作。工具名是 mcp__cobot__<名字>，在代码里调用时写作 tools.mcp__cobot__<名字>(参数)，不需要先搜索工具列表。\n")
+	} else {
+		b.WriteString("你通过 CoBot 的工具协作。这些工具都在 mcp__cobot 这个命名空间里，名字就是下面列的 handoff、view_tasks 等，" +
+			"像调用其他工具一样直接调用，不需要先搜索工具列表。不要把命名空间拼进名字（不要写成 mcp__cobot__handoff），" +
+			"也不要通过 exec 或写代码去调用。\n")
+	}
 	if role == "leader" {
 		b.WriteString("- start_requirement({title, document, stages})：提交需求文档和链路。stages 按顺序列出每一环：{name, kind, ownerId?, reviewType?, criteria}。" +
 			"kind 取值：confirm（用户确认，不填 ownerId）、design（产品设计）、review（评审，必须填 reviewType：requirements、design、test_plan、code 或 general）、" +
@@ -115,7 +129,7 @@ const browserGuide = `- browser({help?, url?, steps?, ...})：团队共用的真
 // with the digest of what they told it. The order goes from the most shared
 // to the most personal: the platform layer every member reads, the tools of
 // its place in the team, its role, its team, and its memories.
-func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot domain.Bot, role roles.Role) (string, contextDigest) {
+func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot domain.Bot, role roles.Role, codeMode bool) (string, contextDigest) {
 	roster := a.rosterText(ctx, team.ID)
 	memories := a.memoriesText(ctx, team.ID, bot.ID)
 	place := bridgeRole(team, bot)
@@ -124,7 +138,7 @@ func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot doma
 	if place != "leader" {
 		b.WriteString(directRequestLayer)
 	}
-	b.WriteString(toolGuide(place))
+	b.WriteString(toolGuide(place, codeMode))
 	b.WriteString("\n# 你的角色\n")
 	b.WriteString(role.Instructions)
 	b.WriteString("\n\n# 团队\n")
