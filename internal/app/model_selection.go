@@ -72,9 +72,18 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	if settings.DefaultProvider != "" {
 		candidates = append(candidates, candidate{settings.DefaultProvider, settings.DefaultModel})
 	}
+	// The default model names a model of the default provider: it is no
+	// fallback for another provider, whose models it is not. A default
+	// with no provider is the older form, a model of the engine's own.
+	fallback := func(p domain.Provider) string {
+		if settings.DefaultProvider == "" || settings.DefaultProvider == p.ID {
+			return settings.DefaultModel
+		}
+		return ""
+	}
 	for _, c := range candidates {
 		if p, ok := byID[c.provider]; ok && p.Enabled {
-			return a.namedModel(ctx, choiceFor(p, c.model, settings.DefaultModel)), nil
+			return a.namedModel(ctx, choiceFor(p, c.model, fallback(p))), nil
 		}
 	}
 	// With nothing named, the first enabled provider that can run a turn:
@@ -82,12 +91,12 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	signedIn := a.EngineStatusCached().LoggedIn
 	for _, p := range providers {
 		if p.Enabled && (p.AuthMode != domain.ProviderAuthChatGPT || signedIn) {
-			return a.namedModel(ctx, choiceFor(p, "", settings.DefaultModel)), nil
+			return a.namedModel(ctx, choiceFor(p, "", fallback(p))), nil
 		}
 	}
 	// Nothing is configured or everything is off: the engine's own account
 	// is what is left, and the core does not refuse to run on it.
-	return a.namedModel(ctx, ModelChoice{EngineProvider: officialEngineProvider, Model: settings.DefaultModel}), nil
+	return a.namedModel(ctx, ModelChoice{EngineProvider: officialEngineProvider, Model: fallback(domain.Provider{ID: officialEngineProvider})}), nil
 }
 
 // namedModel fills in the engine's own default model when a choice on the
@@ -106,17 +115,22 @@ func (a *App) namedModel(ctx context.Context, choice ModelChoice) ModelChoice {
 func (a *App) engineDefaultModel(ctx context.Context) string {
 	a.engineDefaultMu.Lock()
 	defer a.engineDefaultMu.Unlock()
-	if a.engineDefault != "" && time.Now().Before(a.engineDefaultUntil) {
+	if time.Now().Before(a.engineDefaultUntil) {
 		return a.engineDefault
 	}
+	// An answer is kept for a few minutes. Not knowing is kept too, for
+	// less: every turn would otherwise ask an engine that cannot say, one
+	// after the other behind this lock.
 	raw, err := a.ModelList(ctx)
-	if err != nil {
-		return ""
+	id := ""
+	if err == nil {
+		id = defaultModelIn(raw)
 	}
-	id := defaultModelIn(raw)
-	if id != "" {
-		a.engineDefault, a.engineDefaultUntil = id, time.Now().Add(5*time.Minute)
+	keep := 5 * time.Minute
+	if id == "" {
+		keep = 30 * time.Second
 	}
+	a.engineDefault, a.engineDefaultUntil = id, time.Now().Add(keep)
 	return id
 }
 
