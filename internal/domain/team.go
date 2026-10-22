@@ -78,9 +78,14 @@ type Bot struct {
 	Status       string `json:"status"`
 	CurrentRunID string `json:"currentRunId,omitempty"`
 	// Avatar is the member's own avatar; nil follows its role's.
-	Avatar    *AvatarRef `json:"avatar,omitempty"`
-	Revision  int64      `json:"revision"`
-	CreatedAt time.Time  `json:"createdAt"`
+	Avatar *AvatarRef `json:"avatar,omitempty"`
+	// ProviderID and Model are the model this member runs with, as the
+	// member's own choice. Both empty means the member follows the default
+	// model named in the settings.
+	ProviderID string    `json:"providerId,omitempty"`
+	Model      string    `json:"model,omitempty"`
+	Revision   int64     `json:"revision"`
+	CreatedAt  time.Time `json:"createdAt"`
 	// LastMessage previews the latest message between the user and this
 	// member; only team listings fill it.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
@@ -96,12 +101,29 @@ type MessagePreview struct {
 
 // ProviderSession maps a bot onto its engine thread.
 type ProviderSession struct {
-	BotID            string    `json:"botId"`
-	ProviderThreadID string    `json:"providerThreadId"`
-	EngineEpoch      string    `json:"engineEpoch"`
-	Model            string    `json:"model,omitempty"`
-	ModelProvider    string    `json:"modelProvider,omitempty"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	BotID            string `json:"botId"`
+	ProviderThreadID string `json:"providerThreadId"`
+	EngineEpoch      string `json:"engineEpoch"`
+	Model            string `json:"model,omitempty"`
+	ModelProvider    string `json:"modelProvider,omitempty"`
+	// TranscriptPath is the file the engine keeps this thread's full
+	// record in.
+	TranscriptPath string `json:"transcriptPath,omitempty"`
+	// Handover names the thread this one took over from, until the first
+	// turn that tells the member about it is accepted.
+	Handover  *ThreadHandover `json:"handover,omitempty"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// ThreadHandover is the thread a member's new thread took over from: one
+// started for another vendor's model, or after the old one could not be
+// loaded again.
+type ThreadHandover struct {
+	ThreadID       string `json:"threadId"`
+	TranscriptPath string `json:"transcriptPath,omitempty"`
+	// ModelProvider and Model are what the old thread ran with.
+	ModelProvider string `json:"modelProvider,omitempty"`
+	Model         string `json:"model,omitempty"`
 }
 
 // Event types recorded by the M2 surface; append, never rename.

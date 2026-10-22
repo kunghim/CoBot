@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -166,13 +167,13 @@ func InsertBotTx(ctx context.Context, tx *sql.Tx, bot domain.Bot) error {
 	return nil
 }
 
-const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, avatar, revision, created_at`
+const botColumns = `id, team_id, name, role_id, role_version, is_leader, status, current_run_id, avatar, provider_id, model, revision, created_at`
 
 func scanBot(rows *sql.Rows) (domain.Bot, error) {
 	var b domain.Bot
 	var isLeader int
 	var created, avatar string
-	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &avatar, &b.Revision, &created); err != nil {
+	if err := rows.Scan(&b.ID, &b.TeamID, &b.Name, &b.RoleID, &b.RoleVersion, &isLeader, &b.Status, &b.CurrentRunID, &avatar, &b.ProviderID, &b.Model, &b.Revision, &created); err != nil {
 		return domain.Bot{}, err
 	}
 	b.IsLeader = isLeader != 0
@@ -219,14 +220,49 @@ func GetBot(ctx context.Context, q Queryer, botID string) (domain.Bot, error) {
 // UpsertProviderSession stores the bot<->thread mapping.
 func UpsertProviderSession(ctx context.Context, tx *sql.Tx, session domain.ProviderSession) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := tx.ExecContext(ctx, `INSERT INTO provider_sessions (bot_id, provider_thread_id, engine_epoch, model, model_provider, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+	// A path the engine did not repeat is kept: the record stays where it was.
+	_, err := tx.ExecContext(ctx, `INSERT INTO provider_sessions (bot_id, provider_thread_id, engine_epoch, model, model_provider, transcript_path, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(bot_id) DO UPDATE SET provider_thread_id = excluded.provider_thread_id,
 			engine_epoch = excluded.engine_epoch, model = excluded.model,
-			model_provider = excluded.model_provider, updated_at = excluded.updated_at`,
-		session.BotID, session.ProviderThreadID, session.EngineEpoch, session.Model, session.ModelProvider, now)
+			model_provider = excluded.model_provider,
+			transcript_path = CASE WHEN excluded.transcript_path != '' THEN excluded.transcript_path
+				WHEN provider_sessions.provider_thread_id = excluded.provider_thread_id THEN provider_sessions.transcript_path
+				ELSE '' END,
+			updated_at = excluded.updated_at`,
+		session.BotID, session.ProviderThreadID, session.EngineEpoch, session.Model, session.ModelProvider, session.TranscriptPath, now)
 	if err != nil {
 		return fmt.Errorf("upsert provider session: %w", err)
+	}
+	return nil
+}
+
+// RetireSessionThread lets go of a member's thread: its next turn starts a
+// new one, handed over from this one.
+func RetireSessionThread(ctx context.Context, tx *sql.Tx, botID string, handover domain.ThreadHandover) error {
+	data, err := json.Marshal(handover)
+	if err != nil {
+		return fmt.Errorf("encode handover: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE provider_sessions SET provider_thread_id = '', handover = ? WHERE bot_id = ?`, string(data), botID); err != nil {
+		return fmt.Errorf("retire session thread: %w", err)
+	}
+	return nil
+}
+
+// SetSessionHandover records (or, with nil, clears) the thread a member's
+// thread took over from.
+func SetSessionHandover(ctx context.Context, tx *sql.Tx, botID string, handover *domain.ThreadHandover) error {
+	raw := ""
+	if handover != nil {
+		data, err := json.Marshal(handover)
+		if err != nil {
+			return fmt.Errorf("encode handover: %w", err)
+		}
+		raw = string(data)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE provider_sessions SET handover = ? WHERE bot_id = ?`, raw, botID); err != nil {
+		return fmt.Errorf("set session handover: %w", err)
 	}
 	return nil
 }
@@ -235,9 +271,10 @@ func UpsertProviderSession(ctx context.Context, tx *sql.Tx, session domain.Provi
 func GetProviderSession(ctx context.Context, q Queryer, botID string) (domain.ProviderSession, error) {
 	var s domain.ProviderSession
 	var updated string
-	err := q.QueryRowContext(ctx, `SELECT bot_id, provider_thread_id, engine_epoch, model, model_provider, updated_at
+	var handover string
+	err := q.QueryRowContext(ctx, `SELECT bot_id, provider_thread_id, engine_epoch, model, model_provider, transcript_path, handover, updated_at
 		FROM provider_sessions WHERE bot_id = ?`, botID).
-		Scan(&s.BotID, &s.ProviderThreadID, &s.EngineEpoch, &s.Model, &s.ModelProvider, &updated)
+		Scan(&s.BotID, &s.ProviderThreadID, &s.EngineEpoch, &s.Model, &s.ModelProvider, &s.TranscriptPath, &handover, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ProviderSession{}, ErrNotFound
 	}
@@ -245,6 +282,12 @@ func GetProviderSession(ctx context.Context, q Queryer, botID string) (domain.Pr
 		return domain.ProviderSession{}, err
 	}
 	s.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
+	if handover != "" {
+		var h domain.ThreadHandover
+		if json.Unmarshal([]byte(handover), &h) == nil {
+			s.Handover = &h
+		}
+	}
 	return s, nil
 }
 

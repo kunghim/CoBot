@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -85,6 +86,9 @@ func New() *Discoverer {
 // gateway is not an OpenAI-compatible gateway" are different problems with
 // different fixes.
 func (d *Discoverer) Discover(ctx context.Context, baseURL, apiKey string) ([]string, error) {
+	if err := checkBaseURL(baseURL); err != nil {
+		return nil, classifyError("discover", 0, "", err)
+	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/models"
 
 	callCtx, cancel := context.WithTimeout(ctx, d.discoverTimeout())
@@ -234,3 +238,28 @@ func (e *classifiedError) Error() string {
 
 // Unwrap exposes the cause to errors.Is and errors.As without printing it.
 func (e *classifiedError) Unwrap() error { return e.cause }
+
+// Reason is the part of a failed call's error a person reads: "密钥无效"
+// rather than "discover: auth_invalid: 密钥无效". The operation and the
+// machine code stay in the log line.
+func Reason(err error) string {
+	var classified *classifiedError
+	if errors.As(err, &classified) {
+		return classified.message
+	}
+	return err.Error()
+}
+
+// checkBaseURL accepts only an http or https address with a host. The
+// address is the user's own choice of gateway, so any host is allowed, but
+// nothing else is: no file:, no bare path, no scheme-less string.
+func checkBaseURL(baseURL string) error {
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return fmt.Errorf("endpoint address: %w", err)
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("endpoint address must be an http or https URL")
+	}
+	return nil
+}

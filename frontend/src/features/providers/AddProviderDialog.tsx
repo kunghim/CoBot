@@ -152,10 +152,13 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const addedIds = useMemo(() => new Set(providers.map((entry) => entry.presetId).filter((id): id is string => !!id)), [providers]);
 
+  // The ChatGPT account is always in the provider list, so it is not one
+  // of the vendors to add.
   const visiblePresets = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return presets;
-    return presets.filter((entry) => {
+    const addable = presets.filter((entry) => !entry.official);
+    if (!needle) return addable;
+    return addable.filter((entry) => {
       const label = presetName(entry, t).toLowerCase();
       return label.includes(needle) || entry.id.includes(needle);
     });
@@ -173,6 +176,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const codexEndpoint = endpoints.find((endpoint) => endpoint.dialect === CODEX_DIALECT) ?? null;
   const key = apiKey.trim();
+  // The probe's code names the reason; its message is the core's own
+  // Chinese wording, kept for a code this build does not know.
+  const reasonOf = (status: ProviderProbeResult | undefined) =>
+    status ? t(`providers.dialog.reason.${status.code || 'unknown'}`, { defaultValue: status.message ?? '' }) : '';
   const okCount = selected.filter((id) => statuses[id]?.ok).length;
   const failedModels = selected.filter((id) => statuses[id] && !statuses[id].ok);
   // Without an endpoint Codex can use there is nothing to check against.
@@ -184,9 +191,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       toast.show({ tone: 'info', title: t('providers.dialog.alreadyAdded') });
       return;
     }
-    if (entry.official) {
-      onClose();
-      toast.show({ tone: 'info', title: t('providers.dialog.officialHint') });
+    if (preset?.id === entry.id) {
+      // Back to the vendor list and into the same vendor again: the
+      // models fetched and ticked there are still the user's.
+      setView('form');
       return;
     }
     setPreset(entry);
@@ -235,7 +243,7 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     setDiscovering(true);
     setErrorText('');
     try {
-      const result = await api.discoverProviderModels(codexEndpoint.baseUrl, key || undefined);
+      const result = await api.discoverProviderModels(codexEndpoint.baseUrl, key || undefined, editing?.id);
       setModels(result.models);
       setSelected((current) => current.filter((id) => result.models.includes(id)));
       setStatuses({});
@@ -266,11 +274,12 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     setErrorText('');
     try {
       // A key the user pasted is used here; without one the server checks
-      // the stored provider with the key it keeps.
+      // with the key the stored provider keeps. Either way it is the models
+      // ticked now that are checked, not the ones stored last time.
       const results =
-        editing && !key
+        editing && !key && !codexEndpoint
           ? (await reprobe.mutateAsync(editing.id)).results
-          : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', selected, key || undefined)).results;
+          : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', selected, key || undefined, editing?.id)).results;
       setStatuses(results);
       setProbed(true);
     } catch (error) {
@@ -357,14 +366,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
                   {added && <Badge>{t('providers.dialog.addedBadge')}</Badge>}
                 </span>
                 <span className="mt-1 flex flex-wrap items-center gap-1">
-                  {entry.official ? (
-                    <span className="text-2xs text-neutral-600 dark:text-neutral-300">{t('providers.dialog.officialBadge')}</span>
-                  ) : (
-                    <>
-                      {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
-                      {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
-                    </>
-                  )}
+                  {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
+                  {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
                 </span>
               </span>
             </button>
@@ -474,10 +477,12 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
         labels={{
           title: t('providers.dialog.models'),
           count: t('providers.dialog.selectedCount', { count: selected.length, total: models.length }),
-          manual: t('providers.dialog.manualModel'),
-          manualAdd: t('providers.dialog.manualAdd'),
+          search: t('providers.dialog.searchModels'),
+          addAs: (id) => t('providers.dialog.addModelAs', { id }),
+          noMatch: t('providers.dialog.noModelMatch'),
           ok: t('providers.dialog.statusOk'),
           failed: t('providers.dialog.statusFailed'),
+          reason: reasonOf,
           noModels: t('providers.dialog.noModels'),
           note: t('providers.dialog.modelsHint'),
         }}
@@ -487,7 +492,7 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
         <div className="space-y-2">
           <Alert tone="warning">
             {t('providers.dialog.probeAllFailed', {
-              models: failedModels.map((id) => `${id}（${statuses[id]?.message ?? ''}）`).join('、'),
+              models: failedModels.map((id) => `${id}（${reasonOf(statuses[id])}）`).join('、'),
             })}
           </Alert>
           <div className="flex flex-wrap items-center gap-2">
@@ -516,7 +521,7 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
             <Alert tone="warning">
               {t('providers.dialog.probeSomeFailed', {
                 count: failedModels.length,
-                models: failedModels.map((id) => `${id}（${statuses[id]?.message ?? ''}）`).join('、'),
+                models: failedModels.map((id) => `${id}（${reasonOf(statuses[id])}）`).join('、'),
               })}
             </Alert>
           )}

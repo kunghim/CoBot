@@ -41,8 +41,12 @@ func (s *Server) handleCancelRequirement(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
+	// The revision is optional: the page cancels whatever state the
+	// requirement is in, and a client that sends If-Match (which the write
+	// guard copies into the body) gets it checked.
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID        string `json:"requestId"`
+		ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)

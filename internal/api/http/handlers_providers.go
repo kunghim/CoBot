@@ -178,17 +178,23 @@ func (s *Server) handleDiscoverProviderModels(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var req struct {
-		RequestID string `json:"requestId"`
-		BaseURL   string `json:"baseUrl"`
-		APIKey    string `json:"apiKey"`
+		RequestID  string `json:"requestId"`
+		BaseURL    string `json:"baseUrl"`
+		APIKey     string `json:"apiKey"`
+		ProviderID string `json:"providerId"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
 		return
 	}
-	models, err := provider.New().Discover(r.Context(), req.BaseURL, req.APIKey)
+	key, err := s.checkKey(r, req.APIKey, req.ProviderID, req.BaseURL)
 	if err != nil {
-		writeError(w, r, domain.InvalidRequest("error.provider.discover_failed", map[string]any{"reason": err.Error()}))
+		writeError(w, r, err)
+		return
+	}
+	models, err := provider.New().Discover(r.Context(), req.BaseURL, key)
+	if err != nil {
+		writeError(w, r, domain.InvalidRequest("error.provider.discover_failed", map[string]any{"reason": provider.Reason(err)}))
 		return
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"models": models})
@@ -202,17 +208,33 @@ func (s *Server) handleProbeProviderModels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var req struct {
-		RequestID string   `json:"requestId"`
-		BaseURL   string   `json:"baseUrl"`
-		APIKey    string   `json:"apiKey"`
-		ModelIDs  []string `json:"modelIds"`
+		RequestID  string   `json:"requestId"`
+		BaseURL    string   `json:"baseUrl"`
+		APIKey     string   `json:"apiKey"`
+		ProviderID string   `json:"providerId"`
+		ModelIDs   []string `json:"modelIds"`
 	}
 	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, err)
 		return
 	}
-	results := provider.New().Probe(r.Context(), req.BaseURL, req.APIKey, req.ModelIDs)
+	key, err := s.checkKey(r, req.APIKey, req.ProviderID, req.BaseURL)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	results := provider.New().Probe(r.Context(), req.BaseURL, key, req.ModelIDs)
 	writeData(w, r, http.StatusOK, map[string]any{"results": results})
+}
+
+// checkKey is the key a stateless check runs with: the one the user typed,
+// or, when they left it empty while editing a stored provider, the one that
+// provider keeps.
+func (s *Server) checkKey(r *http.Request, typed, providerID, baseURL string) (string, error) {
+	if typed != "" || providerID == "" {
+		return typed, nil
+	}
+	return s.App.StoredProviderKey(r.Context(), providerID, baseURL)
 }
 
 // handleReprobeProvider checks a stored provider's models again. The key

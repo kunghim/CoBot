@@ -1,11 +1,14 @@
+// The ChatGPT account signs in on its own provider card: the engine runs
+// whichever provider a member chose, and this is the one provider whose
+// credential is a browser sign-in rather than a key.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n';
-import { EngineSection } from './SettingsSections';
+import ProviderSection from './ProviderSection';
 
 const fixture = vi.hoisted(() => ({
-  info: { status: 'ready', loggedIn: false, version: '0.161.0', capabilities: ['codexHook:trusted'] },
+  info: { status: 'ready', loggedIn: false },
   refetch: vi.fn(),
   mutate: vi.fn(),
 }));
@@ -14,20 +17,27 @@ vi.mock('../../api/queries', () => ({
   useEngineLogin: () => ({ mutate: fixture.mutate, isPending: false }),
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
-  useEngineCheck: () => ({ mutate: vi.fn(), isPending: false }),
-  // The engine section also asks which provider the profile runs with, so
-  // it can tell that a third-party provider needs no ChatGPT sign-in.
-  useProviders: () => ({ data: { providers: [] }, isPending: false }),
-  useSettings: () => ({ data: { defaultProvider: '' }, isPending: false }),
+  useProviders: () => ({
+    data: { providers: [{ id: 'openai', name: 'OpenAI', kind: 'official', authMode: 'chatgpt', endpoints: [], models: [], enabled: true, revision: 1, presetId: 'openai' }] },
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+  }),
+  useProviderPresets: () => ({ data: { presets: [] } }),
+  useDeleteProvider: () => ({ mutateAsync: vi.fn() }),
+  useSetProviderEnabled: () => ({ mutate: vi.fn() }),
+  useReprobeProvider: () => ({ mutateAsync: vi.fn() }),
+  useSaveProvider: () => ({ mutateAsync: vi.fn() }),
 }));
+vi.mock('../../components/ui/Toast', () => ({ useToast: () => ({ show: vi.fn(), dismiss: vi.fn() }) }));
 
 const authURL = 'https://auth.openai.com/oauth/authorize?state=test-only';
 
-describe('engine sign-in state and browser handoff', () => {
+describe('ChatGPT sign-in on the provider card', () => {
   let host: HTMLDivElement;
   let root: Root;
   const nativeOpen = vi.fn(async (_url: string) => {});
-  const render = () => act(() => root.render(h(EngineSection)));
+  const render = () => act(() => root.render(h(ProviderSection)));
   const clickLogin = async () => {
     const button = Array.from(host.querySelectorAll('button')).find((node) => node.textContent === i18n.t('engine.login'));
     expect(button).toBeDefined();
@@ -35,7 +45,7 @@ describe('engine sign-in state and browser handoff', () => {
   };
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    fixture.info = { status: 'ready', loggedIn: false, version: '0.161.0', capabilities: ['codexHook:trusted'] };
+    fixture.info = { status: 'ready', loggedIn: false };
     fixture.mutate.mockReset().mockImplementation((_args, handlers) => handlers.onSuccess({ authUrl: authURL }));
     nativeOpen.mockReset().mockResolvedValue(undefined);
     Object.defineProperty(window, 'go', { configurable: true, value: { desktop: { Bridge: { OpenLoginURL: nativeOpen } } } });
@@ -49,21 +59,16 @@ describe('engine sign-in state and browser handoff', () => {
     Reflect.deleteProperty(window, 'go');
   });
 
-  it('makes sign-in required prominent even when the binary and hook are ready', () => {
+  it('says the account is signed out and offers to sign in', () => {
     render();
-    const status = host.querySelector('[role="status"]')!;
-    expect(status.textContent).toContain('未登录');
-    expect(status.textContent).not.toContain('引擎可用');
-    expect(status.querySelector('.bg-amber-500')).not.toBeNull();
+    expect(host.textContent).toContain(i18n.t('providers.accountSignedOut'));
   });
 
-  it('shows green readiness only after the engine reports an account', () => {
+  it('says the account is signed in and offers to sign out', () => {
     fixture.info.loggedIn = true;
     render();
-    const status = host.querySelector('[role="status"]')!;
-    expect(status.textContent).toContain('已登录');
-    // The library's success tone (StatusDot) is emerald.
-    expect(status.querySelector('.bg-emerald-500')).not.toBeNull();
+    expect(host.textContent).toContain(i18n.t('providers.accountSignedIn'));
+    expect(Array.from(host.querySelectorAll('button')).some((node) => node.textContent === i18n.t('engine.logout'))).toBe(true);
     expect(nativeOpen).not.toHaveBeenCalled();
   });
 
@@ -71,7 +76,6 @@ describe('engine sign-in state and browser handoff', () => {
     render();
     await clickLogin();
     expect(nativeOpen).toHaveBeenCalledExactlyOnceWith(authURL);
-    expect(host.querySelector('[role="status"]')!.textContent).toContain('未登录');
     const link = host.querySelector('a')!;
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });
     await act(async () => { link.dispatchEvent(event); });
@@ -85,7 +89,6 @@ describe('engine sign-in state and browser handoff', () => {
     await clickLogin();
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('无法打开默认浏览器');
     expect(host.querySelector('a')?.href).toBe(authURL);
-    expect(host.querySelector('[role="status"]')!.textContent).toContain('未登录');
   });
 
   it('keeps a normal browser link for the Web version without requiring the desktop bridge', async () => {
@@ -101,9 +104,10 @@ describe('engine sign-in state and browser handoff', () => {
   it('clears the pending authorization link only when the engine confirms sign-in', async () => {
     render();
     await clickLogin();
+    expect(host.querySelector('a')).not.toBeNull();
     fixture.info.loggedIn = true;
     render();
     expect(host.querySelector('a')).toBeNull();
-    expect(host.querySelector('[role="status"] .bg-emerald-500')).not.toBeNull();
+    expect(host.textContent).toContain(i18n.t('providers.accountSignedIn'));
   });
 });

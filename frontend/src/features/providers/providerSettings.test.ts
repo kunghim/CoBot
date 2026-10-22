@@ -1,8 +1,8 @@
-// The model provider settings: which provider is in use, how a provider is
-// enabled, and which of the two checks runs when.
+// The model provider settings: every provider listed with its own switch,
+// the ChatGPT account always among them, and which of the two checks runs
+// when.
 //
-// The provider in use is the server's answer (settings.defaultProvider), and
-// a check that runs without a key in the browser is the server's (POST
+// A check that runs without a key in the browser is the server's (POST
 // /providers/{id}/probe) — the browser never holds a stored key.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   presets: [] as unknown[],
   settings: { revision: 3, defaultProvider: '' } as Record<string, unknown>,
   update: vi.fn(),
+  setEnabled: vi.fn(),
   save: vi.fn(),
   remove: vi.fn(),
   reprobe: vi.fn(),
@@ -34,6 +35,12 @@ vi.mock('../../api/queries', () => ({
   useDeleteProvider: () => ({ mutateAsync: state.remove }),
   useReprobeProvider: () => ({ mutateAsync: state.reprobe }),
   useSaveProvider: () => ({ mutateAsync: state.save }),
+  useSetProviderEnabled: () => ({ mutate: state.setEnabled }),
+  // The ChatGPT account's card drives its own sign-in.
+  useEngine: () => ({ data: { status: 'ready', loggedIn: false }, refetch: vi.fn() }),
+  useEngineLogin: () => ({ mutate: vi.fn(), isPending: false }),
+  useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
+  useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/client', () => ({
   api: {
@@ -72,6 +79,21 @@ const provider = {
   updatedAt: '2026-10-20T00:00:00Z',
   hasCredential: true,
   presetId: 'deepseek',
+  enabled: true,
+};
+
+const official = {
+  id: 'openai',
+  name: 'OpenAI',
+  kind: 'official',
+  authMode: 'chatgpt',
+  endpoints: [],
+  models: [],
+  revision: 1,
+  createdAt: '1970-01-01T00:00:00Z',
+  updatedAt: '1970-01-01T00:00:00Z',
+  presetId: 'openai',
+  enabled: true,
 };
 
 describe('provider settings', () => {
@@ -90,6 +112,7 @@ describe('provider settings', () => {
     state.settings = { revision: 3, defaultProvider: '' };
     client.setQueryData(queryKeys.settings, state.settings);
     state.update.mockReset().mockImplementation((_vars, callbacks) => callbacks?.onSuccess?.(state.settings));
+    state.setEnabled.mockReset();
     state.save.mockReset().mockResolvedValue(provider);
     state.reprobe.mockReset().mockResolvedValue({ results: { 'deepseek-v4-pro': { ok: true } } });
     state.discover.mockReset().mockResolvedValue({ models: ['deepseek-v4-pro', 'deepseek-flash'] });
@@ -113,29 +136,46 @@ describe('provider settings', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
-  it('shows the provider the server names as the one in use', () => {
-    state.providers = [provider];
-    state.settings = { revision: 3, defaultProvider: 'deepseek' };
+  it('lists the ChatGPT account first, then every provider with its own switch', () => {
+    state.providers = [provider, official];
     render();
-    const groups = host.querySelectorAll('p');
-    const inUse = [...groups].find((node) => node.textContent === '使用中');
-    expect(inUse?.nextElementSibling?.textContent).toContain('DeepSeek');
-    expect(inUse?.nextElementSibling?.textContent).toContain('https://api.deepseek.com/v1');
-    expect(inUse?.nextElementSibling?.textContent).toContain('deepseek-v4-pro');
+    const switches = [...host.querySelectorAll<HTMLButtonElement>('button[role="switch"]')];
+    expect(switches).toHaveLength(2);
+    expect(switches.every((entry) => entry.getAttribute('aria-checked') === 'true')).toBe(true);
+    const text = host.textContent ?? '';
+    expect(text.indexOf('OpenAI')).toBeLessThan(text.indexOf('DeepSeek'));
+    expect(text).toContain('https://api.deepseek.com/v1');
+    // Nothing reads as a single provider "in use" any more.
+    expect(text).not.toContain('使用中');
   });
 
-  it('enables another provider by writing the profile default', () => {
-    state.providers = [provider];
-    state.settings = { revision: 3, defaultProvider: '' };
+  it('switches a provider off without touching the profile settings', () => {
+    state.providers = [official, provider];
     render();
-    act(() => byText('启用')!.click());
-    expect(state.update).toHaveBeenCalledWith(
-      { patch: { defaultProvider: 'deepseek' }, expectedRevision: 3 },
-      expect.anything(),
-    );
+    const deepseek = [...host.querySelectorAll<HTMLButtonElement>('button[role="switch"]')][1];
+    act(() => deepseek.click());
+    expect(state.setEnabled).toHaveBeenCalledWith({ id: 'deepseek', enabled: false, expectedRevision: 3 }, expect.anything());
+    expect(state.update).not.toHaveBeenCalled();
   });
 
-  it('makes the first provider the one in use right after it is added', async () => {
+  it('shows a disabled provider as disabled', () => {
+    state.providers = [official, { ...provider, enabled: false }];
+    render();
+    expect(host.textContent).toContain('已停用');
+    const deepseek = [...host.querySelectorAll<HTMLButtonElement>('button[role="switch"]')][1];
+    expect(deepseek.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('signs the ChatGPT account in on its own card and never offers to edit or remove it', () => {
+    state.providers = [official];
+    render();
+    expect(byText('登录')).toBeTruthy();
+    expect(byText('编辑')).toBeUndefined();
+    expect(byText('移除')).toBeUndefined();
+  });
+
+  it('adds a provider without making it a profile default', async () => {
+    state.providers = [official];
     render();
     act(() => byText('添加供应商')!.click());
     act(() => byText('DeepSeek')!.click());
@@ -152,23 +192,64 @@ describe('provider settings', () => {
     await act(async () => {
       byText('保存')!.click();
     });
-    expect(state.update).toHaveBeenCalledWith(
-      { patch: { defaultProvider: 'deepseek' }, expectedRevision: 3 },
-      expect.anything(),
-    );
-    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '已添加并启用 DeepSeek，纳入 1 个模型' }));
+    expect(state.save).toHaveBeenCalledTimes(1);
+    expect(state.update).not.toHaveBeenCalled();
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '已添加 DeepSeek，纳入 1 个模型' }));
   });
 
-  it('re-checks a stored provider on the server when the key is left alone', async () => {
-    state.providers = [provider];
-    state.settings = { revision: 3, defaultProvider: 'deepseek' };
+  it('keeps the ticked models when the user goes back and into the same vendor', async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    const pressed = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')].map((button) => button.textContent?.replace('✓', ''));
+    const chip = [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].find((button) => button.textContent?.includes('deepseek-v4-pro'));
+    act(() => chip!.click());
+    expect(pressed()).toEqual(['deepseek-v4-pro']);
+    act(() => byText('返回')!.click());
+    act(() => byText('DeepSeek')!.click());
+    expect(pressed()).toEqual(['deepseek-v4-pro']);
+  });
+
+  it('finds models by search and keeps an unlisted one as typed', async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    const chips = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].map((button) => button.textContent?.replace('✓', ''));
+    expect(chips()).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement;
+    act(() => setValue(search, 'v4'));
+    expect(chips()).toEqual(['deepseek-v4-pro']);
+    act(() => setValue(search, 'deepseek-r9'));
+    expect(chips()).toEqual([]);
+    act(() => byText('添加「deepseek-r9」')!.click());
+    expect(chips()).toEqual(['deepseek-flash', 'deepseek-r9', 'deepseek-v4-pro']);
+  });
+
+  it('checks a stored provider with the key it keeps when the key is left alone', async () => {
+    state.providers = [official, provider];
     render();
     act(() => byText('编辑')!.click());
     await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    expect(state.discover).toHaveBeenCalledWith('https://api.deepseek.com/v1', undefined, 'deepseek');
+    await act(async () => {
       byText('测试并保存')!.click();
     });
-    expect(state.reprobe).toHaveBeenCalledWith('deepseek');
-    expect(state.probe).not.toHaveBeenCalled();
+    expect(state.probe).toHaveBeenCalledWith('https://api.deepseek.com/v1', ['deepseek-v4-pro'], undefined, 'deepseek');
+    expect(state.reprobe).not.toHaveBeenCalled();
     await act(async () => {
       byText('保存')!.click();
     });
@@ -178,9 +259,8 @@ describe('provider settings', () => {
     expect(body.expectedRevision).toBe(3);
   });
 
-  it('clears the profile default when the provider in use is removed', async () => {
-    state.providers = [provider];
-    state.settings = { revision: 3, defaultProvider: 'deepseek' };
+  it('removes a provider without touching the profile settings', async () => {
+    state.providers = [official, provider];
     state.remove.mockReset().mockResolvedValue({ deleted: true });
     render();
     act(() => byText('移除')!.click());
@@ -189,15 +269,17 @@ describe('provider settings', () => {
       confirm!.click();
     });
     expect(state.remove).toHaveBeenCalledWith('deepseek');
-    expect(state.update).toHaveBeenCalledWith({ patch: { defaultProvider: '' }, expectedRevision: 3 });
+    expect(state.update).not.toHaveBeenCalled();
   });
 
-  it('sends the official vendor to the engine section instead of a form', () => {
-    state.presets = [{ ...preset, id: 'openai', name: 'OpenAI', short: 'OA', official: true, authMode: 'chatgpt', endpoints: [], models: [{ id: 'gpt-6.1-sol' }] }];
+  it('does not offer the ChatGPT account as a vendor to add', () => {
+    state.presets = [preset, { ...preset, id: 'openai', name: 'OpenAI', short: 'OA', official: true, authMode: 'chatgpt', endpoints: [], models: [] }];
+    state.providers = [official];
     render();
     act(() => byText('添加供应商')!.click());
-    act(() => byText('OpenAI')!.click());
-    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '请在「Codex 引擎」分区登录 ChatGPT 账号' }));
-    expect(host.querySelector('[role="dialog"]')).toBeFalsy();
+    const dialog = host.querySelector('[role="dialog"]')!;
+    const vendors = [...dialog.querySelectorAll('button')].map((button) => button.textContent ?? '');
+    expect(vendors.some((label) => label.includes('DeepSeek'))).toBe(true);
+    expect(vendors.some((label) => label.includes('OpenAI'))).toBe(false);
   });
 });

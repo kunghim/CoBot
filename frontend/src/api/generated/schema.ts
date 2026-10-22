@@ -334,6 +334,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/providers/{id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Offer a provider's models to members, or stop offering them
+         * @description A disabled provider keeps its configuration and is out of every model picker; members that ran on it fall back to the default model from their next turn.
+         */
+        put: operations["setProviderEnabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/provider-presets": {
         parameters: {
             query?: never;
@@ -684,6 +704,26 @@ export interface paths {
         put?: never;
         /** Open (or reveal) a file inside the team folder with the system's default program */
         post: operations["openTeamPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose the model a member runs with
+         * @description Any model an enabled provider serves can be chosen. An empty providerId puts the member back on the default model. Applies from the member's next turn; moving to another provider loads the member's thread again with it, and the history stays.
+         */
+        put: operations["setBotModel"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1158,6 +1198,8 @@ export interface components {
             defaultModel?: string;
             retries?: components["schemas"]["ProviderRetries"];
             presetId?: string;
+            /** @description Whether members may pick this provider's models. */
+            enabled: boolean;
             /** Format: int64 */
             revision: number;
             /** @description Whether a key is stored for this provider. */
@@ -1638,6 +1680,10 @@ export interface components {
             status: "idle" | "queued" | "working" | "waiting_approval" | "waiting_input" | "interrupted" | "unknown";
             currentRunId?: string;
             avatar?: components["schemas"]["AvatarRef"];
+            /** @description The provider of the model this member chose; absent means the member follows the default model. */
+            providerId?: string;
+            /** @description The model this member chose, one its provider serves. */
+            model?: string;
             /** Format: int64 */
             revision: number;
             /** Format: date-time */
@@ -2438,6 +2484,42 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
+    setProviderEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Provider"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     listProviderPresets: {
         parameters: {
             query?: never;
@@ -2510,6 +2592,8 @@ export interface operations {
                     requestId: string;
                     baseUrl: string;
                     apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
                 };
             };
         };
@@ -2545,6 +2629,8 @@ export interface operations {
                     requestId: string;
                     baseUrl: string;
                     apiKey?: string;
+                    /** @description A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints. */
+                    providerId?: string;
                     modelIds?: string[];
                 };
             };
@@ -3250,6 +3336,44 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
+    setBotModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** Format: int64 */
+                    expectedRevision?: number;
+                    providerId: string;
+                    model: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated member */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Bot"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     listMessages: {
         parameters: {
             query?: {
@@ -3565,6 +3689,11 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     requestId: string;
+                    /**
+                     * Format: int64
+                     * @description Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
+                     */
+                    expectedRevision?: number;
                 };
             };
         };

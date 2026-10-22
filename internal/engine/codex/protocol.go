@@ -53,13 +53,16 @@ type ThreadResumeParams struct {
 // authoritative answer to "who is this thread using" — a record CoBot kept
 // itself can be stale.
 type ThreadResumeResult struct {
-	Model         string `json:"model"`
-	ModelProvider string `json:"modelProvider"`
+	Thread        ThreadRef `json:"thread"`
+	Model         string    `json:"model"`
+	ModelProvider string    `json:"modelProvider"`
 }
 
 // ThreadRef is the provider thread identity.
 type ThreadRef struct {
 	ID string `json:"id"`
+	// Path is the file the engine keeps the thread's full record in.
+	Path string `json:"path,omitempty"`
 }
 
 // ThreadStartResult is the thread/start response (experiment-verified

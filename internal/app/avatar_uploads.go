@@ -95,7 +95,12 @@ func (a *App) requireUploadExists(ref *domain.AvatarRef) error {
 	if ref == nil || ref.Kind != domain.AvatarKindUpload {
 		return nil
 	}
-	if _, err := os.Stat(filepath.Join(a.Paths.AvatarUploadsDir(), ref.File)); err != nil {
+	// Callers validate the reference first; the name is checked here too
+	// so the path never depends on that order.
+	if !domain.UploadFileName.MatchString(ref.File) || filepath.Base(ref.File) != ref.File {
+		return domain.InvalidRequest("error.avatar.upload_missing", nil)
+	}
+	if _, err := os.Stat(filepath.Join(a.Paths.AvatarUploadsDir(), filepath.Base(ref.File))); err != nil {
 		return domain.InvalidRequest("error.avatar.upload_missing", nil)
 	}
 	return nil

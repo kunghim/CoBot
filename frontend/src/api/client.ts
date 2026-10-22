@@ -172,17 +172,24 @@ export const api = {
   updateProvider: (id: string, body: import('./types').ProviderRequest) =>
     request<import('./types').Provider>('PATCH', `/api/v1/providers/${id}`, body),
   deleteProvider: (id: string) => request<{ deleted: boolean }>('DELETE', `/api/v1/providers/${id}`),
+  setProviderEnabled: (id: string, enabled: boolean, expectedRevision?: number) =>
+    request<import('./types').Provider>('PUT', `/api/v1/providers/${id}/enabled`, { enabled, expectedRevision }),
   reprobeProvider: (id: string) =>
     request<import('./types').ProviderProbeResults>('POST', `/api/v1/providers/${id}/probe`),
   detectProvider: (apiKey: string) =>
     request<{ presetId: string }>('POST', '/api/v1/providers/detect', { apiKey }),
-  discoverProviderModels: (baseUrl: string, apiKey?: string) =>
-    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', { baseUrl, ...(apiKey ? { apiKey } : {}) }),
-  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string) =>
+  // Without a typed key, providerId names a stored provider whose own key
+  // the server uses; baseUrl has to be one of that provider's endpoints.
+  discoverProviderModels: (baseUrl: string, apiKey?: string, providerId?: string) =>
+    request<import('./types').ProviderDiscoverResult>('POST', '/api/v1/providers/discover', {
+      baseUrl,
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
+    }),
+  probeProviderModels: (baseUrl: string, modelIds: string[], apiKey?: string, providerId?: string) =>
     request<import('./types').ProviderProbeResults>('POST', '/api/v1/providers/probe-models', {
       baseUrl,
       modelIds,
-      ...(apiKey ? { apiKey } : {}),
+      ...(apiKey ? { apiKey } : providerId ? { providerId } : {}),
     }),
   exchangeBootstrap: async (secret: string) => {
     const result = await request<{ sessionExpiresAt: string; userId: string; bearerToken?: string; bearerExpiresAt?: string; csrfCookieName: string }>(
@@ -213,6 +220,8 @@ export const api = {
   getBotStats: (botId: string) => request<import('./types').SessionStats>('GET', `/api/v1/bots/${botId}/stats`),
   setTeamReasoningEffort: (teamId: string, reasoningEffort: string, expectedRevision?: number) =>
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { reasoningEffort, expectedRevision }),
+  setBotModel: (botId: string, providerId: string, model: string, expectedRevision?: number) =>
+    request<import('./types').Bot>('PUT', `/api/v1/bots/${botId}/model`, { providerId, model, expectedRevision }),
   addBot: (teamId: string, roleId: string) =>
     request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
   listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),

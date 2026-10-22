@@ -97,11 +97,17 @@ func TestChangingATeamsProviderMovesItsThreads(t *testing.T) {
 	}
 	waitUntil(t, 5*time.Second, "second turn", func() bool { return len(fake.Turns()) == 2 })
 
-	if got := fake.Archived(); len(got) == 0 {
-		t.Fatal("the thread was never asked to let go of its provider")
+	// Another provider is another vendor: its model cannot take the old
+	// history as input, so the member starts a new thread pointed at the
+	// old record (see handover_test.go), and the old thread is left alone.
+	if got := fake.Archived(); len(got) != 0 {
+		t.Fatalf("the old thread was archived: %v", got)
 	}
-	if got := fake.ThreadProviders; len(got) < 2 || got[1] != "second" {
-		t.Fatalf("the thread was not loaded again with the new provider: %v", got)
+	if got := fake.ThreadProviders; len(got) != 2 || got[1] != "second" {
+		t.Fatalf("no new thread on the new provider: %v", got)
+	}
+	if second := fake.Turns()[1]; second.ThreadID == first.ThreadID {
+		t.Fatal("the second turn ran on the old thread")
 	}
 }
 
@@ -128,5 +134,26 @@ func saveProvider(t *testing.T, h *m2Harness, id, model string) {
 		DefaultModel: model,
 	}, 0); err != nil {
 		t.Fatalf("save the provider %s: %v", id, err)
+	}
+}
+
+// A check run while editing a provider with the key field left empty uses
+// the key that provider keeps, but only toward an address the provider
+// already has: the address comes from the caller, and a stored key must not
+// go wherever a request asks it to.
+func TestAStoredKeyOnlyGoesToItsOwnEndpoint(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	saveProvider(t, h, "gateway", "gateway-model")
+	if err := h.app.Credentials.Put(ctx, "provider_gateway", []byte("sk-stored")); err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := h.app.StoredProviderKey(ctx, "gateway", "https://gateway.example/v1/")
+	if err != nil || key != "sk-stored" {
+		t.Fatalf("the provider's own endpoint got %q, %v", key, err)
+	}
+	if key, err := h.app.StoredProviderKey(ctx, "gateway", "https://elsewhere.example/v1"); err == nil || key != "" {
+		t.Fatalf("another address got %q, %v; want a refusal", key, err)
 	}
 }

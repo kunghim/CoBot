@@ -646,6 +646,45 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/providers/{id}/enabled:
+    put:
+      operationId: setProviderEnabled
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Offer a provider's models to members, or stop offering them
+      description: A disabled provider keeps its configuration and is out of every model picker; members that ran on it fall back to the default model from their next turn.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, enabled]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Updated provider
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Provider" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/provider-presets:
     get:
       operationId: listProviderPresets
@@ -725,6 +764,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
       responses:
         "200":
           description: Model ids
@@ -765,6 +805,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
                 modelIds:
                   type: array
                   items: { type: string }
@@ -1500,6 +1541,48 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/model:
+    put:
+      operationId: setBotModel
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Choose the model a member runs with
+      description: Any model an enabled provider serves can be chosen. An empty providerId puts the member back on the default model. Applies from the member's next turn; moving to another provider loads the member's thread again with it, and the history stays.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, providerId, model]
+              properties:
+                requestId: { type: string, format: uuid }
+                expectedRevision: { type: integer, format: int64, minimum: 1 }
+                providerId: { type: string }
+                model: { type: string }
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/bots/{id}/messages:
     get:
       operationId: listMessages
@@ -1856,6 +1939,11 @@ paths:
               required: [requestId]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
       responses:
         "200":
           description: Cancelled requirement
@@ -2480,7 +2568,7 @@ components:
     Provider:
       type: object
       description: A model vendor or gateway the engine can call. The secret is never part of it.
-      required: [id, name, kind, authMode, endpoints, models, revision, createdAt, updatedAt]
+      required: [id, name, kind, authMode, endpoints, models, enabled, revision, createdAt, updatedAt]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2497,6 +2585,7 @@ components:
         defaultModel: { type: string }
         retries: { $ref: "#/components/schemas/ProviderRetries" }
         presetId: { type: string }
+        enabled: { type: boolean, description: Whether members may pick this provider's models. }
         revision: { type: integer, format: int64 }
         hasCredential: { type: boolean, description: Whether a key is stored for this provider. }
         createdAt: { type: string, format: date-time }
@@ -3005,6 +3094,12 @@ components:
           enum: [idle, queued, working, waiting_approval, waiting_input, interrupted, unknown]
         currentRunId: { type: string }
         avatar: { $ref: "#/components/schemas/AvatarRef" }
+        providerId:
+          type: string
+          description: The provider of the model this member chose; absent means the member follows the default model.
+        model:
+          type: string
+          description: The model this member chose, one its provider serves.
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         lastMessage: { $ref: "#/components/schemas/MessagePreview" }

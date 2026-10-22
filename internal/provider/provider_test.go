@@ -94,6 +94,10 @@ func TestDiscoverUnauthorizedIsClassified(t *testing.T) {
 	if code, _ := classify(http.StatusUnauthorized, ""); code != CodeAuthInvalid {
 		t.Fatalf("classify(401) = %q, want %q", code, CodeAuthInvalid)
 	}
+	// The user reads the reason alone, not the operation and the code.
+	if got := Reason(err); got != messageAuthInvalid {
+		t.Fatalf("Reason = %q, want %q", got, messageAuthInvalid)
+	}
 }
 
 func TestDiscoverErrorHidesSecret(t *testing.T) {
@@ -458,5 +462,24 @@ func TestClassifyTable(t *testing.T) {
 				t.Fatalf("message %q is longer than 20 characters", message)
 			}
 		})
+	}
+}
+
+// Only an http or https address with a host is ever requested.
+func TestOnlyWebAddressesAreRequested(t *testing.T) {
+	for _, bad := range []string{"file:///etc/passwd", "localhost:8080/v1", "/v1", "ftp://example.com/v1", "https://"} {
+		if _, err := New().Discover(context.Background(), bad, "sk-test"); err == nil {
+			t.Errorf("discover %q: no error", bad)
+		}
+		for id, res := range New().Probe(context.Background(), bad, "sk-test", []string{"m"}) {
+			if res.OK {
+				t.Errorf("probe %q: %s answered", bad, id)
+			}
+		}
+	}
+	for _, good := range []string{"https://api.example.com/v1", "http://127.0.0.1:8080/v1"} {
+		if err := checkBaseURL(good); err != nil {
+			t.Errorf("%q refused: %v", good, err)
+		}
 	}
 }
