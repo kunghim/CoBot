@@ -1,7 +1,7 @@
 import { act, createElement as h, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Team } from '../../api/types';
+import type { Bot, Team } from '../../api/types';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 
 const state = vi.hoisted(() => ({ save: vi.fn(), toast: vi.fn() }));
@@ -17,10 +17,12 @@ vi.mock('../../api/queries', () => ({
     },
   }),
   useSetTeamReasoningEffort: () => ({ mutateAsync: state.save, isPending: false }),
-  // The picker follows the provider the profile runs with, so it needs the
-  // provider list and the way to write a gateway's own default model.
-  useProviders: () => ({ data: { providers: [] } }),
-  useSaveProvider: () => ({ mutate: vi.fn() }),
+  // The picker offers every enabled provider's models: here only the
+  // ChatGPT account, signed in, with the engine's own list.
+  useProviders: () => ({ data: { providers: [{ id: 'openai', name: 'OpenAI', kind: 'official', authMode: 'chatgpt', endpoints: [], models: [], enabled: true, revision: 1 }] } }),
+  useProviderPresets: () => ({ data: { presets: [] } }),
+  useEngine: () => ({ data: { status: 'ready', loggedIn: true } }),
+  useSetBotModel: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('../../components/ui/Toast', () => ({ useToast: () => ({ show: state.toast, dismiss: vi.fn() }) }));
 vi.mock('../settings/useSettingSaver', () => ({ useSettingSaver: () => ({ save: vi.fn() }) }));
@@ -30,6 +32,7 @@ describe('thinking effort saves across view lifecycle changes', () => {
   let host: HTMLDivElement;
   let mounted: boolean;
   const team = { id: 'team-1', revision: 7, reasoningEffort: 'medium' } as Team;
+  const bot = { id: 'bot-1', name: 'engineer', revision: 3 } as Bot;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -54,7 +57,7 @@ describe('thinking effort saves across view lifecycle changes', () => {
   });
 
   const open = (strict = false) => {
-    const picker = h(ReasoningEffortSelect, { team });
+    const picker = h(ReasoningEffortSelect, { team, bot });
     act(() => root.render(strict ? h(StrictMode, null, picker) : picker));
     act(() => host.querySelector('button')!.click());
   };

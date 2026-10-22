@@ -5,24 +5,20 @@ import {
   useAvatarCatalog,
   useEngine,
   useEngineCheck,
-  useEngineLogin,
-  useEngineLoginCancel,
-  useEngineLogout,
   useEngineModels,
   useProviders,
   useRevokeAuthorization,
-  useSettings,
   useStatus,
   useRoles,
-  useSaveProvider,
   useSessionLogout,
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
-import type { EngineModel, Settings, SettingsPatch } from '../../api/types';
+import type { Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
-import { gatewayModelID, gatewayModelRequest, gatewayModels, gatewayOf, providerOf } from '../providers/providerModels';
+import { choiceKey, defaultChoice, engineDefaultModel, selectableModels } from '../providers/providerModels';
+import { useProviderName } from '../providers/useProviderName';
 import {
   Alert,
   Button,
@@ -39,10 +35,8 @@ import {
   Select,
   Skeleton,
   StatusDot,
-  useToast,
   type Tone,
 } from '../../components/ui';
-import { desktopBridge } from '../../platform/native-bridge';
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
 type SectionProps = { settings: Settings; save: Save; errors: Record<string, string> };
 
@@ -240,113 +234,27 @@ function AvatarCatalogCard() {
 export function EngineSection() {
   const { t } = useTranslation();
   const engine = useEngine();
-  const settings = useSettings(true);
-  const providers = useProviders();
-  const login = useEngineLogin();
-  const loginCancel = useEngineLoginCancel();
-  const logout = useEngineLogout();
   const check = useEngineCheck();
-  const [loginPending, setLoginPending] = useState(false);
-  const [authUrl, setAuthUrl] = useState('');
-  const [loginTimedOut, setLoginTimedOut] = useState(false);
   const [actionError, setActionError] = useState('');
 
-  // Keep the latest refetch function in a ref so the polling interval does
-  // not restart on every render.
-  const refetchEngine = useRef(engine.refetch);
-  refetchEngine.current = engine.refetch;
-
-  useEffect(() => {
-    if (!loginPending) return;
-    const deadline = Date.now() + 120_000;
-    const interval = window.setInterval(() => {
-      if (Date.now() >= deadline) {
-        setLoginTimedOut(true);
-        window.clearInterval(interval);
-        return;
-      }
-      void refetchEngine.current();
-    }, 3_000);
-    return () => window.clearInterval(interval);
-  }, [loginPending]);
-
-  // The engine reports loggedIn only after the real handshake; that ends
-  // the pending state without any optimistic guessing.
-  useEffect(() => {
-    if (engine.data?.loggedIn) {
-      setLoginPending(false);
-      setAuthUrl('');
-      setLoginTimedOut(false);
-    }
-  }, [engine.data?.loggedIn]);
-
-  const openNativeLogin = async (url: string) => {
-    try {
-      await desktopBridge()!.OpenLoginURL(url);
-    } catch {
-      setActionError(t('engine.openLoginFailed'));
-    }
-  };
-  const startLogin = () => {
-    setActionError('');
-    login.mutate(undefined, {
-      onSuccess: (result) => {
-        setLoginPending(true);
-        setAuthUrl(result.authUrl);
-        setLoginTimedOut(false);
-        if (desktopBridge()) void openNativeLogin(result.authUrl);
-      },
-      onError: (err) => setActionError(apiErrorMessage(t, err)),
-    });
-  };
-  const cancelLogin = () => {
-    setActionError('');
-    loginCancel.mutate(undefined, {
-      onSuccess: () => {
-        setLoginPending(false);
-        setAuthUrl('');
-        void refetchEngine.current();
-      },
-      onError: (err) => setActionError(apiErrorMessage(t, err)),
-    });
-  };
-  const engineLogout = () => {
-    setActionError('');
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        setLoginPending(false);
-        void refetchEngine.current();
-      },
-      onError: (err) => setActionError(apiErrorMessage(t, err)),
-    });
-  };
   const recheck = () => {
     setActionError('');
     check.mutate(undefined, { onError: (err) => setActionError(apiErrorMessage(t, err)) });
   };
 
   const info = engine.data;
-  const loggedIn = info?.loggedIn ?? false;
-  // A third-party provider runs on its own key: the engine's own ChatGPT
-  // account is not part of that setup, so asking to sign in would be noise.
-  const gateway = providers.data?.providers.find((entry) => entry.id === settings.data?.defaultProvider);
-  const usesGateway = !!gateway && gateway.authMode !== 'chatgpt';
+  // The engine runs whichever provider a member chose; whether the ChatGPT
+  // account is signed in belongs to that provider's card, not here.
   const statusText = !info
     ? t('status.loading')
     : info.status === 'ready'
-      ? loggedIn
-        ? t('settings.engineReady')
-        : usesGateway
-          ? t('settings.engineGatewayReady')
-          : `${t('settings.engineLoggedOut')} · ${t('engine.signInRequired')}`
+      ? t('settings.engineReady')
       : info.status === 'error'
         ? t('settings.engineError')
         : info.status === 'starting'
           ? t('settings.engineStarting')
           : t('settings.engineNotConfigured');
-  // Ready but signed out is not ready to work: it reads as a warning. A
-  // gateway needs no sign-in at all, so there it is plain ready.
-  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? (loggedIn || usesGateway ? 'success' : 'warning') : info.status === 'starting' ? 'neutral' : 'danger';
+  const engineTone: Tone = !info ? 'neutral' : info.status === 'ready' ? 'success' : info.status === 'starting' ? 'neutral' : 'danger';
   const hookState = info?.capabilities?.find((value) => value.startsWith('codexHook:'))?.slice('codexHook:'.length) ?? 'unavailable';
   const hookKey = hookState === 'trusted' ? 'Trusted' : hookState === 'failed' ? 'Failed' : 'Untrusted';
   const hookTone: Tone = hookState === 'trusted' ? 'success' : hookState === 'failed' ? 'danger' : 'warning';
@@ -362,64 +270,22 @@ export function EngineSection() {
         <div className="space-y-4">
           <p className="flex items-center gap-2 text-sm" role="status">
             <StatusDot tone={engineTone} label={statusText} />
-            <span className={info?.status === 'ready' && !loggedIn && !usesGateway ? 'font-medium text-amber-700 dark:text-amber-400' : undefined}>
+            <span>
               {statusText}
               {info?.version ? ` · ${info.version}` : ''}
-              {info?.status === 'ready' && loggedIn ? ` · ${t('settings.engineLoggedIn')}` : ''}
             </span>
           </p>
-          {usesGateway && !loggedIn && (
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('settings.engineGatewayLoginHint')}</p>
-          )}
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('settings.engineAccountHint')}</p>
           {details.length > 0 && <DescriptionList items={details} />}
           {info?.errorKey && <Alert tone="danger">{errorMessage(t, info.errorKey)}</Alert>}
-          <div className="flex flex-wrap items-center gap-2">
-            {!loggedIn && info?.status === 'ready' && !loginPending && !usesGateway && (
-              <Button variant="primary" onClick={startLogin} loading={login.isPending}>
-                {t('engine.login')}
-              </Button>
-            )}
-            {loginPending && (
-              <>
-                {authUrl && (
-                  <a
-                    href={authUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-signal-600 hover:underline dark:text-signal-400"
-                    onClick={(event) => {
-                      // The desktop shell opens it in the default browser.
-                      if (desktopBridge()) {
-                        event.preventDefault();
-                        setActionError('');
-                        void openNativeLogin(authUrl);
-                      }
-                    }}
-                  >
-                    {t('engine.openLogin')}
-                    <Icons.openExternal size={14} aria-hidden />
-                  </a>
-                )}
-                <span className="text-sm text-neutral-500 dark:text-neutral-400" role="status">
-                  {t('engine.waitingLogin')}
-                </span>
-                <Button onClick={cancelLogin} loading={loginCancel.isPending}>
-                  {t('engine.cancelLogin')}
-                </Button>
-              </>
-            )}
-            {loggedIn && (
-              <Button onClick={engineLogout} loading={logout.isPending}>
-                {t('engine.logout')}
-              </Button>
-            )}
-            {info && info.status !== 'ready' && (
+          {info && info.status !== 'ready' && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button icon={Icons.retry} onClick={recheck} loading={check.isPending}>
                 {check.isPending ? t('engine.rechecking') : t('engine.recheck')}
               </Button>
-            )}
-          </div>
-          {loginTimedOut && <Alert tone="warning">{t('engine.loginTimeout')}</Alert>}        </div>
+            </div>
+          )}
+        </div>
       </Card>
 
       {info?.status === 'ready' && (
@@ -446,24 +312,20 @@ export function EngineSection() {
   );
 }
 
+/**
+ * ModelsSection names the default model: the one a member runs with until
+ * it chooses its own in the conversation. Any model of an enabled provider
+ * can be the default; the choice is one write of the provider and the model
+ * together, so the two never disagree.
+ */
 export function ModelsSection({ settings, save, errors }: SectionProps) {
   const { t } = useTranslation();
   const engine = useEngine();
   const providers = useProviders();
   const models = useEngineModels(engine.data?.status === 'ready');
-  const saveProvider = useSaveProvider();
-  const toast = useToast();
-  const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
-  useEffect(() => setDefaultModel(settings.defaultModel), [settings.defaultModel]);
+  const providerName = useProviderName();
 
-  // The provider the profile runs with decides which models exist. The
-  // engine's own list belongs to the engine's own vendor, and a third-party
-  // gateway never has those models; the official provider is the engine's
-  // own account, so it keeps the engine's list.
-  //
-  // Until the provider list is in, there is no telling which list is the
-  // right one, so the picker waits instead of showing the engine's models
-  // for a moment and then swapping them out.
+  // Until the provider list is in, there is no telling what is on offer.
   if (providers.isPending) {
     return (
       <Card>
@@ -471,73 +333,38 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
       </Card>
     );
   }
-  const provider = providerOf(providers.data?.providers, settings.defaultProvider);
-  const gateway = gatewayOf(providers.data?.providers, settings.defaultProvider);
-  // A provider that is named but gone leaves the profile on the engine's
-  // own account, which is what the core falls back to as well.
-  const providerGone = !!settings.defaultProvider && !provider;
-
-  if (!gateway && engine.data && engine.data.status !== 'ready') {
+  const list = providers.data?.providers;
+  const offered = selectableModels(list, models.data?.models, engine.data?.loggedIn ?? false, providerName);
+  if (offered.length === 0) {
     return (
       <Card>
-        <EmptyState icon={<Icons.engine size={20} aria-hidden />} title={t('settings.modelsNeedEngine')} />
+        <EmptyState icon={<Icons.engine size={20} aria-hidden />} title={t('settings.modelsNeedProvider')} />
       </Card>
     );
   }
-
-  const options: { value: string; label: string }[] = gateway
-    ? gatewayModels(gateway, t('settings.modelUnavailable')).map((option) => ({ value: option.id, label: option.label }))
-    : (models.data?.models ?? []).flatMap((model: EngineModel) => {
-        const id = model.slug ?? model.id ?? '';
-        return id === '' ? [] : [{ value: id, label: model.displayName ?? id }];
-      });
-
-  // The value the profile runs with: a gateway's own default model, or the
-  // profile's own setting. A gateway without a default falls back to its
-  // first model, the same way the core picks the model for a turn, so the
-  // picker shows what a turn will really ask for.
-  const value = gateway ? gatewayModelID(gateway) : defaultModel;
-  if (value !== '' && !options.some((option) => option.value === value)) {
-    options.unshift({ value, label: value });
+  const current = defaultChoice(settings, list, engineDefaultModel(models.data?.models), engine.data?.loggedIn ?? false);
+  const value = choiceKey(current.providerId, current.model);
+  const unavailable = t('settings.modelUnavailable');
+  const options = offered.map((entry) => ({
+    value: entry.key,
+    label: `${entry.group} · ${entry.unavailable ? `${entry.label} · ${unavailable}` : entry.label}`,
+    disabled: entry.unavailable,
+  }));
+  if (!options.some((option) => option.value === value) && current.model) {
+    options.unshift({ value, label: current.model, disabled: false });
   }
 
   return (
     <Card>
-      <div className="max-w-sm">
-        <Field
-          label={t('settings.defaultModel')}
-          hint={
-            gateway
-              ? t('settings.defaultModelProviderHint', { provider: gateway.name })
-              : providerGone
-                ? t('settings.defaultModelProviderGone')
-                : t('settings.defaultModelHint')
-          }
-          error={errors.defaultModel}
-        >
+      <div className="max-w-md">
+        <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} error={errors.defaultModel}>
           <Select
             value={value}
-            options={[
-              { value: '', label: t(gateway ? 'settings.modelUnsetProvider' : 'settings.modelUnset') },
-              ...options,
-            ]}
+            options={options}
             onChange={(next) => {
-              if (gateway) {
-                // The provider's own default model is what a turn asks for;
-                // the profile's setting is only the fallback for a profile
-                // that runs with no provider.
-                saveProvider.mutate(
-                  { id: gateway.id, body: gatewayModelRequest(gateway, next) },
-                  {
-                    onError: (error) => {
-                      toast.show({ tone: 'danger', title: t('settings.saveFailed'), description: apiErrorMessage(t, error) });
-                    },
-                  },
-                );
-                return;
-              }
-              setDefaultModel(next);
-              save('defaultModel', { defaultModel: next }, (persisted) => setDefaultModel(persisted.defaultModel));
+              const chosen = offered.find((entry) => entry.key === next);
+              if (!chosen) return;
+              save('defaultModel', { defaultProvider: chosen.providerId, defaultModel: chosen.model });
             }}
           />
         </Field>

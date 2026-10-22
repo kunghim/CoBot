@@ -316,7 +316,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             options={
               <>
                 <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
-                <ReasoningEffortSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+                <ReasoningEffortSelect team={team} bot={bot} disabled={readOnly || blockReasonKey !== null} />
               </>
             }
           />
