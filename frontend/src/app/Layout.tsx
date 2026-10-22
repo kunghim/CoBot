@@ -1,12 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTeams } from '../api/queries';
-import { BrandMark, Icons, RailItem, SplitHandle } from '../components/ui';
+import { BrandMark, Icons, RailItem, SplitHandle, cx } from '../components/ui';
 import TeamList from '../features/teams/TeamList';
 import Workspace from '../features/workspace/Workspace';
 import { WorkspaceProvider, useWorkspace } from '../features/workspace/WorkspaceProvider';
-import { MAX_WIDTH, MIN_WIDTH } from '../features/workspace/state';
+import { MAX_WIDTH, MIN_WIDTH, layoutColumns } from '../features/workspace/state';
 import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
 import { useShell } from './shell';
@@ -23,7 +23,6 @@ import { rememberWorkspacePath } from './workspacePath';
 export default function Layout() {
   const { t } = useTranslation();
   const shell = useShell();
-  const navigate = useNavigate();
   const { botId, setBotId } = useSelectedBot();
   const location = useLocation();
   useEffect(() => rememberWorkspacePath(location.pathname + location.search), [location.pathname, location.search]);
@@ -52,6 +51,37 @@ export default function Layout() {
 
   return (
     <WorkspaceProvider teamId={context?.team.id ?? null} botId={botId}>
+      <Columns context={context} teamList={teamList} listOpen={shell.listOpen} />
+    </WorkspaceProvider>
+  );
+}
+
+/** The window's width, kept current as the window is resized. */
+function useViewportWidth(): number {
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth));
+  useEffect(() => {
+    const update = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return width;
+}
+
+/**
+ * The columns themselves. They share the window by rule (layoutColumns):
+ * the conversation keeps its minimum, the workspace narrows first, then
+ * the team list steps out, and on a very small window the workspace and
+ * the conversation take turns. What the user set — the list open, the
+ * workspace's width — is kept for when the window grows again.
+ */
+function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof findBotContext> | null; teamList: ReactNode; listOpen: boolean }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { state } = useWorkspace();
+  const viewport = useViewportWidth();
+  const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width);
+  return (
       <div className="flex h-full bg-side text-neutral-900 dark:text-neutral-100">
         {/* Primary icon rail: the mark and home on top, settings at the bottom. */}
         <nav aria-label={t('app.title')} className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3">
@@ -64,16 +94,16 @@ export default function Layout() {
           </div>
         </nav>
 
-        {shell.listOpen && <Column>{teamList}</Column>}
+        {layout.showList && <Column>{teamList}</Column>}
 
-        {/* Conversation area: the routed page. */}
-        <main className="relative mt-2 flex min-w-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet">
+        {/* Conversation area: the routed page. It stays mounted while the
+            workspace takes its turn, so a draft and the scroll survive. */}
+        <main className={cx('relative mt-2 min-w-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet', layout.showConversation ? 'flex' : 'hidden')}>
           <Outlet />
         </main>
 
-        <WorkspaceColumn context={context} />
+        <WorkspaceColumn context={context} width={layout.workspaceWidth} fill={!layout.showConversation} />
       </div>
-    </WorkspaceProvider>
   );
 }
 
@@ -87,14 +117,14 @@ function Column({ children }: { children: ReactNode }) {
  * The workspace column: the drag line and the area itself, present only
  * while the workspace is open on a team the user is looking at.
  */
-function WorkspaceColumn({ context }: { context: ReturnType<typeof findBotContext> | null }) {
+function WorkspaceColumn({ context, width, fill }: { context: ReturnType<typeof findBotContext> | null; width: number; fill: boolean }) {
   const { t } = useTranslation();
   const { state, setWidth } = useWorkspace();
-  if (!state.open || !context) return null;
+  if (!state.open || !context || width <= 0) return null;
   return (
     <>
       <SplitHandle value={state.width} min={MIN_WIDTH} max={MAX_WIDTH} label={t('workspace.resize')} onChange={setWidth} />
-      <div style={{ width: state.width }} className="min-h-0 shrink-0">
+      <div style={fill ? undefined : { width }} className={cx('min-h-0', fill ? 'min-w-0 flex-1' : 'shrink-0')}>
         <Workspace teamId={context.team.id} bots={context.item.bots} />
       </div>
     </>

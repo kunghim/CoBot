@@ -136,3 +136,24 @@ func saveProvider(t *testing.T, h *m2Harness, id, model string) {
 		t.Fatalf("save the provider %s: %v", id, err)
 	}
 }
+
+// A check run while editing a provider with the key field left empty uses
+// the key that provider keeps, but only toward an address the provider
+// already has: the address comes from the caller, and a stored key must not
+// go wherever a request asks it to.
+func TestAStoredKeyOnlyGoesToItsOwnEndpoint(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	saveProvider(t, h, "gateway", "gateway-model")
+	if err := h.app.Credentials.Put(ctx, "provider_gateway", []byte("sk-stored")); err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := h.app.StoredProviderKey(ctx, "gateway", "https://gateway.example/v1/")
+	if err != nil || key != "sk-stored" {
+		t.Fatalf("the provider's own endpoint got %q, %v", key, err)
+	}
+	if key, err := h.app.StoredProviderKey(ctx, "gateway", "https://elsewhere.example/v1"); err == nil || key != "" {
+		t.Fatalf("another address got %q, %v; want a refusal", key, err)
+	}
+}

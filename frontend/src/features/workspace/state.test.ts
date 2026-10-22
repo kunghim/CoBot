@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHANGES_TAB_ID,
+  CONVERSATION_MIN_WIDTH,
+  layoutColumns,
   DEFAULT_WIDTH,
   MAX_WIDTH,
   MIN_WIDTH,
@@ -101,5 +103,28 @@ describe('workspace persistence', () => {
     // A saved view of a tab that no longer exists falls back to the last tab.
     saveWorkspace(key, { open: true, width: DEFAULT_WIDTH, tabs: [browserTab('t1')], activeId: 'gone' });
     expect(loadWorkspace(key)?.activeId).toBe('browser:t1');
+  });
+});
+
+describe('the columns share a narrow window by rule', () => {
+  it('keeps the wanted width when there is room', () => {
+    expect(layoutColumns(1600, true, true, 640)).toEqual({ showList: true, showConversation: true, workspaceWidth: 640 });
+  });
+  it('narrows the workspace first, keeping the conversation its minimum', () => {
+    const layout = layoutColumns(1280, true, true, 640);
+    expect(layout.showList).toBe(true);
+    expect(layout.workspaceWidth).toBe(1280 - 56 - 256 - CONVERSATION_MIN_WIDTH - 8);
+  });
+  it('steps the team list out before the workspace goes below its minimum', () => {
+    const layout = layoutColumns(1024, true, true, 640);
+    expect(layout.showList).toBe(false);
+    expect(layout.showConversation).toBe(true);
+    expect(1024 - 56 - layout.workspaceWidth - 8).toBeGreaterThanOrEqual(CONVERSATION_MIN_WIDTH);
+  });
+  it('lets the workspace take turns with the conversation on a very small window', () => {
+    expect(layoutColumns(760, true, true, 640)).toEqual({ showList: false, showConversation: false, workspaceWidth: 760 - 56 - 8 });
+  });
+  it('leaves everything as the user set it while the workspace is folded', () => {
+    expect(layoutColumns(800, true, false, 640)).toEqual({ showList: true, showConversation: true, workspaceWidth: 0 });
   });
 });

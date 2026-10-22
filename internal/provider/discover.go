@@ -234,3 +234,14 @@ func (e *classifiedError) Error() string {
 
 // Unwrap exposes the cause to errors.Is and errors.As without printing it.
 func (e *classifiedError) Unwrap() error { return e.cause }
+
+// Reason is the part of a failed call's error a person reads: "密钥无效"
+// rather than "discover: auth_invalid: 密钥无效". The operation and the
+// machine code stay in the log line.
+func Reason(err error) string {
+	var classified *classifiedError
+	if errors.As(err, &classified) {
+		return classified.message
+	}
+	return err.Error()
+}

@@ -764,6 +764,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
       responses:
         "200":
           description: Model ids
@@ -804,6 +805,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
                 modelIds:
                   type: array
                   items: { type: string }
@@ -1937,6 +1939,11 @@ paths:
               required: [requestId]
               properties:
                 requestId: { type: string, format: uuid }
+                expectedRevision:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
       responses:
         "200":
           description: Cancelled requirement

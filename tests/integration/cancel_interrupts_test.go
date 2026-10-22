@@ -46,3 +46,31 @@ func TestCancelRequirementInterruptsOnlyItsOwnWork(t *testing.T) {
 		t.Fatalf("a user's turn was interrupted by the cancel: interrupts = %d, want still 1", got)
 	}
 }
+
+// A cancel that names the revision it saw is refused once the requirement
+// has moved on, and goes through when the revision still holds. The write
+// guard copies an If-Match header into this revision.
+func TestCancelRequirementChecksARevisionWhenOneIsSent(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	_, req := h.handCard(t, team, bots[0], bots[1], "带版本取消", "做完")
+
+	stale, err := app.WithWriteRequest(h.user, "http.POST /api/v1/requirements/{id}/cancel", "stale-cancel", map[string]any{"id": req.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale.Write.ExpectedRevision = req.Revision + 7
+	if _, err := h.app.CancelRequirement(ctx, stale, req.ID); err == nil {
+		t.Fatal("a cancel naming a stale revision went through")
+	}
+
+	current, err := app.WithWriteRequest(h.user, "http.POST /api/v1/requirements/{id}/cancel", "current-cancel", map[string]any{"id": req.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.Write.ExpectedRevision = req.Revision
+	if _, err := h.app.CancelRequirement(ctx, current, req.ID); err != nil {
+		t.Fatalf("a cancel naming the current revision: %v", err)
+	}
+}

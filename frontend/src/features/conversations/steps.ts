@@ -55,7 +55,7 @@ const knownErrorCodes = new Set([
 // balance that ran out, a key that was refused and a model that does not
 // exist all reach the engine as "the request failed".
 const providerFailureCodes = new Set([
-  'quota', 'rate_limit', 'auth_invalid', 'model_unknown', 'context_exceeded',
+  'quota', 'rate_limit', 'auth_invalid', 'model_unknown', 'model_unavailable', 'context_exceeded',
   'protocol_unsupported', 'request_rejected', 'network', 'engine_internal',
 ]);
 

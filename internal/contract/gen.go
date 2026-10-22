@@ -1394,17 +1394,23 @@ type DetectProviderJSONBody struct {
 
 // DiscoverProviderModelsJSONBody defines parameters for DiscoverProviderModels.
 type DiscoverProviderModelsJSONBody struct {
-	ApiKey    *string            `json:"apiKey,omitempty"`
-	BaseUrl   string             `json:"baseUrl"`
-	RequestId openapi_types.UUID `json:"requestId"`
+	ApiKey  *string `json:"apiKey,omitempty"`
+	BaseUrl string  `json:"baseUrl"`
+
+	// ProviderId A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints.
+	ProviderId *string            `json:"providerId,omitempty"`
+	RequestId  openapi_types.UUID `json:"requestId"`
 }
 
 // ProbeProviderModelsJSONBody defines parameters for ProbeProviderModels.
 type ProbeProviderModelsJSONBody struct {
-	ApiKey    *string            `json:"apiKey,omitempty"`
-	BaseUrl   string             `json:"baseUrl"`
-	ModelIds  *[]string          `json:"modelIds,omitempty"`
-	RequestId openapi_types.UUID `json:"requestId"`
+	ApiKey   *string   `json:"apiKey,omitempty"`
+	BaseUrl  string    `json:"baseUrl"`
+	ModelIds *[]string `json:"modelIds,omitempty"`
+
+	// ProviderId A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints.
+	ProviderId *string            `json:"providerId,omitempty"`
+	RequestId  openapi_types.UUID `json:"requestId"`
 }
 
 // SetProviderEnabledJSONBody defines parameters for SetProviderEnabled.
@@ -1436,7 +1442,9 @@ type CancelQuestionJSONBody struct {
 
 // CancelRequirementJSONBody defines parameters for CancelRequirement.
 type CancelRequirementJSONBody struct {
-	RequestId openapi_types.UUID `json:"requestId"`
+	// ExpectedRevision Optional; when sent (or as If-Match) a requirement that has moved on is refused with 409.
+	ExpectedRevision *int64             `json:"expectedRevision,omitempty"`
+	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
 // SetRoleAvatarJSONBody defines parameters for SetRoleAvatar.
