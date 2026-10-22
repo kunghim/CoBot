@@ -764,6 +764,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
       responses:
         "200":
           description: Model ids
@@ -804,6 +805,7 @@ paths:
                 requestId: { type: string, format: uuid }
                 baseUrl: { type: string }
                 apiKey: { type: string }
+                providerId: { type: string, description: "A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints." }
                 modelIds:
                   type: array
                   items: { type: string }

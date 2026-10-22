@@ -20,6 +20,7 @@ const (
 	CodeRateLimit           = failure.CodeRateLimit
 	CodeAuthInvalid         = failure.CodeAuthInvalid
 	CodeModelUnknown        = failure.CodeModelUnknown
+	CodeModelUnavailable    = failure.CodeModelUnavailable
 	CodeContextExceeded     = failure.CodeContextExceeded
 	CodeProtocolUnsupported = failure.CodeProtocolUnsupported
 	CodeRequestRejected     = failure.CodeRequestRejected

@@ -94,6 +94,10 @@ func TestDiscoverUnauthorizedIsClassified(t *testing.T) {
 	if code, _ := classify(http.StatusUnauthorized, ""); code != CodeAuthInvalid {
 		t.Fatalf("classify(401) = %q, want %q", code, CodeAuthInvalid)
 	}
+	// The user reads the reason alone, not the operation and the code.
+	if got := Reason(err); got != messageAuthInvalid {
+		t.Fatalf("Reason = %q, want %q", got, messageAuthInvalid)
+	}
 }
 
 func TestDiscoverErrorHidesSecret(t *testing.T) {

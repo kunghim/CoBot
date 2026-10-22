@@ -1394,17 +1394,23 @@ type DetectProviderJSONBody struct {
 
 // DiscoverProviderModelsJSONBody defines parameters for DiscoverProviderModels.
 type DiscoverProviderModelsJSONBody struct {
-	ApiKey    *string            `json:"apiKey,omitempty"`
-	BaseUrl   string             `json:"baseUrl"`
-	RequestId openapi_types.UUID `json:"requestId"`
+	ApiKey  *string `json:"apiKey,omitempty"`
+	BaseUrl string  `json:"baseUrl"`
+
+	// ProviderId A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints.
+	ProviderId *string            `json:"providerId,omitempty"`
+	RequestId  openapi_types.UUID `json:"requestId"`
 }
 
 // ProbeProviderModelsJSONBody defines parameters for ProbeProviderModels.
 type ProbeProviderModelsJSONBody struct {
-	ApiKey    *string            `json:"apiKey,omitempty"`
-	BaseUrl   string             `json:"baseUrl"`
-	ModelIds  *[]string          `json:"modelIds,omitempty"`
-	RequestId openapi_types.UUID `json:"requestId"`
+	ApiKey   *string   `json:"apiKey,omitempty"`
+	BaseUrl  string    `json:"baseUrl"`
+	ModelIds *[]string `json:"modelIds,omitempty"`
+
+	// ProviderId A stored provider whose key is used when apiKey is empty; baseUrl must be one of its endpoints.
+	ProviderId *string            `json:"providerId,omitempty"`
+	RequestId  openapi_types.UUID `json:"requestId"`
 }
 
 // SetProviderEnabledJSONBody defines parameters for SetProviderEnabled.

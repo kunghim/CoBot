@@ -197,15 +197,59 @@ describe('provider settings', () => {
     expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '已添加 DeepSeek，纳入 1 个模型' }));
   });
 
-  it('re-checks a stored provider on the server when the key is left alone', async () => {
+  it('keeps the ticked models when the user goes back and into the same vendor', async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    const pressed = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')].map((button) => button.textContent?.replace('✓', ''));
+    const chip = [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].find((button) => button.textContent?.includes('deepseek-v4-pro'));
+    act(() => chip!.click());
+    expect(pressed()).toEqual(['deepseek-v4-pro']);
+    act(() => byText('返回')!.click());
+    act(() => byText('DeepSeek')!.click());
+    expect(pressed()).toEqual(['deepseek-v4-pro']);
+  });
+
+  it('finds models by search and keeps an unlisted one as typed', async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    const chips = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].map((button) => button.textContent?.replace('✓', ''));
+    expect(chips()).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement;
+    act(() => setValue(search, 'v4'));
+    expect(chips()).toEqual(['deepseek-v4-pro']);
+    act(() => setValue(search, 'deepseek-r9'));
+    expect(chips()).toEqual([]);
+    act(() => byText('添加「deepseek-r9」')!.click());
+    expect(chips()).toEqual(['deepseek-flash', 'deepseek-r9', 'deepseek-v4-pro']);
+  });
+
+  it('checks a stored provider with the key it keeps when the key is left alone', async () => {
     state.providers = [official, provider];
     render();
     act(() => byText('编辑')!.click());
     await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    expect(state.discover).toHaveBeenCalledWith('https://api.deepseek.com/v1', undefined, 'deepseek');
+    await act(async () => {
       byText('测试并保存')!.click();
     });
-    expect(state.reprobe).toHaveBeenCalledWith('deepseek');
-    expect(state.probe).not.toHaveBeenCalled();
+    expect(state.probe).toHaveBeenCalledWith('https://api.deepseek.com/v1', ['deepseek-v4-pro'], undefined, 'deepseek');
+    expect(state.reprobe).not.toHaveBeenCalled();
     await act(async () => {
       byText('保存')!.click();
     });
