@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -83,7 +82,7 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	}
 	for _, c := range candidates {
 		if p, ok := byID[c.provider]; ok && p.Enabled {
-			return a.namedModel(ctx, choiceFor(p, c.model, fallback(p))), nil
+			return choiceFor(p, c.model, fallback(p)), nil
 		}
 	}
 	// With nothing named, the first enabled provider that can run a turn:
@@ -91,47 +90,12 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 	signedIn := a.EngineStatusCached().LoggedIn
 	for _, p := range providers {
 		if p.Enabled && (p.AuthMode != domain.ProviderAuthChatGPT || signedIn) {
-			return a.namedModel(ctx, choiceFor(p, "", fallback(p))), nil
+			return choiceFor(p, "", fallback(p)), nil
 		}
 	}
 	// Nothing is configured or everything is off: the engine's own account
 	// is what is left, and the core does not refuse to run on it.
-	return a.namedModel(ctx, ModelChoice{EngineProvider: officialEngineProvider, Model: fallback(domain.Provider{ID: officialEngineProvider})}), nil
-}
-
-// namedModel fills in the engine's own default model when a choice on the
-// ChatGPT account names none. A turn that asks for no model keeps whatever
-// model its thread last ran with, so a member moved back to "the default"
-// from a model of its own would otherwise go on running that model.
-func (a *App) namedModel(ctx context.Context, choice ModelChoice) ModelChoice {
-	if choice.Model == "" && choice.EngineProvider == officialEngineProvider {
-		choice.Model = a.engineDefaultModel(ctx)
-	}
-	return choice
-}
-
-// engineDefaultModel is the model the engine marks as its default, cached
-// for a few minutes; empty when the engine cannot say.
-func (a *App) engineDefaultModel(ctx context.Context) string {
-	a.engineDefaultMu.Lock()
-	defer a.engineDefaultMu.Unlock()
-	if time.Now().Before(a.engineDefaultUntil) {
-		return a.engineDefault
-	}
-	// An answer is kept for a few minutes. Not knowing is kept too, for
-	// less: every turn would otherwise ask an engine that cannot say, one
-	// after the other behind this lock.
-	raw, err := a.ModelList(ctx)
-	id := ""
-	if err == nil {
-		id = defaultModelIn(raw)
-	}
-	keep := 5 * time.Minute
-	if id == "" {
-		keep = 30 * time.Second
-	}
-	a.engineDefault, a.engineDefaultUntil = id, time.Now().Add(keep)
-	return id
+	return ModelChoice{EngineProvider: officialEngineProvider, Model: fallback(domain.Provider{ID: officialEngineProvider})}, nil
 }
 
 // defaultModelIn picks the default model out of a sanitized model list: the
