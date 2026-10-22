@@ -103,23 +103,25 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 
 ## 快速开始
 
-### Windows 桌面版下载
+### 桌面版下载
 
-[**v0.1.0-beta.1 — 下载与发布说明**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+[**v0.1.0-beta.2 — 下载与发布说明**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.2)
 
 | 下载 | 使用方法 |
 | --- | --- |
-| [Windows x64 MSI 安装包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | 安装到当前用户，从开始菜单打开 **CoBot** |
-| [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
+| [Windows x64 MSI 安装包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.msi) | 安装到当前用户，从开始菜单打开 **CoBot** |
+| [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
+| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | 将 **CoBot.app** 复制到「应用程序」，弹出映像后打开（需要 Codex CLI 0.146.0 或更新版本） |
 
-两种下载包含相同的程序文件。需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
+两种 Windows 下载包含相同的程序文件。Windows 需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
 以及已在 `PATH` 上安装的官方 **Codex CLI 0.161.0 或更新版本**，具备可用账号和访问 Codex 服务的网络。
-安装包不包含 Codex。本测试版支持官方 Codex 账号登录，不承诺支持第三方中转配置。
+安装包不包含 Codex；只随 Codex 桌面版附带的引擎找不到。成员可以使用官方 ChatGPT 账号，
+也可以使用兼容 OpenAI Responses 接口的 API 供应商。
 使用上述下载包无需安装 Go 或 Node。
 
-程序包尚未签名，发布页面附有可选的 `.sha256` 校验文件。
+程序包尚未签名（macOS 只有临时签名，未公证），发布页面附有可选的 `.sha256` 校验文件。
 GitHub 自动提供的 **Source code** 是源码，不是可直接运行的程序。
-打开 CoBot 后，在 **设置 → Codex 引擎** 登录，再选择模型、创建团队。
+打开 CoBot 后，在 **设置 → 模型供应商** 登录或添加供应商，再创建团队。
 CoBot 使用自己的私有 Codex 环境，需要独立登录。
 
 暂不支持自动更新：更新时先关闭 CoBot，再安装新版 MSI，或将完整新版 ZIP 解压到新文件夹。
@@ -128,7 +130,7 @@ CoBot 使用自己的私有 Codex 环境，需要独立登录。
 
 ### 从源码构建
 
-以下命令构建**本机 Web 版**。已发布的 beta 目前仅提供 Windows 下载；macOS 桌面包可按下文在本机构建。
+以下命令构建**本机 Web 版**。已发布的 beta 提供 Windows x64 和 Apple Silicon 下载；macOS 桌面包也可按下文在本机构建。
 
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
