@@ -86,16 +86,41 @@ func (a *App) MemberModel(ctx context.Context, teamID, botID string) (ModelChoic
 		}
 	}
 	// With nothing named, the first enabled provider that can run a turn:
-	// the ChatGPT account only once it is signed in.
-	signedIn := a.EngineStatusCached().LoggedIn
-	for _, p := range providers {
-		if p.Enabled && (p.AuthMode != domain.ProviderAuthChatGPT || signedIn) {
-			return choiceFor(p, "", fallback(p)), nil
+	// the ChatGPT account unless it is known to be signed out. Not knowing
+	// yet is not signed out: a member must not drift onto a gateway the
+	// user never chose for it just because no one has checked the account
+	// since the core started. The account is asked only when another
+	// provider could take its place.
+	signedIn, known := a.officialLoginState()
+	for i, p := range providers {
+		if !p.Enabled {
+			continue
 		}
+		if p.AuthMode == domain.ProviderAuthChatGPT && !signedIn {
+			if !known && hasRunnableProvider(providers[i+1:]) {
+				signedIn = a.EngineStatus(ctx).LoggedIn
+				known = true
+			}
+			if known && !signedIn {
+				continue
+			}
+		}
+		return choiceFor(p, "", fallback(p)), nil
 	}
 	// Nothing is configured or everything is off: the engine's own account
 	// is what is left, and the core does not refuse to run on it.
 	return ModelChoice{EngineProvider: officialEngineProvider, Model: fallback(domain.Provider{ID: officialEngineProvider})}, nil
+}
+
+// hasRunnableProvider reports whether any enabled provider besides the
+// ChatGPT account is in the list.
+func hasRunnableProvider(providers []domain.Provider) bool {
+	for _, p := range providers {
+		if p.Enabled && p.AuthMode != domain.ProviderAuthChatGPT {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultModelIn picks the default model out of a sanitized model list: the

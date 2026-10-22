@@ -137,24 +137,26 @@ not yet.
 
 ## Quick start
 
-### Windows desktop downloads
+### Desktop downloads
 
-[**v0.1.0-beta.1 — downloads and release notes**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.1)
+[**v0.1.0-beta.2 — downloads and release notes**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.2)
 
 | Download | How to use |
 | --- | --- |
-| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.msi) | Install for your current user, then open **CoBot** from the Start menu |
-| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.1/CoBot-0.1.0-beta.1-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
+| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.msi) | Install for your current user, then open **CoBot** from the Start menu |
+| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
+| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | Copy **CoBot.app** to Applications, eject the image, then open the installed app (Codex CLI 0.146.0 or newer) |
 
-Both downloads contain the same application files. You need **Windows 10/11 x64**, an existing
+The two Windows downloads contain the same application files. On Windows you need **Windows 10/11 x64**, an existing
 **WebView2 Runtime**, and the official **Codex CLI 0.161.0 or newer on `PATH`**, with an eligible
-account and network access to Codex services. Codex is not bundled. This beta supports official
-Codex account sign-in; third-party relay configurations are outside its supported scope.
+account and network access to Codex services. Codex is not bundled; a copy that only ships inside
+the Codex desktop app is not found. Members can run on the official ChatGPT account or on API-key
+providers that speak the OpenAI Responses API.
 You do not need Go or Node to use these downloads.
 
-The packages are unsigned. Optional `.sha256` checksum files are on the release page.
+The packages are unsigned (macOS has an ad-hoc signature, not notarized). Optional `.sha256` checksum files are on the release page.
 GitHub's **Source code** archives are for building, not ready-to-run applications.
-After opening CoBot, sign in under **Settings → Codex engine**, choose a model and create a team.
+After opening CoBot, sign in or add a provider under **Settings → Model providers**, then create a team.
 CoBot uses a private Codex environment with its own login.
 
 Updates are manual: close CoBot before installing a newer MSI, or extract a complete newer ZIP
@@ -163,8 +165,8 @@ from program files. Uninstalling the MSI or deleting an extracted ZIP folder ret
 
 ### Build from source
 
-The commands below build the **local Web** version. The published beta currently provides
-Windows downloads only; a macOS desktop package can also be built locally as described below.
+The commands below build the **local Web** version. The published beta provides
+Windows x64 and Apple Silicon downloads; a macOS desktop package can also be built locally as described below.
 
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.

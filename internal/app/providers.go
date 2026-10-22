@@ -264,6 +264,29 @@ func (a *App) bindProvider(ctx context.Context, p domain.Provider) error {
 	return nil
 }
 
+// RebindProviders hands every stored key provider to the engine again. The
+// engine's configuration is only written when a provider is saved, so an
+// engine home that was reset or restored apart from the database would no
+// longer know providers members still run on, and their turns would fail
+// without saying why. Writing the same entries again changes nothing.
+func (a *App) RebindProviders(ctx context.Context) {
+	providers, err := sqlite.ListProviders(ctx, a.DB)
+	if err != nil {
+		if a.Logger != nil {
+			a.Logger.Warn("providers not handed to the engine", "error", err)
+		}
+		return
+	}
+	for _, p := range providers {
+		if p.AuthMode != domain.ProviderAuthAPIKey {
+			continue
+		}
+		if err := a.bindProvider(ctx, p); err != nil && a.Logger != nil {
+			a.Logger.Warn("provider not handed to the engine", "provider", p.ID, "error", err)
+		}
+	}
+}
+
 func (a *App) unbindProvider(ctx context.Context, id string) error {
 	binder, err := a.providerBinder(ctx)
 	if err != nil {
