@@ -113,8 +113,9 @@ func TestProviderListAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("listed %d providers, want 2", len(list))
+	// The ChatGPT account is listed in every profile, next to the two.
+	if len(list) != 3 {
+		t.Fatalf("listed %d providers, want 3", len(list))
 	}
 	for _, p := range list {
 		if p.ID == "" || p.Name == "" {
@@ -145,7 +146,7 @@ func TestProviderRejectsAnInvalidRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
+	if len(list) != 1 || list[0].AuthMode != domain.ProviderAuthChatGPT {
 		t.Fatalf("a rejected provider was stored anyway: %d rows", len(list))
 	}
 }

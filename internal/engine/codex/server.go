@@ -481,6 +481,15 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 				// safe to store, and the retry attempt count is read
 				// from it.
 				failureCode = root
+			} else if status, ok := httpErrorStatus(p.Error.Message); ok {
+				// Without structured detail the engine passes the
+				// vendor's own error body on as its message; the status
+				// and the body's wording are the same evidence.
+				failureCode, _ = failure.ClassifyHTTP(status, p.Error.Message)
+			} else if body, ok := vendorErrorBody(p.Error.Message); ok {
+				// A body the vendor streamed back has no status in it,
+				// only its own error code.
+				failureCode, _ = failure.ClassifyBody(body)
 			}
 			n.Problem = &engine.Problem{Level: "error", Message: p.Error.Message, Code: code, FailureCode: failureCode, WillRetry: p.WillRetry}
 		}
@@ -1056,4 +1065,45 @@ func (s *Server) Ping(ctx context.Context) error {
 // (for example account/logout).
 func (s *Server) Call(ctx context.Context, method string, params any, out any) error {
 	return s.client.Call(ctx, method, params, out)
+}
+
+// httpErrorStatus reads the HTTP status out of an error message that is a
+// vendor's JSON error body, as the engine passes one on when it has nothing
+// structured to say, for example
+// {"type":"error","status":400,"error":{"message":"..."}}.
+func httpErrorStatus(message string) (int, bool) {
+	raw, ok := vendorErrorBody(message)
+	if !ok {
+		return 0, false
+	}
+	var body struct {
+		Status int `json:"status"`
+	}
+	if json.Unmarshal([]byte(raw), &body) != nil || body.Status < 400 || body.Status > 599 {
+		return 0, false
+	}
+	return body.Status, true
+}
+
+// vendorErrorBody reports whether an error message is a vendor's JSON error
+// body, and returns it. A vendor that refuses a streamed request answers
+// with one server-sent event, so the body may come as "data:{...}".
+func vendorErrorBody(message string) (string, bool) {
+	trimmed := strings.TrimSpace(message)
+	if strings.HasPrefix(trimmed, "{") {
+		return trimmed, json.Valid([]byte(trimmed))
+	}
+	// Server-sent events: the error is the first data line that holds a
+	// JSON object; an event: line or a second event may come with it.
+	for _, line := range strings.Split(trimmed, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if strings.HasPrefix(data, "{") && json.Valid([]byte(data)) {
+			return data, true
+		}
+	}
+	return "", false
 }

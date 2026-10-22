@@ -172,6 +172,8 @@ export const api = {
   updateProvider: (id: string, body: import('./types').ProviderRequest) =>
     request<import('./types').Provider>('PATCH', `/api/v1/providers/${id}`, body),
   deleteProvider: (id: string) => request<{ deleted: boolean }>('DELETE', `/api/v1/providers/${id}`),
+  setProviderEnabled: (id: string, enabled: boolean, expectedRevision?: number) =>
+    request<import('./types').Provider>('PUT', `/api/v1/providers/${id}/enabled`, { enabled, expectedRevision }),
   reprobeProvider: (id: string) =>
     request<import('./types').ProviderProbeResults>('POST', `/api/v1/providers/${id}/probe`),
   detectProvider: (apiKey: string) =>
@@ -213,6 +215,8 @@ export const api = {
   getBotStats: (botId: string) => request<import('./types').SessionStats>('GET', `/api/v1/bots/${botId}/stats`),
   setTeamReasoningEffort: (teamId: string, reasoningEffort: string, expectedRevision?: number) =>
     request<import('./types').Team>('PATCH', `/api/v1/teams/${teamId}`, { reasoningEffort, expectedRevision }),
+  setBotModel: (botId: string, providerId: string, model: string, expectedRevision?: number) =>
+    request<import('./types').Bot>('PUT', `/api/v1/bots/${botId}/model`, { providerId, model, expectedRevision }),
   addBot: (teamId: string, roleId: string) =>
     request<import('./types').Bot>('POST', `/api/v1/teams/${teamId}/bots`, { roleId }),
   listRoles: () => request<import('./types').RoleListResult>('GET', '/api/v1/roles'),

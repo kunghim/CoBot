@@ -81,6 +81,10 @@ export interface ModelOption {
   id: string;
   label: string;
   description?: ReactNode;
+  /** The heading the model is listed under, such as its provider. */
+  group?: string;
+  /** Shown but not choosable, such as a model that failed its check. */
+  disabled?: boolean;
 }
 
 /** The panel's content: effort and model on top, then the slider or the model list. */
@@ -95,16 +99,22 @@ export function ModelEffortPanel({ models, model, onModel, levels, effort, onEff
           <IconButton icon={ChevronLeft} label={labels.back} size="sm" shape="circle" onClick={() => setChoosing(false)} />
           <span className="text-sm font-semibold">{labels.chooseModel}</span>
         </div>
-        <ul role="listbox" aria-label={labels.chooseModel} className="mt-2 space-y-0.5">
-          {models.map((entry) => (
-            <li key={entry.id} role="option" aria-selected={entry.id === model}>
+        <ul role="listbox" aria-label={labels.chooseModel} className="mt-2 max-h-80 space-y-0.5 overflow-y-auto">
+          {models.map((entry, index) => (
+            <li key={entry.id} role="option" aria-selected={entry.id === model} aria-disabled={entry.disabled || undefined}>
+              {entry.group && entry.group !== models[index - 1]?.group && (
+                <p role="presentation" className="px-2 pb-0.5 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 first:pt-0 dark:text-neutral-400">
+                  {entry.group}
+                </p>
+              )}
               <button
                 type="button"
+                disabled={entry.disabled}
                 onClick={() => {
                   onModel(entry.id);
                   setChoosing(false);
                 }}
-                className={cx('flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm', interactive.hover)}
+                className={cx('flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm', interactive.hover, 'disabled:pointer-events-none disabled:opacity-50')}
               >
                 <Check size={15} aria-hidden className={cx('mt-0.5 shrink-0', entry.id === model ? 'text-signal-500' : 'opacity-0')} />
                 <span className="min-w-0">
