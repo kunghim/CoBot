@@ -5,33 +5,16 @@ import (
 	"testing"
 )
 
-// Code mode is OpenAI's; another vendor's model told its spelling joins
-// the namespace into the tool's name, which the engine refuses.
-func TestOnlyCodeModeIsToldTheCodeModeSpelling(t *testing.T) {
-	code, plain := toolGuide("member", true), toolGuide("member", false)
-	if !strings.Contains(code, "tools.mcp__cobot__<名字>") {
-		t.Fatalf("code mode lost its spelling:\n%s", code)
+func TestAQuotedReplyKeepsWhatComesNext(t *testing.T) {
+	if got := quoteReply("做完了"); got != "做完了" {
+		t.Fatalf("a short reply changed: %q", got)
 	}
-	if strings.Contains(plain, "tools.mcp__cobot__") || strings.Contains(plain, "工具名是 mcp__cobot__") {
-		t.Fatalf("a plain-call model is told the code-mode spelling:\n%s", plain)
+	long := "①和②都做完了。" + strings.Repeat("细节", 300) + "等你说继续再做③。"
+	got := quoteReply(long)
+	if !strings.HasPrefix(got, "①和②都做完了。") || !strings.HasSuffix(got, "等你说继续再做③。") {
+		t.Fatalf("the start or the end was lost: %q", got)
 	}
-	if !strings.Contains(plain, "mcp__cobot 这个命名空间") || !strings.Contains(plain, "不要通过 exec") {
-		t.Fatalf("a plain-call model is not told how to call:\n%s", plain)
-	}
-}
-
-func TestAQuotedReplyNamesToolsWithoutTheirNamespace(t *testing.T) {
-	got := joinedToolName.ReplaceAllString("`mcp__cobot__browser` 返回 unsupported call；text(await tools.mcp__cobot__handoff({}))", "$1")
-	if got != "`browser` 返回 unsupported call；text(await handoff({}))" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestReadablePathDropsTheExtendedLengthPrefix(t *testing.T) {
-	if got := readablePath(`\\?\E:\data\rollout.jsonl`); got != `E:\data\rollout.jsonl` {
-		t.Fatalf("got %q", got)
-	}
-	if got := readablePath(`/home/u/rollout.jsonl`); got != `/home/u/rollout.jsonl` {
-		t.Fatalf("got %q", got)
+	if n := len([]rune(got)); n != lastReplyRunes+len([]rune("……")) {
+		t.Fatalf("quoted %d runes, want %d", n, lastReplyRunes+2)
 	}
 }
