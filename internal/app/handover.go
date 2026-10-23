@@ -20,8 +20,12 @@ import (
 // another vendor's model starts a fresh thread, and its first turn is told
 // where the previous record is; the model reads from it what it needs.
 
-// lastReplyRunes bounds the member's last reply quoted in a handover.
-const lastReplyRunes = 400
+// lastReplyRunes bounds the member's last reply quoted in a handover, and
+// replyHeadRunes is how much of it comes from the start; the rest is the end.
+const (
+	lastReplyRunes = 400
+	replyHeadRunes = 120
+)
 
 // joinedToolName is a CoBot tool spelled with its namespace joined in, as
 // code mode writes it.
@@ -150,7 +154,9 @@ func runOutcome(ctx context.Context, a *App, run domain.Run) string {
 	when := run.EndedAt.Local().Format("01-02 15:04")
 	switch run.Status {
 	case domain.RunCompleted:
-		return "完成，" + when
+		// The turn ran to its end; that says nothing about whether the work
+		// is done, which is what "完成" alone reads like.
+		return "正常结束（只说明这一轮跑完了，活做到哪看你最后的回复），" + when
 	case domain.RunInterrupted:
 		return "被打断，" + when
 	case domain.RunFailed:
@@ -162,8 +168,8 @@ func runOutcome(ctx context.Context, a *App, run domain.Run) string {
 	return "没有结果（运行中途断了），" + when
 }
 
-// lastReply is the start of the member's latest reply with text, on one
-// line.
+// lastReply is the member's latest reply with text, on one line and
+// shortened by quoteReply.
 func (a *App) lastReply(ctx context.Context, botID string) string {
 	messages, err := sqlite.ListMessages(ctx, a.DB, botID, "", 30)
 	if err != nil {
@@ -179,10 +185,19 @@ func (a *App) lastReply(ctx context.Context, botID string) string {
 		if text == "" {
 			continue
 		}
-		if runes := []rune(text); len(runes) > lastReplyRunes {
-			text = string(runes[:lastReplyRunes]) + "……"
-		}
-		return text
+		return quoteReply(text)
 	}
 	return ""
+}
+
+// quoteReply keeps a long reply's start and its end. The end is where a
+// member says what comes next ("等你说继续再做③"); cut from the start
+// alone, a reply that stopped to wait reads as one that finished, and the
+// next model stops too.
+func quoteReply(text string) string {
+	runes := []rune(text)
+	if len(runes) <= lastReplyRunes {
+		return text
+	}
+	return string(runes[:replyHeadRunes]) + "……" + string(runes[len(runes)-(lastReplyRunes-replyHeadRunes):])
 }

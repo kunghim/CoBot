@@ -82,7 +82,7 @@ func TestAHandoverIsToldOnTheFirstTurnOnly(t *testing.T) {
 		handoverHeading,
 		fakeengine.TranscriptPath(first.ThreadID),
 		"之前是 alpha（alpha-model），现在是 beta（beta-model）",
-		"上一轮的结果：完成",
+		"上一轮的结果：正常结束",
 		"你最后的回复：「做完了：one」",
 	} {
 		if !strings.Contains(second.Text, want) {
