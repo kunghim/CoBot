@@ -21,9 +21,11 @@ import (
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
+	"github.com/kunghim/CoBot/internal/modelcatalog"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/internal/updates"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 	"sync/atomic"
 )
@@ -44,12 +46,20 @@ type App struct {
 	ServiceEpoch string
 	Version      string
 	Logger       *slog.Logger
-	writeLocksMu sync.Mutex
-	writeLocks   map[string]*writeLock
+	// Updates answers the "check for updates" button; nil disables it.
+	Updates *updates.Checker
+	// ModelCatalog knows models by id: their context, input and thinking.
+	ModelCatalog *modelcatalog.Store
+	// ClientCatalogs builds the catalog an engine is started with so it knows
+	// the third-party models' context windows.
+	ClientCatalogs *codex.CatalogBuilder
+	writeLocksMu   sync.Mutex
+	writeLocks     map[string]*writeLock
 
 	// Scheduler dispatches queued deliveries to team app-servers; it is
 	// assigned during composition so tests can inject a fake factory.
 	Scheduler *Scheduler
+	Chats     *ChatRunner
 
 	// CollaborationTokens is the bridge credential authority. Tokens are
 	// minted when a thread starts and are only valid for this core lifetime.

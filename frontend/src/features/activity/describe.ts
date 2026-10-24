@@ -68,9 +68,13 @@ export function describeActivity(item: ActivityItem, nameOf: (id: unknown) => st
     case 'memory.changed':
       return { text: t(d.deleted ? 'activity.line.memoryDeleted' : 'activity.line.memory', { actor: actor || t('activity.someone') }), quote: str(d.text) };
     case 'budget.paused': {
-      // The event names why: spent, spend unknown, or too little left for a turn.
-      const reason = item.resourceId === 'usage_unknown' ? 'Unknown' : item.resourceId === 'reserve' ? 'Reserve' : '';
-      return { text: t(`activity.line.budgetPaused${reason}`, { actor: actor || t('activity.someone') }) };
+      // The event names why (spent, spend unknown, too little left for a
+      // turn) and whose limit it was, as "reason:scope". Older events carry
+      // the reason alone and read as the member's.
+      const [why, scope] = item.resourceId.split(':');
+      const reason = why === 'usage_unknown' ? 'Unknown' : why === 'reserve' ? 'Reserve' : '';
+      const team = scope === 'team' && reason !== 'Unknown' ? 'Team' : '';
+      return { text: t(`activity.line.budgetPaused${reason}${team}`, { actor: actor || t('activity.someone') }) };
     }
     case 'team.created':
     case 'team.archived':

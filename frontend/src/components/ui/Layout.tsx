@@ -82,28 +82,29 @@ export interface WindowControls {
  * hidden: the panel toggles sit at its two ends, the middle drags the
  * window, and it follows CoBot's theme instead of the system's. On macOS
  * the system traffic lights stay on the left; on Windows the bar draws
- * minimize, maximize and close itself. The web app has no title bar; the
- * toggles stay in the conversation header there.
+ * minimize, maximize and close itself. The web app reuses the compact
+ * strip without native controls, so the four workspace slots stay aligned.
  */
-export function AppTitleBar({ platform, title, left, right, windowControls }: { platform: 'windows' | 'mac'; title: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls }) {
+export function AppTitleBar({ platform, title, left, right, windowControls, flushLeft = false }: { platform: 'windows' | 'mac'; title?: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls; flushLeft?: boolean }) {
   const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
   const control = 'flex h-full w-11 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-900/[0.07] hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
   return (
     <div
+      data-testid="app-title-bar"
       style={{ ['--wails-draggable' as string]: 'drag' }}
       className="flex h-10 shrink-0 select-none items-center bg-side"
       onDoubleClick={windowControls?.onToggleMaximize}
     >
       {platform === 'mac' && <span className="w-[76px] shrink-0" aria-hidden />}
-      <div className="flex items-center gap-1 px-2" style={noDrag}>
+      <div className={cx('flex items-center gap-1', !flushLeft && 'px-2')} style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
         {left}
       </div>
       <div className="min-w-0 flex-1 truncate text-center text-xs font-medium text-neutral-600 dark:text-neutral-300">{title}</div>
-      <div className="flex items-center gap-1 px-2" style={noDrag}>
+      <div className="flex items-center gap-1 px-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
         {right}
       </div>
       {platform === 'windows' && windowControls && (
-        <div className="flex h-full items-stretch" style={noDrag}>
+        <div className="flex h-full items-stretch" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
           <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={control}>
             <Minus size={15} aria-hidden />
           </button>

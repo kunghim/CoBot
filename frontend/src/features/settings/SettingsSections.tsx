@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useAuthorizations,
   useAvatarCatalog,
   useEngine,
   useEngineCheck,
   useEngineModels,
   useProviders,
-  useRevokeAuthorization,
-  useStatus,
   useRoles,
-  useSessionLogout,
   useSyncAvatarCatalog,
 } from '../../api/queries';
 import { RoleAvatarRow } from '../avatars/AvatarEditors';
+import { defaultTokens, fromUnits, minUnits, stepOf, toUnits, unitLabelKey, type BudgetKind, type BudgetScale } from '../budget/budgetUnits';
 import type { Settings, SettingsPatch } from '../../api/types';
 import { apiErrorMessage, errorMessage } from '../../i18n/errors';
 import { applyAppearance, type Appearance, type ColorMode, type Theme } from '../../app/appearance';
@@ -28,7 +25,6 @@ import {
   Field,
   Icons,
   List,
-  ListRow,
   NumberInput,
   RadioCards,
   SegmentedControl,
@@ -38,7 +34,7 @@ import {
   type Tone,
 } from '../../components/ui';
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
-type SectionProps = { settings: Settings; save: Save; errors: Record<string, string> };
+type SectionProps = { settings: Settings; save: Save; errors: Record<string, string>; budgetScale?: BudgetScale };
 
 /**
  * NumberField keeps a draft while the value changes and saves it once the
@@ -50,8 +46,11 @@ function NumberField(props: {
   value: number;
   min: number;
   max?: number;
+  step?: number;
+  unit?: string;
   disabled?: boolean;
   error?: string;
+  hint?: string;
   onCommit: (value: number, revert: () => void) => void;
 }) {
   const { t } = useTranslation();
@@ -65,12 +64,14 @@ function NumberField(props: {
     props.onCommit(next, () => setDraft(props.value));
   };
   return (
-    <Field label={props.label} error={props.error}>
+    <Field label={props.label} error={props.error} hint={props.hint}>
       <div onBlur={() => commit(draft)}>
         <NumberInput
           value={draft}
           min={props.min}
           max={props.max}
+          step={props.step}
+          unit={props.unit}
           disabled={props.disabled}
           decreaseLabel={t('common.decrease')}
           increaseLabel={t('common.increase')}
@@ -375,10 +376,11 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
   );
 }
 
-export function CollaborationSection({ settings, save, errors }: SectionProps) {
+export function CollaborationSection({ settings, save, errors, budgetScale = 'release' }: SectionProps) {
   const { t } = useTranslation();
   const [budgetScope, setBudgetScope] = useState(settings.budgetScope);
   useEffect(() => setBudgetScope(settings.budgetScope), [settings.budgetScope]);
+  const kind: BudgetKind | null = budgetScope === 'team' || budgetScope === 'bot' ? budgetScope : null;
   return (
     <div className="space-y-6">
       <Card title={t('settings.limitsTitle')}>
@@ -409,125 +411,48 @@ export function CollaborationSection({ settings, save, errors }: SectionProps) {
           />
         </div>
       </Card>
-      <Card title={t('settings.budget')}>
+      <Card title={t('settings.budget')} description={t('settings.budgetHint')}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('settings.budgetScope')} error={errors.budgetScope}>
             <Select
               value={budgetScope}
               options={[
                 { value: '', label: t('settings.budgetNone') },
-                { value: 'bot', label: t('settings.budgetBot') },
                 { value: 'team', label: t('settings.budgetTeam') },
+                { value: 'bot', label: t('settings.budgetBot') },
               ]}
               onChange={(next) => {
                 const value = next as Settings['budgetScope'];
                 setBudgetScope(value);
-                save('budgetScope', { budgetScope: value }, (persisted) => setBudgetScope(persisted.budgetScope));
+                // The scope and its limit go together: a limit with no scope,
+                // or a scope with no limit, is refused. Choosing a scope brings
+                // that scope's own starting limit.
+                save(
+                  'budgetScope',
+                  { budgetScope: value, budgetTokens: value === '' ? 0 : defaultTokens(value, budgetScale) },
+                  (persisted) => setBudgetScope(persisted.budgetScope),
+                );
               }}
             />
           </Field>
-          <NumberField
-            label={t('settings.budgetTokens')}
-            value={settings.budgetTokens}
-            min={0}
-            disabled={budgetScope === ''}
-            error={errors.budgetTokens}
-            onCommit={(value, revert) => save('budgetTokens', { budgetTokens: value }, revert)}
-          />
+          {kind && (
+            <NumberField
+              label={t('settings.budgetTokens')}
+              value={toUnits(settings.budgetTokens, kind, budgetScale)}
+              min={minUnits(kind)}
+              step={stepOf(kind)}
+              unit={t(unitLabelKey(kind, budgetScale))}
+              error={errors.budgetTokens}
+              onCommit={(value, revert) => save('budgetTokens', { budgetTokens: fromUnits(value, kind, budgetScale) }, revert)}
+            />
+          )}
         </div>
       </Card>
     </div>
   );
 }
 
-export function SecuritySection() {
-  const { t, i18n } = useTranslation();
-  const authorizations = useAuthorizations(true);
-  const revoke = useRevokeAuthorization();
-  const signOut = useSessionLogout();
-  const [revokeError, setRevokeError] = useState('');
-  const [signOutError, setSignOutError] = useState('');
-  const items = authorizations.data?.items ?? [];
-  return (
-    <div className="space-y-6">
-      <Card title={t('settings.authorizations')} description={t('settings.authorizationsHint')}>
-        {authorizations.isPending && <Skeleton className="h-10 w-full" />}
-        {authorizations.isSuccess && items.length === 0 && (
-          <EmptyState icon={<Icons.permission size={20} aria-hidden />} title={t('settings.authorizationsEmpty')} />
-        )}
-        {authorizations.isSuccess && items.length > 0 && (
-          <List>
-            {items.map((item) => (
-              <ListRow
-                key={item.botId + item.engineEpoch}
-                title={<span className="font-mono text-xs">{item.botId.slice(0, 8)}</span>}
-                description={
-                  <span className="font-mono">
-                    {item.engineEpoch.slice(0, 8)} · {new Date(item.expiresAt).toLocaleTimeString(i18n.language)}
-                  </span>
-                }
-                trailing={
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => {
-                      setRevokeError('');
-                      revoke.mutate(item.botId, { onError: (error) => setRevokeError(apiErrorMessage(t, error)) });
-                    }}
-                  >
-                    {t('settings.revoke')}
-                  </Button>
-                }
-              />
-            ))}
-          </List>
-        )}
-        {revokeError && (
-          <div className="mt-3">
-            <Alert tone="danger">{revokeError}</Alert>
-          </div>
-        )}
-      </Card>
-
-      {/* A shared machine keeps the session for days, so there has to be a
-          way to end it without closing the program. */}
-      <Card title={t('settings.sessionTitle')} description={t('settings.sessionHint')}>
-        <Button
-          variant="danger"
-          loading={signOut.isPending}
-          onClick={() => {
-            setSignOutError('');
-            signOut.mutate(undefined, { onError: (error) => setSignOutError(apiErrorMessage(t, error)) });
-          }}
-        >
-          {t('settings.signOut')}
-        </Button>
-        {signOutError && (
-          <div className="mt-3">
-            <Alert tone="danger">{signOutError}</Alert>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-export function AboutSection() {
-  const { t } = useTranslation();
-  const status = useStatus();
-  const s = status.data;
-  return (
-    <Card>
-      <DescriptionList
-        items={[
-          { term: t('settings.version'), value: s?.version, mono: true },
-          { term: t('settings.profile'), value: s?.profile === 'production' ? t('settings.profileProduction') : t('settings.profileDevelopment') },
-          { term: t('settings.dataRoot'), value: s?.dataRoot, mono: true },
-        ]}
-      />
-    </Card>
-  );
-}
+export { default as AboutSection } from './AboutSection';
 
 /** The role library with each role's avatar; members without their own follow it. */
 export function RolesSection() {

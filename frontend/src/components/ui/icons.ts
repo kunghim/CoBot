@@ -10,6 +10,7 @@ import {
   Bot,
   Brain,
   Check,
+  Shrink,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -51,6 +52,8 @@ import {
   Palette,
   Pencil,
   Plug,
+  Pin,
+  PinOff,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -93,6 +96,8 @@ export const Icons = {
   model: Box,
   provider: Plug,
   // Actions
+  pin: Pin,
+  unpin: PinOff,
   add: Plus,
   edit: Pencil,
   delete: Trash2,
@@ -133,6 +138,7 @@ export const Icons = {
   tool: Wrench,
   webSearch: Globe,
   plan: ListChecks,
+  compaction: Shrink,
   thinking: MessageSquareText,
   subagent: Bot,
   reasoningEffort: Brain,
@@ -161,10 +167,10 @@ export type IconName = keyof typeof Icons;
 /** What each icon means, for the gallery. */
 export const iconMeaning: Record<IconName, string> = {
   home: '首页', settings: '设置', team: '团队', member: '成员', leader: '队长', tasks: '任务', approvals: '审批', activity: '动态', memory: '记忆', inbox: '待处理', roles: '角色', appearance: '外观', general: '通用设置', engine: '引擎（Codex）', model: '模型', provider: '模型供应商、外部网关',
-  add: '新建、添加', edit: '编辑、重命名', delete: '删除', archive: '归档', restore: '恢复', copy: '复制', search: '搜索', filter: '筛选', more: '更多操作', close: '关闭', back: '返回', send: '发送消息', sendMessage: '发给成员', stop: '停止', refresh: '刷新、检查更新', retry: '重试', upload: '上传、选图', download: '下载', openFolder: '打开目录', openExternal: '在外部打开', view: '查看',
+  pin: '置顶', unpin: '取消置顶', add: '新建、添加', edit: '编辑、重命名', delete: '删除', archive: '归档', restore: '恢复', copy: '复制', search: '搜索', filter: '筛选', more: '更多操作', close: '关闭', back: '返回', send: '发送消息', sendMessage: '发给成员', stop: '停止', refresh: '刷新、检查更新', retry: '重试', upload: '上传、选图', download: '下载', openFolder: '打开目录', openExternal: '在外部打开', view: '查看',
   panelLeftOpen: '展开左栏', panelLeftClose: '收起左栏', panelRightOpen: '展开右栏', panelRightClose: '收起右栏', minimize: '最小化', maximize: '最大化',
   expand: '展开', collapse: '收起', previous: '上一个', next: '下一个',
-  command: '命令', fileChange: '改文件', diff: '本轮改动', tool: '工具调用', webSearch: '网页搜索', plan: '计划', thinking: '思考、说明', subagent: '子智能体', reasoningEffort: '思考强度', permission: '权限模式（默认权限）', readOnly: '只读权限', fullAccess: '完全访问', secret: '密钥、登录', locked: '锁定、必选', duration: '用时', notification: '通知',
+  command: '命令', fileChange: '改文件', diff: '本轮改动', tool: '工具调用', webSearch: '网页搜索', plan: '计划', compaction: '压缩上下文', thinking: '思考、说明', subagent: '子智能体', reasoningEffort: '思考强度', permission: '权限模式（默认权限）', readOnly: '只读权限', fullAccess: '完全访问', secret: '密钥、登录', locked: '锁定、必选', duration: '用时', notification: '通知',
   system: '跟随系统', light: '浅色', dark: '深色',
   success: '成功', error: '错误', warning: '警告', info: '信息', help: '帮助', done: '完成、已选',
 };
