@@ -98,8 +98,10 @@ func TestTheEngineIsStartedWithTheCatalogFile(t *testing.T) {
 	if got := (ClientCatalog{}).CatalogArgs(); got != nil {
 		t.Fatalf("no catalog, args = %v", got)
 	}
-	got := (ClientCatalog{Path: `C:\home\cobot-model-catalog.json`}).CatalogArgs()
-	if !reflect.DeepEqual(got, []string{"-c", `model_catalog_json="C:/home/cobot-model-catalog.json"`}) {
+	// Written with the platform's own separator, so it reads the same on every OS.
+	path := filepath.Join("home", "cobot-model-catalog.json")
+	got := (ClientCatalog{Path: path}).CatalogArgs()
+	if !reflect.DeepEqual(got, []string{"-c", `model_catalog_json="home/cobot-model-catalog.json"`}) {
 		t.Fatalf("args = %v", got)
 	}
 }
