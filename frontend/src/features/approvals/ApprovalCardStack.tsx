@@ -98,7 +98,7 @@ export default function ApprovalCardStack({
       {approval.reason && (
         <p>
           <span className="text-neutral-500 dark:text-neutral-400">{t('approvals.reason')}: </span>
-          <span className="whitespace-pre-wrap">{approval.reason}</span>
+          <span className="whitespace-pre-wrap">{t(`approvals.reasonCode.${approval.reason}`, { defaultValue: approval.reason })}</span>
         </p>
       )}
       {unavailable.map((reason) => (

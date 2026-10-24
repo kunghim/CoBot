@@ -19,6 +19,17 @@ import (
 // "#L12", "#L12-L20", ":12" or ":12:5".
 var lineSuffix = regexp.MustCompile(`(#L\d+(-L?\d+)?|:\d+(:\d+)?)$`)
 
+func (a *App) OpenChatPath(ctx context.Context, principal auth.Principal, chatID, raw string, reveal bool) (map[string]any, error) {
+	if principal.Kind != auth.KindUser {
+		return nil, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	chat, err := sqlite.GetChat(ctx, a.DB, chatID)
+	if err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+	return a.openWorkspacePath(chat.Workspace, raw, reveal)
+}
+
 // OpenTeamPath opens (or reveals) a file a member linked in the
 // conversation. Only paths inside the team's own folder are opened; the
 // link text comes from the model, so everything else is refused.
@@ -30,7 +41,11 @@ func (a *App) OpenTeamPath(ctx context.Context, principal auth.Principal, teamID
 	if err != nil {
 		return nil, sqlite.NormalizeError(err)
 	}
-	path, ok := resolveTeamPath(team.Directory, raw)
+	return a.openWorkspacePath(team.Directory, raw, reveal)
+}
+
+func (a *App) openWorkspacePath(directory, raw string, reveal bool) (map[string]any, error) {
+	path, ok := resolveTeamPath(directory, raw)
 	if !ok {
 		return nil, domain.InvalidRequest("error.path.outside_team", nil)
 	}

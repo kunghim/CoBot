@@ -7,10 +7,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngine, useEngineModels, useProviders, useSetBotModel, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
-import type { Bot, EngineModel, Team } from '../../api/types';
+import type { Bot, EngineModel, Provider, Team } from '../../api/types';
 import { ModelEffortPicker, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
-import { choiceKey, engineDefaultModel, isOfficial, memberChoice, selectableModels } from '../providers/providerModels';
+import { choiceKey, DEFAULT_EFFORTS, engineDefaultModel, isOfficial, memberChoice, selectableModels } from '../providers/providerModels';
 import { useProviderName } from '../providers/useProviderName';
 import { createSettledSave, type SettledSave } from './settledSave';
 
@@ -18,6 +18,35 @@ import { createSettledSave, type SettledSave } from './settledSave';
  * engine's own default. */
 export function currentModel(models: EngineModel[], configured: string | undefined): EngineModel | undefined {
   return models.find((m) => configured && (m.slug === configured || m.id === configured)) ?? models.find((m) => m.isDefault) ?? models[0];
+}
+
+export interface EffortChoices {
+  levels: Array<{ effort: string }>;
+  /** Thinking can be switched off; the team's level is then "none". */
+  toggle: boolean;
+  /** The level the model uses when none is chosen; empty when it has none. */
+  defaultEffort: string;
+}
+
+/**
+ * The thinking levels a model offers. The ChatGPT account's models list their
+ * own, which the engine reports. Another vendor's model has the ones its
+ * configuration lists, or low, medium and high when it lists none: CoBot
+ * cannot tell what a gateway accepts, so the rest is the user's to declare.
+ */
+export function effortChoices(provider: Provider | undefined, model: string, engineList: EngineModel[]): EffortChoices {
+  if (!provider || isOfficial(provider)) {
+    const known = provider ? currentModel(engineList, model) : currentModel(engineList, undefined);
+    return { levels: known?.reasoningEfforts ?? [], toggle: false, defaultEffort: known?.defaultReasoningEffort ?? '' };
+  }
+  const own = provider.models.find((entry) => entry.id === model);
+  if (!own) return { levels: [], toggle: false, defaultEffort: '' };
+  // What the core worked out from the model catalog and the user's entries.
+  if (own.spec) {
+    return { levels: own.spec.thinking.efforts.map((effort) => ({ effort })), toggle: own.spec.thinking.toggle, defaultEffort: own.spec.thinking.defaultEffort ?? '' };
+  }
+  const declared = own.supportedEfforts?.length ? own.supportedEfforts : DEFAULT_EFFORTS;
+  return { levels: declared.map((effort) => ({ effort })), toggle: own.thinkingToggle ?? false, defaultEffort: own.defaultEffort ?? '' };
 }
 
 export default function ReasoningEffortSelect({ team, bot, disabled }: { team: Team; bot: Bot; disabled?: boolean }) {
@@ -42,14 +71,10 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
     label: entry.unavailable ? `${entry.label} · ${unavailable}` : entry.label,
     group: entry.group,
     disabled: entry.unavailable,
+    badge: entry.contextBadge,
   }));
-  // The efforts CoBot can send are the ones the engine knows. On the
-  // ChatGPT account that is the chosen model's own list; another provider's
-  // model does not change what the engine accepts, so it is the engine's
-  // default model's list.
   const chosenProvider = providerList?.find((entry) => entry.id === choice.providerId);
-  const effortModel = chosenProvider && isOfficial(chosenProvider) ? currentModel(engineList, choice.model) : currentModel(engineList, undefined);
-  const levels = effortModel?.reasoningEfforts ?? [];
+  const { levels, toggle, defaultEffort } = effortChoices(chosenProvider, choice.model, engineList);
   const stored = team.reasoningEffort ?? '';
   const label = (effort: string) => t(`effort.level.${effort}`, { defaultValue: effort });
 
@@ -87,11 +112,15 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
   // Without a model on offer there is nothing to choose from.
   if (options.length === 0) return null;
 
-  const current = chosen ?? stored;
+  // A level the team chose on another model, which this one does not offer,
+  // counts as none: this model runs with its own default.
+  const wanted = chosen ?? stored;
+  const off = toggle && wanted === 'none';
+  const current = off ? '' : levels.some((level) => level.effort === wanted) ? wanted : '';
   // Following the model's default shows the model's default level.
-  const shown = current || effortModel?.defaultReasoningEffort || levels[0]?.effort || '';
+  const shown = current || defaultEffort || levels[0]?.effort || '';
   const chooseEffort = (effort: string, now = false) => {
-    if (effort === current) return;
+    if (effort === wanted) return;
     setChosen(effort);
     saver.current?.set(effort);
     if (now) saver.current?.flush();
@@ -102,7 +131,11 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
   return (
     <ModelEffortPicker
       disabled={disabled}
-      triggerLabel={`${t('effort.label')}：${current ? label(current) : t('effort.default')} · ${chosenLabel}`}
+      triggerLabel={
+        levels.length > 0 || toggle
+          ? `${t('effort.label')}：${off ? t('effort.off') : current ? label(current) : t('effort.default')} · ${chosenLabel}`
+          : chosenLabel
+      }
       models={options}
       model={selected}
       onModel={(key) => {
@@ -119,10 +152,11 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
       levels={levels.map((option) => ({ value: option.effort, label: label(option.effort) }))}
       effort={shown}
       onEffort={chooseEffort}
-      isDefault={current === ''}
+      isDefault={current === '' && !off}
+      thinking={toggle ? { on: !off, label: off ? t('effort.off') : t('effort.on'), onChange: (on) => chooseEffort(on ? '' : 'none', true) } : undefined}
       onReset={() => chooseEffort('', true)}
       labels={{ effort: t('effort.label'), reset: t('effort.reset'), chooseModel: t('effort.chooseModel'), back: t('effort.back') }}
-      note={`${t('effort.note')} ${t('effort.modelNote')}`}
+      note={levels.length > 0 || toggle ? `${t('effort.note')} ${t('effort.modelNote')}` : t('effort.modelNote')}
     />
   );
 }

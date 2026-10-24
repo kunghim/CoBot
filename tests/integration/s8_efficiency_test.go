@@ -144,8 +144,18 @@ func TestBudgetReserveHoldsATurnTheRestCannotCover(t *testing.T) {
 	waitUntil(t, 5*time.Second, "reserve pause recorded", func() bool {
 		return h.app.DB.QueryRowContext(ctx, `SELECT resource_id FROM events WHERE type = ? ORDER BY seq DESC LIMIT 1`, domain.EventBudgetPaused).Scan(&reason) == nil
 	})
-	if reason != "reserve" || len(fake.Turns()) != 1 {
+	if reason != "reserve:bot" || len(fake.Turns()) != 1 {
 		t.Fatalf("reason = %q, turns = %d", reason, len(fake.Turns()))
+	}
+	// The hold asks the user once whether to count again, and says whose limit it was.
+	var cardCount int
+	var summary, cardReason string
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT count(*), COALESCE(max(summary), ''), COALESCE(max(reason), '') FROM approvals WHERE type = ? AND request_state = ?`,
+		domain.ApprovalBudget, domain.ApprovalStatePending).Scan(&cardCount, &summary, &cardReason); err != nil {
+		t.Fatal(err)
+	}
+	if cardCount != 1 || summary != "approval.card.budget_bot" || cardReason != "budget_reserve" {
+		t.Fatalf("budget cards = %d (%q, %q), want one about the member's own limit", cardCount, summary, cardReason)
 	}
 	// Room for one more such turn lets it start.
 	settings, _ = h.app.GetSettings(ctx)

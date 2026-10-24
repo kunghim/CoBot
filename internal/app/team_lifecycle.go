@@ -230,6 +230,9 @@ func (a *App) ArchiveTeam(ctx context.Context, principal auth.Principal, teamID 
 	if team.Status != domain.TeamStatusActive {
 		return domain.Team{}, domain.Conflict("error.team.not_active", map[string]any{"status": team.Status})
 	}
+	// A budget question about work that is no longer queued is not a reason to
+	// keep the team from being archived.
+	a.closeFreedBudgetCards(ctx)
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Team{}, err

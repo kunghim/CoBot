@@ -9,16 +9,18 @@ import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useCancelMessage, useConversation, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
-import { forgetLiveRuns, useLiveRuns } from '../../api/live';
+import { forgetLiveRuns, useLiveRuns, type LiveRun } from '../../api/live';
 import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
+import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
+import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
-import RunProcess from './RunProcess';
+import RunProcess, { runHasContent } from './RunProcess';
 import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
 import { Alert, Composer, FloatingCard, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
 import WorkPanel from '../../components/WorkPanel';
@@ -83,6 +85,15 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const liveRuns = useLiveRuns();
   const runs = conv.data?.runs ?? [];
   const timeline = buildTimeline(messages, runs, activeRun, bot.id);
+  // A turn is one thing to read: what the member did and said, then its reply,
+  // under one name. The reply is given to its turn here and not listed again.
+  const runIds = new Set(timeline.flatMap((entry) => (entry.kind === 'run' ? [entry.run.id] : [])));
+  const repliesByRun = new Map<string, Message[]>();
+  for (const entry of timeline) {
+    if (entry.kind !== 'message' || entry.message.kind !== 'assistant' || !entry.message.runId || !runIds.has(entry.message.runId)) continue;
+    repliesByRun.set(entry.message.runId, [...(repliesByRun.get(entry.message.runId) ?? []), entry.message]);
+  }
+  const listed = timeline.filter((entry) => entry.kind === 'run' || !(entry.message.kind === 'assistant' && entry.message.runId && repliesByRun.has(entry.message.runId)));
   // Only the member's latest turn can be retried.
   const latestRunId = [...timeline].reverse().find((entry) => entry.kind === 'run')?.run.id;
   const activeLive = activeRun ? liveRuns[activeRun.id] : undefined;
@@ -225,11 +236,12 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </div>
         )}
         <ul className="mx-auto max-w-3xl space-y-6">
-          {timeline.map((entry) =>
+          {listed.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
-                <RunProcess
+                <TurnRow
                   run={entry.run}
+                  replies={repliesByRun.get(entry.run.id) ?? []}
                   active={entry.run.id === activeRun?.id}
                   live={liveRuns[entry.run.id]}
                   teamId={team.id}
@@ -285,6 +297,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
 
         <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
           <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
+          <QuestionCardStack key={`q-${bot.id}`} teamId={team.id} viewBotId={bot.id} />
 
           <Composer
             value={draft}
@@ -390,6 +403,45 @@ export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeR
   return entries.sort((a, b) => a.at - b.at || (a.kind === b.kind ? 0 : a.kind === 'message' ? -1 : 1));
 }
 
+/** One turn of a member: its name once, what it did and said as it went, and
+ * the reply that closes it. */
+function TurnRow({
+  run,
+  replies,
+  active,
+  live,
+  teamId,
+  nameOf,
+  onRetry,
+  retrying,
+}: {
+  run: RunWithSteps;
+  replies: Message[];
+  active: boolean;
+  live: LiveRun | undefined;
+  teamId: string;
+  nameOf: (botId: string) => string;
+  onRetry?: () => void;
+  retrying: boolean;
+}) {
+  const membersById = useContext(TeamMembersContext);
+  const author = membersById.get(run.botId);
+  const replyText = replies.map((reply) => stripToolCallText(messageText(reply))).filter((text) => text !== '').join('\n\n');
+  if (replies.length > 0 && replyText === '' && !runHasContent(run, active, '')) return null;
+  const process = runHasContent(run, active, replyText) ? (
+    <RunProcess run={run} active={active} live={live} scope={{ teamId }} nameOf={nameOf} replyText={replyText} onRetry={onRetry} retrying={retrying} />
+  ) : null;
+  if (!process && replyText === '') return null;
+  return (
+    <MessageBubble from="member" avatar={author ? <Avatar bot={author} size="md" /> : undefined} author={nameOf(run.botId)}>
+      <div className="space-y-2">
+        {process}
+        {replyText !== '' && <Markdown text={replyText} teamId={teamId} />}
+      </div>
+    </MessageBubble>
+  );
+}
+
 function MessageRow({
   message,
   recipients,
@@ -435,6 +487,9 @@ function MessageRow({
   if (message.kind === 'system') return <SystemNote>{text}</SystemNote>;
 
   const isUser = message.kind === 'user';
+  // A tool call the model wrote as text is not shown (see toolCallText.ts); a reply that was only that has nothing to show.
+  const shown = isUser ? text : stripToolCallText(text);
+  if (!isUser && text !== '' && shown === '') return null;
   const delivery = isLastUser && message.deliveryStatus ? t(deliveryLabelKey(message.deliveryStatus)) : '';
   const meta =
     delivery || showCancel ? (
@@ -451,7 +506,7 @@ function MessageRow({
       author={isUser ? undefined : nameOf(message.botId)}
       meta={meta}
     >
-      {isUser ? text : <Markdown text={text} teamId={teamId} />}
+      {isUser ? text : <Markdown text={shown} teamId={teamId} />}
     </MessageBubble>
   );
 }

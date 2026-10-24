@@ -26,6 +26,9 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	if n.Method == "item/completed" && n.ItemType == "agentMessage" {
 		s.bufferReply(ctx, source, n)
 	}
+	if n.Step != nil && isWorkStep(n.Step.Kind) {
+		s.noteWork(ctx, source, n)
+	}
 	if s.onProgress(ctx, teamID, source, n) {
 		return
 	}
@@ -245,7 +248,40 @@ func takeReply(rt *teamRuntime, runID string) string {
 	if text := joinTexts(buf.texts); text != "" {
 		return text
 	}
+	if len(buf.loose) > 0 {
+		return joinTexts(looseReply(buf.loose, buf.work))
+	}
 	return buf.commentary
+}
+
+// looseReply is what a model that marks no phase said as its answer: the
+// messages after the last work step. A turn that ended on a work step (the
+// answer, then a hand-off call) answers with the last thing said.
+func looseReply(pieces []loosePiece, work int) []string {
+	var tail []string
+	for _, piece := range pieces {
+		if piece.work == work && strings.TrimSpace(piece.text) != "" {
+			tail = append(tail, piece.text)
+		}
+	}
+	if len(tail) == 0 {
+		for i := len(pieces) - 1; i >= 0; i-- {
+			if strings.TrimSpace(pieces[i].text) != "" {
+				return []string{pieces[i].text}
+			}
+		}
+	}
+	return tail
+}
+
+// isWorkStep says whether a step is the member doing something, as against
+// thinking, reporting or saying something.
+func isWorkStep(kind string) bool {
+	switch kind {
+	case engine.StepCommand, engine.StepFileChange, engine.StepTool, engine.StepWebSearch, engine.StepAgent:
+		return true
+	}
+	return false
 }
 
 // settleRetryDelays space the retries of a settlement whose write failed.
@@ -725,10 +761,40 @@ func (s *Scheduler) bufferReply(ctx context.Context, source *teamRuntime, n engi
 	if n.ItemID != "" && buf.items[n.ItemID] {
 		return
 	}
-	if n.Phase == "commentary" {
+	switch n.Phase {
+	case "commentary":
 		buf.commentary = n.Text
-	} else {
+	case "":
+		buf.loose = append(buf.loose, loosePiece{text: n.Text, work: buf.work})
+	default:
 		buf.texts = append(buf.texts, n.Text)
 	}
 	buf.items[n.ItemID] = true
+}
+
+// noteWork counts a work step the first time it is seen, so a message can say
+// how much work had begun before it.
+func (s *Scheduler) noteWork(ctx context.Context, source *teamRuntime, n engine.Notification) {
+	if n.TurnID == "" || source == nil {
+		return
+	}
+	runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
+	if runID == "" {
+		return
+	}
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	buf := source.buffer[runID]
+	if buf == nil {
+		buf = &runBuffer{items: map[string]bool{}}
+		source.buffer[runID] = buf
+	}
+	if buf.workSeen == nil {
+		buf.workSeen = map[string]bool{}
+	}
+	if buf.workSeen[n.Step.ID] {
+		return
+	}
+	buf.workSeen[n.Step.ID] = true
+	buf.work++
 }

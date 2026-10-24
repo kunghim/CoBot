@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useSettings } from '../../api/queries';
+import { useSettings, useStatus } from '../../api/queries';
 import { workspacePath } from '../../app/workspacePath';
+import { scaleOf } from '../budget/budgetUnits';
 import { Alert, Button, Icons, NavItem, NavSection, PageHeader, Skeleton } from '../../components/ui';
 import {
   AboutSection,
@@ -13,12 +14,11 @@ import {
   GeneralSection,
   ModelsSection,
   ProviderSection,
-  SecuritySection,
 } from './SettingsSections';
-import ArchivedTeamsSection from './ArchivedTeamsSection';
+import ArchivedSection from './ArchivedSection';
 import { useSettingSaver } from './useSettingSaver';
 
-type SectionId = 'general' | 'appearance' | 'roles' | 'engine' | 'models' | 'providers' | 'collaboration' | 'archived' | 'security' | 'about';
+type SectionId = 'general' | 'appearance' | 'roles' | 'engine' | 'models' | 'providers' | 'collaboration' | 'archived' | 'about';
 
 const sections: { id: SectionId; icon: (typeof Icons)[keyof typeof Icons] }[] = [
   { id: 'general', icon: Icons.general },
@@ -29,7 +29,6 @@ const sections: { id: SectionId; icon: (typeof Icons)[keyof typeof Icons] }[] = 
   { id: 'models', icon: Icons.model },
   { id: 'collaboration', icon: Icons.team },
   { id: 'archived', icon: Icons.archive },
-  { id: 'security', icon: Icons.permission },
   { id: 'about', icon: Icons.info },
 ];
 
@@ -44,6 +43,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { section } = useParams();
   const settings = useSettings(true);
+  const status = useStatus();
   const { save, errors } = useSettingSaver();
 
   const back = () => navigate(workspacePath());
@@ -66,7 +66,7 @@ export default function SettingsPage() {
   if (settings.isPending) body = <Skeleton className="h-32 w-full rounded-xl" />;
   else if (settings.isError || !settings.data) body = <Alert tone="danger">{t('status.error')}</Alert>;
   else {
-    const props = { settings: settings.data, save, errors };
+    const props = { settings: settings.data, save, errors, budgetScale: scaleOf(status.data?.profile) };
     body = {
       general: <GeneralSection {...props} />,
       appearance: <AppearanceSection {...props} />,
@@ -75,8 +75,7 @@ export default function SettingsPage() {
       models: <ModelsSection {...props} />,
       providers: <ProviderSection />,
       collaboration: <CollaborationSection {...props} />,
-      archived: <ArchivedTeamsSection />,
-      security: <SecuritySection />,
+      archived: <ArchivedSection />,
       about: <AboutSection />,
     }[current.id];
   }
@@ -87,7 +86,7 @@ export default function SettingsPage() {
         aria-label={t('settings.title')}
         className="shrink-0 space-y-4 px-3 py-3 md:w-56"
       >
-        <Button variant="ghost" size="sm" icon={Icons.back} onClick={back}>
+        <Button variant="ghost" size="sm" block className="justify-start" icon={Icons.back} onClick={back}>
           {t('settings.back')}
         </Button>
         <NavSection title={t('settings.title')}>
