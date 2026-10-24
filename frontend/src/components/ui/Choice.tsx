@@ -2,7 +2,7 @@
 // (a setting that applies at once), radios and radio cards (one of a few,
 // all visible), checkbox cards (several of a few, with pictures), segmented control (one of 2–4 short options) and toggle.
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
-import { Check, Lock, Minus } from 'lucide-react';
+import { Check, Loader2, Lock, Minus, PlugZap, RotateCcw } from 'lucide-react';
 import { controlHeight, cx, interactive, type ControlSize } from './foundation';
 
 export function Checkbox({
@@ -55,11 +55,11 @@ export function Checkbox({
   );
 }
 
-export function Switch({ checked, onChange, label, description, disabled = false }: { checked: boolean; onChange: (checked: boolean) => void; label: ReactNode; description?: ReactNode; disabled?: boolean }) {
+export function Switch({ checked, onChange, label, description, disabled = false, hideLabel = false }: { checked: boolean; onChange: (checked: boolean) => void; label: ReactNode; description?: ReactNode; disabled?: boolean; hideLabel?: boolean }) {
   const id = useId();
   return (
     <div className={cx('flex items-start justify-between gap-4', disabled && 'opacity-50')}>
-      <label htmlFor={id} className="min-w-0 text-sm">
+      <label htmlFor={id} className={cx('min-w-0 text-sm', hideLabel && 'sr-only')}>
         <span className="block text-neutral-800 dark:text-neutral-100">{label}</span>
         {description && <span className="mt-0.5 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{description}</span>}
       </label>
@@ -295,6 +295,7 @@ export function Chip({
   disabled = false,
   title,
   className,
+  action,
 }: {
   pressed: boolean;
   onClick: () => void;
@@ -308,8 +309,15 @@ export function Chip({
   disabled?: boolean;
   title?: string;
   className?: string;
+  /**
+   * A second control on the chip that does something to the item without
+   * choosing it (check it, retry it). It shows while the pointer is over the
+   * chip or focus is in it, and stays shown when `visible` is set, so it can
+   * also be reached without a mouse.
+   */
+  action?: { label: string; onClick: () => void; busy?: boolean; visible?: boolean; kind?: 'check' | 'retry' };
 }) {
-  return (
+  const chip = (
     <button
       type="button"
       aria-pressed={pressed}
@@ -317,14 +325,15 @@ export function Chip({
       onClick={onClick}
       title={title}
       className={cx(
-        'inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex max-w-full items-center gap-1.5 rounded-lg border py-1 pl-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        action ? 'pr-7' : 'pr-2.5',
         mono && 'font-mono',
         pressed
           ? tone === 'danger'
             ? 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
             : 'border-signal-500 bg-signal-500/10 text-signal-600 dark:text-signal-400'
           : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-900/[0.04] dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-white/[0.07]',
-        className,
+        !action && className,
       )}
     >
       <span aria-hidden className={cx('text-[9px] leading-none', !pressed && 'opacity-0')}>
@@ -333,5 +342,30 @@ export function Chip({
       <span className="min-w-0 truncate">{children}</span>
       {trailing}
     </button>
+  );
+  if (!action) return chip;
+  return (
+    <span className={cx('group relative inline-flex max-w-full', className)}>
+      {chip}
+      <button
+        type="button"
+        aria-label={action.label}
+        title={action.label}
+        disabled={disabled || action.busy}
+        onClick={action.onClick}
+        className={cx(
+          'absolute right-1 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 transition-opacity hover:bg-neutral-900/[0.08] hover:text-neutral-900 focus-visible:opacity-100 disabled:cursor-not-allowed dark:text-neutral-400 dark:hover:bg-white/[0.12] dark:hover:text-neutral-50',
+          action.visible || action.busy ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+        )}
+      >
+        {action.busy ? (
+          <Loader2 size={12} className="animate-spin" aria-hidden />
+        ) : action.kind === 'retry' ? (
+          <RotateCcw size={12} aria-hidden />
+        ) : (
+          <PlugZap size={12} aria-hidden />
+        )}
+      </button>
+    </span>
   );
 }

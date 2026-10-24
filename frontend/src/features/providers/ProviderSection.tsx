@@ -134,12 +134,12 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
             <Button size="sm" onClick={onEdit}>
               {t('providers.edit')}
             </Button>
-            <Button size="sm" variant="ghost" onClick={onRemove}>
+            <Button size="sm" className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={onRemove}>
               {t('providers.remove')}
             </Button>
           </>
         )}
-        <Switch checked={provider.enabled} disabled={switching} label={t('providers.enabledLabel')} onChange={onToggle} />
+        <Switch checked={provider.enabled} disabled={switching} label={t('providers.enabledLabel')} hideLabel onChange={onToggle} />
       </div>
     </div>
   );

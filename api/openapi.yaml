@@ -342,6 +342,193 @@ paths:
                         $ref: "#/components/schemas/AvatarCatalog"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/budget:
+    get:
+      operationId: getTeamBudget
+      security:
+        - SessionCookie: []
+      summary: A team's daily token limit, each member's, and what was spent today
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The team's and its members' limits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TeamBudget"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: setTeamBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set the team's own daily token limit; null follows the default in the settings, 0 is no limit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLimitRequest"
+      responses:
+        "200":
+          description: The limit now set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetLimitResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/budget:
+    put:
+      operationId: setBotBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set the member's own daily token limit; null follows the default in the settings, 0 is no limit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLimitRequest"
+      responses:
+        "200":
+          description: The limit now set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetLimitResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/budget/reset:
+    post:
+      operationId: resetTeamBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start counting today's spend again from now, for the team and its members
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Counting started again
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetResetResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/budget/reset:
+    post:
+      operationId: resetBotBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start counting one member's spend today again from now
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Counting started again
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetResetResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/updates/check:
+    post:
+      operationId: checkForUpdate
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Ask GitHub now whether a newer release exists; an unreachable GitHub is reported in state, not as an error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: How the installed version stands against the newest release
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/UpdateCheck"
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/engine/check:
     post:
       operationId: checkEngine
@@ -2966,6 +3153,83 @@ components:
           type: string
           description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
         bearerExpiresAt: { type: string, format: date-time }
+    UpdateCheck:
+      type: object
+      required: [state, current, checkedAt]
+      properties:
+        state:
+          type: string
+          description: >-
+            upToDate: nothing newer; available: a newer release exists;
+            unknown: the installed build is not a release number, so it cannot
+            be compared; unreachable: GitHub could not be reached; rejected:
+            GitHub answered with something that is not a release list.
+          enum: [upToDate, available, unknown, unreachable, rejected]
+        current: { type: string }
+        latest: { type: string }
+        releaseUrl: { type: string }
+        publishedAt: { type: string, format: date-time }
+        checkedAt: { type: string, format: date-time }
+    BudgetLine:
+      type: object
+      description: >-
+        One daily token limit. override is what this team or member set for
+        itself (null: it follows the default; 0: no limit). default is what it
+        follows, effective what is in force now (0 means none), usedToday what
+        was spent since local midnight.
+      required: [override, default, effective, limitedBy, ceiling, usedToday]
+      properties:
+        override: { type: integer, format: int64, nullable: true }
+        default: { type: integer, format: int64 }
+        effective: { type: integer, format: int64 }
+        limitedBy:
+          type: string
+          description: >-
+            What the effective limit comes from: none (no limit), default (the
+            settings), own (set on this team or member) or team (a member held
+            to its team's limit).
+          enum: [none, default, own, team]
+        ceiling:
+          type: integer
+          format: int64
+          description: The most a member may set for itself, its team's limit; 0 when the team has none.
+        usedToday: { type: integer, format: int64 }
+    MemberBudget:
+      allOf:
+        - $ref: "#/components/schemas/BudgetLine"
+        - type: object
+          required: [botId]
+          properties:
+            botId: { type: string }
+    TeamBudget:
+      type: object
+      required: [team, members]
+      properties:
+        team:
+          $ref: "#/components/schemas/BudgetLine"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberBudget"
+    BudgetLimitRequest:
+      type: object
+      required: [requestId, limit]
+      properties:
+        requestId: { type: string, format: uuid }
+        limit: { type: integer, format: int64, nullable: true, minimum: 0 }
+    BudgetLimitResult:
+      type: object
+      required: [limit, clamped]
+      properties:
+        limit: { type: integer, format: int64, nullable: true }
+        clamped:
+          type: integer
+          description: How many members had a limit above the team's, or none, and were brought down to the team's.
+    BudgetResetResult:
+      type: object
+      required: [reset]
+      properties:
+        reset: { type: boolean }
     AvatarCatalog:
       type: object
       required: [series, status]
@@ -3145,7 +3409,7 @@ components:
         teamId: { type: string }
         requesterBotId: { type: string }
         runId: { type: string }
-        type: { type: string, enum: [native_tool, recovery, chain] }
+        type: { type: string, enum: [native_tool, recovery, chain, budget] }
         method: { type: string }
         summary: { type: string }
         reason: { type: string }

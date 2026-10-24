@@ -64,9 +64,10 @@ export default function CreateTeamDialog({
     checkedPath.current = '';
   }, [open]);
 
-  // A scenario preselects its usual members; switching scenarios resets them.
+  // Only the project manager, who always comes, is there to start with; the
+  // rest of the team is the user's to pick. Switching scenarios starts over.
   useEffect(() => {
-    if (open && scenario) setSelectedRoles(new Set(scenario.defaultRoleIds));
+    if (open) setSelectedRoles(new Set());
   }, [open, scenario]);
 
   if (!open) return null;
@@ -171,9 +172,6 @@ export default function CreateTeamDialog({
       <div className="space-y-5">
         <Field label={t('team.directory')}>
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Icons.openFolder} onClick={choose} loading={picking} className="shrink-0">
-              {picking ? t('team.choosing') : t('team.chooseDirectory')}
-            </Button>
             <TextInput
               mono
               className="min-w-0 flex-1"
@@ -190,6 +188,9 @@ export default function CreateTeamDialog({
               }}
               placeholder={t('team.directoryPlaceholder')}
             />
+            <Button variant="secondary" icon={Icons.openFolder} onClick={choose} loading={picking} className="shrink-0">
+              {picking ? t('team.choosing') : t('team.chooseDirectory')}
+            </Button>
           </div>
           {/* One line is kept for the check result, so the dialog does not
               shift under the pointer when leaving the field starts a check. */}

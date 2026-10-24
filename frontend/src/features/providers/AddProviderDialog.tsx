@@ -18,7 +18,7 @@ import { useReprobeProvider, useSaveProvider } from '../../api/queries';
 import type { Provider, ProviderEndpoint, ProviderModel, ProviderPreset, ProviderProbeResult, ProviderRequest } from '../../api/types';
 import { Alert, Badge, Button, Dialog, Field, Icons, LogoTile, SearchInput, TextInput, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
-import ModelPick from './ModelPick';
+import ModelPick, { modelsToProbe, withSelection } from './ModelPick';
 
 // ---------------------------------------------------------------------------
 // The vocabulary of dialects and engines, shared with the settings section.
@@ -107,6 +107,7 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const [statuses, setStatuses] = useState<Record<string, ProviderProbeResult>>({});
   const [discovering, setDiscovering] = useState(false);
   const [probing, setProbing] = useState(false);
+  const [probingIds, setProbingIds] = useState<string[]>([]);
   const [probed, setProbed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState('');
@@ -214,14 +215,23 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     setView('form');
   };
 
+  // A model that answered keeps its answer when it is ticked off and on again:
+  // the answer belongs to the endpoint and the key, and changing either one
+  // clears it (see forgetAnswers).
   const toggleModel = (id: string) => {
-    setSelected((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
-    setStatuses((current) => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+    setSelected((current) => withSelection(current, [id], !current.includes(id)));
+    setProbed(false);
+  };
+
+  const selectMany = (ids: string[], on: boolean) => {
+    setSelected((current) => withSelection(current, ids, on));
+    setProbed(false);
+  };
+
+  // The answers were given by one endpoint with one key; with another they
+  // say nothing.
+  const forgetAnswers = () => {
+    setStatuses({});
     setProbed(false);
   };
 
@@ -246,7 +256,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       const result = await api.discoverProviderModels(codexEndpoint.baseUrl, key || undefined, editing?.id);
       setModels(result.models);
       setSelected((current) => current.filter((id) => result.models.includes(id)));
-      setStatuses({});
+      // What a model answered stays true while it is still on offer.
+      setStatuses((current) => Object.fromEntries(Object.entries(current).filter(([id]) => result.models.includes(id))));
       setProbed(false);
       setNote(t('providers.dialog.discovered', { base: codexEndpoint.baseUrl.replace(/^https?:\/\//, ''), count: result.models.length }));
     } catch (error) {
@@ -275,13 +286,30 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     try {
       // A key the user pasted is used here; without one the server checks
       // with the key the stored provider keeps. Either way it is the models
-      // ticked now that are checked, not the ones stored last time.
-      const results =
-        editing && !key && !codexEndpoint
-          ? (await reprobe.mutateAsync(editing.id)).results
-          : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', selected, key || undefined, editing?.id)).results;
-      setStatuses(results);
+      // ticked now that are checked, not the ones stored last time, and only
+      // those that have not already passed.
+      const todo = modelsToProbe(selected, statuses);
+      const fresh =
+        todo.length === 0
+          ? {}
+          : editing && !key && !codexEndpoint
+            ? (await reprobe.mutateAsync(editing.id)).results
+            : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', todo, key || undefined, editing?.id)).results;
+      const merged = Object.fromEntries(
+        selected.flatMap((id) => {
+          const answer = fresh[id] ?? statuses[id];
+          return answer ? [[id, answer] as const] : [];
+        }),
+      );
+      setStatuses(merged);
       setProbed(true);
+      // All of them answering is the only case that needs no word from the
+      // user. Otherwise the notice below says which did not, and saving then
+      // is the user's own press of the button.
+      if (selected.every((id) => merged[id]?.ok)) {
+        setProbing(false);
+        await write(false, merged);
+      }
     } catch (error) {
       setErrorText(apiErrorMessage(t, error));
     } finally {
@@ -289,7 +317,39 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     }
   };
 
-  const write = async (force: boolean) => {
+  // Checks one model on its own, from the button on its chip.
+  const probeOne = async (id: string) => {
+    if (!codexEndpoint && !editing) {
+      toast.show({ tone: 'warning', title: t('providers.dialog.needEndpoint') });
+      return;
+    }
+    if (!editing && !key) {
+      toast.show({ tone: 'warning', title: t('providers.dialog.needKey') });
+      return;
+    }
+    setProbingIds((current) => [...current, id]);
+    setErrorText('');
+    try {
+      const { results } = await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', [id], key || undefined, editing?.id);
+      const answer = results[id];
+      if (answer) {
+        setStatuses((current) => ({ ...current, [id]: answer }));
+        // The button's own answer: the chip changes too, but a mark that small
+        // is easy to miss.
+        if (answer.ok) toast.show({ tone: 'success', title: t('providers.dialog.modelOk', { id }) });
+        // Not 'danger': that one stays until it is closed, and a model that does
+        // not answer is an answer, not a fault of the page.
+        else toast.show({ tone: 'warning', duration: 5000, title: t('providers.dialog.modelFailed', { id }), description: reasonOf(answer) });
+      }
+      setProbed(false);
+    } catch (error) {
+      setErrorText(apiErrorMessage(t, error));
+    } finally {
+      setProbingIds((current) => current.filter((entry) => entry !== id));
+    }
+  };
+
+  const write = async (force: boolean, answers: Record<string, ProviderProbeResult> = statuses) => {
     if (!preset && !name.trim()) {
       toast.show({ tone: 'warning', title: t('providers.dialog.needName') });
       return;
@@ -303,7 +363,7 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       return;
     }
     const kept: ProviderModel[] = selected.map((id) => {
-      const status = statuses[id];
+      const status = answers[id];
       if (force) return { id, status: 'failed', failure: status?.code ?? '', message: status?.message ?? '' };
       if (!status) return { id, status: 'unknown' };
       if (status.ok) return { id, status: 'ok' };
@@ -392,8 +452,9 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const formView = (
     <div className="space-y-4">
-      {probeImpossible && (
-        <Alert tone="warning">{t('providers.dialog.noCodexEndpoint')}</Alert>
+      {/* Said once the user has described a provider the engine cannot check, not before they have typed anything. */}
+      {probeImpossible && (preset ? true : anthropicBase.trim() !== '') && (
+        <Alert tone="warning">{t('providers.noCodexEndpoint')}</Alert>
       )}
 
       {preset ? (
@@ -415,7 +476,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
             <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder={t('providers.dialog.displayNamePlaceholder')} />
           </Field>
           <Field label={t('providers.dialog.openaiEndpoint')} hint={t('providers.dialog.openaiEndpointHint')}>
-            <TextInput mono value={openaiBase} onChange={(event) => setOpenaiBase(event.target.value)} placeholder="https://gateway.example/v1" />
+            <TextInput mono value={openaiBase} onChange={(event) => {
+                setOpenaiBase(event.target.value);
+                forgetAnswers();
+              }} placeholder="https://gateway.example/v1" />
           </Field>
           <Field label={t('providers.dialog.anthropicEndpoint')} hint={t('providers.dialog.anthropicEndpointHint')}>
             <TextInput mono value={anthropicBase} onChange={(event) => setAnthropicBase(event.target.value)} placeholder="https://gateway.example/anthropic" />
@@ -450,7 +514,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
           mono
           type="password"
           value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
+          onChange={(event) => {
+            setApiKey(event.target.value);
+            forgetAnswers();
+          }}
           placeholder={t('providers.dialog.apiKeyPlaceholder')}
         />
       </Field>
@@ -473,6 +540,9 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
         selected={selected}
         statuses={statuses}
         onToggle={toggleModel}
+        onProbe={probeImpossible ? undefined : (id) => void probeOne(id)}
+        probing={probingIds}
+        onSelectMany={selectMany}
         onAdd={addModel}
         labels={{
           title: t('providers.dialog.models'),
@@ -485,6 +555,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
           reason: reasonOf,
           noModels: t('providers.dialog.noModels'),
           note: t('providers.dialog.modelsHint'),
+          selectAll: t('providers.dialog.selectAll'),
+          clearAll: t('providers.dialog.clearAll'),
+          testOne: (id) => t('providers.dialog.testOne', { id }),
+          retryOne: (id) => t('providers.dialog.retryOne', { id }),
         }}
       />
 

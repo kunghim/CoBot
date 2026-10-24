@@ -35,6 +35,7 @@ import (
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/internal/updates"
 	"github.com/kunghim/CoBot/internal/webui"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 )
@@ -85,6 +86,8 @@ type Core struct {
 	closeLog    func() error
 	scheduler   *app.Scheduler
 	stopStreams context.CancelFunc
+	// stopBudgetWatch ends the check that wakes held work at midnight.
+	stopBudgetWatch context.CancelFunc
 }
 
 // Start brings up the core: lock, storage, migrations, HTTP listener.
@@ -230,6 +233,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		catalog, _ = avatars.New(paths.AvatarsDir(), "")
 	}
 	application.Avatars = catalog
+	application.Updates = updates.New(opts.Version, "")
 	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
 
 	// The credential store holds the model providers' API keys, encrypted
@@ -405,11 +409,14 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		closeLog:         closeLog,
 		scheduler:        scheduler,
 	}
+	budgetCtx, stopBudgetWatch := context.WithCancel(context.Background())
+	core.stopBudgetWatch = stopBudgetWatch
 
 	// Ownership transfers only after all fallible startup work has finished;
 	// no dispatch worker may outlive a failed Start call.
 	startupComplete = true
 	scheduler.Start()
+	application.StartBudgetDayWatch(budgetCtx)
 	if opts.AvatarSync {
 		application.StartAvatarSync()
 	}
@@ -456,6 +463,9 @@ func (c *Core) SetEngineStatus(p apihttp.EngineStatusProvider) {
 // touches resources of another instance.
 func (c *Core) Shutdown(ctx context.Context) error {
 	var errs []error
+	if c.stopBudgetWatch != nil {
+		c.stopBudgetWatch()
+	}
 	// Order: stop dispatch and engines first, then HTTP, then storage.
 	if c.scheduler != nil {
 		if err := c.scheduler.Stop(ctx); err != nil {

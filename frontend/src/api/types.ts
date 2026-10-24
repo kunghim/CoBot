@@ -3,6 +3,9 @@
 import type { components } from './generated/schema';
 
 export type Status = components['schemas']['Status'];
+export type UpdateCheck = components['schemas']['UpdateCheck'];
+export type TeamBudget = components['schemas']['TeamBudget'];
+export type BudgetLine = components['schemas']['BudgetLine'];
 export type Settings = components['schemas']['Settings'];
 export type AvatarCatalog = components['schemas']['AvatarCatalog'];
 export type AvatarSeries = components['schemas']['AvatarSeries'];
@@ -267,14 +270,6 @@ export interface DirectoryCheckResult {
   archived?: boolean;
   teamId?: string;
   teamName?: string;
-}
-
-/** GET /authorizations — live bridge credentials, never token values. */
-export interface AuthorizationBinding {
-  botId: string;
-  teamId: string;
-  engineEpoch: string;
-  expiresAt: string;
 }
 
 // ---------------------------------------------------------------------------

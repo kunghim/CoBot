@@ -24,6 +24,7 @@ import (
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/internal/updates"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 	"sync/atomic"
 )
@@ -44,6 +45,8 @@ type App struct {
 	ServiceEpoch string
 	Version      string
 	Logger       *slog.Logger
+	// Updates answers the "check for updates" button; nil disables it.
+	Updates      *updates.Checker
 	writeLocksMu sync.Mutex
 	writeLocks   map[string]*writeLock
 

@@ -186,11 +186,9 @@ describe('provider settings', () => {
     });
     const chip = [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].find((button) => button.textContent?.includes('deepseek-v4-pro'));
     act(() => chip!.click());
+    // One that answers is enough: the provider is added without a second click.
     await act(async () => {
       byText('测试并添加')!.click();
-    });
-    await act(async () => {
-      byText('保存')!.click();
     });
     expect(state.save).toHaveBeenCalledTimes(1);
     expect(state.update).not.toHaveBeenCalled();
@@ -237,7 +235,7 @@ describe('provider settings', () => {
     expect(chips()).toEqual(['deepseek-flash', 'deepseek-r9', 'deepseek-v4-pro']);
   });
 
-  it('checks a stored provider with the key it keeps when the key is left alone', async () => {
+  it('saves a stored provider without asking again about models that already passed', async () => {
     state.providers = [official, provider];
     render();
     act(() => byText('编辑')!.click());
@@ -248,15 +246,128 @@ describe('provider settings', () => {
     await act(async () => {
       byText('测试并保存')!.click();
     });
-    expect(state.probe).toHaveBeenCalledWith('https://api.deepseek.com/v1', ['deepseek-v4-pro'], undefined, 'deepseek');
+    expect(state.probe).not.toHaveBeenCalled();
     expect(state.reprobe).not.toHaveBeenCalled();
-    await act(async () => {
-      byText('保存')!.click();
-    });
     const body = state.save.mock.calls[0][0].body;
     expect(body.apiKey).toBeUndefined();
     expect(body.models).toEqual([{ id: 'deepseek-v4-pro', status: 'ok' }]);
     expect(body.expectedRevision).toBe(3);
+  });
+
+  it('asks again about every model once the key is changed', async () => {
+    state.providers = [official, provider];
+    render();
+    act(() => byText('编辑')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-other'));
+    await act(async () => {
+      byText('测试并保存')!.click();
+    });
+    expect(state.probe).toHaveBeenCalledWith('https://api.deepseek.com/v1', ['deepseek-v4-pro'], 'sk-other', 'deepseek');
+    expect(state.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('ticks every model the search shows with one button, and clears them again', async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    const pressed = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')].length;
+    act(() => byText('全选')!.click());
+    expect(pressed()).toBe(2);
+    act(() => byText('清空')!.click());
+    expect(pressed()).toBe(0);
+  });
+
+  it('warns about a missing OpenAI endpoint only once a Claude one is given', () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('自建网关 / 中转站')!.click());
+    expect(host.textContent).not.toContain('没有填 OpenAI 格式端点');
+    const claude = [...host.querySelectorAll<HTMLInputElement>('input')].find((input) => input.placeholder.includes('anthropic'))!;
+    act(() => setValue(claude, 'https://gateway.example/anthropic'));
+    expect(host.textContent).toContain('没有填 OpenAI 格式端点');
+    expect(host.textContent).not.toContain('providers.');
+  });
+
+  // A new DeepSeek provider with both of its models ticked and a key typed.
+  const startWithBothModels = async () => {
+    state.providers = [official];
+    render();
+    act(() => byText('添加供应商')!.click());
+    act(() => byText('DeepSeek')!.click());
+    const key = host.querySelector('input[type="password"]') as HTMLInputElement;
+    act(() => setValue(key, 'sk-test'));
+    await act(async () => {
+      byText('获取可用模型')!.click();
+    });
+    act(() => byText('全选')!.click());
+  };
+
+  it('does not add a provider on its own when some models did not answer', async () => {
+    state.probe.mockResolvedValue({
+      results: { 'deepseek-flash': { ok: false, code: 'model_unknown' }, 'deepseek-v4-pro': { ok: true } },
+    });
+    await startWithBothModels();
+    await act(async () => {
+      byText('测试并添加')!.click();
+    });
+    expect(state.save).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('1 个模型不可用');
+    // Saving is then the user's own press, and asks nothing again.
+    await act(async () => {
+      byText('保存')!.click();
+    });
+    expect(state.probe).toHaveBeenCalledTimes(1);
+    expect(state.save).toHaveBeenCalledTimes(1);
+    expect(state.save.mock.calls[0][0].body.models).toEqual(
+      expect.arrayContaining([{ id: 'deepseek-v4-pro', status: 'ok' }, expect.objectContaining({ id: 'deepseek-flash', status: 'failed' })]),
+    );
+  });
+
+  it('checks one model from its own button and does not ask about it again', async () => {
+    state.probe.mockResolvedValueOnce({
+      results: { 'deepseek-flash': { ok: false, code: 'model_unknown' }, 'deepseek-v4-pro': { ok: true } },
+    });
+    await startWithBothModels();
+    await act(async () => {
+      byText('测试并添加')!.click();
+    });
+    expect(state.save).not.toHaveBeenCalled();
+    // The failed one is tried again on its own...
+    state.probe.mockResolvedValueOnce({ results: { 'deepseek-flash': { ok: true } } });
+    // A model that failed offers retry, not test.
+    expect(host.querySelector('button[aria-label="测试 deepseek-flash"]')).toBeNull();
+    const retest = host.querySelector<HTMLButtonElement>('button[aria-label="重试 deepseek-flash"]')!;
+    await act(async () => {
+      retest.click();
+    });
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ tone: 'success', title: 'deepseek-flash 可用' }));
+    expect(state.probe).toHaveBeenLastCalledWith('https://api.deepseek.com/v1', ['deepseek-flash'], 'sk-test', undefined);
+    // ...and with both answered, adding asks nothing more.
+    await act(async () => {
+      byText('测试并添加')!.click();
+    });
+    expect(state.probe).toHaveBeenCalledTimes(2);
+    expect(state.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('says in a toast how a single check ended, with the reason when it failed', async () => {
+    await startWithBothModels();
+    state.probe.mockResolvedValueOnce({ results: { 'deepseek-flash': { ok: false, code: 'auth_invalid' } } });
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="测试 deepseek-flash"]')!.click();
+    });
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ tone: 'warning', duration: 5000, title: 'deepseek-flash 不可用', description: '密钥无效' }));
+    // The chip carries a mark, not the reason written after the name.
+    expect(host.querySelector('[aria-label="不可用：密钥无效"]')).toBeTruthy();
+    expect(host.textContent).not.toContain('不可用 · 密钥无效');
   });
 
   it('removes a provider without touching the profile settings', async () => {

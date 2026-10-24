@@ -188,12 +188,12 @@ export function Tooltip({ content, children, side = 'top' }: { content: ReactNod
 }
 
 /** The backdrop and focus handling shared by Dialog, AlertDialog and Sheet. */
-function Modal({ open, onClose, busy = false, children, position, labelledBy, describedBy, role = 'dialog', width = 'max-w-lg' }: { open: boolean; onClose: () => void; busy?: boolean; children: ReactNode; position: 'center' | 'left' | 'right'; labelledBy: string; describedBy?: string; role?: 'dialog' | 'alertdialog'; width?: string }) {
+function Modal({ open, onClose, busy = false, children, position, labelledBy, describedBy, role = 'dialog', width = 'max-w-lg', maxHeight }: { open: boolean; onClose: () => void; busy?: boolean; children: ReactNode; position: 'center' | 'left' | 'right'; labelledBy: string; describedBy?: string; role?: 'dialog' | 'alertdialog'; width?: string; maxHeight?: string }) {
   const panel = useDialogFocus(open, onClose, busy);
   if (!open) return null;
   return (
     <div
-      className={cx('fixed inset-0 flex animate-fade-in bg-neutral-950/45 backdrop-blur-[2px]', layer.dialog, position === 'center' && 'items-start justify-center overflow-y-auto p-4 pt-[10vh]', position === 'right' && 'justify-end', position === 'left' && 'justify-start')}
+      className={cx('fixed inset-0 flex animate-fade-in bg-neutral-950/45 backdrop-blur-[2px]', layer.dialog, position === 'center' && 'items-start justify-center p-4 pt-[10vh]', position === 'right' && 'justify-end', position === 'left' && 'justify-start')}
       onMouseDown={() => !busy && onClose()}
     >
       <div
@@ -204,9 +204,12 @@ function Modal({ open, onClose, busy = false, children, position, labelledBy, de
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
         onMouseDown={(event) => event.stopPropagation()}
+        // 100% is the room the overlay leaves, so a smaller window shrinks the
+        // panel too; a caller's own limit can only lower it.
+        style={position === 'center' && maxHeight ? { maxHeight: `min(${maxHeight}, 100%)` } : undefined}
         className={cx(
           'bg-card shadow-2xl outline-none',
-          position === 'center' && cx('w-full animate-pop-in rounded-2xl border border-neutral-200 dark:border-neutral-700', width),
+          position === 'center' && cx('flex max-h-full w-full animate-pop-in flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700', width),
           position === 'right' && 'flex h-full w-80 max-w-[90vw] animate-slide-in-right flex-col border-l border-neutral-200 dark:border-neutral-700',
           position === 'left' && 'flex h-full w-72 max-w-[90vw] animate-slide-in-left flex-col border-r border-neutral-200 dark:border-neutral-700',
         )}
@@ -218,13 +221,13 @@ function Modal({ open, onClose, busy = false, children, position, labelledBy, de
 }
 
 /** A task that needs the page to wait: a title, the content, and actions. */
-export function Dialog({ open, onClose, title, description, children, footer, busy, closeLabel, size = 'md' }: { open: boolean; onClose: () => void; title: ReactNode; description?: ReactNode; children?: ReactNode; footer?: ReactNode; busy?: boolean; closeLabel: string; size?: 'sm' | 'md' | 'lg' }) {
+export function Dialog({ open, onClose, title, description, children, footer, busy, closeLabel, size = 'md', maxHeight }: { open: boolean; onClose: () => void; title: ReactNode; description?: ReactNode; children?: ReactNode; footer?: ReactNode; busy?: boolean; closeLabel: string; size?: 'sm' | 'md' | 'lg'; maxHeight?: string }) {
   const id = useId();
   const width = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }[size];
   return (
-    <Modal open={open} onClose={onClose} busy={busy} position="center" width={width} labelledBy={`${id}-title`} describedBy={description ? `${id}-description` : undefined}>
-      <div className="p-6">
-        <div className="flex items-start gap-3">
+    <Modal open={open} onClose={onClose} busy={busy} position="center" width={width} labelledBy={`${id}-title`} describedBy={description ? `${id}-description` : undefined} maxHeight={maxHeight}>
+      <div className="flex min-h-0 flex-1 flex-col p-6">
+        <div className="flex shrink-0 items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 id={`${id}-title`} className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">{title}</h2>
             {description && <p id={`${id}-description`} className="mt-1.5 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{description}</p>}
@@ -233,8 +236,9 @@ export function Dialog({ open, onClose, title, description, children, footer, bu
             <X size={18} aria-hidden />
           </button>
         </div>
-        {children && <div className="mt-5">{children}</div>}
-        {footer && <div className="mt-6 flex flex-wrap items-center justify-end gap-2">{footer}</div>}
+        {/* The title and the actions stay where they are; what lies between scrolls. */}
+        {children && <div className="-mx-1 mt-5 min-h-0 flex-1 overflow-y-auto px-1">{children}</div>}
+        {footer && <div className="mt-6 flex shrink-0 flex-wrap items-center justify-end gap-2">{footer}</div>}
       </div>
     </Modal>
   );

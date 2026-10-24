@@ -45,6 +45,7 @@ const (
 
 // Defines values for ApprovalType.
 const (
+	Budget     ApprovalType = "budget"
 	Chain      ApprovalType = "chain"
 	NativeTool ApprovalType = "native_tool"
 	Recovery   ApprovalType = "recovery"
@@ -71,6 +72,14 @@ const (
 	BotStatusWaitingApproval BotStatus = "waiting_approval"
 	BotStatusWaitingInput    BotStatus = "waiting_input"
 	BotStatusWorking         BotStatus = "working"
+)
+
+// Defines values for BudgetLineLimitedBy.
+const (
+	BudgetLineLimitedByDefault BudgetLineLimitedBy = "default"
+	BudgetLineLimitedByNone    BudgetLineLimitedBy = "none"
+	BudgetLineLimitedByOwn     BudgetLineLimitedBy = "own"
+	BudgetLineLimitedByTeam    BudgetLineLimitedBy = "team"
 )
 
 // Defines values for CollaborationRequestTool.
@@ -122,6 +131,14 @@ const (
 	EvidenceOutcomeDone     EvidenceOutcome = "done"
 	EvidenceOutcomeEscalate EvidenceOutcome = "escalate"
 	EvidenceOutcomeResume   EvidenceOutcome = "resume"
+)
+
+// Defines values for MemberBudgetLimitedBy.
+const (
+	MemberBudgetLimitedByDefault MemberBudgetLimitedBy = "default"
+	MemberBudgetLimitedByNone    MemberBudgetLimitedBy = "none"
+	MemberBudgetLimitedByOwn     MemberBudgetLimitedBy = "own"
+	MemberBudgetLimitedByTeam    MemberBudgetLimitedBy = "team"
 )
 
 // Defines values for MessageDeliveryStatus.
@@ -404,6 +421,15 @@ const (
 	ToolResultStatusWaiting     ToolResultStatus = "waiting"
 )
 
+// Defines values for UpdateCheckState.
+const (
+	Available   UpdateCheckState = "available"
+	Rejected    UpdateCheckState = "rejected"
+	Unknown     UpdateCheckState = "unknown"
+	Unreachable UpdateCheckState = "unreachable"
+	UpToDate    UpdateCheckState = "upToDate"
+)
+
 // Defines values for ListApprovalsParamsState.
 const (
 	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
@@ -596,6 +622,40 @@ type BrowserViewport struct {
 	Width  int   `json:"width"`
 }
 
+// BudgetLimitRequest defines model for BudgetLimitRequest.
+type BudgetLimitRequest struct {
+	Limit     *int64             `json:"limit"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// BudgetLimitResult defines model for BudgetLimitResult.
+type BudgetLimitResult struct {
+	// Clamped How many members had a limit above the team's, or none, and were brought down to the team's.
+	Clamped int    `json:"clamped"`
+	Limit   *int64 `json:"limit"`
+}
+
+// BudgetLine One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+type BudgetLine struct {
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy BudgetLineLimitedBy `json:"limitedBy"`
+	Override  *int64              `json:"override"`
+	UsedToday int64               `json:"usedToday"`
+}
+
+// BudgetLineLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type BudgetLineLimitedBy string
+
+// BudgetResetResult defines model for BudgetResetResult.
+type BudgetResetResult struct {
+	Reset bool `json:"reset"`
+}
+
 // CollaborationRequest defines model for CollaborationRequest.
 type CollaborationRequest struct {
 	Arguments *map[string]interface{} `json:"arguments,omitempty"`
@@ -716,6 +776,24 @@ type Execution struct {
 	} `json:"commands"`
 	Files []string `json:"files"`
 }
+
+// MemberBudget defines model for MemberBudget.
+type MemberBudget struct {
+	BotId string `json:"botId"`
+
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy MemberBudgetLimitedBy `json:"limitedBy"`
+	Override  *int64                `json:"override"`
+	UsedToday int64                 `json:"usedToday"`
+}
+
+// MemberBudgetLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type MemberBudgetLimitedBy string
 
 // Memory defines model for Memory.
 type Memory struct {
@@ -1211,6 +1289,14 @@ type TeamPermissionMode string
 // TeamStatus defines model for Team.Status.
 type TeamStatus string
 
+// TeamBudget defines model for TeamBudget.
+type TeamBudget struct {
+	Members []MemberBudget `json:"members"`
+
+	// Team One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+	Team BudgetLine `json:"team"`
+}
+
 // TeamWithBots defines model for TeamWithBots.
 type TeamWithBots struct {
 	Bots []Bot `json:"bots"`
@@ -1237,6 +1323,21 @@ type ToolResult struct {
 
 // ToolResultStatus defines model for ToolResult.Status.
 type ToolResultStatus string
+
+// UpdateCheck defines model for UpdateCheck.
+type UpdateCheck struct {
+	CheckedAt   time.Time  `json:"checkedAt"`
+	Current     string     `json:"current"`
+	Latest      *string    `json:"latest,omitempty"`
+	PublishedAt *time.Time `json:"publishedAt,omitempty"`
+	ReleaseUrl  *string    `json:"releaseUrl,omitempty"`
+
+	// State upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+	State UpdateCheckState `json:"state"`
+}
+
+// UpdateCheckState upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+type UpdateCheckState string
 
 // Error defines model for Error.
 type Error = ErrorEnvelope
@@ -1308,6 +1409,11 @@ type PatchBotJSONBody struct {
 	Avatar           *AvatarRef         `json:"avatar"`
 	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// ResetBotBudgetJSONBody defines parameters for ResetBotBudget.
+type ResetBotBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ListCollaborationParams defines parameters for ListCollaboration.
@@ -1613,6 +1719,11 @@ type SetTeamBrowserTabViewportJSONBody struct {
 // SetTeamBrowserTabViewportJSONBodyPreset defines parameters for SetTeamBrowserTabViewport.
 type SetTeamBrowserTabViewportJSONBodyPreset string
 
+// ResetTeamBudgetJSONBody defines parameters for ResetTeamBudget.
+type ResetTeamBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // OpenTeamPathJSONBody defines parameters for OpenTeamPath.
 type OpenTeamPathJSONBody struct {
 	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
@@ -1641,6 +1752,11 @@ type ListTasksParams struct {
 
 // WarmTeamJSONBody defines parameters for WarmTeam.
 type WarmTeamJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// CheckForUpdateJSONBody defines parameters for CheckForUpdate.
+type CheckForUpdateJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -1677,6 +1793,12 @@ type SaveAvatarUploadJSONRequestBody SaveAvatarUploadJSONBody
 
 // PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
 type PatchBotJSONRequestBody PatchBotJSONBody
+
+// SetBotBudgetJSONRequestBody defines body for SetBotBudget for application/json ContentType.
+type SetBotBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetBotBudgetJSONRequestBody defines body for ResetBotBudget for application/json ContentType.
+type ResetBotBudgetJSONRequestBody ResetBotBudgetJSONBody
 
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
@@ -1759,6 +1881,12 @@ type OpenTeamBrowserTabJSONRequestBody OpenTeamBrowserTabJSONBody
 // SetTeamBrowserTabViewportJSONRequestBody defines body for SetTeamBrowserTabViewport for application/json ContentType.
 type SetTeamBrowserTabViewportJSONRequestBody SetTeamBrowserTabViewportJSONBody
 
+// SetTeamBudgetJSONRequestBody defines body for SetTeamBudget for application/json ContentType.
+type SetTeamBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetTeamBudgetJSONRequestBody defines body for ResetTeamBudget for application/json ContentType.
+type ResetTeamBudgetJSONRequestBody ResetTeamBudgetJSONBody
+
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
 
@@ -1767,6 +1895,9 @@ type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
 // WarmTeamJSONRequestBody defines body for WarmTeam for application/json ContentType.
 type WarmTeamJSONRequestBody WarmTeamJSONBody
+
+// CheckForUpdateJSONRequestBody defines body for CheckForUpdate for application/json ContentType.
+type CheckForUpdateJSONRequestBody CheckForUpdateJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest

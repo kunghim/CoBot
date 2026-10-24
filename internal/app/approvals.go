@@ -74,6 +74,8 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
 	case domain.ApprovalChain, domain.ApprovalRecovery:
 		return a.decideControlApproval(ctx, principal, card, optionID, comment, expectedRevision)
+	case domain.ApprovalBudget:
+		return a.decideBudgetApproval(ctx, principal, card, optionID, comment, expectedRevision)
 	default:
 		return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", nil)
 	}

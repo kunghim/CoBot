@@ -145,10 +145,13 @@ func (a *App) SetBotAvatar(ctx context.Context, principal auth.Principal, botID 
 // SetRoleAvatar sets the avatar of a role in the library; nil returns it to
 // the catalog's default. Members that have no avatar of their own follow it.
 func (a *App) SetRoleAvatar(ctx context.Context, principal auth.Principal, roleID string, ref *domain.AvatarRef) error {
-	_, unlock, writeErr := beginWrite[struct{}](ctx, a, principal)
+	replay, unlock, writeErr := beginWrite[struct{}](ctx, a, principal)
 	defer unlock()
 	if writeErr != nil {
 		return writeErr
+	}
+	if replay != nil {
+		return nil
 	}
 	if principal.Kind != auth.KindUser {
 		return domain.Forbidden("error.forbidden.user_only", nil)

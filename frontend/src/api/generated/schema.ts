@@ -192,6 +192,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A team's daily token limit, each member's, and what was spent today */
+        get: operations["getTeamBudget"];
+        /** Set the team's own daily token limit; null follows the default in the settings, 0 is no limit */
+        put: operations["setTeamBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the member's own daily token limit; null follows the default in the settings, 0 is no limit */
+        put: operations["setBotBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/budget/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start counting today's spend again from now, for the team and its members */
+        post: operations["resetTeamBudget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/budget/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start counting one member's spend today again from now */
+        post: operations["resetBotBudget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/updates/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask GitHub now whether a newer release exists; an unreachable GitHub is reported in state, not as an error */
+        post: operations["checkForUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/engine/check": {
         parameters: {
             query?: never;
@@ -1563,6 +1649,63 @@ export interface components {
             /** Format: date-time */
             bearerExpiresAt?: string;
         };
+        UpdateCheck: {
+            /**
+             * @description upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+             * @enum {string}
+             */
+            state: "upToDate" | "available" | "unknown" | "unreachable" | "rejected";
+            current: string;
+            latest?: string;
+            releaseUrl?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        /** @description One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight. */
+        BudgetLine: {
+            /** Format: int64 */
+            override: number | null;
+            /** Format: int64 */
+            default: number;
+            /** Format: int64 */
+            effective: number;
+            /**
+             * @description What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+             * @enum {string}
+             */
+            limitedBy: "none" | "default" | "own" | "team";
+            /**
+             * Format: int64
+             * @description The most a member may set for itself, its team's limit; 0 when the team has none.
+             */
+            ceiling: number;
+            /** Format: int64 */
+            usedToday: number;
+        };
+        MemberBudget: components["schemas"]["BudgetLine"] & {
+            botId: string;
+        };
+        TeamBudget: {
+            team: components["schemas"]["BudgetLine"];
+            members: components["schemas"]["MemberBudget"][];
+        };
+        BudgetLimitRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: int64 */
+            limit: number | null;
+        };
+        BudgetLimitResult: {
+            /** Format: int64 */
+            limit: number | null;
+            /** @description How many members had a limit above the team's, or none, and were brought down to the team's. */
+            clamped: number;
+        };
+        BudgetResetResult: {
+            reset: boolean;
+        };
         AvatarCatalog: {
             series: components["schemas"]["AvatarSeries"][];
             status: {
@@ -1724,7 +1867,7 @@ export interface components {
             requesterBotId: string;
             runId?: string;
             /** @enum {string} */
-            type: "native_tool" | "recovery" | "chain";
+            type: "native_tool" | "recovery" | "chain" | "budget";
             method?: string;
             summary: string;
             reason?: string;
@@ -2177,6 +2320,190 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The team's and its members' limits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TeamBudget"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetLimitRequest"];
+            };
+        };
+        responses: {
+            /** @description The limit now set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetLimitResult"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setBotBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetLimitRequest"];
+            };
+        };
+        responses: {
+            /** @description The limit now set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetLimitResult"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    resetTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Counting started again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetResetResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    resetBotBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Counting started again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetResetResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    checkForUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description How the installed version stands against the newest release */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["UpdateCheck"];
                     };
                 };
             };

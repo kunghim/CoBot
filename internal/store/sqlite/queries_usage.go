@@ -76,8 +76,9 @@ func MarkUnknownUsageIfMissing(ctx context.Context, tx *sql.Tx, e domain.UsageEn
 // SumUsage totals billable tokens (input+output, cached never double counted)
 // over a scope and counts unknown rows. botID == "" scopes the whole team
 // including system sessions; a bot scope counts only that bot's business
-// turns.
-func SumUsage(ctx context.Context, q Queryer, teamID, botID string) (billable int64, unknown int, err error) {
+// turns. since limits the sum to rows created at or after it, written as
+// "2006-01-02 15:04:05.000" in UTC; "" counts everything.
+func SumUsage(ctx context.Context, q Queryer, teamID, botID, since string) (billable int64, unknown int, err error) {
 	query := `SELECT
 		COALESCE(SUM(input_tokens + output_tokens), 0),
 		COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0)
@@ -86,6 +87,12 @@ func SumUsage(ctx context.Context, q Queryer, teamID, botID string) (billable in
 	if botID != "" {
 		query += ` AND bot_id = ? AND purpose = ?`
 		args = append(args, botID, domain.UsagePurposeRun)
+	}
+	if since != "" {
+		// Rows keep their time as RFC 3339 with a fraction of any length, which
+		// does not compare as text; strftime brings it to the same fixed width.
+		query += ` AND strftime('%Y-%m-%d %H:%M:%f', created_at) >= ?`
+		args = append(args, since)
 	}
 	err = q.QueryRowContext(ctx, query, args...).Scan(&billable, &unknown)
 	if err != nil {

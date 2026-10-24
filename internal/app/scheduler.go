@@ -366,7 +366,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if pause, perr := s.app.budgetPaused(ctx, team.ID, bot.ID, settings); perr != nil {
 		return perr
 	} else if pause != nil {
-		return s.holdForBudget(ctx, team.ID, bot.ID, pause.Reason)
+		return s.holdForBudget(ctx, team.ID, bot.ID, pause)
 	}
 
 	// Claim: delivery -> dispatching, run row created, bot -> working.
@@ -679,7 +679,7 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, botID s
 // holdForBudget parks a bot whose queue is blocked by a budget: the bot
 // shows "needs input", the deliveries keep their place, and the reason is a
 // durable event the UI can explain. Fixing the budget re-wakes these bots.
-func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID, reason string) error {
+func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID string, pause *BudgetPause) error {
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -688,10 +688,18 @@ func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID, reason str
 	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusWaitingInput, ""); err != nil {
 		return err
 	}
+	// The user is asked once whether to start the count again.
+	card, err := s.app.requestBudgetDecision(ctx, tx, teamID, botID, pause)
+	if err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventBudgetPaused, TeamID: teamID, BotID: botID, ResourceID: reason})
+	if card != nil {
+		s.app.recordEvent(ctx, domain.Event{Type: domain.EventApprovalCreated, TeamID: teamID, BotID: botID, ResourceID: card.ID})
+	}
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventBudgetPaused, TeamID: teamID, BotID: botID, ResourceID: pause.Reason + ":" + pause.Scope})
 	s.app.Hub.Publish()
 	return nil
 }

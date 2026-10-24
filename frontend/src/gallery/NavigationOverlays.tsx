@@ -166,7 +166,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
+      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。内容超过窗口时标题和按钮不动，中间区域自己滚动；需要更矮的上限时传 maxHeight（如 32rem），它不会超过窗口能给的高度。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
         <Demo>
           <Matrix
             items={[

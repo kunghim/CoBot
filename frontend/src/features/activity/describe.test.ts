@@ -43,8 +43,12 @@ describe('describeActivity', () => {
   it('says why a budget held a turn', () => {
     const line = (reason: string) => describeActivity(item('budget.paused', {}, { botId: 'fe', resourceId: reason }), nameOf, t).text;
     expect(line('exceeded')).toContain('activity.line.budgetPaused{');
+    expect(line('exceeded:bot')).toContain('activity.line.budgetPaused{');
+    expect(line('exceeded:team')).toContain('activity.line.budgetPausedTeam');
     expect(line('usage_unknown')).toContain('activity.line.budgetPausedUnknown');
+    expect(line('usage_unknown:team')).toContain('activity.line.budgetPausedUnknown');
     expect(line('reserve')).toContain('activity.line.budgetPausedReserve');
+    expect(line('reserve:team')).toContain('activity.line.budgetPausedReserveTeam');
   });
   it('keeps a removed member by the name it had', () => {
     expect(describeActivity(item('bot.deleted', { name: '后端开发' }), nameOf, t).text).toContain('后端开发');
