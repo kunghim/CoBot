@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useExchanges } from '../../api/queries';
 import { messageText } from './delivery';
+import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
 import { usePerson } from './ExchangeLine';
 import { Alert, Button, IconButton, Icons, Spinner } from '../../components/ui';
@@ -134,7 +135,7 @@ export default function ExchangeOverlay({
                     } ${anchor ? 'ring-2 ring-signal-500/60' : ''}`}
                     data-anchor={anchor || undefined}
                   >
-                    <Markdown text={messageText(message)} teamId={teamId} />
+                    <Markdown text={stripToolCallText(messageText(message))} teamId={teamId} />
                   </div>
                 </div>
               </li>

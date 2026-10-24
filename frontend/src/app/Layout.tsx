@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTeams } from '../api/queries';
-import { BrandMark, Icons, RailItem, SplitHandle, cx } from '../components/ui';
+import { Icons, RailItem, SplitHandle, cx } from '../components/ui';
 import TeamList from '../features/teams/TeamList';
 import Workspace from '../features/workspace/Workspace';
 import { WorkspaceProvider, useWorkspace } from '../features/workspace/WorkspaceProvider';
@@ -83,11 +83,8 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
   const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width);
   return (
       <div className="flex h-full bg-side text-neutral-900 dark:text-neutral-100">
-        {/* Primary icon rail: the mark and home on top, settings at the bottom. */}
+        {/* Primary icon rail: home on top, settings at the bottom. */}
         <nav aria-label={t('app.title')} className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3">
-          <div className="mb-3" title={t('app.title')} aria-hidden="true">
-            <BrandMark />
-          </div>
           <RailItem icon={Icons.home} label={t('nav.home')} current={location.pathname === '/'} onClick={() => navigate('/')} />
           <div className="mt-auto">
             <RailItem icon={Icons.settings} label={t('nav.settings')} current={location.pathname.startsWith('/settings')} onClick={() => navigate('/settings')} />

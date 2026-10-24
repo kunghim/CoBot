@@ -11,7 +11,6 @@ import { useSelectedBot } from '../app/SelectedBotContext';
 import ActivityList from '../features/activity/ActivityList';
 import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
 import MemoryList from '../features/memories/MemoryList';
-import QuestionList from '../features/questions/QuestionList';
 import TaskBoardList from '../features/tasks/TaskBoardList';
 import { findBotContext } from '../features/teams/teamUtils';
 import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
@@ -38,7 +37,7 @@ export default function WorkPanel() {
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* The conversation header already names the member and the team, so
           the panel opens straight on its tabs. */}
       <div className="flex min-h-14 items-center gap-2 px-3 py-2">
@@ -57,7 +56,6 @@ export default function WorkPanel() {
         <fieldset disabled={context?.team.status === 'directory_missing'} className="m-0 min-w-0 border-0 p-0">
         {context && tab === 'tasks' && (
           <div key={context.bot.id}>
-            <QuestionList teamId={context.team.id} viewBotId={context.bot.id} />
             <TaskBoardList teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} focusTaskId={focus?.taskId} focusNonce={focus?.nonce} />
           </div>
         )}

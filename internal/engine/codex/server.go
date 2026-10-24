@@ -24,6 +24,9 @@ import (
 type ServerOptions struct {
 	Binary    string   // resolved codex executable
 	ExtraArgs []string // e.g. -c key=value overrides
+	// Catalog is the model catalog the process is started with, when it is
+	// (ExtraArgs does not have to carry it).
+	Catalog   ClientCatalog
 	Cwd       string   // team working directory (startup cwd = writable root)
 	Env       []string // full environment for the child; nil inherits ours
 	Client    ClientInfo
@@ -51,6 +54,10 @@ type Server struct {
 	waitOnce  sync.Once
 	waitDone  chan struct{}
 	waitErr   error
+
+	// catalog is the fingerprint of the model catalog this process was
+	// started with; empty when it knows only the engine's own models.
+	catalog string
 
 	loaded map[string]bool   // threads this app-server has loaded
 	phases map[string]string // agent message item -> phase, while it streams
@@ -117,6 +124,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		opts.Logger = slog.Default()
 	}
 	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
+	args = append(args, opts.Catalog.CatalogArgs()...)
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
@@ -169,6 +177,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		cwd:       opts.Cwd,
 		fileItems: map[nativeItemKey][]engine.FileChange{},
 		callbacks: opts.Callbacks,
+		catalog:   opts.Catalog.Fingerprint,
 	}
 	s.trace, s.tracePeer, s.traceStderr = opts.Trace, peer, stderrLines
 	s.client = NewClient(stdin, stdout, ClientHooks{
@@ -198,6 +207,11 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 
 func (s *Server) handleRequest(req InboundRequest) {
 	switch req.Method {
+	case "item/tool/requestUserInput":
+		if s.callbacks.OnInput == nil {
+			_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
+			return
+		}
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
 		// Only verified native contracts become actionable product cards.
 	case "mcpServer/elicitation/request":
@@ -268,7 +282,11 @@ func (s *Server) handleRequest(req InboundRequest) {
 		approval.Permissions = base.Permissions
 	}
 	approval.Network = len(base.NetworkApprovalContext) > 0 && string(base.NetworkApprovalContext) != "null"
-	if s.callbacks.OnApproval == nil {
+	callback := s.callbacks.OnApproval
+	if req.Method == "item/tool/requestUserInput" {
+		callback = s.callbacks.OnInput
+	}
+	if callback == nil {
 		return
 	}
 	if req.Method == "item/fileChange/requestApproval" && len(approval.Changes) == 0 && s.client != nil {
@@ -288,7 +306,7 @@ func (s *Server) handleRequest(req InboundRequest) {
 		}()
 		return
 	}
-	s.callbacks.OnApproval(approval)
+	callback(approval)
 }
 
 func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemID string) ([]engine.FileChange, error) {
@@ -441,7 +459,9 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.ItemID = p.ItemID
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
-			if s.itemPhase(p.ItemID) == "commentary" {
+			// A message with no phase streams where it sits among the steps; its
+			// place as the reply is decided when the turn ends.
+			if phase := s.itemPhase(p.ItemID); phase == "commentary" || phase == noPhase {
 				n.DeltaKind, n.Phase = "commentary", "commentary"
 			}
 		}
@@ -558,6 +578,10 @@ func secretEnvName(name string) bool {
 // Epoch identifies this app-server lifetime (leases/requests reference it).
 func (s *Server) Epoch() string { return s.epoch }
 
+// CatalogFingerprint identifies the model catalog this process was started
+// with; empty when there is none.
+func (s *Server) CatalogFingerprint() string { return s.catalog }
+
 // StartThread creates a new provider thread for one bot.
 func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
@@ -637,6 +661,25 @@ func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
 	return nil
 }
 
+// ThreadArchiveState uses the exact persisted log path returned by Codex,
+// not the continued existence of an app-server process, as archive evidence.
+func (s *Server) ThreadArchiveState(ctx context.Context, threadID string) (bool, error) {
+	path, err := s.ThreadPath(ctx, threadID)
+	if err != nil {
+		return false, err
+	}
+	parts := strings.Split(strings.ReplaceAll(path, "\\", "/"), "/")
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] == "archived_sessions" {
+			return true, nil
+		}
+		if parts[i] == "sessions" {
+			return false, nil
+		}
+	}
+	return false, errors.New("thread archive path could not be verified")
+}
+
 // ThreadLoaded reports whether this app-server has the thread loaded: it
 // was started or resumed here and Codex has not closed or unloaded it since.
 // A loaded thread takes a new turn directly, with no resume first.
@@ -713,15 +756,22 @@ func (s *Server) RootThread(threadID string) string {
 func (s *Server) setItemPhase(itemID, phase string, done bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if done || phase == "" {
+	if done {
 		delete(s.phases, itemID)
 		return
 	}
 	if s.phases == nil {
 		s.phases = map[string]string{}
 	}
+	if phase == "" {
+		phase = noPhase
+	}
 	s.phases[itemID] = phase
 }
+
+// noPhase marks a message the engine gave no phase: it is known, unlike an
+// item that was never seen.
+const noPhase = "-"
 
 func (s *Server) itemPhase(itemID string) string {
 	s.mu.Lock()

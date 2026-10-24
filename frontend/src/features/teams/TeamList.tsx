@@ -8,6 +8,7 @@ import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
+import { modeIcons } from '../../app/ModeSelector';
 import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, MemberRow, Skeleton } from '../../components/ui';
 import CreateTeamDialog from './CreateTeamDialog';
 import TeamMenu from './TeamMenu';
@@ -55,16 +56,11 @@ export default function TeamList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-14 items-center justify-between px-3 py-2">
-        <span className="px-1 text-2xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">
-          {t('nav.teamList')}
-        </span>
-      </div>
-
-      <div className="px-3 pb-2">
-        <Button block variant="ghost" icon={Icons.add} onClick={() => setCreateOpen(true)} className="justify-start text-neutral-600 dark:text-neutral-300">
+      <div className="px-3 pt-2 pb-2">
+        <Button block variant="ghost" icon={modeIcons.work} onClick={() => setCreateOpen(true)} className="justify-start text-neutral-600 dark:text-neutral-300">
           {t('team.new')}
         </Button>
+        <p className="mt-4 px-3.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('nav.teamList')}</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">

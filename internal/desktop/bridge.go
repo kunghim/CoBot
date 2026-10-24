@@ -266,6 +266,32 @@ func validateLoginURL(rawURL string) error {
 	return nil
 }
 
+// OpenProjectURL opens a page of the project's own repository (releases, issues)
+// in the default browser. The WebView stays on the application, and no other
+// address is ever handed to the system.
+func (b *Bridge) OpenProjectURL(rawURL string) error {
+	if err := validateProjectURL(rawURL); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	ctx := b.wailsCtx
+	b.mu.Unlock()
+	if ctx == nil {
+		return fmt.Errorf("application context is not ready")
+	}
+	wailsruntime.BrowserOpenURL(ctx, rawURL)
+	return nil
+}
+
+func validateProjectURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.Port() != "" ||
+		(u.Path != "/kunghim/CoBot" && !strings.HasPrefix(u.Path, "/kunghim/CoBot/")) {
+		return fmt.Errorf("not a page of the project")
+	}
+	return nil
+}
+
 // Quit asks the host to shut down; OnShutdown then stops the owned core with
 // the product's bounded exit rules.
 func (b *Bridge) Quit() error {

@@ -40,7 +40,7 @@ export function FloatingCard({ label, closeLabel, onClose, children, className }
       <div className="flex items-center justify-end px-2 pt-2">
         <IconButton size="sm" icon={Icons.close} label={closeLabel} onClick={onClose} />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-2">{children}</div>
     </div>
   );
 }

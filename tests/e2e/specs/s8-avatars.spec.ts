@@ -5,6 +5,8 @@ import { authorize } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  // These scenarios exercise teams; a fresh profile now opens in chat mode.
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The core downloads the avatar catalog at startup (from this checkout's
@@ -21,6 +23,8 @@ test('members show their role avatar from the downloaded catalog', async ({ page
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/团队名称|team name/i).fill('头像团队');
   await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
+  // Only the project manager comes by default; the second role is picked.
+  await dialog.getByRole('checkbox', { name: /全栈工程师|Full-stack/ }).check();
   await dialog.getByRole('button', { name: /创建|create/i }).click();
 
   const list = page.getByRole('complementary', { name: /团队列表|team list/i });

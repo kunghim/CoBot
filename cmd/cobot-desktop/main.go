@@ -7,6 +7,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -58,6 +60,7 @@ func main() {
 		os.Exit(1)
 	}
 	bridge := desktop.NewBridge(env, version, desktopOrigins)
+	var windowCtx context.Context
 
 	err = wails.Run(&options.App{
 		Title:  "CoBot",
@@ -72,7 +75,21 @@ func main() {
 		// only the traffic lights over the page. Linux keeps its system bar.
 		Frameless: runtime.GOOS == "windows",
 		Mac:       &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
+		// One window per profile: a second launch hands over to the first
+		// and exits. Without it the extra process adopts the running core
+		// as a guest, and closing the first window stops the core under it.
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: instanceID(env, *dataRoot),
+			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
+				if windowCtx == nil {
+					return
+				}
+				wailsruntime.WindowUnminimise(windowCtx)
+				wailsruntime.WindowShow(windowCtx)
+			},
+		},
 		OnStartup: func(ctx context.Context) {
+			windowCtx = ctx
 			bridge.SetContext(ctx)
 			if err := bridge.StartCore(ctx, *dataRoot); err != nil {
 				wailsruntime.MessageDialog(ctx, messageDialogError(err))
@@ -94,6 +111,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "wails:", err)
 		os.Exit(1)
 	}
+}
+
+// instanceID names the single-instance lock. It follows the data root, the
+// same thing the core's own instance lock follows, so a throwaway profile used
+// for testing does not collide with the installed app.
+func instanceID(env platform.Environment, dataRoot string) string {
+	sum := sha256.Sum256([]byte(string(env) + "\x00" + dataRoot))
+	return "cobot-desktop-" + hex.EncodeToString(sum[:8])
 }
 
 func messageDialogError(err error) wailsruntime.MessageDialogOptions {

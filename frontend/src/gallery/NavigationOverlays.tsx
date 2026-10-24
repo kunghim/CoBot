@@ -48,7 +48,7 @@ export default function NavigationOverlays() {
           <div className="w-56 space-y-4">
             <NavItem icon={Settings2} label="返回工作区" onClick={() => undefined} />
             <NavSection title="设置">
-              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档团队', Archive]].map(([id, label, Icon]) => (
+              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档', Archive]].map(([id, label, Icon]) => (
                 <NavItem key={id as string} icon={Icon as typeof Settings2} label={label as string} current={nav === id} onClick={() => setNav(id as string)} />
               ))}
             </NavSection>
@@ -105,7 +105,7 @@ export default function NavigationOverlays() {
       <Doc id="breadcrumbs" name="Breadcrumbs 面包屑 · Steps 步骤 · Pagination 分页" file="components/ui/Navigation.tsx" use="面包屑：页面在哪一层。步骤：一个短流程走到哪一步。分页：很长的列表（短列表用“加载更多”）。">
         <Demo surface="raised">
           <div className="space-y-5">
-            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档团队', onClick: () => undefined }, { label: '官网改版' }]} />
+            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档', onClick: () => undefined }, { label: '官网改版' }]} />
             <Steps label="新建团队" current={1} steps={['选择目录', '选择成员', '完成']} />
             <Pagination label="分页" page={page} pages={12} onChange={setPage} previousLabel="上一页" nextLabel="下一页" />
           </div>
@@ -166,7 +166,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
+      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。内容超过窗口时标题和按钮不动，中间区域自己滚动；需要更矮的上限时传 maxHeight（如 32rem），它不会超过窗口能给的高度。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
         <Demo>
           <Matrix
             items={[

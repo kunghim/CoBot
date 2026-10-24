@@ -21,15 +21,17 @@ type Options struct {
 
 // New builds the product logger and returns a close function for the file sink.
 func New(opts Options) (*slog.Logger, func() error, error) {
-	var writers []io.Writer
-	if opts.Console {
-		writers = append(writers, os.Stdout)
-	}
 	fileWriter, closer, err := newRotatingFile(filepath.Join(opts.Dir, "cobot.log"), 10<<20, 5)
 	if err != nil {
 		return nil, nil, err
 	}
-	writers = append(writers, fileWriter)
+	// The file comes first and the console never fails the write: a desktop
+	// build has no console, writing to its invalid stdout returns an error, and
+	// io.MultiWriter stops at the first error, which left the log file empty.
+	writers := []io.Writer{fileWriter}
+	if opts.Console {
+		writers = append(writers, bestEffort{os.Stdout})
+	}
 	handler := slog.NewJSONHandler(io.MultiWriter(writers...), &slog.HandlerOptions{Level: opts.Level})
 	logger := slog.New(handler)
 	return logger, closer, nil
@@ -107,4 +109,13 @@ func (r *rotatingFile) Close() error {
 	err := r.f.Close()
 	r.f = nil
 	return err
+}
+
+// bestEffort passes writes on and reports every one as done: a sink that is
+// missing must not stop the others.
+type bestEffort struct{ w io.Writer }
+
+func (b bestEffort) Write(p []byte) (int, error) {
+	_, _ = b.w.Write(p)
+	return len(p), nil
 }

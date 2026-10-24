@@ -26,6 +26,7 @@ type NativeBinding struct {
 	ThreadID     string `json:"threadId"`
 	TurnID       string `json:"turnId"`
 	BotID        string `json:"botId"`
+	ChatID       string `json:"chatId,omitempty"`
 	RunID        string `json:"runId"`
 	EngineEpoch  string `json:"engineEpoch"`
 	InstanceID   string `json:"instanceId"`
@@ -38,7 +39,7 @@ func bindingPath(root, threadID, turnID string) string {
 }
 
 func WriteNativeBinding(root string, binding NativeBinding) error {
-	if binding.ThreadID == "" || binding.TurnID == "" || binding.BotID == "" || binding.RunID == "" || binding.EngineEpoch == "" || binding.ServiceEpoch == "" || binding.InstanceID == "" {
+	if binding.ThreadID == "" || binding.TurnID == "" || (binding.BotID == "") == (binding.ChatID == "") || binding.RunID == "" || binding.EngineEpoch == "" || binding.ServiceEpoch == "" || binding.InstanceID == "" {
 		return errors.New("incomplete native hook binding")
 	}
 	data, err := json.Marshal(binding)
@@ -77,21 +78,31 @@ func RunNativeCodex(stdin io.Reader, stdout io.Writer, root string) int {
 	}
 	data, err := os.ReadFile(bindingPath(root, input.ThreadID, input.TurnID))
 	var binding NativeBinding
-	if err != nil || json.Unmarshal(data, &binding) != nil || binding.ThreadID != input.ThreadID || binding.TurnID != input.TurnID || binding.BotID == "" || binding.RunID == "" || binding.EngineEpoch == "" || binding.ServiceEpoch == "" || binding.InstanceID == "" {
+	if err != nil || json.Unmarshal(data, &binding) != nil || binding.ThreadID != input.ThreadID || binding.TurnID != input.TurnID || (binding.BotID == "") == (binding.ChatID == "") || binding.RunID == "" || binding.EngineEpoch == "" || binding.ServiceEpoch == "" || binding.InstanceID == "" {
 		return deny("turn_not_bound")
 	}
 	instance, err := platform.ReadInstance(platform.Paths{Root: root})
 	if err != nil || instance.InstanceID != binding.InstanceID || instance.ServiceEpoch != binding.ServiceEpoch {
 		return deny("service_changed_or_stopped")
 	}
-	lease, reason, err := platform.ReadLease(root, binding.BotID, binding.InstanceID, time.Now().UTC())
+	var leaseEpoch, leaseRun string
+	var reason string
+	if binding.ChatID != "" {
+		var lease platform.ChatLease
+		lease, reason, err = platform.ReadChatLease(root, binding.ChatID, binding.InstanceID, time.Now().UTC())
+		leaseEpoch, leaseRun = lease.Epoch, lease.RunID
+	} else {
+		var lease platform.Lease
+		lease, reason, err = platform.ReadLease(root, binding.BotID, binding.InstanceID, time.Now().UTC())
+		leaseEpoch, leaseRun = lease.Epoch, lease.RunID
+	}
 	if err != nil || reason != platform.LeaseReasonOK {
 		return deny("lease_" + reason)
 	}
-	if lease.Epoch != binding.EngineEpoch {
+	if leaseEpoch != binding.EngineEpoch {
 		return deny("engine_changed")
 	}
-	if lease.RunID != binding.RunID {
+	if leaseRun != binding.RunID {
 		return deny("run_not_live")
 	}
 	if _, err := io.WriteString(stdout, "{}\n"); err != nil {
