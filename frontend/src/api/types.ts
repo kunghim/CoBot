@@ -2,6 +2,17 @@
 // Entity shapes come from OpenAPI; page composites add local view metadata.
 import type { components } from './generated/schema';
 
+export type Chat = components['schemas']['Chat'];
+export type ChatNavigation = components['schemas']['ChatNavigation'];
+export type ChatSection = components['schemas']['ChatSection'];
+export type ChatNavigationInput = Omit<components['schemas']['ChatNavigationInput'], 'requestId'>;
+export type ChatPage = components['schemas']['ChatPage'];
+export type ChatList = components['schemas']['ChatList'];
+export type ChatRun = components['schemas']['ChatRun'];
+export type ChatRequest = components['schemas']['ChatRequest'];
+export type ChatStep = components['schemas']['ChatStep'];
+export type ChatSendInput = Omit<components['schemas']['ChatSendInput'], 'requestId'>;
+
 export type Status = components['schemas']['Status'];
 export type UpdateCheck = components['schemas']['UpdateCheck'];
 export type TeamBudget = components['schemas']['TeamBudget'];
@@ -203,6 +214,7 @@ export interface ConversationResult {
 /** A transient `cobot.live` stream frame: a step that changed or streamed
  * text of a running turn. */
 export interface LiveSignal {
+	chatId?: string;
   type: 'step' | 'delta';
   teamId: string;
   botId: string;

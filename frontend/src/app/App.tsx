@@ -3,13 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client';
-import { queryKeys, useEventStream, useSnapshot, useStatus } from '../api/queries';
+import { queryKeys, useEventStream, useSnapshot, useStatus, useTeams } from '../api/queries';
+import ChatLayout from '../features/chats/ChatLayout';
+import ChatRoute from '../features/chats/ChatPage';
+import { savedMode, lastChatPath, writeLocal } from './mode';
+import ModeSwitch from './ModeSwitch';
+import { modeHeaderClass } from './ModeSelector';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
-import { AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { AppModeHeader, AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
 import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
-import { ShellProvider, ShellToggle } from './shell';
+import { ShellProvider, ShellToggle, useShell } from './shell';
 import { authStateFrom, type AuthState } from './authState';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
@@ -41,9 +46,9 @@ export default function App() {
   // The desktop shell hides the system title bar; the app draws its own,
   // in CoBot's theme, above every screen.
   return (
-    <ShellProvider titleBar={desktop !== null}>
+    <ShellProvider titleBar>
       <div className="flex h-full flex-col">
-        {desktop && <TitleBar desktop={desktop} />}
+        <TitleBar desktop={desktop} />
         <div className="min-h-0 flex-1">
           <Screens />
         </div>
@@ -52,16 +57,20 @@ export default function App() {
   );
 }
 
-function TitleBar({ desktop }: { desktop: DesktopWindow }) {
+function TitleBar({ desktop }: { desktop: DesktopWindow | null }) {
   const { t } = useTranslation();
   // The toggle belongs to the workspace; Settings has no side panels.
-  const workspace = !useLocation().pathname.startsWith('/settings');
+  const path = useLocation().pathname;
+  const { listOpen } = useShell();
+  const workspace = !path.startsWith('/settings');
+  if (!desktop && !workspace) return null;
   return (
     <AppTitleBar
-      platform={desktop.platform}
-      title="CoBot"
-      left={workspace ? <ShellToggle place="titlebar" /> : undefined}
-      windowControls={{
+      platform={desktop?.platform ?? 'windows'}
+      title={desktop ? 'CoBot' : undefined}
+      flushLeft
+      left={workspace ? <div className={modeHeaderClass(listOpen)}><AppModeHeader brandLabel={t('app.title')} compact={!!desktop} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader></div> : undefined}
+      windowControls={desktop ? {
         minimizeLabel: t('window.minimize'),
         maximizeLabel: t('window.maximize'),
         restoreLabel: t('window.restore'),
@@ -70,7 +79,7 @@ function TitleBar({ desktop }: { desktop: DesktopWindow }) {
         onMinimize: desktop.minimize,
         onToggleMaximize: desktop.toggleMaximize,
         onClose: desktop.close,
-      }}
+      } : undefined}
     />
   );
 }
@@ -183,12 +192,27 @@ function Screens() {
       <Routes>
         <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
+        <Route path="/chat" element={<ChatLayout />}>
+          <Route index element={<Navigate to="new" replace />} />
+          <Route path="new" element={<ChatRoute />} />
+          <Route path=":chatId" element={<ChatRoute />} />
+        </Route>
         <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<HomeEntry />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </SelectedBotProvider>
     </ToastProvider>
   );
+}
+
+function HomeEntry() {
+  const teams = useTeams(true);
+  const stored = savedMode();
+  const mode = stored ?? (teams.isSuccess ? (teams.data?.items.length ? 'work' : 'chat') : null);
+  useEffect(() => { if (mode) writeLocal('cobot.mode', mode); }, [mode]);
+  if (!mode) return <div className="m-auto" role="status"><Spinner size={20} /></div>;
+  if (mode === 'chat') return <Navigate to={lastChatPath()} replace />;
+  return <HomePage />;
 }

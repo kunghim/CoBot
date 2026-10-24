@@ -3,7 +3,8 @@
 // escapes it). Links to local files are opened by the core, which only
 // opens files inside the team folder; web links open in a new tab; any other
 // scheme is dropped.
-import { memo, useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode, isValidElement } from 'react';
+import { CopyButton } from '../../components/ui';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,9 +13,9 @@ import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import { linkTarget } from './links';
 
-function Markdown({ text, teamId }: { text: string; teamId: string }) {
+function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; chatId?: string }) {
   const components: Components = {
-    a: ({ href, children }) => <MarkdownLink href={href ?? ''} teamId={teamId}>{children}</MarkdownLink>,
+    a: ({ href, children }) => <MarkdownLink href={href ?? ''} teamId={teamId} chatId={chatId}>{children}</MarkdownLink>,
     p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>,
     h1: ({ children }) => <h3 className="mb-1.5 mt-3 text-base font-semibold first:mt-0">{children}</h3>,
     h2: ({ children }) => <h3 className="mb-1.5 mt-3 text-base font-semibold first:mt-0">{children}</h3>,
@@ -24,7 +25,7 @@ function Markdown({ text, teamId }: { text: string; teamId: string }) {
     ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-0.5 pl-5">{children}</ol>,
     blockquote: ({ children }) => <blockquote className="my-1.5 border-l-2 border-neutral-300 pl-3 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300">{children}</blockquote>,
     hr: () => <hr className="my-3 border-neutral-200 dark:border-neutral-700" />,
-    pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-xl bg-neutral-900/[0.04] p-3 text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">{children}</pre>,
+    pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
     code: ({ className, children }) =>
       className ? <code className={className}>{children}</code> : <code className="rounded bg-neutral-200/70 px-1 py-0.5 font-mono text-[0.85em] dark:bg-neutral-700/70">{children}</code>,
     table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="min-w-full border-collapse text-xs">{children}</table></div>,
@@ -42,7 +43,7 @@ function Markdown({ text, teamId }: { text: string; teamId: string }) {
 
 export default memo(Markdown);
 
-function MarkdownLink({ href, teamId, children }: { href: string; teamId: string; children: ReactNode }) {
+function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId?: string; chatId?: string; children: ReactNode }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
   const target = linkTarget(href);
@@ -52,7 +53,8 @@ function MarkdownLink({ href, teamId, children }: { href: string; teamId: string
   if (target.kind === 'blocked') return <span>{children}</span>;
   const open = (reveal: boolean) => {
     setError('');
-    api.openTeamPath(teamId, target.path, reveal).catch((err) => setError(apiErrorMessage(t, err)));
+    const opening = chatId ? api.openChatPath(chatId, target.path, reveal) : teamId ? api.openTeamPath(teamId, target.path, reveal) : Promise.reject(new Error('No workspace'));
+    opening.catch((err) => setError(apiErrorMessage(t, err)));
   };
   return (
     <span className="group/link inline">
@@ -79,4 +81,19 @@ function MarkdownLink({ href, teamId, children }: { href: string; teamId: string
       {error && <span role="alert" className="ml-1 text-xs text-red-600 dark:text-red-400">{error}</span>}
     </span>
   );
+}
+
+function codeText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(codeText).join('');
+  if (isValidElement<{ children?: ReactNode }>(node)) return codeText(node.props.children);
+  return '';
+}
+
+function CodeBlock({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  return <div className="my-2 rounded-xl bg-neutral-900/[0.04] dark:bg-black/30">
+    <div className="flex justify-end px-2 pt-1"><CopyButton value={codeText(children)} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} /></div>
+    <pre className="overflow-x-auto px-3 pb-3 font-mono text-xs leading-5 text-neutral-800 dark:text-neutral-100">{children}</pre>
+  </div>;
 }

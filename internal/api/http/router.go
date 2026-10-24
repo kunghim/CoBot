@@ -47,6 +47,18 @@ type Server struct {
 // Handler builds the full HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/chats", s.handleListChats)
+	mux.HandleFunc("GET /api/v1/chat-navigation", s.handleChatNavigation)
+	mux.HandleFunc("POST /api/v1/chat-navigation", s.handleChangeChatNavigation)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/actions/{action}", s.handleChatAction)
+	mux.HandleFunc("POST /api/v1/chats", s.handleSendChat)
+	mux.HandleFunc("GET /api/v1/chats/{chatId}", s.handleGetChat)
+	mux.HandleFunc("PATCH /api/v1/chats/{chatId}", s.handleRenameChat)
+	mux.HandleFunc("DELETE /api/v1/chats/{chatId}", s.handleDeleteChat)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/messages", s.handleSendChat)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/runs/{runId}/{action}", s.handleChatRunAction)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/requests/{requestId}/reply", s.handleChatReply)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/open-path", s.handleOpenChatPath)
 
 	mux.HandleFunc("GET /api/v1/status", s.handleStatus)
 	mux.HandleFunc("POST /api/v1/session/bootstrap", s.handleSessionBootstrap)

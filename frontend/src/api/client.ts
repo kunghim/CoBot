@@ -152,6 +152,17 @@ function pageQuery(params: Record<string, string | number | undefined>): string 
 }
 
 export const api = {
+  listChats: (cursor = '', filter: { pinned?: string; archived?: boolean; sort?: string; search?: string; section?: string } = {}) => request<import('./types').ChatList>('GET', '/api/v1/chats' + pageQuery({ cursor, ...filter, archived: filter.archived ? 'true' : undefined })),
+  chatNavigation: () => request<import('./types').ChatNavigation>('GET', '/api/v1/chat-navigation'),
+  changeChatNavigation: (body: import('./types').ChatNavigationInput) => request<import('./types').ChatNavigation>('POST', '/api/v1/chat-navigation', body),
+  organizeChat: (id: string, action: 'pin' | 'unpin' | 'move' | 'reorder' | 'archive' | 'restore', body: { expectedRevision: number; sectionId?: string; beforeId?: string }) => request<import('./types').Chat>('POST', `/api/v1/chats/${encodeURIComponent(id)}/actions/${action}`, body),
+  getChat: (id: string, cursor = '') => request<import('./types').ChatPage>('GET', `/api/v1/chats/${encodeURIComponent(id)}` + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  sendChat: (id: string | null, body: import('./types').ChatSendInput) => request<import('./types').ChatPage>('POST', id ? `/api/v1/chats/${encodeURIComponent(id)}/messages` : '/api/v1/chats', body),
+  renameChat: (id: string, title: string, expectedRevision: number) => request<import('./types').Chat>('PATCH', `/api/v1/chats/${encodeURIComponent(id)}`, { title, expectedRevision }),
+  deleteChat: (id: string, expectedRevision: number) => request<import('./types').Chat>('DELETE', `/api/v1/chats/${encodeURIComponent(id)}`, { expectedRevision }),
+  chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
+  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
+  openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {
     const status = await request<import('./types').Status>('GET', '/api/v1/status');
     if (status.csrfCookieName) csrfCookieName = status.csrfCookieName;

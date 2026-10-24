@@ -1,7 +1,24 @@
 {
-  "app": { "title": "CoBot" },
-  "window": { "minimize": "最小化", "maximize": "最大化", "restore": "还原", "close": "关闭" },
-  "common": { "close": "关闭", "cancel": "取消", "clearSearch": "清除搜索", "decrease": "减少", "increase": "增加" },
+  "app": {
+    "title": "CoBot"
+  },
+  "window": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
+    "close": "关闭"
+  },
+  "common": {
+    "close": "关闭",
+    "cancel": "取消",
+    "clearSearch": "清除搜索",
+    "decrease": "减少",
+    "increase": "增加",
+    "loading": "加载中…",
+    "back": "返回",
+    "save": "保存",
+    "delete": "删除"
+  },
   "nav": {
     "home": "首页",
     "settings": "设置",
@@ -65,7 +82,7 @@
     "directoryNested": "该目录与团队「{{teamName}}」的目录存在包含关系",
     "deleteConfirmTitle": "删除团队「{{name}}」？",
     "archiveConfirmTitle": "归档团队「{{name}}」？",
-    "archiveConfirmBody": "归档后，团队会从团队列表移到“设置 › 已归档团队”，它的 Codex 进程会关闭，目录仍归它所有。会话和数据都保留，随时可以恢复。",
+    "archiveConfirmBody": "归档后，团队会从团队列表移到“设置 › 已归档”，它的 Codex 进程会关闭，目录仍归它所有。会话和数据都保留，随时可以恢复。",
     "deleteMissingConfirmBody": "团队的项目目录已不在原位置。删除后，团队的成员、会话、任务、记忆和 Codex 会话都会被永久删除，未完成的工作也会一并删除，无法恢复。",
     "deleteMemberConfirmBody": "该成员在本团队的会话、记忆、执行记录、它负责过的已结束任务以及 Codex 会话会被永久删除，无法恢复。它发给其他成员的消息会保留。角色本身不受影响，其他团队仍可使用。",
     "actions": "团队操作：{{name}}",
@@ -114,14 +131,31 @@
     }
   },
   "scenario": {
-    "software": { "name": "软件开发" }
+    "software": {
+      "name": "软件开发"
+    }
   },
   "role": {
-    "leader": { "name": "项目经理", "summary": "和你沟通需求，写需求文档、拟定链路，最后向你汇报。" },
-    "productManager": { "name": "产品经理", "summary": "把需求文档做成产品设计和原型。" },
-    "fullstackEngineer": { "name": "全栈工程师", "summary": "实现界面、交互、服务端逻辑与数据。" },
-    "qaEngineer": { "name": "测试工程师", "summary": "编写测试用例、执行测试，不通过就退回。" },
-    "codeReviewer": { "name": "评审员", "summary": "对照检查清单评审需求、设计、测试用例和代码，不通过就退回。" }
+    "leader": {
+      "name": "项目经理",
+      "summary": "和你沟通需求，写需求文档、拟定链路，最后向你汇报。"
+    },
+    "productManager": {
+      "name": "产品经理",
+      "summary": "把需求文档做成产品设计和原型。"
+    },
+    "fullstackEngineer": {
+      "name": "全栈工程师",
+      "summary": "实现界面、交互、服务端逻辑与数据。"
+    },
+    "qaEngineer": {
+      "name": "测试工程师",
+      "summary": "编写测试用例、执行测试，不通过就退回。"
+    },
+    "codeReviewer": {
+      "name": "评审员",
+      "summary": "对照检查清单评审需求、设计、测试用例和代码，不通过就退回。"
+    }
   },
   "stats": {
     "turns": "{{turns}} 轮 {{steps}} 步",
@@ -165,7 +199,11 @@
   },
   "permission": {
     "label": "权限模式",
-    "mode": { "read_only": "只读", "default": "默认权限", "full": "完全访问" },
+    "mode": {
+      "read_only": "只读",
+      "default": "默认权限",
+      "full": "完全访问"
+    },
     "hint": {
       "read_only": "只能查看和分析，修改前都会问你",
       "default": "可在团队目录内自由读写和执行，超出范围时会问你",
@@ -215,9 +253,19 @@
       "network": "连不上供应商的端点，请检查地址和网络后重发",
       "engine_internal": "供应商的模型服务内部出错，请稍后重发"
     },
-    "file": { "open": "打开文件", "reveal": "在文件夹中显示" },
-    "fileKind": { "add": "新增", "update": "修改", "delete": "删除" },
-    "duration": { "seconds": "{{s}} 秒", "minutes": "{{m}} 分 {{s}} 秒" },
+    "file": {
+      "open": "打开文件",
+      "reveal": "在文件夹中显示"
+    },
+    "fileKind": {
+      "add": "新增",
+      "update": "修改",
+      "delete": "删除"
+    },
+    "duration": {
+      "seconds": "{{s}} 秒",
+      "minutes": "{{m}} 分 {{s}} 秒"
+    },
     "phase": {
       "preparing": "正在准备…",
       "starting": "正在启动",
@@ -544,8 +592,18 @@
     "ownerUser": "你",
     "empty": "暂无需求",
     "loadFailed": "需求加载失败",
-    "status": { "todo": "待接收", "doing": "进行中", "done": "已交接", "cancelled": "已取消" },
-    "requirementStatus": { "active": "进行中", "accepting": "待验收", "done": "已完成", "cancelled": "已取消" },
+    "status": {
+      "todo": "待接收",
+      "doing": "进行中",
+      "done": "已交接",
+      "cancelled": "已取消"
+    },
+    "requirementStatus": {
+      "active": "进行中",
+      "accepting": "待验收",
+      "done": "已完成",
+      "cancelled": "已取消"
+    },
     "at": "第 {{index}}/{{total}} 环 · {{name}} · {{owner}}",
     "route": "链路",
     "document": "需求文档",
@@ -563,9 +621,23 @@
       "draft": "修改需求文档",
       "escalation": "处理上报"
     },
-    "reviewType": { "requirements": "需求", "design": "设计", "test_plan": "测试用例", "code": "代码", "general": "通用" },
-    "outcome": { "done": "完成", "back": "退回", "escalate": "上报", "resume": "交回继续" },
-    "mode": { "rerun": "重走", "return_to_me": "只回我" },
+    "reviewType": {
+      "requirements": "需求",
+      "design": "设计",
+      "test_plan": "测试用例",
+      "code": "代码",
+      "general": "通用"
+    },
+    "outcome": {
+      "done": "完成",
+      "back": "退回",
+      "escalate": "上报",
+      "resume": "交回继续"
+    },
+    "mode": {
+      "rerun": "重走",
+      "return_to_me": "只回我"
+    },
     "handoffs": "交接记录",
     "handoffsEmpty": "还没有交接",
     "suggestions": "建议",
@@ -758,18 +830,42 @@
     "modelSummary": "纳入 {{count}} 个模型，{{usable}} 个可用"
   },
   "preset": {
-    "openai": { "name": "OpenAI 官方" },
-    "anthropic": { "name": "Anthropic 官方" },
-    "deepseek": { "name": "DeepSeek" },
-    "kimi": { "name": "月之暗面 Kimi" },
-    "zhipu": { "name": "智谱 GLM" },
-    "zai": { "name": "Z.ai" },
-    "minimax": { "name": "MiniMax" },
-    "dashscope": { "name": "阿里百炼" },
-    "mimo": { "name": "小米 MiMo" },
-    "xai": { "name": "xAI" },
-    "openrouter": { "name": "OpenRouter" },
-    "opencode-zen": { "name": "OpenCode Zen" }
+    "openai": {
+      "name": "OpenAI 官方"
+    },
+    "anthropic": {
+      "name": "Anthropic 官方"
+    },
+    "deepseek": {
+      "name": "DeepSeek"
+    },
+    "kimi": {
+      "name": "月之暗面 Kimi"
+    },
+    "zhipu": {
+      "name": "智谱 GLM"
+    },
+    "zai": {
+      "name": "Z.ai"
+    },
+    "minimax": {
+      "name": "MiniMax"
+    },
+    "dashscope": {
+      "name": "阿里百炼"
+    },
+    "mimo": {
+      "name": "小米 MiMo"
+    },
+    "xai": {
+      "name": "xAI"
+    },
+    "openrouter": {
+      "name": "OpenRouter"
+    },
+    "opencode-zen": {
+      "name": "OpenCode Zen"
+    }
   },
   "about": {
     "tagline": "Agent 干活，CoBot 带队。",
@@ -823,7 +919,7 @@
       "models": "默认模型",
       "providers": "模型供应商",
       "collaboration": "协作与预算",
-      "archived": "已归档团队",
+      "archived": "已归档",
       "about": "关于"
     },
     "sectionHints": {
@@ -834,12 +930,16 @@
       "models": "成员还没在会话里选过模型时用它，对之后开始的任务起作用。",
       "providers": "配置一次，Codex 与 Claude Code 通用。启用的供应商的模型都可以在会话里选，在厂商自己的供应商里换模型，会接着原来的会话；换供应商或在网关里换模型，会开一个新会话，并把之前的完整记录交给新模型。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
-      "archived": "归档的团队不再出现在团队列表里，可以在这里恢复或彻底删除。",
+      "archived": "查看、恢复或删除已归档的聊天和团队。",
       "about": "版本、更新和项目信息。"
     },
     "language": "语言",
     "colorMode": "明暗",
-    "colorModes": { "system": "跟随系统", "light": "浅色", "dark": "深色" },
+    "colorModes": {
+      "system": "跟随系统",
+      "light": "浅色",
+      "dark": "深色"
+    },
     "theme": "主题",
     "avatarCatalog": "头像库",
     "avatarCatalogNone": "还没有下载头像库，成员暂时显示默认头像。",
@@ -850,10 +950,22 @@
     "avatarCatalogRejected": "上次检查下载到的头像库无法使用，已保留之前的版本。",
     "avatarCatalogCheck": "检查更新",
     "themes": {
-      "graphite": { "name": "石墨", "summary": "带一点绿意的石墨灰，钴蓝强调" },
-      "harbor": { "name": "港湾", "summary": "偏冷的蓝灰，青绿强调" },
-      "classic": { "name": "经典", "summary": "宣纸与墨，柔和的黑白灰" },
-      "dusk": { "name": "暮梅", "summary": "带紫调的暖灰，梅红强调" }
+      "graphite": {
+        "name": "石墨",
+        "summary": "带一点绿意的石墨灰，钴蓝强调"
+      },
+      "harbor": {
+        "name": "港湾",
+        "summary": "偏冷的蓝灰，青绿强调"
+      },
+      "classic": {
+        "name": "经典",
+        "summary": "宣纸与墨，柔和的黑白灰"
+      },
+      "dusk": {
+        "name": "暮梅",
+        "summary": "带紫调的暖灰，梅红强调"
+      }
     },
     "engineNotConfigured": "未检测到已配置的引擎",
     "engineReady": "引擎可用",
@@ -898,7 +1010,7 @@
   "errors": {
     "error.approval.file_preview_unavailable": "尚未取得本次文件变更明细，暂不能批准；可拒绝或停止本次执行。",
     "error.internal": "内部错误，请查看服务日志",
-    "error.path.outside_team": "只能打开团队目录里已存在的文件",
+    "error.path.outside_team": "只能打开当前会话工作目录内已经存在的文件",
     "error.path.open_executable": "这是程序或脚本，点开会直接运行，所以不提供打开；可以点旁边的文件夹图标在文件管理器里查看",
     "error.team.permission_mode_invalid": "不支持的权限模式",
     "error.team.patch_one_field": "一次只能修改一项",
@@ -1081,10 +1193,123 @@
     "error.scope.other_team": "该成员不属于当前团队。",
     "error.chain.decision_stale": "该决定对应旧的链路授权，当前不能再使用。",
     "error.engine.interrupt_unconfirmed": "停止请求已保存，尚未确认送达。",
-    "error.recovery.end_unverified": "尚未核实上次具体执行已经结束，成员仍保持锁定。"
+    "error.recovery.end_unverified": "尚未核实上次具体执行已经结束，成员仍保持锁定。",
+    "error.chat.revision_conflict": "聊天已在其他位置更改，请刷新后重试。",
+    "error.chat.engine_unavailable": "聊天引擎尚未就绪。",
+    "error.chat.busy": "请先处理当前聊天的运行或待确认状态。",
+    "error.chat.model_fixed": "请新建聊天来使用其他模型。",
+    "error.chat.model_mismatch": "引擎实际使用的模型或供应商与选择不一致，已停止发送。",
+    "error.chat.title_required": "请输入有效的聊天名称（最多 120 字）。",
+    "error.chat.request_expired": "这个请求已经失效，请刷新聊天。",
+    "error.chat.answers_required": "请回答所有问题。",
+    "error.chat.not_running": "当前轮次尚不能停止，请稍后重试。",
+    "error.chat.not_unknown": "当前轮次不需要核实。",
+    "error.chat.failed": "这一轮未完成。请检查引擎、账号和模型设置；再次发送会发起新的一轮。",
+    "error.chat.restarted": "应用重启，上一轮的执行结果需要核实。",
+    "error.chat.unknown": "无法确认这一轮是否结束，不会自动重新执行。",
+    "error.chat.archived": "这段聊天已归档或正在处理归档操作，请先恢复或核实。",
+    "error.chat.archive_pending": "请先核实尚未完成的归档操作。",
+    "error.chat.archive_unknown": "无法确认原生会话的归档状态，请核实后继续。",
+    "error.chat.archive_state": "聊天归档状态已改变，请刷新后重试。",
+    "error.chat.section_missing": "分区已不存在，请刷新后重试。",
+    "error.chat.order_conflict": "列表顺序已改变，请刷新后重试。"
   },
   "paging": {
     "more": "继续加载",
     "failed": "下一页加载失败，可以重试。"
+  },
+  "chat": {
+    "expandHistory": "展开聊天记录",
+    "collapseHistory": "收起聊天记录",
+    "mode": "使用模式",
+    "chat": "聊天",
+    "work": "团队",
+    "new": "新建聊天",
+    "history": "聊天记录",
+    "emptyHistory": "还没有聊天",
+    "loadMore": "加载更多",
+    "earlier": "查看更早消息",
+    "defaultModel": "默认模型",
+    "chooseModel": "选择模型",
+    "modelFixed": "切换模型请新建聊天",
+    "placeholder": "发送消息",
+    "send": "发送",
+    "stop": "停止生成",
+    "copy": "复制",
+    "copied": "已复制",
+    "menu": "聊天操作",
+    "rename": "重命名",
+    "delete": "删除聊天",
+    "deleteNote": "将删除这段聊天记录。已执行的操作不会撤销，生成的文件会保留。",
+    "title": "聊天名称",
+    "bottom": "回到底部",
+    "unknown": "上一轮的执行状态尚未确认。核实结束状态后才能继续，或新建聊天。",
+    "verify": "核实执行状态",
+    "process": "过程 · {{count}} 项",
+    "tool": "工具过程",
+    "inputRequired": "需要你的回答",
+    "approvalRequired": "需要你的批准",
+    "submitAnswers": "提交回答",
+    "status": {
+      "queued": "等待开始",
+      "starting": "正在连接",
+      "running": "正在回复",
+      "waiting_approval": "等待批准",
+      "waiting_input": "等待回答",
+      "completed": "已完成",
+      "failed": "未完成",
+      "interrupted": "已停止",
+      "unknown": "执行状态未知"
+    },
+    "greeting": {
+      "morning": "早上好，今天想聊些什么？",
+      "forenoon": "上午好，有什么新想法？",
+      "noon": "中午好，来聊一会儿吧。",
+      "afternoon": "下午好，想聊些什么？",
+      "evening": "晚上好，今天有什么想分享的？",
+      "night": "夜深了，还有什么想聊的？"
+    }
+  },
+  "chatNav": {
+    "organize": "整理聊天列表",
+    "display": "显示方式",
+    "bySection": "按分区显示",
+    "merged": "合并显示",
+    "sort": "聊天排序方式",
+    "recent": "最近更新",
+    "manual": "手动排序",
+    "newSection": "新建分区",
+    "sectionName": "分区名称",
+    "renameSection": "重命名分区",
+    "deleteSection": "删除分区",
+    "deleteSectionNote": "聊天会移回未分区列表，聊天记录和文件都会保留。",
+    "sectionMenu": "分区操作：{{name}}",
+    "unsectioned": "未分区",
+    "emptySection": "暂无聊天",
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "置顶",
+    "move": "移至分区",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "openFolder": "打开聊天文件夹",
+    "archive": "归档聊天",
+    "restore": "恢复聊天",
+    "archived": "已归档聊天",
+    "verifyArchive": "核实归档操作",
+    "archivePending": "归档操作尚未确认，请核实后继续。聊天记录和文件仍然保留。",
+    "pendingShort": "待核实",
+    "archivedNotice": "这段聊天已归档，恢复后可以继续发送消息。"
+  },
+  "archivePage": {
+    "type": "归档类型",
+    "chatSearch": "搜索已归档聊天",
+    "chatEmpty": "没有已归档的聊天",
+    "chatNoMatch": "没有匹配的聊天",
+    "chatMeta": "创建于 {{created}} · 归档于 {{archived}}",
+    "chatRestored": "已恢复「{{name}}」，它已回到聊天列表",
+    "chatsDeleted": "已删除 {{count}} 段聊天",
+    "chatDeleteFailed": "{{count}} 段聊天删除失败：{{reason}}",
+    "chatDeleteMany": "删除 {{count}} 段聊天？"
   }
 }

@@ -11,6 +11,425 @@ info:
 servers:
   - url: http://127.0.0.1:0
 paths:
+  /api/v1/chat-navigation:
+    get:
+      operationId: getChatNavigation
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/ChatNavigation" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: changeChatNavigation
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatNavigationInput" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/ChatNavigation" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/actions/{action}:
+    post:
+      operationId: organizeChat
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      parameters:
+        - { name: chatId, in: path, required: true, schema: { type: string } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [pin, unpin, move, reorder, archive, restore] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatActionInput" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/Chat" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/open-path:
+    post:
+      operationId: openChatPath
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      parameters:
+        - { name: chatId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string }
+                path: { type: string }
+                reveal: { type: boolean }
+      responses:
+        "200":
+          description: Opened file
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [path]
+                        properties:
+                          path: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats:
+    get:
+      operationId: "listChats"
+      security:
+        -
+          SessionCookie: []
+      parameters:
+        -
+          name: "cursor"
+          in: "query"
+          schema:
+            type: "string"
+        - { name: pinned, in: query, schema: { type: string, enum: [only, exclude] } }
+        - { name: archived, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [recent, manual, name, created, archived] } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: section, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: "createChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters: []
+      responses:
+        "202":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatSendInput"
+  /api/v1/chats/{chatId}:
+    get:
+      operationId: "getChat"
+      security:
+        -
+          SessionCookie: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "cursor"
+          in: "query"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: "renameChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Chat"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+    delete:
+      operationId: "deleteChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Chat"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+  /api/v1/chats/{chatId}/messages:
+    post:
+      operationId: "sendChatMessage"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "202":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatSendInput"
+  /api/v1/chats/{chatId}/runs/{runId}/{action}:
+    post:
+      operationId: "chatRunAction"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "runId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "action"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            enum:
+              - "interrupt"
+              - "verify"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatRun"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+  /api/v1/chats/{chatId}/requests/{requestId}/reply:
+    post:
+      operationId: "replyChatRequest"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "requestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatRequest"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
   /api/v1/status:
     get:
       operationId: getStatus
@@ -2873,6 +3292,279 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    ChatSection:
+      type: object
+      required: [id, name, order]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        order: { type: integer, format: int64 }
+    ChatNavigation:
+      type: object
+      required: [revision, sort, grouping, sections]
+      properties:
+        revision: { type: integer, format: int64 }
+        sort: { type: string, enum: [recent, manual] }
+        grouping: { type: string, enum: [sections, merged] }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/ChatSection" }
+    ChatNavigationInput:
+      type: object
+      required: [requestId, action, expectedRevision]
+      properties:
+        requestId: { type: string }
+        action: { type: string, enum: [preferences, create, rename, delete, reorder] }
+        expectedRevision: { type: integer, format: int64 }
+        id: { type: string }
+        name: { type: string }
+        beforeId: { type: string }
+        sort: { type: string, enum: [recent, manual] }
+        grouping: { type: string, enum: [sections, merged] }
+    Chat:
+      type: "object"
+      required:
+        - "id"
+        - "title"
+        - "providerId"
+        - "model"
+        - "permissionMode"
+        - "reasoningEffort"
+        - "workspace"
+        - "createdAt"
+        - "updatedAt"
+        - "revision"
+      properties:
+        id:
+          type: "string"
+        title:
+          type: "string"
+        providerId:
+          type: "string"
+        model:
+          type: "string"
+        permissionMode:
+          type: "string"
+        reasoningEffort:
+          type: "string"
+        workspace:
+          type: "string"
+        createdAt:
+          type: "string"
+        updatedAt:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        busy: { type: boolean }
+        archivedAt: { type: string }
+        archiveOperation: { type: string, enum: [archive, restore] }
+        archiveError: { type: string }
+        sectionId: { type: string }
+        pinned: { type: boolean }
+        manualOrder: { type: integer, format: int64 }
+    ChatMessage:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "runId"
+        - "kind"
+        - "text"
+        - "createdAt"
+      properties:
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        runId:
+          type: "string"
+        kind:
+          type: "string"
+        text:
+          type: "string"
+        createdAt:
+          type: "string"
+    ChatStep:
+      type: "object"
+      required:
+        - "id"
+        - "kind"
+        - "status"
+        - "seq"
+        - "detail"
+      properties:
+        id:
+          type: "string"
+        kind:
+          type: "string"
+        status:
+          type: "string"
+        seq:
+          type: "integer"
+          format: "int64"
+        detail:
+          type: "object"
+          additionalProperties: true
+    ChatRun:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "messageId"
+        - "status"
+        - "threadId"
+        - "turnId"
+        - "epoch"
+        - "errorKey"
+        - "startedAt"
+        - "endedAt"
+        - "steps"
+      properties:
+        stopRequested: { type: boolean }
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        messageId:
+          type: "string"
+        status:
+          type: "string"
+        threadId:
+          type: "string"
+        turnId:
+          type: "string"
+        epoch:
+          type: "string"
+        errorKey:
+          type: "string"
+        startedAt:
+          type: "string"
+        endedAt:
+          type: "string"
+        steps:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatStep"
+    ChatRequest:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "runId"
+        - "type"
+        - "method"
+        - "summary"
+        - "reason"
+        - "state"
+        - "responseState"
+        - "revision"
+        - "options"
+      properties:
+        decision: { type: string }
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        runId:
+          type: "string"
+        type:
+          type: "string"
+        method:
+          type: "string"
+        summary:
+          type: "string"
+        reason:
+          type: "string"
+        state:
+          type: "string"
+        responseState:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        options:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ApprovalOption"
+        params:
+          type: "object"
+          additionalProperties: true
+    ChatPage:
+      type: "object"
+      required:
+        - "chat"
+        - "messages"
+        - "runs"
+        - "requests"
+        - "nextCursor"
+      properties:
+        chat:
+          $ref: "#/components/schemas/Chat"
+        messages:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        runs:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatRun"
+        requests:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatRequest"
+        nextCursor:
+          type: "string"
+    ChatList:
+      type: "object"
+      required:
+        - "items"
+        - "nextCursor"
+      properties:
+        items:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Chat"
+        nextCursor:
+          type: "string"
+    ChatSendInput:
+      type: "object"
+      required:
+        - "requestId"
+        - "text"
+      properties:
+        requestId:
+          type: "string"
+        text:
+          type: "string"
+        providerId:
+          type: "string"
+        model:
+          type: "string"
+        reasoningEffort:
+          type: "string"
+    ChatActionInput:
+      type: "object"
+      required:
+        - "requestId"
+      properties:
+        sectionId: { type: string }
+        beforeId: { type: string }
+        requestId:
+          type: "string"
+        title:
+          type: "string"
+        optionId:
+          type: "string"
+        expectedRevision:
+          type: "integer"
+          format: "int64"
+        answers:
+          type: "object"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
     Provider:
       type: object
       description: A model vendor or gateway the engine can call. The secret is never part of it.

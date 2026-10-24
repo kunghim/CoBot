@@ -82,6 +82,45 @@ const (
 	BudgetLineLimitedByTeam    BudgetLineLimitedBy = "team"
 )
 
+// Defines values for ChatArchiveOperation.
+const (
+	ChatArchiveOperationArchive ChatArchiveOperation = "archive"
+	ChatArchiveOperationRestore ChatArchiveOperation = "restore"
+)
+
+// Defines values for ChatNavigationGrouping.
+const (
+	ChatNavigationGroupingMerged   ChatNavigationGrouping = "merged"
+	ChatNavigationGroupingSections ChatNavigationGrouping = "sections"
+)
+
+// Defines values for ChatNavigationSort.
+const (
+	ChatNavigationSortManual ChatNavigationSort = "manual"
+	ChatNavigationSortRecent ChatNavigationSort = "recent"
+)
+
+// Defines values for ChatNavigationInputAction.
+const (
+	Create      ChatNavigationInputAction = "create"
+	Delete      ChatNavigationInputAction = "delete"
+	Preferences ChatNavigationInputAction = "preferences"
+	Rename      ChatNavigationInputAction = "rename"
+	Reorder     ChatNavigationInputAction = "reorder"
+)
+
+// Defines values for ChatNavigationInputGrouping.
+const (
+	ChatNavigationInputGroupingMerged   ChatNavigationInputGrouping = "merged"
+	ChatNavigationInputGroupingSections ChatNavigationInputGrouping = "sections"
+)
+
+// Defines values for ChatNavigationInputSort.
+const (
+	ChatNavigationInputSortManual ChatNavigationInputSort = "manual"
+	ChatNavigationInputSortRecent ChatNavigationInputSort = "recent"
+)
+
 // Defines values for CollaborationRequestTool.
 const (
 	AskUser          CollaborationRequestTool = "ask_user"
@@ -439,10 +478,10 @@ const (
 
 // Defines values for TeamStatus.
 const (
-	Active           TeamStatus = "active"
-	Archived         TeamStatus = "archived"
-	Deleted          TeamStatus = "deleted"
-	DirectoryMissing TeamStatus = "directory_missing"
+	TeamStatusActive           TeamStatus = "active"
+	TeamStatusArchived         TeamStatus = "archived"
+	TeamStatusDeleted          TeamStatus = "deleted"
+	TeamStatusDirectoryMissing TeamStatus = "directory_missing"
 )
 
 // Defines values for ToolResultStatus.
@@ -468,6 +507,37 @@ const (
 const (
 	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
 	ListApprovalsParamsStatePending ListApprovalsParamsState = "pending"
+)
+
+// Defines values for ListChatsParamsPinned.
+const (
+	Exclude ListChatsParamsPinned = "exclude"
+	Only    ListChatsParamsPinned = "only"
+)
+
+// Defines values for ListChatsParamsSort.
+const (
+	ListChatsParamsSortArchived ListChatsParamsSort = "archived"
+	ListChatsParamsSortCreated  ListChatsParamsSort = "created"
+	ListChatsParamsSortManual   ListChatsParamsSort = "manual"
+	ListChatsParamsSortName     ListChatsParamsSort = "name"
+	ListChatsParamsSortRecent   ListChatsParamsSort = "recent"
+)
+
+// Defines values for OrganizeChatParamsAction.
+const (
+	OrganizeChatParamsActionArchive OrganizeChatParamsAction = "archive"
+	OrganizeChatParamsActionMove    OrganizeChatParamsAction = "move"
+	OrganizeChatParamsActionPin     OrganizeChatParamsAction = "pin"
+	OrganizeChatParamsActionReorder OrganizeChatParamsAction = "reorder"
+	OrganizeChatParamsActionRestore OrganizeChatParamsAction = "restore"
+	OrganizeChatParamsActionUnpin   OrganizeChatParamsAction = "unpin"
+)
+
+// Defines values for ChatRunActionParamsAction.
+const (
+	Interrupt ChatRunActionParamsAction = "interrupt"
+	Verify    ChatRunActionParamsAction = "verify"
 )
 
 // Defines values for ListQuestionsParamsStatus.
@@ -694,6 +764,159 @@ type BudgetLineLimitedBy string
 // BudgetResetResult defines model for BudgetResetResult.
 type BudgetResetResult struct {
 	Reset bool `json:"reset"`
+}
+
+// Chat defines model for Chat.
+type Chat struct {
+	ArchiveError     *string               `json:"archiveError,omitempty"`
+	ArchiveOperation *ChatArchiveOperation `json:"archiveOperation,omitempty"`
+	ArchivedAt       *string               `json:"archivedAt,omitempty"`
+	Busy             *bool                 `json:"busy,omitempty"`
+	CreatedAt        string                `json:"createdAt"`
+	Id               string                `json:"id"`
+	ManualOrder      *int64                `json:"manualOrder,omitempty"`
+	Model            string                `json:"model"`
+	PermissionMode   string                `json:"permissionMode"`
+	Pinned           *bool                 `json:"pinned,omitempty"`
+	ProviderId       string                `json:"providerId"`
+	ReasoningEffort  string                `json:"reasoningEffort"`
+	Revision         int64                 `json:"revision"`
+	SectionId        *string               `json:"sectionId,omitempty"`
+	Title            string                `json:"title"`
+	UpdatedAt        string                `json:"updatedAt"`
+	Workspace        string                `json:"workspace"`
+}
+
+// ChatArchiveOperation defines model for Chat.ArchiveOperation.
+type ChatArchiveOperation string
+
+// ChatActionInput defines model for ChatActionInput.
+type ChatActionInput struct {
+	Answers          *map[string][]string `json:"answers,omitempty"`
+	BeforeId         *string              `json:"beforeId,omitempty"`
+	ExpectedRevision *int64               `json:"expectedRevision,omitempty"`
+	OptionId         *string              `json:"optionId,omitempty"`
+	RequestId        string               `json:"requestId"`
+	SectionId        *string              `json:"sectionId,omitempty"`
+	Title            *string              `json:"title,omitempty"`
+}
+
+// ChatList defines model for ChatList.
+type ChatList struct {
+	Items      []Chat `json:"items"`
+	NextCursor string `json:"nextCursor"`
+}
+
+// ChatMessage defines model for ChatMessage.
+type ChatMessage struct {
+	ChatId    string `json:"chatId"`
+	CreatedAt string `json:"createdAt"`
+	Id        string `json:"id"`
+	Kind      string `json:"kind"`
+	RunId     string `json:"runId"`
+	Text      string `json:"text"`
+}
+
+// ChatNavigation defines model for ChatNavigation.
+type ChatNavigation struct {
+	Grouping ChatNavigationGrouping `json:"grouping"`
+	Revision int64                  `json:"revision"`
+	Sections []ChatSection          `json:"sections"`
+	Sort     ChatNavigationSort     `json:"sort"`
+}
+
+// ChatNavigationGrouping defines model for ChatNavigation.Grouping.
+type ChatNavigationGrouping string
+
+// ChatNavigationSort defines model for ChatNavigation.Sort.
+type ChatNavigationSort string
+
+// ChatNavigationInput defines model for ChatNavigationInput.
+type ChatNavigationInput struct {
+	Action           ChatNavigationInputAction    `json:"action"`
+	BeforeId         *string                      `json:"beforeId,omitempty"`
+	ExpectedRevision int64                        `json:"expectedRevision"`
+	Grouping         *ChatNavigationInputGrouping `json:"grouping,omitempty"`
+	Id               *string                      `json:"id,omitempty"`
+	Name             *string                      `json:"name,omitempty"`
+	RequestId        string                       `json:"requestId"`
+	Sort             *ChatNavigationInputSort     `json:"sort,omitempty"`
+}
+
+// ChatNavigationInputAction defines model for ChatNavigationInput.Action.
+type ChatNavigationInputAction string
+
+// ChatNavigationInputGrouping defines model for ChatNavigationInput.Grouping.
+type ChatNavigationInputGrouping string
+
+// ChatNavigationInputSort defines model for ChatNavigationInput.Sort.
+type ChatNavigationInputSort string
+
+// ChatPage defines model for ChatPage.
+type ChatPage struct {
+	Chat       Chat          `json:"chat"`
+	Messages   []ChatMessage `json:"messages"`
+	NextCursor string        `json:"nextCursor"`
+	Requests   []ChatRequest `json:"requests"`
+	Runs       []ChatRun     `json:"runs"`
+}
+
+// ChatRequest defines model for ChatRequest.
+type ChatRequest struct {
+	ChatId        string                  `json:"chatId"`
+	Decision      *string                 `json:"decision,omitempty"`
+	Id            string                  `json:"id"`
+	Method        string                  `json:"method"`
+	Options       []ApprovalOption        `json:"options"`
+	Params        *map[string]interface{} `json:"params,omitempty"`
+	Reason        string                  `json:"reason"`
+	ResponseState string                  `json:"responseState"`
+	Revision      int64                   `json:"revision"`
+	RunId         string                  `json:"runId"`
+	State         string                  `json:"state"`
+	Summary       string                  `json:"summary"`
+	Type          string                  `json:"type"`
+}
+
+// ChatRun defines model for ChatRun.
+type ChatRun struct {
+	ChatId        string     `json:"chatId"`
+	EndedAt       string     `json:"endedAt"`
+	Epoch         string     `json:"epoch"`
+	ErrorKey      string     `json:"errorKey"`
+	Id            string     `json:"id"`
+	MessageId     string     `json:"messageId"`
+	StartedAt     string     `json:"startedAt"`
+	Status        string     `json:"status"`
+	Steps         []ChatStep `json:"steps"`
+	StopRequested *bool      `json:"stopRequested,omitempty"`
+	ThreadId      string     `json:"threadId"`
+	TurnId        string     `json:"turnId"`
+}
+
+// ChatSection defines model for ChatSection.
+type ChatSection struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Order int64  `json:"order"`
+}
+
+// ChatSendInput defines model for ChatSendInput.
+type ChatSendInput struct {
+	Model           *string `json:"model,omitempty"`
+	ProviderId      *string `json:"providerId,omitempty"`
+	ReasoningEffort *string `json:"reasoningEffort,omitempty"`
+	RequestId       string  `json:"requestId"`
+	Text            string  `json:"text"`
+}
+
+// ChatStep defines model for ChatStep.
+type ChatStep struct {
+	Detail map[string]interface{} `json:"detail"`
+	Id     string                 `json:"id"`
+	Kind   string                 `json:"kind"`
+	Seq    int64                  `json:"seq"`
+	Status string                 `json:"status"`
 }
 
 // CollaborationRequest defines model for CollaborationRequest.
@@ -1592,6 +1815,40 @@ type SetBotModelJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ListChatsParams defines parameters for ListChats.
+type ListChatsParams struct {
+	Cursor   *string                `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Pinned   *ListChatsParamsPinned `form:"pinned,omitempty" json:"pinned,omitempty"`
+	Archived *bool                  `form:"archived,omitempty" json:"archived,omitempty"`
+	Sort     *ListChatsParamsSort   `form:"sort,omitempty" json:"sort,omitempty"`
+	Search   *string                `form:"search,omitempty" json:"search,omitempty"`
+	Section  *string                `form:"section,omitempty" json:"section,omitempty"`
+}
+
+// ListChatsParamsPinned defines parameters for ListChats.
+type ListChatsParamsPinned string
+
+// ListChatsParamsSort defines parameters for ListChats.
+type ListChatsParamsSort string
+
+// GetChatParams defines parameters for GetChat.
+type GetChatParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// OrganizeChatParamsAction defines parameters for OrganizeChat.
+type OrganizeChatParamsAction string
+
+// OpenChatPathJSONBody defines parameters for OpenChatPath.
+type OpenChatPathJSONBody struct {
+	Path      string `json:"path"`
+	RequestId string `json:"requestId"`
+	Reveal    *bool  `json:"reveal,omitempty"`
+}
+
+// ChatRunActionParamsAction defines parameters for ChatRunAction.
+type ChatRunActionParamsAction string
+
 // ListDirectoriesParams defines parameters for ListDirectories.
 type ListDirectoriesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
@@ -1944,6 +2201,33 @@ type SendMessageJSONRequestBody SendMessageJSONBody
 
 // SetBotModelJSONRequestBody defines body for SetBotModel for application/json ContentType.
 type SetBotModelJSONRequestBody SetBotModelJSONBody
+
+// ChangeChatNavigationJSONRequestBody defines body for ChangeChatNavigation for application/json ContentType.
+type ChangeChatNavigationJSONRequestBody = ChatNavigationInput
+
+// CreateChatJSONRequestBody defines body for CreateChat for application/json ContentType.
+type CreateChatJSONRequestBody = ChatSendInput
+
+// DeleteChatJSONRequestBody defines body for DeleteChat for application/json ContentType.
+type DeleteChatJSONRequestBody = ChatActionInput
+
+// RenameChatJSONRequestBody defines body for RenameChat for application/json ContentType.
+type RenameChatJSONRequestBody = ChatActionInput
+
+// OrganizeChatJSONRequestBody defines body for OrganizeChat for application/json ContentType.
+type OrganizeChatJSONRequestBody = ChatActionInput
+
+// SendChatMessageJSONRequestBody defines body for SendChatMessage for application/json ContentType.
+type SendChatMessageJSONRequestBody = ChatSendInput
+
+// OpenChatPathJSONRequestBody defines body for OpenChatPath for application/json ContentType.
+type OpenChatPathJSONRequestBody OpenChatPathJSONBody
+
+// ReplyChatRequestJSONRequestBody defines body for ReplyChatRequest for application/json ContentType.
+type ReplyChatRequestJSONRequestBody = ChatActionInput
+
+// ChatRunActionJSONRequestBody defines body for ChatRunAction for application/json ContentType.
+type ChatRunActionJSONRequestBody = ChatActionInput
 
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody

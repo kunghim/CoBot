@@ -4,6 +4,134 @@
  */
 
 export interface paths {
+    "/api/v1/chat-navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getChatNavigation"];
+        put?: never;
+        post: operations["changeChatNavigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizeChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/open-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["openChatPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listChats"];
+        put?: never;
+        post: operations["createChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getChat"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteChat"];
+        options?: never;
+        head?: never;
+        patch: operations["renameChat"];
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sendChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/runs/{runId}/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["chatRunAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/requests/{requestId}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["replyChatRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/status": {
         parameters: {
             query?: never;
@@ -1337,6 +1465,137 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChatSection: {
+            id: string;
+            name: string;
+            /** Format: int64 */
+            order: number;
+        };
+        ChatNavigation: {
+            /** Format: int64 */
+            revision: number;
+            /** @enum {string} */
+            sort: "recent" | "manual";
+            /** @enum {string} */
+            grouping: "sections" | "merged";
+            sections: components["schemas"]["ChatSection"][];
+        };
+        ChatNavigationInput: {
+            requestId: string;
+            /** @enum {string} */
+            action: "preferences" | "create" | "rename" | "delete" | "reorder";
+            /** Format: int64 */
+            expectedRevision: number;
+            id?: string;
+            name?: string;
+            beforeId?: string;
+            /** @enum {string} */
+            sort?: "recent" | "manual";
+            /** @enum {string} */
+            grouping?: "sections" | "merged";
+        };
+        Chat: {
+            id: string;
+            title: string;
+            providerId: string;
+            model: string;
+            permissionMode: string;
+            reasoningEffort: string;
+            workspace: string;
+            createdAt: string;
+            updatedAt: string;
+            /** Format: int64 */
+            revision: number;
+            busy?: boolean;
+            archivedAt?: string;
+            /** @enum {string} */
+            archiveOperation?: "archive" | "restore";
+            archiveError?: string;
+            sectionId?: string;
+            pinned?: boolean;
+            /** Format: int64 */
+            manualOrder?: number;
+        };
+        ChatMessage: {
+            id: string;
+            chatId: string;
+            runId: string;
+            kind: string;
+            text: string;
+            createdAt: string;
+        };
+        ChatStep: {
+            id: string;
+            kind: string;
+            status: string;
+            /** Format: int64 */
+            seq: number;
+            detail: {
+                [key: string]: unknown;
+            };
+        };
+        ChatRun: {
+            stopRequested?: boolean;
+            id: string;
+            chatId: string;
+            messageId: string;
+            status: string;
+            threadId: string;
+            turnId: string;
+            epoch: string;
+            errorKey: string;
+            startedAt: string;
+            endedAt: string;
+            steps: components["schemas"]["ChatStep"][];
+        };
+        ChatRequest: {
+            decision?: string;
+            id: string;
+            chatId: string;
+            runId: string;
+            type: string;
+            method: string;
+            summary: string;
+            reason: string;
+            state: string;
+            responseState: string;
+            /** Format: int64 */
+            revision: number;
+            options: components["schemas"]["ApprovalOption"][];
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        ChatPage: {
+            chat: components["schemas"]["Chat"];
+            messages: components["schemas"]["ChatMessage"][];
+            runs: components["schemas"]["ChatRun"][];
+            requests: components["schemas"]["ChatRequest"][];
+            nextCursor: string;
+        };
+        ChatList: {
+            items: components["schemas"]["Chat"][];
+            nextCursor: string;
+        };
+        ChatSendInput: {
+            requestId: string;
+            text: string;
+            providerId?: string;
+            model?: string;
+            reasoningEffort?: string;
+        };
+        ChatActionInput: {
+            sectionId?: string;
+            beforeId?: string;
+            requestId: string;
+            title?: string;
+            optionId?: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+            answers?: {
+                [key: string]: string[];
+            };
+        };
         /** @description A model vendor or gateway the engine can call. The secret is never part of it. */
         Provider: {
             id: string;
@@ -2114,6 +2373,353 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getChatNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatNavigation"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    changeChatNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatNavigationInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatNavigation"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    organizeChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                action: "pin" | "unpin" | "move" | "reorder" | "archive" | "restore";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    openChatPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    path: string;
+                    reveal?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Opened file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: {
+                            path: string;
+                        };
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listChats: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pinned?: "only" | "exclude";
+                archived?: boolean;
+                sort?: "recent" | "manual" | "name" | "created" | "archived";
+                search?: string;
+                section?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatList"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getChat: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    renameChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    sendChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    chatRunAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                runId: string;
+                action: "interrupt" | "verify";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatRun"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    replyChatRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatRequest"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getStatus: {
         parameters: {
             query?: never;
