@@ -9,7 +9,7 @@
 // what stays here belongs to the model provider feature alone.
 import { useState } from 'react';
 import type { ProviderProbeResult } from '../../api/types';
-import { Badge, Button, Chip, TextInput } from '../../components/ui';
+import { Button, Chip, Icons, TextInput } from '../../components/ui';
 
 export interface ModelPickLabels {
   /** The heading above the chips, e.g. "可用模型". */
@@ -22,9 +22,9 @@ export interface ModelPickLabels {
   addAs: (id: string) => string;
   /** What to say when the search matches nothing. */
   noMatch: string;
-  /** The badge of a model that answered. */
+  /** The name of the mark on a model that answered. */
   ok: string;
-  /** The badge of a model that did not answer. */
+  /** The name of the mark on a model that did not answer. */
   failed: string;
   /** Why a model did not answer, in the reader's language. */
   reason: (status: ProviderProbeResult) => string;
@@ -32,6 +32,13 @@ export interface ModelPickLabels {
   noModels: string;
   /** The line under the chips. */
   note: string;
+  /** The buttons that tick or clear every model the search shows. */
+  selectAll: string;
+  clearAll: string;
+  /** The button on a chip that checks that one model. */
+  testOne: (id: string) => string;
+  /** The same button on a model that did not answer. */
+  retryOne: (id: string) => string;
 }
 
 export interface ModelPickProps {
@@ -42,6 +49,12 @@ export interface ModelPickProps {
   /** What the last check said, per model id. */
   statuses?: Record<string, ProviderProbeResult>;
   onToggle: (id: string) => void;
+  /** Checks one model now. Without it the chips carry no such button. */
+  onProbe?: (id: string) => void;
+  /** The models being checked right now. */
+  probing?: string[];
+  /** Ticks or clears several models at once: the ones the search shows. */
+  onSelectMany: (ids: string[], on: boolean) => void;
   /** Adds a model the vendor did not list (a hand written id). */
   onAdd: (id: string) => void;
   labels: ModelPickLabels;
@@ -61,7 +74,22 @@ export function visibleModels(models: string[], query: string): string[] {
   return shown.sort(byName.compare);
 }
 
-export default function ModelPick({ models, selected, statuses, onToggle, onAdd, labels }: ModelPickProps) {
+/** The selection after ticking or clearing some models; the order the user ticked them in is kept. */
+export function withSelection(selected: string[], ids: string[], on: boolean): string[] {
+  if (!on) return selected.filter((id) => !ids.includes(id));
+  return [...selected, ...ids.filter((id) => !selected.includes(id))];
+}
+
+/**
+ * The models a check still has to answer: those ticked that have not passed
+ * yet. One that already answered keeps its answer until the endpoint or the
+ * key changes, so a second try asks only about what is new or failed.
+ */
+export function modelsToProbe(selected: string[], statuses: Record<string, ProviderProbeResult>): string[] {
+  return selected.filter((id) => !statuses[id]?.ok);
+}
+
+export default function ModelPick({ models, selected, statuses, onToggle, onProbe, probing = [], onSelectMany, onAdd, labels }: ModelPickProps) {
   const [query, setQuery] = useState('');
   const shown = visibleModels(models, query);
   const typed = query.trim();
@@ -82,7 +110,8 @@ export default function ModelPick({ models, selected, statuses, onToggle, onAdd,
         <span className="ml-auto text-xs text-neutral-500 dark:text-neutral-400">{labels.count}</span>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
+      {/* The search and the select buttons stay in view while a long list scrolls under them. */}
+      <div className="sticky top-0 z-10 -mx-1 mt-2 flex items-center gap-2 bg-card px-1 py-1">
         <TextInput
           mono
           size="sm"
@@ -102,10 +131,20 @@ export default function ModelPick({ models, selected, statuses, onToggle, onAdd,
             {labels.addAs(typed)}
           </Button>
         )}
+        {shown.length > 0 && (
+          <>
+            <Button size="sm" className="shrink-0" onClick={() => onSelectMany(shown, true)} disabled={shown.every((id) => selected.includes(id))}>
+              {labels.selectAll}
+            </Button>
+            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => onSelectMany(shown, false)} disabled={!shown.some((id) => selected.includes(id))}>
+              {labels.clearAll}
+            </Button>
+          </>
+        )}
       </div>
 
-      {/* The field scrolls inside the dialog rather than growing it. */}
-      <div className="mt-2 max-h-60 overflow-y-auto">
+      {/* Every model is shown; the dialog scrolls, not the list. */}
+      <div className="mt-2">
         {shown.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {shown.map((id) => {
@@ -117,13 +156,21 @@ export default function ModelPick({ models, selected, statuses, onToggle, onAdd,
                   pressed={selected.includes(id)}
                   onClick={() => onToggle(id)}
                   mono
+                  mark={false}
                   tone={broken ? 'danger' : 'neutral'}
                   title={broken && status ? labels.reason(status) : undefined}
+                  action={
+                    onProbe
+                      ? { label: broken ? labels.retryOne(id) : labels.testOne(id), kind: broken ? 'retry' : 'check', onClick: () => onProbe(id), busy: probing.includes(id), visible: true }
+                      : undefined
+                  }
                   trailing={
                     status ? (
-                      <Badge tone={status.ok ? 'success' : 'danger'}>
-                        {status.ok ? labels.ok : `${labels.failed} · ${labels.reason(status)}`}
-                      </Badge>
+                      status.ok ? (
+                        <Icons.success size={14} role="img" aria-label={labels.ok} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <Icons.error size={14} role="img" aria-label={`${labels.failed}：${labels.reason(status)}`} className="shrink-0 text-red-600 dark:text-red-400" />
+                      )
                     ) : undefined
                   }
                 >

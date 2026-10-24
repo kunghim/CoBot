@@ -48,7 +48,10 @@ MSI 卸载或删除 ZIP 目录不会自动删除用户数据。更换安装形�
 
 [迁移 00022](../../internal/store/sqlite/migrations/00022_fullstack_and_project_manager.sql)
 调整内置成员角色，[迁移 00024](../../internal/store/sqlite/migrations/00024_avatars.sql)
-增加头像字段与角色头像设置。后续升级继续逐项核对新增迁移，不能用本文替代具体版本的变更说明。
+增加头像字段与角色头像设置。[迁移 00029](../../internal/store/sqlite/migrations/00029_budget_overrides.sql)
+[迁移 00030](../../internal/store/sqlite/migrations/00030_budget_resets.sql)
+新增手动重置时间表。两者都只新增表，不改已有数据；但设置里已有的预算从此按天统计、隔天重置，
+此前它是累计到底的。此影响应在跨越该迁移的版本发布说明中列出。后续升级继续逐项核对新增迁移，不能用本文替代具体版本的变更说明。
 
 ## 首次启动后检查
 

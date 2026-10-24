@@ -1,7 +1,24 @@
 {
-  "app": { "title": "CoBot" },
-  "window": { "minimize": "Minimize", "maximize": "Maximize", "restore": "Restore", "close": "Close" },
-  "common": { "close": "Close", "cancel": "Cancel", "clearSearch": "Clear search", "decrease": "Decrease", "increase": "Increase" },
+  "app": {
+    "title": "CoBot"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "clearSearch": "Clear search",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "loading": "Loading…",
+    "back": "Back",
+    "save": "Save",
+    "delete": "Delete"
+  },
   "nav": {
     "home": "Home",
     "settings": "Settings",
@@ -65,12 +82,13 @@
     "directoryNested": "Nested with the directory of team {{teamName}}",
     "deleteConfirmTitle": "Delete team “{{name}}”?",
     "archiveConfirmTitle": "Archive team “{{name}}”?",
-    "archiveConfirmBody": "The team moves from the team list to Settings › Archived teams, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
+    "archiveConfirmBody": "The team moves from the team list to Settings › Archived, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
     "deleteMissingConfirmBody": "The team's project folder is no longer where it was. Deleting permanently removes its members, conversations, tasks, memories and Codex sessions, including any unfinished work. This cannot be undone.",
     "deleteMemberConfirmBody": "Its conversation, memories, runs, the finished tasks it owned and its Codex session in this team are permanently removed. This cannot be undone. Messages it sent to other members stay. The role itself is not affected and stays available to other teams.",
     "actions": "Actions for {{name}}",
     "deleteMemberPick": "Choose the member to delete",
     "edit": "Edit team",
+    "budget": "Daily budget",
     "directoryFixed": "A team's folder cannot change after creation.",
     "membersLocked": "Existing members cannot be changed here; tick new roles to add them.",
     "save": "Save",
@@ -113,14 +131,31 @@
     }
   },
   "scenario": {
-    "software": { "name": "Software development" }
+    "software": {
+      "name": "Software development"
+    }
   },
   "role": {
-    "leader": { "name": "Project manager", "summary": "Talks the need through with you, writes the requirement document, drafts the route and reports back at the end." },
-    "productManager": { "name": "Product manager", "summary": "Turns the requirement document into a product design and prototype." },
-    "fullstackEngineer": { "name": "Full-stack engineer", "summary": "Builds the interface, interactions, server logic and data." },
-    "qaEngineer": { "name": "QA engineer", "summary": "Writes test cases and runs the tests, sending failures back." },
-    "codeReviewer": { "name": "Reviewer", "summary": "Reviews requirements, designs, test cases and code against the checklist; a failing review sends the work back." }
+    "leader": {
+      "name": "Project manager",
+      "summary": "Talks the need through with you, writes the requirement document, drafts the route and reports back at the end."
+    },
+    "productManager": {
+      "name": "Product manager",
+      "summary": "Turns the requirement document into a product design and prototype."
+    },
+    "fullstackEngineer": {
+      "name": "Full-stack engineer",
+      "summary": "Builds the interface, interactions, server logic and data."
+    },
+    "qaEngineer": {
+      "name": "QA engineer",
+      "summary": "Writes test cases and runs the tests, sending failures back."
+    },
+    "codeReviewer": {
+      "name": "Reviewer",
+      "summary": "Reviews requirements, designs, test cases and code against the checklist; a failing review sends the work back."
+    }
   },
   "stats": {
     "turns": "{{turns}} turns {{steps}} steps",
@@ -148,6 +183,8 @@
     "resets": "Resets: {{time}}"
   },
   "effort": {
+    "on": "Thinking",
+    "off": "Thinking off",
     "label": "Reasoning effort",
     "default": "Default",
     "modelDefault": "Left to the model (its default: {{level}})",
@@ -157,12 +194,26 @@
     "chooseModel": "Choose model",
     "back": "Back",
     "saveFailed": "Thinking effort was not changed",
-    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" },
+    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high", "max": "Max", "ultra": "Ultra" },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
   "permission": {
+    "chat": {
+      "hint": {
+        "read_only": "Can look and analyse; asks before changing anything",
+        "default": "Free to read, write and run inside this chat's folder; asks beyond it",
+        "full": "Never asks; not limited to the chat's folder"
+      },
+      "confirmFull": {
+        "body": "It will run any command and change any file without asking, beyond the chat folder and network limits. Applies from your next message."
+      }
+    },
     "label": "Permission mode",
-    "mode": { "read_only": "Read only", "default": "Default", "full": "Full access" },
+    "mode": {
+      "read_only": "Read only",
+      "default": "Default",
+      "full": "Full access"
+    },
     "hint": {
       "read_only": "Can look and analyse; asks before changing anything",
       "default": "Free to read, write and run inside the team folder; asks beyond it",
@@ -212,9 +263,19 @@
       "network": "Cannot reach the provider's endpoint; check the address and the network, then send again",
       "engine_internal": "The provider's model service had an internal error; send again later"
     },
-    "file": { "open": "Open file", "reveal": "Show in folder" },
-    "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
-    "duration": { "seconds": "{{s}}s", "minutes": "{{m}}m {{s}}s" },
+    "file": {
+      "open": "Open file",
+      "reveal": "Show in folder"
+    },
+    "fileKind": {
+      "add": "Added",
+      "update": "Modified",
+      "delete": "Deleted"
+    },
+    "duration": {
+      "seconds": "{{s}}s",
+      "minutes": "{{m}}m {{s}}s"
+    },
     "phase": {
       "preparing": "Getting ready…",
       "starting": "Starting",
@@ -225,11 +286,20 @@
       "editing": "Editing files",
       "tool": "Collaborating",
       "searching": "Searching the web",
+      "compacting": "Compacting the context",
       "reconnecting": "Reconnecting to the model (attempt {{attempt}})",
       "waitingApproval": "Waiting for your approval",
       "waitingInput": "Waiting for your reply"
     },
     "process": {
+      "group": {
+        "command": "Ran {{count}} command(s)",
+        "file_change": "Changed {{count}} file(s)",
+        "tool": "Called a tool {{count}} time(s)",
+        "web_search": "Searched the web {{count}} time(s)",
+        "agent": "Used {{count}} sub-agent(s)",
+        "other": "{{count}} step(s)"
+      },
       "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
@@ -265,6 +335,8 @@
       "fileChange": "Changed {{count}} files",
       "webSearch": "Searched the web: {{query}}",
       "plan": "Made a plan",
+      "compacting": "Compacting the context…",
+      "compacted": "Compacted the context automatically",
       "retrying": "Reconnecting to the model (attempt {{attempt}})",
       "retried": "Reconnected after {{attempt}} attempts",
       "warning": "Note: {{message}}",
@@ -322,7 +394,8 @@
     "type": {
       "native_tool": "Security approval",
       "recovery": "Recovery",
-      "chain": "Chain confirmation"
+      "chain": "Chain confirmation",
+      "budget": "Daily budget"
     },
     "requester": "Requested by: {{name}}",
     "requesterAsks": "asks for your approval",
@@ -349,7 +422,10 @@
     "reasonCode": {
       "over_limit": "Members reached the collaboration limit",
       "risk_zone": "The collaboration needs your confirmation",
-      "unresolved_run": "The last run's state is unknown after the process exited"
+      "unresolved_run": "The last run's state is unknown after the process exited",
+      "budget_exceeded": "Today's usage has reached the limit",
+      "budget_reserve": "Too little of today's budget is left for another turn",
+      "budget_usage_unknown": "A turn's usage today is unknown, so the budget cannot be judged"
     },
     "openConversation": "Open requester conversation"
   },
@@ -357,6 +433,8 @@
     "card": {
       "chain_risk": "The work will continue in this direction — please confirm",
       "chain_over_limit": "Members have woken each other many times. Continuing grants them another budget of the same size",
+      "budget_team": "The team has spent today's budget (all members together), so the next turn is paused. Reset and continue counts today's usage again from now and leaves the history alone; otherwise it resumes by itself tomorrow.",
+      "budget_bot": "This member has spent its own budget for today, so its next turn is paused. Reset and continue counts its usage again from now and leaves the history alone; otherwise it resumes by itself tomorrow.",
       "recovery": "A previous execution is unresolved after the process exited. Rerun makes the member do the work again; Only release the member does not redo it — the member goes idle, the work stays unfinished and you need to message the member again; Abandon cancels the work."
     },
     "option": {
@@ -368,6 +446,8 @@
       "decline": "Decline",
       "permissions.deny": "Deny",
       "chain_continue": "Continue",
+      "budget_reset": "Reset and continue",
+      "budget_wait": "Stay paused",
       "recovery_continue": "Only release the member",
       "recovery_rerun": "Rerun",
       "recovery_abandon": "Abandon",
@@ -413,9 +493,11 @@
       "message": "{{from}} → {{to}}",
       "memory": "{{actor}} saved a working method",
       "memoryDeleted": "Deleted a memory of {{actor}}",
-      "budgetPaused": "Budget spent; {{actor}}'s next turn is paused",
+      "budgetPaused": "{{actor}} has spent today's budget; the next turn is paused until tomorrow",
+      "budgetPausedTeam": "The team's daily budget is spent (all members together); {{actor}}'s next turn is paused until tomorrow",
       "budgetPausedUnknown": "A turn's usage is unknown, so the budget cannot be judged; {{actor}}'s next turn is paused",
-      "budgetPausedReserve": "Too little budget left for another of {{actor}}'s turns (estimated from recent ones); the next turn is paused"
+      "budgetPausedReserve": "Too little budget left for another of {{actor}}'s turns (estimated from recent ones); the next turn is paused",
+      "budgetPausedReserveTeam": "The team has too little of today's budget left for another of {{actor}}'s turns (estimated from recent ones); the next turn is paused until tomorrow"
     },
     "empty": "No activity yet",
     "loadFailed": "Failed to load activity",
@@ -435,7 +517,7 @@
       "question.answered": "Question answered",
       "chain.updated": "Chain state changed",
       "usage.updated": "Usage recorded",
-      "budget.paused": "Budget paused new turns",
+      "budget.paused": "Daily budget paused new turns",
       "memory.changed": "Memory changed",
       "team.updated": "Team updated",
       "team.archived": "Team archived",
@@ -522,8 +604,18 @@
     "ownerUser": "You",
     "empty": "No requirements yet",
     "loadFailed": "Failed to load requirements",
-    "status": { "todo": "Handed over", "doing": "In progress", "done": "Handed off", "cancelled": "Cancelled" },
-    "requirementStatus": { "active": "In progress", "accepting": "Awaiting acceptance", "done": "Done", "cancelled": "Cancelled" },
+    "status": {
+      "todo": "Handed over",
+      "doing": "In progress",
+      "done": "Handed off",
+      "cancelled": "Cancelled"
+    },
+    "requirementStatus": {
+      "active": "In progress",
+      "accepting": "Awaiting acceptance",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
     "at": "Stage {{index}}/{{total}} · {{name}} · {{owner}}",
     "route": "Route",
     "document": "Requirement document",
@@ -541,9 +633,23 @@
       "draft": "Revise the requirement document",
       "escalation": "Handle an escalation"
     },
-    "reviewType": { "requirements": "requirements", "design": "design", "test_plan": "test cases", "code": "code", "general": "general" },
-    "outcome": { "done": "done", "back": "sent back", "escalate": "escalated", "resume": "resumed" },
-    "mode": { "rerun": "rerun the route", "return_to_me": "back to the reviewer" },
+    "reviewType": {
+      "requirements": "requirements",
+      "design": "design",
+      "test_plan": "test cases",
+      "code": "code",
+      "general": "general"
+    },
+    "outcome": {
+      "done": "done",
+      "back": "sent back",
+      "escalate": "escalated",
+      "resume": "resumed"
+    },
+    "mode": {
+      "rerun": "rerun the route",
+      "return_to_me": "back to the reviewer"
+    },
     "handoffs": "Handoffs",
     "handoffsEmpty": "No handoffs yet",
     "suggestions": "Suggestions",
@@ -555,6 +661,8 @@
     "cancelKeep": "Keep it"
   },
   "questions": {
+    "prev": "Previous card",
+    "next": "Next card",
     "confirm": {
       "title": "Needs your confirmation",
       "accept": "Confirm and continue",
@@ -589,13 +697,28 @@
     "rechecking": "Checking…",
     "openLogin": "Open sign-in page in browser",
     "openLoginFailed": "Could not open the default browser. Copy the sign-in link and open it in your browser.",
-    "login": "Sign in to Codex",
+    "login": "Sign in with ChatGPT",
     "cancelLogin": "Cancel sign-in",
     "logout": "Sign out of Codex",
     "waitingLogin": "Waiting for sign-in (checked every 3s, up to 2 minutes)…",
     "loginTimeout": "Sign-in timed out; check the Codex login window in the browser"
   },
   "providers": {
+    "catalog": {
+      "stale": "{{count}} team engine(s) still run the old catalog; longer context windows apply after a restart.",
+      "apply": "Restart idle engines",
+      "applied": "Restarted {{count}} engine(s); they start with the new catalog on the next turn. {{busy}} more are in a turn and take it when they next start.",
+      "title": "Model catalog",
+      "intro": "The catalog knows each model's context length, the input types it takes and its thinking levels. A model you add is matched by name, and what matches does not have to be filled in. The data comes from models.dev.",
+      "update": "Update model catalog",
+      "updated": "Model catalog updated: {{count}} models",
+      "unreachable": "Could not reach models.dev. Check the network and try again; the catalog in use is unchanged.",
+      "rejected": "models.dev returned something unusable; the catalog in use is unchanged.",
+      "source": {
+        "bundled": "Using the catalog shipped with the program: {{count}} models, from {{date}}.",
+        "downloaded": "Using a downloaded catalog: {{count}} models, updated {{date}}."
+      }
+    },
     "title": "Model providers",
     "add": "Add provider",
     "edit": "Edit",
@@ -641,6 +764,45 @@
       "discovered": "Found {{count}} models on {{base}}",
       "models": "Available models",
       "selectedCount": "{{count}} / {{total}} selected",
+      "adv": {
+        "thinkingCanOff": "Thinking can be switched off (from the model catalog)",
+        "thinkingCannotOff": "Thinking cannot be switched off, only its level chosen (from the model catalog)",
+        "contextLimitHint": "In tokens. Empty means the catalog's {{limit}}; only a smaller number is accepted. The context is compacted as it nears the limit.",
+        "maxOutputLimitHint": "In tokens, for reference only; the engine cannot limit it. Empty means the catalog's {{limit}}; only a smaller number is accepted.",
+        "title": "Advanced settings",
+        "noModel": "Pick the models to keep above first.",
+        "model": "Model to set up",
+        "fromCatalog": "{{name}}: the catalog's numbers are limits you may lower but not exceed; thinking comes from the catalog and cannot be changed.",
+        "custom": "The model catalog does not know this model, so everything below is yours to fill in.",
+        "alias": "Alias",
+        "aliasHint": "Shown in place of the model name when set.",
+        "context": "Context length",
+        "contextHint": "In tokens. Once set, the context is compacted automatically as it nears the limit.",
+        "maxOutput": "Max output length",
+        "maxOutputHint": "In tokens, for reference only; the engine cannot limit it.",
+        "lockedHint": "From the model catalog; cannot be changed.",
+        "input": "Input types",
+        "inputHint": "Text is always supported. A type left unticked cannot be sent to this model in a conversation.",
+        "kind": {
+          "text": "Text",
+          "image": "Image",
+          "video": "Video",
+          "pdf": "PDF"
+        },
+        "abilities": "Abilities",
+        "webSearch": "Web search",
+        "webSearchHint": "Turn on only if the provider supports web search; one that does not fails the whole turn.",
+        "thinking": "Thinking",
+        "thinkingToggle": "Thinking can be switched off",
+        "thinkingToggleHint": "When on, a conversation can turn thinking on and off.",
+        "thinkingHint": "Tick the thinking levels this model supports; with none ticked, low, medium and high apply."
+      },
+      "selectAll": "Select all",
+      "clearAll": "Clear",
+      "testOne": "Test {{id}}",
+      "retryOne": "Retry {{id}}",
+      "modelOk": "{{id}} works",
+      "modelFailed": "{{id}} is not available",
       "reason": {
         "quota": "out of balance",
         "rate_limit": "rate limited",
@@ -688,27 +850,82 @@
     "modelSummary_other": "{{count}} models, {{usable}} usable"
   },
   "preset": {
-    "openai": { "name": "OpenAI" },
-    "anthropic": { "name": "Anthropic" },
-    "deepseek": { "name": "DeepSeek" },
-    "kimi": { "name": "Moonshot Kimi" },
-    "zhipu": { "name": "Zhipu BigModel" },
-    "zai": { "name": "Z.ai" },
-    "minimax": { "name": "MiniMax" },
-    "dashscope": { "name": "Alibaba Bailian" },
-    "mimo": { "name": "Xiaomi MiMo" },
-    "xai": { "name": "xAI" },
-    "openrouter": { "name": "OpenRouter" },
-    "opencode-zen": { "name": "OpenCode Zen" }
+    "openai": {
+      "name": "OpenAI"
+    },
+    "anthropic": {
+      "name": "Anthropic"
+    },
+    "deepseek": {
+      "name": "DeepSeek"
+    },
+    "kimi": {
+      "name": "Moonshot Kimi"
+    },
+    "zhipu": {
+      "name": "Zhipu BigModel"
+    },
+    "zai": {
+      "name": "Z.ai"
+    },
+    "minimax": {
+      "name": "MiniMax"
+    },
+    "dashscope": {
+      "name": "Alibaba Bailian"
+    },
+    "mimo": {
+      "name": "Xiaomi MiMo"
+    },
+    "xai": {
+      "name": "xAI"
+    },
+    "openrouter": {
+      "name": "OpenRouter"
+    },
+    "opencode-zen": {
+      "name": "OpenCode Zen"
+    }
+  },
+  "about": {
+    "tagline": "Agents do the work, CoBot runs the team.",
+    "stage": { "beta": "Beta", "alpha": "Alpha" },
+    "developmentBuild": "Development build",
+    "checkUpdate": "Check for updates",
+    "viewRelease": "View this release",
+    "checkedAt": "Checked {{time}}",
+    "update": {
+      "upToDate": "You have the latest version",
+      "available": "Version {{latest}} is available",
+      "unknown": "This is not a published release; the newest release is {{latest}}",
+      "unreachable": "Could not reach GitHub. Check the network and try again.",
+      "rejected": "GitHub did not return a release list (possibly too many requests). Try again later."
+    },
+    "engine": "Codex engine",
+    "engineNotReady": "Not ready",
+    "repository": "GitHub repository",
+    "releases": "Release notes",
+    "issues": "Report a problem",
+    "license": "License (Apache-2.0)"
+  },
+  "budget": {
+    "title": "Daily budget · {{name}}",
+    "dialogHint": "Counted per day and reset the next day. Whatever is not set here follows the default in the settings.",
+    "team": "The whole team",
+    "follow": "Follow default ({{limit}})",
+    "custom": "Custom",
+    "unlimited": "Unlimited",
+    "usedToday": "Used today {{used}} / {{limit}}",
+    "ownerNone": "No limit of its own",
+    "heldToTeam": "Held to the team's limit: at most {{limit}}, shared with the other members",
+    "unlimitedNeedsTeamNone": "A member cannot be unlimited while the team has a limit",
+    "reset": "Reset today's usage",
+    "resetDone": "Today's usage counts from now",
+    "resetHint": "Count today's usage from now; the history is untouched",
+    "resetTeamHint": "Resetting the team resets every member too",
+    "clamped": "{{count}} member limits were brought down to the team's"
   },
   "settings": {
-    "authorizations": "Live authorizations",
-    "authorizationsHint": "Member bridge credentials (token values never shown); revoking invalidates the next bridge call immediately",
-    "authorizationsEmpty": "No live authorizations",
-    "revoke": "Revoke",
-    "sessionTitle": "Signed-in session",
-    "sessionHint": "Ends the session on this machine. The page goes back to \"authorization needed\"; to come back in, run cobot serve in a terminal for a fresh 60-second one-time link, or open the desktop app.",
-    "signOut": "Sign out of CoBot",
     "title": "Settings",
     "back": "Back",
     "version": "Version",
@@ -722,8 +939,7 @@
       "models": "Default model",
       "providers": "Model providers",
       "collaboration": "Collaboration & budget",
-      "archived": "Archived teams",
-      "security": "Security",
+      "archived": "Archived",
       "about": "About"
     },
     "sectionHints": {
@@ -734,13 +950,16 @@
       "models": "Used by a member until it is given its own model in the conversation; applies to work that starts afterwards.",
       "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
-      "archived": "Archived teams leave the team list; restore them or delete them for good here.",
-      "security": "Bridge authorizations members currently hold; revoke them at any time.",
-      "about": "Version and where data is stored on this machine."
+      "archived": "View, restore, or delete archived chats and teams.",
+      "about": "Version, updates and project information."
     },
     "language": "Language",
     "colorMode": "Mode",
-    "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
+    "colorModes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "theme": "Theme",
     "avatarCatalog": "Avatar catalog",
     "avatarCatalogNone": "The avatar catalog has not been downloaded yet; members show the default avatar for now.",
@@ -751,10 +970,22 @@
     "avatarCatalogRejected": "The avatar catalog downloaded in the last check could not be used; the previous version is kept.",
     "avatarCatalogCheck": "Check for updates",
     "themes": {
-      "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
-      "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
-      "classic": { "name": "Classic", "summary": "Rice paper and ink: soft black, white and gray" },
-      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a plum-blossom accent" }
+      "graphite": {
+        "name": "Graphite",
+        "summary": "Sage-tinted graphite with a cobalt accent"
+      },
+      "harbor": {
+        "name": "Harbor",
+        "summary": "Cool blue-slate with a sea-green accent"
+      },
+      "classic": {
+        "name": "Classic",
+        "summary": "Rice paper and ink: soft black, white and gray"
+      },
+      "dusk": {
+        "name": "Dusk",
+        "summary": "Plum-tinted warm gray with a plum-blossom accent"
+      }
     },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
@@ -767,15 +998,17 @@
     "memberLimit": "Member limit (incl. project manager)",
     "chainLimit": "Collaboration chain wake limit",
     "reviewRejectLimit": "Review send-back limit",
-    "budget": "Budget",
-    "budgetScope": "Budget scope",
+    "budget": "Daily budget",
+    "budgetHint": "Counted per day and reset the next day. This is the default: a team or a member can set its own under Team → Daily budget.",
+    "budgetScope": "Default applies to",
     "budgetNone": "Unlimited",
-    "budgetBot": "Per member",
-    "budgetTeam": "Per team",
-    "budgetTokens": "Token limit",
-    "profile": "Profile",
-    "profileDevelopment": "Development",
-    "profileProduction": "Production",
+    "budgetBot": "Each member",
+    "budgetTeam": "Each team",
+    "budgetTokens": "Default daily limit",
+    "budgetUnitTeam": "× 100M tokens",
+    "budgetUnitBot": "× 10M tokens",
+    "budgetUnitTeamTest": "× 10K tokens (test)",
+    "budgetUnitBotTest": "× 10K tokens (test)",
     "dataRoot": "Data root",
     "saved": "Saved",
     "saveFailed": "Save failed",
@@ -797,7 +1030,7 @@
   "errors": {
     "error.approval.file_preview_unavailable": "The exact file changes are unavailable. Approval is disabled; reject or stop this execution.",
     "error.internal": "Internal error; check the service log",
-    "error.path.outside_team": "Only existing files inside the team folder can be opened",
+    "error.path.outside_team": "Only existing files inside the current conversation workspace can be opened",
     "error.path.open_executable": "This is a program or script and would run if opened, so it is not opened; use the folder icon beside it to see it in the file manager",
     "error.team.permission_mode_invalid": "Unsupported permission mode",
     "error.team.patch_one_field": "Change one thing at a time",
@@ -832,6 +1065,9 @@
     "error.provider.invalid_endpoint": "Invalid endpoint address: {{baseUrl}}",
     "error.provider.invalid_id": "Invalid provider id: {{id}}",
     "error.provider.invalid_kind": "Unsupported provider type {{kind}}",
+    "error.provider.invalid_effort": "A thinking level is not valid",
+    "error.provider.invalid_model_limit": "A context length or output limit is out of range",
+    "error.provider.invalid_input_kind": "An input type is not valid",
     "error.provider.model_id_required": "A model needs a name",
     "error.provider.model_not_kept": "The provider does not keep the model {{model}}",
     "error.provider.model_required": "Choose a model",
@@ -851,6 +1087,10 @@
     "error.settings.budget_scope_required": "Pick a budget scope before setting a token limit",
     "error.settings.budget_scope_invalid": "Invalid budget scope",
     "error.settings.budget_tokens_positive": "Token limit must be positive",
+    "error.budget.limit_range": "A daily limit cannot be negative or unreasonably large",
+    "error.budget.limit_required": "The request has no daily limit",
+    "error.budget.above_team_limit": "A member's daily limit cannot be above the team's",
+    "error.budget.unlimited_under_team_limit": "A member cannot be unlimited while the team has a limit",
     "error.invalid_cursor": "Invalid event cursor",
     "error.invalid_json": "Request body is not valid JSON",
     "error.not_found": "Resource not found",
@@ -892,8 +1132,6 @@
     "error.run.nothing_to_retry": "Nothing is left to run again for this turn (its card was handed off or cancelled)",
     "error.engine.not_found": "Codex not found. Install the Codex CLI 0.161.0 or newer, make sure `codex` runs in a terminal, then reopen CoBot",
     "error.engine.not_found_macos": "Codex not found. Install the Codex CLI 0.146.0 or newer, make sure `codex` runs in a terminal, then reopen CoBot",
-    "error.engine.version_unsupported": "Codex is too old; version 0.161.0 or newer is required",
-    "error.engine.version_unsupported_macos": "Codex is too old; macOS requires version 0.146.0 or newer",
     "error.engine.version_probe_failed": "Cannot read the Codex version",
     "error.engine.control_unavailable": "Engine control process unavailable",
     "error.engine.settings_unreadable": "Cannot read engine settings",
@@ -975,10 +1213,123 @@
     "error.scope.other_team": "This member belongs to another team.",
     "error.chain.decision_stale": "This decision belongs to an earlier chain authorization.",
     "error.engine.interrupt_unconfirmed": "The stop request was saved, but delivery is unconfirmed.",
-    "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked."
+    "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked.",
+    "error.chat.revision_conflict": "This chat changed elsewhere. Refresh and try again.",
+    "error.chat.engine_unavailable": "The chat engine is not ready.",
+    "error.chat.busy": "Resolve the current execution or pending requests first.",
+    "error.chat.model_fixed": "Start a new chat to use another model.",
+    "error.chat.model_mismatch": "The engine reported a different model or provider. The message was not sent.",
+    "error.chat.title_required": "Enter a chat name of up to 120 characters.",
+    "error.chat.request_expired": "This request has expired. Refresh the chat.",
+    "error.chat.answers_required": "Answer all questions.",
+    "error.chat.not_running": "This turn cannot be stopped yet. Try again shortly.",
+    "error.chat.not_unknown": "This turn does not need verification.",
+    "error.chat.failed": "This turn did not complete. Check the engine, account and model settings. Sending again starts a new turn.",
+    "error.chat.restarted": "The app restarted. Verify the previous execution state.",
+    "error.chat.unknown": "The execution state is unverified. This turn will not be automatically repeated.",
+    "error.chat.archived": "This chat is archived or has an unconfirmed archive operation. Restore or verify it first.",
+    "error.chat.archive_pending": "Verify the pending archive operation first.",
+    "error.chat.archive_unknown": "The native thread archive state could not be confirmed. Verify it to continue.",
+    "error.chat.archive_state": "The archive state changed. Refresh and try again.",
+    "error.chat.section_missing": "This section no longer exists. Refresh and try again.",
+    "error.chat.order_conflict": "The list order changed. Refresh and try again."
   },
   "paging": {
     "more": "Load more",
     "failed": "Could not load the next page. Try again."
+  },
+  "chat": {
+    "expandHistory": "Expand chats",
+    "collapseHistory": "Collapse chats",
+    "mode": "Mode",
+    "chat": "Chat",
+    "work": "Teams",
+    "new": "New chat",
+    "history": "Chats",
+    "emptyHistory": "No chats yet",
+    "loadMore": "Load more",
+    "earlier": "Earlier messages",
+    "defaultModel": "Default model",
+    "chooseModel": "Choose model",
+    "modelFixed": "Start a new chat to change models",
+    "placeholder": "Send a message",
+    "send": "Send",
+    "stop": "Stop generating",
+    "copy": "Copy",
+    "copied": "Copied",
+    "menu": "Chat actions",
+    "rename": "Rename",
+    "delete": "Delete chat",
+    "deleteNote": "This deletes the conversation. Actions are not undone and generated files are kept.",
+    "title": "Chat name",
+    "bottom": "Back to bottom",
+    "unknown": "The previous execution is unverified. Verify it ended before continuing, or start a new chat.",
+    "verify": "Verify execution status",
+    "process": "Process · {{count}} items",
+    "tool": "Tool activity",
+    "inputRequired": "Your answer is needed",
+    "approvalRequired": "Approval needed",
+    "submitAnswers": "Submit answers",
+    "status": {
+      "queued": "Waiting to start",
+      "starting": "Connecting",
+      "running": "Responding",
+      "waiting_approval": "Waiting for approval",
+      "waiting_input": "Waiting for an answer",
+      "completed": "Completed",
+      "failed": "Failed",
+      "interrupted": "Stopped",
+      "unknown": "Execution state unknown"
+    },
+    "greeting": {
+      "morning": "Good morning. What’s on your mind today?",
+      "forenoon": "Good morning. Any new ideas?",
+      "noon": "Good afternoon. Let’s chat for a while.",
+      "afternoon": "Good afternoon. What’s on your mind?",
+      "evening": "Good evening. Anything to share from today?",
+      "night": "Still awake? What’s on your mind?"
+    }
+  },
+  "chatNav": {
+    "organize": "Organize chats",
+    "display": "Display",
+    "bySection": "Group by section",
+    "merged": "Combined list",
+    "sort": "Sort chats",
+    "recent": "Recently updated",
+    "manual": "Manual order",
+    "newSection": "New section",
+    "sectionName": "Section name",
+    "renameSection": "Rename section",
+    "deleteSection": "Delete section",
+    "deleteSectionNote": "Chats return to the unsectioned list. Their history and files are preserved.",
+    "sectionMenu": "Section actions: {{name}}",
+    "unsectioned": "Unsectioned",
+    "emptySection": "No chats yet",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "move": "Move to section",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "openFolder": "Open chat folder",
+    "archive": "Archive chat",
+    "restore": "Restore chat",
+    "archived": "Archived chats",
+    "verifyArchive": "Verify archive operation",
+    "archivePending": "The archive operation is unconfirmed. Verify it to continue. Chat history and files are preserved.",
+    "pendingShort": "Unconfirmed",
+    "archivedNotice": "This chat is archived. Restore it to send messages."
+  },
+  "archivePage": {
+    "type": "Archive type",
+    "chatSearch": "Search archived chats",
+    "chatEmpty": "No archived chats",
+    "chatNoMatch": "No matching chats",
+    "chatMeta": "Created {{created}} · Archived {{archived}}",
+    "chatRestored": "Restored “{{name}}” to the chat list",
+    "chatsDeleted": "Deleted {{count}} chats",
+    "chatDeleteFailed": "Failed to delete {{count}} chats: {{reason}}",
+    "chatDeleteMany": "Delete {{count}} chats?"
   }
 }

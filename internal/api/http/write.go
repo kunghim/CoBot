@@ -34,6 +34,9 @@ func writeData(w http.ResponseWriter, r *http.Request, status int, data any) {
 
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	de := domain.AsError(err)
+	if de.Code == domain.CodeInternal {
+		recordFailure(r, err)
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(de.HTTPStatus())
 	_ = json.NewEncoder(w).Encode(errorEnvelope{

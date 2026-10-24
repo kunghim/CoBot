@@ -64,7 +64,7 @@ flowchart LR
   Agent 可以向你提问，你回答后它会被唤醒。成员工作时你发的消息会并入它正在进行的这一轮；
   这一轮已结束则排队等待。
 - **防失控**：每条协作链唤醒成员的次数有上限（默认 10 次）。超过上限后协作链等你决定：继续会再给一份
-  同样大小的额度，停止则结束这条链。可选的 token 预算（按成员或按团队）会暂停新的轮次。
+  同样大小的额度，停止则结束这条链。可选的每日 token 预算（按团队或按成员，且各自可调）会暂停新的轮次，隔天自动恢复。
 - **工作过程可见**：每一轮的步骤、工具调用和文件改动都显示在会话里；输入框下的会话统计显示轮数、
   模型与工具用时、token 与缓存、上下文占用和账号额度。每个团队可从模型提供的档位中选择思考强度。
   成员启动的 Codex 子智能体在该成员的运行内工作，步骤、审批和用量都归属这名成员。
@@ -114,7 +114,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | 将 **CoBot.app** 复制到「应用程序」，弹出映像后打开（需要 Codex CLI 0.146.0 或更新版本） |
 
 两种 Windows 下载包含相同的程序文件。Windows 需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
-以及已在 `PATH` 上安装的官方 **Codex CLI 0.161.0 或更新版本**，具备可用账号和访问 Codex 服务的网络。
+以及已在 `PATH` 上安装的官方 **Codex CLI**，具备可用账号和访问 Codex 服务的网络。
 安装包不包含 Codex；只随 Codex 桌面版附带的引擎找不到。成员可以使用官方 ChatGPT 账号，
 也可以使用兼容 OpenAI Responses 接口的 API 供应商。
 使用上述下载包无需安装 Go 或 Node。
@@ -135,7 +135,7 @@ CoBot 使用自己的私有 Codex 环境，需要独立登录。
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
 让 Agent 工作还需在 `PATH` 上安装 [Codex CLI](https://github.com/openai/codex)
-（Windows/Linux 最低 0.161.0，macOS 最低 0.146.0），具备可使用 Codex 的账号和访问其服务的网络。
+（建议使用最新版），具备可使用 Codex 的账号和访问其服务的网络。
 Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
 
 #### Windows（PowerShell）

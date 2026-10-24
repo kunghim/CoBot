@@ -121,3 +121,43 @@ func TestProviderApplyLeavesUnmentionedFieldsAlone(t *testing.T) {
 		t.Fatal("patch changed the models it did not mention")
 	}
 }
+
+func TestAModelMayDeclareOnlyValidThinkingLevels(t *testing.T) {
+	provider := func(model ProviderModel) Provider {
+		return Provider{
+			ID: "gw", Name: "Gateway", Kind: ProviderKindCustom, AuthMode: ProviderAuthAPIKey, CredentialRef: "ref",
+			Endpoints: []ProviderEndpoint{{Dialect: DialectOpenAIResponses, BaseURL: "https://gw.example/v1"}},
+			Models:    []ProviderModel{model},
+		}
+	}
+	good := []ProviderModel{
+		{ID: "m"},
+		{ID: "m", SupportedEfforts: []string{"low", "high", "xhigh"}, DefaultEffort: "high"},
+	}
+	for _, m := range good {
+		if err := provider(m).Validate(); err != nil {
+			t.Errorf("%+v rejected: %v", m, err)
+		}
+	}
+	bad := []ProviderModel{
+		{ID: "m", SupportedEfforts: []string{""}},
+		{ID: "m", SupportedEfforts: []string{"High!"}},
+		{ID: "m", SupportedEfforts: []string{"low", "low"}},
+		{ID: "m", SupportedEfforts: []string{"low"}, DefaultEffort: "high"},
+		{ID: "m", DefaultEffort: "low"},
+	}
+	for _, m := range bad {
+		if err := provider(m).Validate(); err == nil {
+			t.Errorf("%+v accepted", m)
+		}
+	}
+}
+
+func TestAModelThatListsNoThinkingLevelsHasTheDefaultThree(t *testing.T) {
+	if got := (ProviderModel{ID: "m"}).SupportedEffortsOf(); len(got) != 3 || got[0] != "low" || got[1] != "medium" || got[2] != "high" {
+		t.Fatalf("defaults = %v", got)
+	}
+	if got := (ProviderModel{ID: "m", SupportedEfforts: []string{"xhigh"}}).SupportedEffortsOf(); len(got) != 1 || got[0] != "xhigh" {
+		t.Fatalf("listed = %v", got)
+	}
+}

@@ -5,6 +5,7 @@ import { authorize, seedRequirement, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The work-panel pages are all real: the requirement board shows a route
@@ -83,6 +84,8 @@ test('an idle team archives to settings and restores', async ({ page }) => {
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/团队名称|team name/i).fill(label);
   await dialog.getByLabel(/工作目录|directory/i).fill(teamDir);
+  // Only the project manager comes by default; the rest is picked.
+  await dialog.getByRole('checkbox', { name: /测试工程师|QA engineer/ }).check();
   await dialog.getByRole('button', { name: /创建|create/i }).click();
   const sidebar = page.getByRole('complementary', { name: /团队列表|team list/i });
   const row = sidebar.locator('li').filter({ hasText: label }).first();

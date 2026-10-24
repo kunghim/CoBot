@@ -221,15 +221,24 @@ func (a *App) enterStageLocked(ctx context.Context, tx *sql.Tx, req domain.Requi
 		if err != nil {
 			return effect, err
 		}
+		// The document is read in the conversation; the question only asks.
+		posted, err := postDocumentLocked(ctx, tx, req.TeamID, team.LeaderID, text)
+		if err != nil {
+			return effect, err
+		}
+		ask := "请确认上面的内容。"
+		if criteria := strings.TrimSpace(req.Stages[idx].Criteria); criteria != "" {
+			ask = "请确认：" + criteria
+		}
 		question := domain.Question{
 			ID: domain.NewID(), Kind: domain.QuestionKindConfirm, RequirementID: req.ID, StageIndex: idx,
-			TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: text, Options: []string{},
+			TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: ask, Options: []string{},
 			Status: domain.QuestionOpen, Revision: 1,
 		}
 		if err := sqlite.InsertQuestion(ctx, tx, question); err != nil {
 			return effect, err
 		}
-		effect.events = append(effect.events, domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID})
+		effect.events = append(effect.events, posted, domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID})
 		return effect, nil
 	}
 	card := domain.Task{
@@ -529,9 +538,14 @@ func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requ
 	} else if len(suggestions) > 0 {
 		text += "\n\n遗留建议：\n- " + strings.Join(suggestions, "\n- ")
 	}
+	// The report is read in the conversation; the question only asks.
+	posted, err := postDocumentLocked(ctx, tx, req.TeamID, team.LeaderID, fmt.Sprintf("## %s · 验收汇报\n\n%s", req.Title, text))
+	if err != nil {
+		return effect, err
+	}
 	question := domain.Question{
 		ID: domain.NewID(), Kind: domain.QuestionKindAcceptance, RequirementID: req.ID, StageIndex: len(req.Stages) - 1,
-		TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: text, Options: []string{},
+		TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: fmt.Sprintf("需求「%s」已完成，请按上面的汇报验收。", req.Title), Options: []string{},
 		Status: domain.QuestionOpen, Revision: 1,
 	}
 	if err := sqlite.InsertQuestion(ctx, tx, question); err != nil {
@@ -540,10 +554,29 @@ func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requ
 	if _, err := sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementAccepting); err != nil {
 		return effect, err
 	}
-	effect.events = append(effect.events,
+	effect.events = append(effect.events, posted,
 		domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID},
 		domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 	return effect, nil
+}
+
+// postDocumentLocked puts a document (the requirement to confirm, the report
+// to accept) into the project manager's conversation, as a message from it,
+// so it is read where the conversation is, before the question that asks for
+// the decision. It stays in the history after the decision.
+func postDocumentLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text string) (domain.Event, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return domain.Event{}, err
+	}
+	message := domain.Message{
+		ID: domain.NewID(), TeamID: teamID, BotID: botID,
+		Kind: domain.MessageKindAssistant, Blocks: blocks, CreatedAt: time.Now().UTC(),
+	}
+	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+		return domain.Event{}, err
+	}
+	return domain.Event{Type: domain.EventMessageCreated, TeamID: teamID, BotID: botID, ResourceID: message.ID}, nil
 }
 
 func requirementSuggestions(ctx context.Context, q sqlite.Queryer, requirementID string) ([]string, error) {
