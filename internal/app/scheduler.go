@@ -49,11 +49,24 @@ type teamRuntime struct {
 }
 
 type runBuffer struct {
+	// texts are the answers the engine marked as final.
 	texts []string
-	items map[string]bool
+	// loose are the messages the engine gave no phase, each with the number
+	// of work steps (commands, tools, edits) that had begun before it: what is
+	// said after the last of them is the turn's reply, the rest was said on the way.
+	loose []loosePiece
+	// work counts the work steps begun so far; workSeen keeps their ids.
+	work     int
+	workSeen map[string]bool
+	items    map[string]bool
 	// commentary is the last thing the model said while working; it stands
 	// in as the reply only when a turn ends without an answer.
 	commentary string
+}
+
+type loosePiece struct {
+	text string
+	work int
 }
 
 // Scheduler wakes per bot, claims queued deliveries serially and drives the

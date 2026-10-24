@@ -13,7 +13,8 @@ import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import DiffView from '../../components/DiffView';
 import Markdown from './Markdown';
-import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, visibleSteps, type Phrase } from './steps';
+import { stripToolCallText } from './toolCallText';
+import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
 
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -25,12 +26,19 @@ function useNow(active: boolean): number {
   return now;
 }
 
+/** Whether a turn has anything to show above its reply: what is being done, what went wrong, or what was done. */
+export function runHasContent(run: RunWithSteps, active: boolean, replyText: string): boolean {
+  if (active || run.status === 'failed' || run.status === 'interrupted') return true;
+  return visibleSteps(mergeSteps(run.steps, undefined), undefined, replyText).length > 0;
+}
+
 export default function RunProcess({
   run,
   active,
   live,
   teamId,
   nameOf,
+  replyText = '',
   onRetry,
   retrying = false,
 }: {
@@ -39,6 +47,8 @@ export default function RunProcess({
   live: LiveRun | undefined;
   teamId: string;
   nameOf: (botId: string) => string;
+  /** The turn's reply, shown right under it: what it holds is not said twice. */
+  replyText?: string;
   /** Given for the member's latest failed turn while it is idle: run the work again. */
   onRetry?: () => void;
   retrying?: boolean;
@@ -51,10 +61,13 @@ export default function RunProcess({
   );
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const now = useNow(active);
+  // null: follow the default; true or false: the user opened or folded all the work.
   const [open, setOpen] = useState<boolean | null>(null);
   const steps = mergeSteps(run.steps, active ? live : undefined);
-  const shown = visibleSteps(steps, active ? live : undefined);
-  // A failed turn stays open so its reason is seen without a click.
+  const shown = visibleSteps(steps, active ? live : undefined, replyText);
+  const blocks = turnBlocks(shown);
+  const workCount = shown.filter((step) => step.kind !== 'message').length;
+  // The work of a running or failed turn stays open so what is going on, or what went wrong, is seen without a click.
   const expanded = open ?? (active || run.status === 'failed');
 
   if (!active && shown.length === 0) {
@@ -74,33 +87,65 @@ export default function RunProcess({
   const duration = say(durationPhrase(seconds));
   const header = active
     ? `${say(runPhase(run, steps, live, seconds))} · ${duration}`
-    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: shown.length });
+    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: workCount });
 
   return (
-    <div className="max-w-[85%] space-y-1.5" data-testid="run-process">
-      <button
-        type="button"
-        onClick={() => setOpen(!expanded)}
-        aria-expanded={expanded}
-        className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
-      >
-        {active ? <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" /> : expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
-        <span role={active ? 'status' : undefined}>{header}</span>
-      </button>
-      {expanded && shown.length > 0 && (
-        <ol className="ml-1.5 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
-          {shown.map((step) => (
-            <li key={step.id}>
-              <StepRow step={step} running={active && step.status === 'in_progress'} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} />
-            </li>
-          ))}
-        </ol>
+    <div className="min-w-0 space-y-2" data-testid="run-process">
+      {(active || workCount > 0 || run.status === 'failed' || run.status === 'interrupted') && (
+        <button
+          type="button"
+          onClick={() => setOpen(!expanded)}
+          aria-expanded={expanded}
+          className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
+        >
+          {active ? <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" /> : expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
+          <span role={active ? 'status' : undefined}>{header}</span>
+        </button>
+      )}
+      {blocks.map((block) =>
+        block.kind === 'text' ? (
+          <StepRow key={block.step.id} step={block.step} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} />
+        ) : (
+          <WorkGroup key={block.id} steps={block.steps} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} say={say} />
+        ),
       )}
       {retry}
       {active && live?.reply && (
         <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
-          <Markdown text={live.reply} teamId={teamId} />
+          <Markdown text={stripToolCallText(live.reply)} teamId={teamId} />
         </div>
+      )}
+    </div>
+  );
+}
+
+/** A stretch of work between two things the member said: a line saying what it
+ * held, which opens into the steps. A running or failed turn shows them open. */
+function WorkGroup({ steps, expanded, active, live, teamId, nameOf, say }: { steps: RunStep[]; expanded: boolean; active: boolean; live: LiveRun | undefined; teamId: string; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
+  const [own, setOwn] = useState<boolean | null>(null);
+  const open = own ?? expanded;
+  const summary = workSummary(steps).map(say).join('、');
+  return (
+    <div>
+      {!active && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOwn(!open)}
+          className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
+        >
+          {open ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
+          <span>{summary}</span>
+        </button>
+      )}
+      {(open || active) && (
+        <ol className="ml-1.5 mt-1 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
+          {steps.map((step) => (
+            <li key={step.id}>
+              <StepRow step={step} running={active && step.status === 'in_progress'} live={live} teamId={teamId} nameOf={nameOf} />
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );
@@ -143,7 +188,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
     const said = (typeof d.text === 'string' && d.text) || live?.commentary[step.id] || '';
     return (
       <div className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="run-commentary">
-        <Markdown text={said} teamId={teamId} />
+        <Markdown text={stripToolCallText(said)} teamId={teamId} />
       </div>
     );
   }

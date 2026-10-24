@@ -141,6 +141,13 @@ func fileEditGuide(goos string) string {
 		"重定向（cat <<'EOF' > 文件）写整个文件，局部替换用 perl -pi -e 's/旧/新/' 文件（不要用 sed -i，macOS 和 Linux 的写法不同），写完读回来确认。\n"
 }
 
+// toolCallGuide is for a model that is not the ChatGPT account's: some write
+// a tool call into their reply as text (in an XML form of their own) instead
+// of, or besides, making the call. That text is never run, and the user is
+// shown none of it, so it only costs the reply its words.
+const toolCallGuide = "\n# 调用工具的方式\n" +
+	"要用工具时，直接发出工具调用。不要把调用写成文字放进回复（比如 <tool_call>、<function=…>、<parameter=…>）：那样的文字不会被执行，也不会显示给用户。\n"
+
 // browserGuide is the one line a member carries about the browser; the rules
 // themselves are returned by the tool on demand (browser.Guide).
 const browserGuide = `- browser({help?, url?, steps?, ...})：团队共用的真实浏览器，用来验证页面、核对界面、查资料。第一次用之前先调用 browser({help: true}) 读使用说明和安全规则（不读的话，第一次真实调用会先把说明返回给你，不执行动作）。
@@ -162,6 +169,7 @@ func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot doma
 	b.WriteString(toolGuide(place, codeMode))
 	if !codeMode {
 		b.WriteString(fileEditGuide(runtime.GOOS))
+		b.WriteString(toolCallGuide)
 	}
 	b.WriteString("\n# 你的角色\n")
 	b.WriteString(role.Instructions)

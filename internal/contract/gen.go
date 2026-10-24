@@ -933,18 +933,27 @@ type ModelCatalogUpdateState string
 
 // ModelSpec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
 type ModelSpec struct {
-	Alias           *string  `json:"alias,omitempty"`
-	CatalogId       *string  `json:"catalogId,omitempty"`
+	Alias     *string `json:"alias,omitempty"`
+	CatalogId *string `json:"catalogId,omitempty"`
+
+	// ContextLimit The most the catalog says the model reads; 0 when it does not know the model.
+	ContextLimit int `json:"contextLimit"`
+
+	// ContextWindow In use. The user's own number when it is below the limit
 	ContextWindow   int      `json:"contextWindow"`
 	DisplayName     string   `json:"displayName"`
 	InputModalities []string `json:"inputModalities"`
 
-	// Locked Fields the catalog gives and the user cannot change.
-	Locked    []ModelSpecLocked `json:"locked"`
-	MaxOutput int               `json:"maxOutput"`
-	Name      *string           `json:"name,omitempty"`
-	Source    ModelSpecSource   `json:"source"`
-	Thinking  struct {
+	// InputOptions The kinds of input the model may be said to take.
+	InputOptions []string `json:"inputOptions"`
+
+	// Locked Fields the catalog gives and the user cannot change; the others only have limits.
+	Locked         []ModelSpecLocked `json:"locked"`
+	MaxOutput      int               `json:"maxOutput"`
+	MaxOutputLimit int               `json:"maxOutputLimit"`
+	Name           *string           `json:"name,omitempty"`
+	Source         ModelSpecSource   `json:"source"`
+	Thinking       struct {
 		DefaultEffort *string  `json:"defaultEffort,omitempty"`
 		Efforts       []string `json:"efforts"`
 		Toggle        bool     `json:"toggle"`

@@ -10,13 +10,9 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-// Field names a model's catalog entry can lock (see domain.ModelSpec.Locked).
-const (
-	lockedContext  = "contextWindow"
-	lockedOutput   = "maxOutput"
-	lockedInput    = "inputModalities"
-	lockedThinking = "thinking"
-)
+// The one field a model's catalog entry locks (see domain.ModelSpec.Locked):
+// the others only have limits.
+const lockedThinking = "thinking"
 
 // resolveModel puts together what is known about a model: the model catalog is
 // trusted where it has a word, and the user's own entries stand where it has
@@ -29,22 +25,20 @@ func (a *App) resolveModel(model domain.ProviderModel) domain.ModelSpec {
 	}
 	spec.DisplayName = firstNonEmpty(model.DisplayName, spec.Name, model.ID)
 
-	spec.ContextWindow = model.ContextWindow
-	if known && entry.Context > 0 {
-		spec.ContextWindow = entry.Context
-		spec.Locked = append(spec.Locked, lockedContext)
-	}
-	spec.MaxOutput = model.MaxOutput
-	if known && entry.Output > 0 {
-		spec.MaxOutput = entry.Output
-		spec.Locked = append(spec.Locked, lockedOutput)
-	}
-	input := model.InputModalities
+	// The catalog's limits are the most a model can do; the user may ask for
+	// less (a smaller context, a shorter output, fewer kinds of input) but
+	// never for more. Nothing entered means the catalog's value.
+	spec.ContextLimit, spec.ContextWindow = known0(known, entry.Context), cappedBy(model.ContextWindow, known0(known, entry.Context))
+	spec.MaxOutputLimit, spec.MaxOutput = known0(known, entry.Output), cappedBy(model.MaxOutput, known0(known, entry.Output))
+	spec.InputOptions = allInputKinds
+	spec.InputModalities = withText(model.InputModalities)
 	if known && len(entry.Input) > 0 {
-		input = entry.Input
-		spec.Locked = append(spec.Locked, lockedInput)
+		spec.InputOptions = withText(entry.Input)
+		spec.InputModalities = spec.InputOptions
+		if len(model.InputModalities) > 0 {
+			spec.InputModalities = intersect(withText(model.InputModalities), spec.InputOptions)
+		}
 	}
-	spec.InputModalities = withText(input)
 
 	switch {
 	case known && entry.Thinking != nil:
@@ -61,6 +55,38 @@ func (a *App) resolveModel(model domain.ProviderModel) domain.ModelSpec {
 		spec.Thinking.DefaultEffort = model.DefaultEffort
 	}
 	return spec
+}
+
+// allInputKinds are the kinds of input a model nothing is known about may be
+// said to take.
+var allInputKinds = []string{"text", "image", "video", "pdf"}
+
+// known0 is the catalog's number when the model is in it, else 0 (no limit).
+func known0(known bool, value int) int {
+	if known && value > 0 {
+		return value
+	}
+	return 0
+}
+
+// cappedBy is the user's number when it is set and within the limit, else
+// the limit itself (0 when there is neither).
+func cappedBy(entered, limit int) int {
+	if entered <= 0 || (limit > 0 && entered > limit) {
+		return limit
+	}
+	return entered
+}
+
+// intersect is the kinds of input in both lists, in the order of the first.
+func intersect(list, allowed []string) []string {
+	out := make([]string, 0, len(list))
+	for _, kind := range list {
+		if contains(allowed, kind) {
+			out = append(out, kind)
+		}
+	}
+	return out
 }
 
 // withText lists what a model takes with text first: every model takes text.
@@ -109,29 +135,42 @@ func (a *App) withSpecs(p domain.Provider) domain.Provider {
 }
 
 // clearedOfWhatTheCatalogGives is the provider's models ready to store: the
-// computed spec dropped, and the entries the catalog already answers for taken
-// out, so nothing stale is left behind to reappear if the catalog stops
-// knowing the model.
+// computed spec dropped, and what the catalog already says taken out, so
+// nothing stale is left behind to reappear if the catalog stops knowing the
+// model. What the user asked for below a limit is kept; a value at or above
+// the limit is the catalog's own and is not stored.
 func (a *App) clearedOfWhatTheCatalogGives(models []domain.ProviderModel) []domain.ProviderModel {
 	out := make([]domain.ProviderModel, len(models))
 	for i, model := range models {
 		spec := a.resolveModel(model)
 		model.Spec = nil
+		// The catalog's own name is what a model is shown as without an alias;
+		// keeping it as an alias would only freeze it.
+		if spec.Name != "" && model.DisplayName == spec.Name {
+			model.DisplayName = ""
+		}
+		if spec.ContextLimit > 0 && model.ContextWindow >= spec.ContextLimit {
+			model.ContextWindow = 0
+		}
+		if spec.MaxOutputLimit > 0 && model.MaxOutput >= spec.MaxOutputLimit {
+			model.MaxOutput = 0
+		}
+		if spec.Source == "catalog" && len(model.InputModalities) > 0 && sameKinds(spec.InputModalities, spec.InputOptions) {
+			model.InputModalities = nil
+		}
 		for _, field := range spec.Locked {
-			switch field {
-			case lockedContext:
-				model.ContextWindow = 0
-			case lockedOutput:
-				model.MaxOutput = 0
-			case lockedInput:
-				model.InputModalities = nil
-			case lockedThinking:
+			if field == lockedThinking {
 				model.SupportedEfforts, model.ThinkingToggle, model.DefaultEffort = nil, false, ""
 			}
 		}
 		out[i] = model
 	}
 	return out
+}
+
+// sameKinds says whether two lists hold the same kinds of input.
+func sameKinds(a, b []string) bool {
+	return len(a) == len(b) && len(intersect(a, b)) == len(a)
 }
 
 // specOfChoice is what is known about the model a member runs with, when it

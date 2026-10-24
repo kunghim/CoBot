@@ -139,15 +139,56 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
   }
 }
 
-/** Steps worth listing: an empty thought would only add noise, and an
- * ongoing reconnect is already the status line itself. */
-export function visibleSteps(steps: RunStep[], live: LiveRun | undefined): RunStep[] {
+/** Steps worth listing: an empty thought would only add noise, an ongoing
+ * reconnect is already the status line itself, and what the member said that
+ * the reply already holds (the closing words of the turn) would be said twice. */
+export function visibleSteps(steps: RunStep[], live: LiveRun | undefined, replyText = ''): RunStep[] {
   return steps.filter((step) => {
     if (step.kind === 'reasoning') return text(step.detail?.text).trim() !== '' || (live?.reasoning[step.id] ?? '') !== '';
-    if (step.kind === 'message') return text(step.detail?.text).trim() !== '' || (live?.commentary[step.id] ?? '') !== '';
+    if (step.kind === 'message') {
+      const said = text(step.detail?.text).trim();
+      if (said !== '' && replyText.includes(said)) return false;
+      return said !== '' || (live?.commentary[step.id] ?? '') !== '';
+    }
     if (step.kind === 'retry') return step.status !== 'in_progress';
     return true;
   });
+}
+
+/** A turn read as the member lived it: what it said, and the stretches of
+ * work between the sayings. */
+export type TurnBlock = { kind: 'text'; step: RunStep } | { kind: 'work'; id: string; steps: RunStep[] };
+
+export function turnBlocks(steps: RunStep[]): TurnBlock[] {
+  const out: TurnBlock[] = [];
+  for (const step of steps) {
+    if (step.kind === 'message') {
+      out.push({ kind: 'text', step });
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (last?.kind === 'work') last.steps.push(step);
+    else out.push({ kind: 'work', id: step.id, steps: [step] });
+  }
+  return out;
+}
+
+const countedKinds = ['command', 'file_change', 'tool', 'web_search', 'agent'] as const;
+
+/** One line for a stretch of work: how many of each it held. */
+export function workSummary(steps: RunStep[]): Phrase[] {
+  const out: Phrase[] = [];
+  for (const kind of countedKinds) {
+    const count = steps.filter((step) => step.kind === kind).length;
+    if (count > 0) out.push({ key: `conversation.process.group.${kind}`, params: { count } });
+  }
+  if (out.length === 0) out.push({ key: 'conversation.process.group.other', params: { count: steps.length } });
+  return out;
+}
+
+/** Whether a stretch of work needs to be seen without a click: something went wrong in it. */
+export function workNeedsAttention(steps: RunStep[]): boolean {
+  return steps.some((step) => step.status === 'failed' || step.status === 'declined' || step.kind === 'notice');
 }
 
 /** The command a member ran, without the shell the engine wrapped it in:

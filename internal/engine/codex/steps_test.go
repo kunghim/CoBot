@@ -15,7 +15,7 @@ func TestProgressNotificationsAreNormalized(t *testing.T) {
 	server.handleNotify("item/commandExecution/outputDelta", json.RawMessage(`{"threadId":"th","turnId":"tu","itemId":"c1","delta":"ok\n"}`))
 	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"reasoning","id":"r1","summary":["看一下","再改"],"content":[]}}`))
 	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"fileChange","id":"f1","status":"completed","changes":[{"path":"a.go","kind":{"type":"update","move_path":"b.go"},"diff":"+x"}]}}`))
-	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"m1","text":"好了"}}`))
+	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"m1","text":"好了","phase":"final_answer"}}`))
 	server.handleNotify("error", json.RawMessage(`{"threadId":"th","turnId":"tu","willRetry":true,"error":{"message":"Reconnecting... 1/5","codexErrorInfo":{"responseStreamDisconnected":{"httpStatusCode":null}}}}`))
 	server.handleNotify("warning", json.RawMessage(`{"threadId":"th","message":"slow"}`))
 
@@ -146,5 +146,28 @@ func TestContextCompactionIsAStep(t *testing.T) {
 	}
 	if s := got[1].Step; s == nil || s.Kind != engine.StepCompaction || s.Status != engine.StepCompleted {
 		t.Fatalf("done = %+v", got[1])
+	}
+}
+
+// A model that marks no phase (a third-party one) still says things on the
+// way: each message is a step in the place it was said, and streams there.
+// Which of them is the reply is for the end of the turn to say.
+func TestAMessageWithNoPhaseIsAStepAndStreamsAsOne(t *testing.T) {
+	var got []engine.Notification
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnNotification: func(n engine.Notification) { got = append(got, n) }}}
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"p1","text":""}}`))
+	server.handleNotify("item/agentMessage/delta", json.RawMessage(`{"threadId":"th","turnId":"tu","itemId":"p1","delta":"我先看看"}`))
+	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"p1","text":"我先看看目录"}}`))
+	if len(got) != 3 {
+		t.Fatalf("notifications = %d", len(got))
+	}
+	if s := got[0].Step; s == nil || s.Kind != engine.StepMessage || s.Status != engine.StepInProgress {
+		t.Fatalf("start = %+v", got[0])
+	}
+	if got[1].DeltaKind != "commentary" || got[1].ItemID != "p1" {
+		t.Fatalf("delta = %+v", got[1])
+	}
+	if s := got[2].Step; s == nil || s.Kind != engine.StepMessage || s.Status != engine.StepCompleted || !strings.Contains(string(s.Detail), "我先看看目录") {
+		t.Fatalf("done = %+v", got[2])
 	}
 }

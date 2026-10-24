@@ -2930,15 +2930,21 @@ components:
     ModelSpec:
       type: object
       description: What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
-      required: [displayName, contextWindow, maxOutput, inputModalities, webSearch, thinking, source, locked]
+      required: [displayName, contextWindow, maxOutput, contextLimit, maxOutputLimit, inputModalities, inputOptions, webSearch, thinking, source, locked]
       properties:
         name: { type: string }
         alias: { type: string }
         displayName: { type: string }
-        contextWindow: { type: integer }
+        contextWindow: { type: integer, description: In use. The user's own number when it is below the limit, else the catalog's. }
         maxOutput: { type: integer }
+        contextLimit: { type: integer, description: The most the catalog says the model reads; 0 when it does not know the model. }
+        maxOutputLimit: { type: integer }
         inputModalities:
           type: array
+          items: { type: string }
+        inputOptions:
+          type: array
+          description: The kinds of input the model may be said to take.
           items: { type: string }
         webSearch: { type: boolean }
         thinking:
@@ -2954,7 +2960,7 @@ components:
         catalogId: { type: string }
         locked:
           type: array
-          description: Fields the catalog gives and the user cannot change.
+          description: Fields the catalog gives and the user cannot change; the others only have limits.
           items: { type: string, enum: [contextWindow, maxOutput, inputModalities, thinking] }
     EngineCatalogState:
       type: object

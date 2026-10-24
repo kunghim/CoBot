@@ -35,9 +35,9 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
   const entry = entries[id] ?? { id };
   const locked = (field: string) => spec?.locked.includes(field as ModelSpec['locked'][number]) ?? false;
 
-  const nameOf = (modelId: string) => entries[modelId]?.displayName || modelId;
-  const context = spec?.contextWindow ?? 0;
-  const badge = contextBadge(context);
+  const badge = contextBadge(spec?.contextWindow);
+  // A number that is not the user's own is only a placeholder: empty means the catalog's.
+  const limited = (entered: number | undefined, limit: number) => (limit > 0 && entered && entered > limit ? limit : (entered ?? 0));
   const takes = spec?.inputModalities ?? ['text'];
   const toggle = spec?.thinking.toggle ?? false;
   const efforts = spec?.thinking.efforts ?? [];
@@ -64,7 +64,7 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
                   size="sm"
                   label={t('providers.dialog.adv.model')}
                   value={id}
-                  options={selected.map((modelId) => ({ value: modelId, label: nameOf(modelId) === modelId ? modelId : `${nameOf(modelId)}（${modelId}）` }))}
+                  options={selected.map((modelId) => ({ value: modelId, label: modelId }))}
                   onChange={setPicked}
                 />
               </div>
@@ -75,7 +75,7 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
               )}
 
               <Field label={t('providers.dialog.adv.alias')} hint={t('providers.dialog.adv.aliasHint')}>
-                <TextInput size="sm" value={entry.displayName ?? ''} placeholder={spec.name || id} onChange={(event) => onChange(id, { displayName: event.target.value })} />
+                <TextInput size="sm" value={entry.displayName ?? spec.name ?? ''} placeholder={spec.name || id} onChange={(event) => onChange(id, { displayName: event.target.value })} />
               </Field>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -86,27 +86,25 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
                       {badge && <Badge tone="success">{badge}</Badge>}
                     </span>
                   }
-                  hint={locked('contextWindow') ? t('providers.dialog.adv.lockedHint') : t('providers.dialog.adv.contextHint')}
+                  hint={spec.contextLimit > 0 ? t('providers.dialog.adv.contextLimitHint', { limit: spec.contextLimit }) : t('providers.dialog.adv.contextHint')}
                 >
                   <TextInput
                     size="sm"
                     mono
                     inputMode="numeric"
-                    readOnly={locked('contextWindow')}
-                    value={context ? String(context) : ''}
-                    placeholder="128000"
-                    onChange={(event) => onChange(id, { contextWindow: digits(event.target.value) })}
+                    value={entry.contextWindow ? String(entry.contextWindow) : ''}
+                    placeholder={spec.contextLimit > 0 ? String(spec.contextLimit) : '128000'}
+                    onChange={(event) => onChange(id, { contextWindow: limited(digits(event.target.value), spec.contextLimit) })}
                   />
                 </Field>
-                <Field label={t('providers.dialog.adv.maxOutput')} hint={locked('maxOutput') ? t('providers.dialog.adv.lockedHint') : t('providers.dialog.adv.maxOutputHint')}>
+                <Field label={t('providers.dialog.adv.maxOutput')} hint={spec.maxOutputLimit > 0 ? t('providers.dialog.adv.maxOutputLimitHint', { limit: spec.maxOutputLimit }) : t('providers.dialog.adv.maxOutputHint')}>
                   <TextInput
                     size="sm"
                     mono
                     inputMode="numeric"
-                    readOnly={locked('maxOutput')}
-                    value={spec.maxOutput ? String(spec.maxOutput) : ''}
-                    placeholder="16384"
-                    onChange={(event) => onChange(id, { maxOutput: digits(event.target.value) })}
+                    value={entry.maxOutput ? String(entry.maxOutput) : ''}
+                    placeholder={spec.maxOutputLimit > 0 ? String(spec.maxOutputLimit) : '16384'}
+                    onChange={(event) => onChange(id, { maxOutput: limited(digits(event.target.value), spec.maxOutputLimit) })}
                   />
                 </Field>
               </div>
@@ -120,11 +118,12 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
                       centered
                       className="min-w-[4.75rem]"
                       pressed={takes.includes(kind)}
-                      disabled={kind === 'text' || locked('inputModalities')}
+                      disabled={kind === 'text' || !spec.inputOptions.includes(kind)}
                       onClick={() => {
-                        const have = (entry.inputModalities?.length ? entry.inputModalities : takes).filter((value) => value !== 'text');
+                        const have = takes.filter((value) => value !== 'text');
                         const next = have.includes(kind) ? have.filter((value) => value !== kind) : [...have, kind];
-                        onChange(id, { inputModalities: next });
+                        // Text is always kept, so "only text" is not mistaken for "nothing entered".
+                        onChange(id, { inputModalities: ['text', ...next] });
                       }}
                     >
                       {t(`providers.dialog.adv.kind.${kind}`)}
@@ -149,13 +148,19 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
               <div>
                 <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100">{t('providers.dialog.adv.thinking')}</p>
                 <div className="mt-1.5 space-y-2">
-                  <Switch
-                    checked={toggle}
-                    disabled={locked('thinking')}
-                    onChange={(checked) => onChange(id, { thinkingToggle: checked })}
-                    label={t('providers.dialog.adv.thinkingToggle')}
-                    description={t('providers.dialog.adv.thinkingToggleHint')}
-                  />
+                  {locked('thinking') ? (
+                    // What the catalog says is a fact about the model, not a control.
+                    <p className="text-sm text-neutral-700 dark:text-neutral-200">
+                      {toggle ? t('providers.dialog.adv.thinkingCanOff') : t('providers.dialog.adv.thinkingCannotOff')}
+                    </p>
+                  ) : (
+                    <Switch
+                      checked={toggle}
+                      onChange={(checked) => onChange(id, { thinkingToggle: checked })}
+                      label={t('providers.dialog.adv.thinkingToggle')}
+                      description={t('providers.dialog.adv.thinkingToggleHint')}
+                    />
+                  )}
                   <div className="flex flex-wrap gap-1.5">
                     {EFFORT_LEVELS.map((level) => (
                       <Chip

@@ -137,6 +137,9 @@ describe('provider settings', () => {
             alias: model.displayName,
             contextWindow: model.contextWindow ?? 0,
             maxOutput: model.maxOutput ?? 0,
+            contextLimit: 0,
+            maxOutputLimit: 0,
+            inputOptions: ['text', 'image', 'video', 'pdf'],
             inputModalities: ['text', ...(model.inputModalities ?? [])],
             webSearch: model.webSearch ?? false,
             thinking: { toggle: model.thinkingToggle ?? false, efforts: model.supportedEfforts?.length || model.thinkingToggle ? (model.supportedEfforts ?? []) : ['low', 'medium', 'high'] },
@@ -452,35 +455,58 @@ describe('provider settings', () => {
     });
     const models = state.save.mock.calls[0][0].body.models as Array<Record<string, unknown>>;
     const flash = models.find((model) => model.id === 'deepseek-flash')!;
-    expect(flash).toMatchObject({ displayName: '闪电', contextWindow: 2000000, inputModalities: ['image'], thinkingToggle: true });
+    expect(flash).toMatchObject({ displayName: '闪电', contextWindow: 2000000, inputModalities: ['text', 'image'], thinkingToggle: true });
     // The other model was left alone.
     expect(models.find((model) => model.id === 'deepseek-v4-pro')).toEqual({ id: 'deepseek-v4-pro', status: 'ok' });
   });
 
-  it('shows what the catalog gives as read-only, and the alias stays the user\'s', async () => {
-    state.resolve.mockImplementation(async (models: Array<{ id: string }>) => ({
+  it('treats what the catalog gives as a limit the user may lower but not pass', async () => {
+    state.resolve.mockImplementation(async (models: Array<{ id: string; displayName?: string; contextWindow?: number }>) => ({
       specs: Object.fromEntries(
         models.map((model) => [
           model.id,
           {
-            displayName: model.id,
+            displayName: model.displayName || 'DeepSeek V4',
             name: 'DeepSeek V4',
-            contextWindow: 1048576,
+            contextWindow: model.contextWindow || 1048576,
+            contextLimit: 1048576,
             maxOutput: 393216,
+            maxOutputLimit: 393216,
             inputModalities: ['text', 'image'],
+            inputOptions: ['text', 'image'],
             webSearch: false,
             thinking: { toggle: true, efforts: ['low', 'high'] },
             source: 'catalog',
-            locked: ['contextWindow', 'maxOutput', 'inputModalities', 'thinking'],
+            locked: ['thinking'],
           },
         ]),
       ),
     }));
+    bothAnswer();
     await startWithBothModels();
     await openAdvanced();
-    expect(inputOf('上下文长度')!.readOnly).toBe(true);
+    const context = inputOf('上下文长度')!;
+    expect(context.readOnly).toBe(false);
+    expect(context.placeholder).toBe('1048576');
     expect(host.textContent).toContain('1M');
+    act(() => setValue(context, '500000'));
+    act(() => setValue(inputOf('上下文长度')!, '9999999'));
+    expect(inputOf('上下文长度')!.value).toBe('1048576');
+    act(() => setValue(inputOf('上下文长度')!, '200000'));
     expect(inputOf('别名')!.readOnly).toBe(false);
+    // Only the thinking comes from the catalog and cannot be changed.
+    expect(host.textContent).toContain('可以关闭思考（来自模型目录）');
+    // Only web search is a switch; what the catalog says about thinking is not.
+    expect(host.querySelectorAll('[role="dialog"] button[role="switch"]').length).toBe(1);
+    // The catalog's name is the alias the user starts from.
+    expect(inputOf('别名')!.value).toBe('DeepSeek V4');
+    // The browser's list of saved entries must not open over the form.
+    expect([...host.querySelectorAll<HTMLInputElement>('[role="dialog"] input:not([type="password"])')].every((input) => input.autocomplete === 'off')).toBe(true);
+    await act(async () => {
+      byText('测试并添加')!.click();
+    });
+    const models = state.save.mock.calls[0][0].body.models as Array<Record<string, unknown>>;
+    expect(models.find((model) => model.id === 'deepseek-flash')).toMatchObject({ contextWindow: 200000 });
   });
 
   it('removes a provider without touching the profile settings', async () => {

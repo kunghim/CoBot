@@ -11,6 +11,7 @@ import (
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/modelcatalog"
+	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -25,24 +26,36 @@ func appWithCatalog(t *testing.T) *App {
 	return a
 }
 
-func TestACatalogModelTakesWhatItKnowsAndLocksIt(t *testing.T) {
+func TestACatalogModelTakesWhatItKnowsAndTheUserMayAskForLess(t *testing.T) {
 	a := appWithCatalog(t)
-	// Whatever the user stored for these is overruled by the catalog.
-	spec := a.resolveModel(domain.ProviderModel{ID: "q-glm-5.3", DisplayName: "我的 GLM", ContextWindow: 1, SupportedEfforts: []string{"minimal"}, WebSearch: true})
-	if spec.Source != "catalog" || spec.ContextWindow != 1000000 || spec.DisplayName != "我的 GLM" {
+	// Nothing entered: the catalog's numbers, and its thinking, which stays the catalog's.
+	spec := a.resolveModel(domain.ProviderModel{ID: "q-glm-5.3", DisplayName: "我的 GLM", SupportedEfforts: []string{"minimal"}, WebSearch: true})
+	if spec.Source != "catalog" || spec.ContextWindow != 1000000 || spec.ContextLimit != 1000000 || spec.DisplayName != "我的 GLM" {
 		t.Fatalf("spec = %+v", spec)
 	}
 	if !reflect.DeepEqual(spec.Thinking.Efforts, []string{"low", "high", "max"}) || spec.Thinking.Toggle {
 		t.Fatalf("thinking = %+v", spec.Thinking)
 	}
-	for _, field := range []string{lockedContext, lockedOutput, lockedInput, lockedThinking} {
-		if !contains(spec.Locked, field) {
-			t.Errorf("%s is not locked: %v", field, spec.Locked)
-		}
+	if !reflect.DeepEqual(spec.Locked, []string{lockedThinking}) {
+		t.Errorf("locked = %v", spec.Locked)
 	}
-	// Web search is never the catalog's to say.
 	if !spec.WebSearch {
 		t.Error("the user's web search choice was lost")
+	}
+	// Less is taken, more is not.
+	if got := a.resolveModel(domain.ProviderModel{ID: "glm-5.3", ContextWindow: 200000, MaxOutput: 8000}); got.ContextWindow != 200000 || got.MaxOutput != 8000 || got.ContextLimit != 1000000 {
+		t.Errorf("a lowered window = %+v", got)
+	}
+	if got := a.resolveModel(domain.ProviderModel{ID: "glm-5.3", ContextWindow: 5000000, MaxOutput: 99999999}); got.ContextWindow != 1000000 || got.MaxOutput != got.MaxOutputLimit {
+		t.Errorf("a raised window = %+v", got)
+	}
+	// Kinds of input: a subset is taken, a kind the model lacks is not.
+	flash := a.resolveModel(domain.ProviderModel{ID: "qwen3.8-flash", InputModalities: []string{"text", "pdf"}})
+	if !reflect.DeepEqual(flash.InputModalities, []string{"text"}) || !contains(flash.InputOptions, "image") {
+		t.Errorf("input = %v of %v", flash.InputModalities, flash.InputOptions)
+	}
+	if got := a.resolveModel(domain.ProviderModel{ID: "qwen3.8-flash"}); !contains(got.InputModalities, "image") {
+		t.Errorf("nothing entered must be the catalog's kinds: %v", got.InputModalities)
 	}
 }
 
@@ -66,7 +79,7 @@ func TestWhatTheCatalogAnswersForIsNotStored(t *testing.T) {
 	a := appWithCatalog(t)
 	p := testProvider()
 	p.Models = []domain.ProviderModel{
-		{ID: "glm-5.3", DisplayName: "GLM", ContextWindow: 5, SupportedEfforts: []string{"low"}, WebSearch: true},
+		{ID: "glm-5.3", DisplayName: "GLM", ContextWindow: 5000000, MaxOutput: 8000, SupportedEfforts: []string{"low"}, WebSearch: true},
 		{ID: "my-own-model-x", ContextWindow: 5},
 	}
 	saved, err := a.SaveProvider(context.Background(), p, 0)
@@ -78,7 +91,7 @@ func TestWhatTheCatalogAnswersForIsNotStored(t *testing.T) {
 		t.Fatal(err)
 	}
 	known, own := stored.Models[0], stored.Models[1]
-	if known.ContextWindow != 0 || known.SupportedEfforts != nil || known.Spec != nil || known.DisplayName != "GLM" || !known.WebSearch {
+	if known.ContextWindow != 0 || known.MaxOutput != 8000 || known.SupportedEfforts != nil || known.Spec != nil || known.DisplayName != "GLM" || !known.WebSearch {
 		t.Fatalf("a model the catalog knows = %+v", known)
 	}
 	if own.ContextWindow != 5 {
@@ -164,5 +177,30 @@ func TestAModelWithoutThePatchToolIsToldHowToEditFiles(t *testing.T) {
 		if !strings.Contains(unix, "apply_patch <<") || !strings.Contains(unix, "perl -pi") || strings.Contains(unix, "Set-Content") || strings.Contains(unix, "不要在命令行里调用") {
 			t.Fatalf("%s guide = %q", goos, unix)
 		}
+	}
+}
+
+func TestTheCatalogsNameIsNotKeptAsAnAlias(t *testing.T) {
+	a := appWithCatalog(t)
+	spec := a.resolveModel(domain.ProviderModel{ID: "q-glm-5.3"})
+	cleared := a.clearedOfWhatTheCatalogGives([]domain.ProviderModel{
+		{ID: "q-glm-5.3", DisplayName: spec.Name},
+		{ID: "glm-5.3", DisplayName: "my own name"},
+	})
+	if cleared[0].DisplayName != "" || cleared[1].DisplayName != "my own name" {
+		t.Fatalf("aliases = %q / %q", cleared[0].DisplayName, cleared[1].DisplayName)
+	}
+}
+
+func TestAModelThatIsNotTheAccountsIsToldNotToWriteToolCallsAsText(t *testing.T) {
+	a := providerTestApp(t, &fakeBinder{})
+	a.Logger = slog.Default()
+	team := domain.Team{ID: "t", Name: "T", Directory: "C:/x"}
+	bot := domain.Bot{ID: "b", TeamID: "t", Name: "PM", IsLeader: true}
+	role := roles.Role{ID: "leader", Name: "项目经理"}
+	other, _ := a.threadInstructions(context.Background(), team, bot, role, false)
+	official, _ := a.threadInstructions(context.Background(), team, bot, role, true)
+	if !strings.Contains(other, "<tool_call>") || strings.Contains(official, "<tool_call>") {
+		t.Fatalf("other has the line: %v, official: %v", strings.Contains(other, "<tool_call>"), strings.Contains(official, "<tool_call>"))
 	}
 }

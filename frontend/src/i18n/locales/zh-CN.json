@@ -234,6 +234,14 @@
       "waitingInput": "等待你回复"
     },
     "process": {
+      "group": {
+        "command": "运行了 {{count}} 条命令",
+        "file_change": "改了 {{count}} 处文件",
+        "tool": "调用了 {{count}} 次工具",
+        "web_search": "搜索了 {{count}} 次网页",
+        "agent": "调度了 {{count}} 个子智能体",
+        "other": "{{count}} 个步骤"
+      },
       "done": "已处理 {{duration}} · {{count}} 个步骤",      "failedAfter": "执行失败 · {{duration}}",
       "retry": "重试这一轮",
       "interruptedAfter": "已停止 · {{duration}}",
@@ -569,6 +577,8 @@
     "cancelKeep": "不取消"
   },
   "questions": {
+    "prev": "上一张卡片",
+    "next": "下一张卡片",
     "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "需要修改什么（选「提修改意见」时必填）", "returnToMe": "改完直接回到我确认（不再重新评审）" },
     "title": "待你回答",
     "loadFailed": "问题加载失败",
@@ -665,10 +675,14 @@
       "models": "可用模型",
       "selectedCount": "已选 {{count}} / {{total}}",
       "adv": {
+        "thinkingCanOff": "可以关闭思考（来自模型目录）",
+        "thinkingCannotOff": "不能关闭思考，只能选档位（来自模型目录）",
+        "contextLimitHint": "单位是 token。不填就用目录的 {{limit}}，只能填更小的；接近上限时会自动压缩上下文。",
+        "maxOutputLimitHint": "单位是 token，仅供参考，引擎不支持限制。不填就用目录的 {{limit}}，只能填更小的。",
         "title": "高级设置",
         "noModel": "先在上面选好要纳入的模型。",
         "model": "设置哪个模型",
-        "fromCatalog": "{{name}}：标注“来自模型目录”的项不能改；没有的项可以自己填。",
+        "fromCatalog": "{{name}}：目录里的数字是上限，可以改小，不能超过；思考方式来自目录，不能改。",
         "custom": "模型目录里没有这个模型，下面的项都由你填写。",
         "alias": "别名",
         "aliasHint": "显示模型时优先用别名，不填就用模型名。",

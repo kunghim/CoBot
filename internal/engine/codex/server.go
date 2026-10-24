@@ -450,7 +450,9 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.ItemID = p.ItemID
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
-			if s.itemPhase(p.ItemID) == "commentary" {
+			// A message with no phase streams where it sits among the steps; its
+			// place as the reply is decided when the turn ends.
+			if phase := s.itemPhase(p.ItemID); phase == "commentary" || phase == noPhase {
 				n.DeltaKind, n.Phase = "commentary", "commentary"
 			}
 		}
@@ -726,15 +728,22 @@ func (s *Server) RootThread(threadID string) string {
 func (s *Server) setItemPhase(itemID, phase string, done bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if done || phase == "" {
+	if done {
 		delete(s.phases, itemID)
 		return
 	}
 	if s.phases == nil {
 		s.phases = map[string]string{}
 	}
+	if phase == "" {
+		phase = noPhase
+	}
 	s.phases[itemID] = phase
 }
+
+// noPhase marks a message the engine gave no phase: it is known, unlike an
+// item that was never seen.
+const noPhase = "-"
 
 func (s *Server) itemPhase(itemID string) string {
 	s.mu.Lock()

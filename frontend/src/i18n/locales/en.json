@@ -234,6 +234,14 @@
       "waitingInput": "Waiting for your reply"
     },
     "process": {
+      "group": {
+        "command": "Ran {{count}} command(s)",
+        "file_change": "Changed {{count}} file(s)",
+        "tool": "Called a tool {{count}} time(s)",
+        "web_search": "Searched the web {{count}} time(s)",
+        "agent": "Used {{count}} sub-agent(s)",
+        "other": "{{count}} step(s)"
+      },
       "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
@@ -571,6 +579,8 @@
     "cancelKeep": "Keep it"
   },
   "questions": {
+    "prev": "Previous card",
+    "next": "Next card",
     "confirm": {
       "title": "Needs your confirmation",
       "accept": "Confirm and continue",
@@ -673,10 +683,14 @@
       "models": "Available models",
       "selectedCount": "{{count}} / {{total}} selected",
       "adv": {
+        "thinkingCanOff": "Thinking can be switched off (from the model catalog)",
+        "thinkingCannotOff": "Thinking cannot be switched off, only its level chosen (from the model catalog)",
+        "contextLimitHint": "In tokens. Empty means the catalog's {{limit}}; only a smaller number is accepted. The context is compacted as it nears the limit.",
+        "maxOutputLimitHint": "In tokens, for reference only; the engine cannot limit it. Empty means the catalog's {{limit}}; only a smaller number is accepted.",
         "title": "Advanced settings",
         "noModel": "Pick the models to keep above first.",
         "model": "Model to set up",
-        "fromCatalog": "{{name}}: items marked as from the model catalog cannot be changed; the rest are yours to fill in.",
+        "fromCatalog": "{{name}}: the catalog's numbers are limits you may lower but not exceed; thinking comes from the catalog and cannot be changed.",
         "custom": "The model catalog does not know this model, so everything below is yours to fill in.",
         "alias": "Alias",
         "aliasHint": "Shown in place of the model name when set.",

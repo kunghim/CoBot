@@ -76,7 +76,8 @@ export function selectableModels(
         key: choiceKey(provider.id, entry.id),
         providerId: provider.id,
         model: entry.id,
-        label: entry.displayName || entry.id,
+        // The user's alias, else the catalog's name for the model, else its id.
+        label: entry.spec?.displayName || entry.displayName || entry.id,
         contextBadge: contextBadge(entry.spec?.contextWindow),
         group,
         unavailable: entry.status === 'failed',

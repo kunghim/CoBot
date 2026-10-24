@@ -1393,9 +1393,15 @@ export interface components {
             name?: string;
             alias?: string;
             displayName: string;
+            /** @description In use. The user's own number when it is below the limit */
             contextWindow: number;
             maxOutput: number;
+            /** @description The most the catalog says the model reads; 0 when it does not know the model. */
+            contextLimit: number;
+            maxOutputLimit: number;
             inputModalities: string[];
+            /** @description The kinds of input the model may be said to take. */
+            inputOptions: string[];
             webSearch: boolean;
             thinking: {
                 toggle: boolean;
@@ -1405,7 +1411,7 @@ export interface components {
             /** @enum {string} */
             source: "catalog" | "custom";
             catalogId?: string;
-            /** @description Fields the catalog gives and the user cannot change. */
+            /** @description Fields the catalog gives and the user cannot change; the others only have limits. */
             locked: ("contextWindow" | "maxOutput" | "inputModalities" | "thinking")[];
         };
         /** @description How the running engines stand against the model catalog now wanted (the context windows of third-party models). */

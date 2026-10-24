@@ -32,14 +32,16 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 	var detail any
 	switch head.Type {
 	case "agentMessage":
-		// Only what the model says while it works is a step; the answer is
-		// the turn's reply.
+		// What the model says is a step, in the place it was said, whether the
+		// engine called it a working remark or gave it no phase at all (a
+		// third-party model does not). Only the answer the engine marks as
+		// final is left out: it is the turn's reply.
 		var item struct {
 			Text  string `json:"text"`
 			Phase string `json:"phase"`
 		}
 		_ = json.Unmarshal(raw, &item)
-		if item.Phase != "commentary" {
+		if item.Phase == "final_answer" {
 			return nil
 		}
 		step.Kind = engine.StepMessage

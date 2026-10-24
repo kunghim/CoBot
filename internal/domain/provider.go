@@ -118,9 +118,16 @@ type ModelSpec struct {
 	Alias       string `json:"alias,omitempty"`
 	DisplayName string `json:"displayName"`
 	// ContextWindow and MaxOutput are in tokens; 0 means not known.
-	ContextWindow   int          `json:"contextWindow"`
-	MaxOutput       int          `json:"maxOutput"`
+	ContextWindow int `json:"contextWindow"`
+	MaxOutput     int `json:"maxOutput"`
+	// ContextLimit and MaxOutputLimit are the most the catalog says the model
+	// can do, 0 when it does not know: the user may ask for less, not more.
+	ContextLimit   int `json:"contextLimit"`
+	MaxOutputLimit int `json:"maxOutputLimit"`
+	// InputModalities are the kinds of input in use; InputOptions the kinds
+	// the model may be said to take.
 	InputModalities []string     `json:"inputModalities"`
+	InputOptions    []string     `json:"inputOptions"`
 	WebSearch       bool         `json:"webSearch"`
 	Thinking        SpecThinking `json:"thinking"`
 	// Source is "catalog" when the catalog knows the model, "custom" otherwise.
@@ -128,7 +135,7 @@ type ModelSpec struct {
 	// CatalogID is the catalog's id for it.
 	CatalogID string `json:"catalogId,omitempty"`
 	// Locked names the fields the catalog gives and the user cannot change:
-	// contextWindow, maxOutput, inputModalities, thinking.
+	// only thinking: the rest have limits.
 	Locked []string `json:"locked"`
 }
 
