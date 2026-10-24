@@ -28,7 +28,7 @@ export default function ChatPatterns() {
     <Doc id="chat-welcome" name="时间问候" file="features/chats/ChatWelcome.tsx" use="新聊天只显示一句本地时间问候；有草稿时保持稳定。" avoid="不放装饰图形、副标题或底部重复引导。" a11y="使用真实标题，时间变化不主动打断读屏。">
       <Demo><ChatWelcome hour={15} /><ChatComposer value={draft} onChange={setDraft} onSend={() => setDraft('')} sendLabel="发送" stopLabel="停止生成" placeholder="发送消息" options={<span className="px-2 text-xs">默认模型</span>} /></Demo>
     </Doc>
-    <Doc id="chat-composer" name="聊天输入" file="components/ui/ChatComposer.tsx" use="聊天输入框独立设计；运行中保留草稿，停止按钮始终可用。" avoid="不要禁用整个输入框导致草稿不能编辑。" a11y="Enter 发送、Shift+Enter 换行；中文输入法确认不发送。">
+    <Doc id="chat-composer" name="聊天输入" file="components/ui/ChatComposer.tsx" use="聊天输入框和团队的输入框同样大小、同样位置（一行起、随文字长高）；运行中保留草稿，停止按钮始终可用。" avoid="不要禁用整个输入框导致草稿不能编辑。" a11y="Enter 发送、Shift+Enter 换行；中文输入法确认不发送。">
       <Demo><ChatComposer value={draft} onChange={setDraft} onSend={() => undefined} running canSend={false} onStop={() => undefined} sendLabel="发送" stopLabel="停止生成" placeholder="发送消息" options={<span className="px-2 text-xs">默认模型</span>} /></Demo>
     </Doc>
     <Doc id="chat-process" name="原生过程与结果" file="features/chats/ChatPage.tsx" use="原生步骤有可展开详情；文件链接按所属聊天打开。" avoid="不把子智能体变成团队成员。" a11y="过程状态有文字，详情使用原生 disclosure 语义。">

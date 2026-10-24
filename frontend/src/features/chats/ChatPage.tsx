@@ -126,8 +126,8 @@ function ChatPage({ id }: { id?: string }) {
       {chat && <ChatMenu chat={chat} busy={!!active || pending.length > 0} />}
     </header>
     {id && query.isPending ? <p role="status" className="m-auto text-sm text-neutral-500">{t('common.loading')}</p> : <div className={cx('flex min-h-0 flex-1 flex-col', !id && 'overflow-y-auto')}>
-      {id && <div ref={scroll} onScroll={() => { const el = scroll.current!; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setBottom(stick.current); }} className="min-h-0 flex-1 overflow-y-auto px-5">
-        <div className="mx-auto w-full max-w-3xl space-y-6 py-6">
+      {id && <div ref={scroll} onScroll={() => { const el = scroll.current!; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setBottom(stick.current); }} className="min-h-0 flex-1 overflow-y-auto px-8">
+        <div className="mx-auto w-full max-w-3xl space-y-6 py-4">
           {query.hasNextPage && <Button variant="ghost" size="sm" loading={query.isFetchingNextPage} onClick={() => { const el = scroll.current; const height = el?.scrollHeight ?? 0; void query.fetchNextPage().then(() => requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; })); }}>{t('chat.earlier')}</Button>}
           {messages.map((message) => {
             const copy = <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"><CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} /></span>;
@@ -143,7 +143,7 @@ function ChatPage({ id }: { id?: string }) {
           {active?.status === 'unknown' && <div className="rounded-xl bg-sunk p-4"><p className="text-sm">{t('chat.unknown')}</p><Button size="sm" className="mt-3" loading={action.isPending} onClick={() => action.mutate(() => api.chatRunAction(id!, active.id, 'verify'))}>{t('chat.verify')}</Button></div>}
         </div>
       </div>}
-      <div className={cx('mx-auto w-full px-5', id ? 'max-w-3xl pb-5 pt-2' : 'my-auto max-w-[40rem] py-12')}>
+      <div className={cx('mx-auto w-full px-8', id ? 'max-w-3xl pb-9 pt-2' : 'my-auto max-w-[40rem] py-12')}>
         {chat && (chat.archivedAt || chat.archiveOperation) && <div className="mb-3 rounded-xl bg-sunk p-3 text-sm"><p role="status">{t(chat.archiveOperation ? 'chatNav.archivePending' : 'chatNav.archivedNotice')}</p>
           <Button className="mt-2" size="sm" disabled={action.isPending} onClick={() => action.mutate(() => api.organizeChat(chat.id, chat.archiveOperation || 'restore', { expectedRevision: chat.revision }))}>{t(chat.archiveOperation ? 'chatNav.verifyArchive' : 'chatNav.restore')}</Button>
         </div>}
