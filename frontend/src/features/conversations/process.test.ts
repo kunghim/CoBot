@@ -5,7 +5,7 @@ import { buildTimeline } from './ConversationView';
 import { messageText } from './delivery';
 import { isExchange, taskCardOf } from './ExchangeLine';
 import { linkTarget } from './links';
-import { describeStep, displayCommand, durationPhrase, runPhase, turnBlocks, visibleSteps, workNeedsAttention, workSummary } from './steps';
+import { describeStep, displayCommand, durationPhrase, runPhase, isPartOfReply, turnBlocks, visibleSteps, workNeedsAttention, workSummary } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({
   id: 's', runId: 'r1', teamId: 't', botId: 'b', seq: 1, kind: 'command', status: 'completed',
@@ -216,5 +216,14 @@ describe('a turn read in the order it happened', () => {
     expect(visibleSteps(steps, undefined, '看完了，结果是 42').map((s) => s.id)).toEqual(['m1', 'c1']);
     // Nothing to compare with while the turn runs.
     expect(visibleSteps(steps, undefined).map((s) => s.id)).toEqual(['m1', 'c1', 'm2']);
+  });
+  it('hides only what the reply is made of, not a short word it happens to contain', () => {
+    expect(isPartOfReply('好', '好')).toBe(true);
+    expect(isPartOfReply('第一点', '第一点\n\n第二点')).toBe(true);
+    expect(isPartOfReply('第二点', '第一点\n\n第二点')).toBe(true);
+    expect(isPartOfReply('第二点', '第一点\n\n第二点\n\n第三点')).toBe(true);
+    expect(isPartOfReply('好', '好的，已经改好了')).toBe(false);
+    const steps = [{ ...step({ id: 'm1', kind: 'message', detail: { text: '好' } }) }, step({ id: 'c1' })];
+    expect(visibleSteps(steps, undefined, '好的，已经改好了').map((s) => s.id)).toEqual(['m1', 'c1']);
   });
 });

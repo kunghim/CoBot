@@ -78,7 +78,15 @@ type CatalogBuilder struct {
 	// the engine's cached account model list is read from here.
 	Home string
 
-	mu      sync.Mutex
+	mu sync.Mutex
+	// seen is the version the binary last said it was, kept for as long as the
+	// file is the same: asking costs a process, and the settings page asks often.
+	seen struct {
+		path    string
+		modTime time.Time
+		size    int64
+		version string
+	}
 	bundled struct {
 		version string
 		models  []json.RawMessage
@@ -88,6 +96,28 @@ type CatalogBuilder struct {
 		catalog ClientCatalog
 		needed  bool
 	}
+}
+
+// versionOf is the engine binary's version, asked for once per file.
+func (b *CatalogBuilder) versionOf(ctx context.Context, binary string) (string, error) {
+	info, statErr := os.Stat(binary)
+	b.mu.Lock()
+	if statErr == nil && b.seen.path == binary && b.seen.modTime.Equal(info.ModTime()) && b.seen.size == info.Size() && b.seen.version != "" {
+		version := b.seen.version
+		b.mu.Unlock()
+		return version, nil
+	}
+	b.mu.Unlock()
+	version, err := ProbeVersion(ctx, binary)
+	if err != nil {
+		return "", err
+	}
+	if statErr == nil {
+		b.mu.Lock()
+		b.seen.path, b.seen.modTime, b.seen.size, b.seen.version = binary, info.ModTime(), info.Size(), version
+		b.mu.Unlock()
+	}
+	return version, nil
 }
 
 // NeedsCatalog says whether any of the models needs a window the engine would
@@ -108,7 +138,7 @@ func (b *CatalogBuilder) Build(ctx context.Context, binary string, env []string,
 	if !NeedsCatalog(models) {
 		return ClientCatalog{}, false, nil
 	}
-	version, err := ProbeVersion(ctx, binary)
+	version, err := b.versionOf(ctx, binary)
 	if err != nil {
 		return ClientCatalog{}, false, err
 	}

@@ -370,3 +370,74 @@ func TestAChatKeepsWhatIsChosenWithEachMessage(t *testing.T) {
 	// A message that says nothing of them leaves them as they are.
 	chatWait(t, h, first.Chat.ID, domain.RunRunning)
 }
+
+// A chat moved to another model of the same vendor goes on in its thread; one
+// moved to another vendor starts a new thread and its first turn says where the
+// old record is, as for a team member.
+func TestAChatMovedToAnotherVendorStartsANewThread(t *testing.T) {
+	h := newM2Harness(t)
+	saveVendorProvider(t, h, "alpha", "a1", "a2")
+	saveVendorProvider(t, h, "beta", "b1")
+	made := attachChats(t, h, nil)
+	ctx := context.Background()
+	active := func(id string) domain.ChatRun {
+		t.Helper()
+		var found domain.ChatRun
+		waitUntil(t, 5*time.Second, "a running turn", func() bool {
+			page, err := h.app.ChatPage(ctx, h.user, id, "")
+			if err != nil {
+				return false
+			}
+			for _, run := range page.Runs {
+				if run.Status == domain.RunRunning {
+					found = run
+					return true
+				}
+			}
+			return false
+		})
+		return found
+	}
+	first, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "v-1", Text: "你好", ProviderID: "alpha", Model: "a1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	run := active(first.Chat.ID)
+	f.EmitTurnCompleted(run.ThreadID, run.TurnID, "completed", "好")
+	chatWait(t, h, first.Chat.ID, domain.RunCompleted)
+
+	// Another model of the vendor: the same thread.
+	if _, err := h.app.SendChat(ctx, h.user, first.Chat.ID, app.ChatSendInput{RequestID: "v-2", Text: "继续", ProviderID: "alpha", Model: "a2"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "the second turn", func() bool { return len(f.Turns()) == 2 })
+	if turns := f.Turns(); turns[1].ThreadID != run.ThreadID || turns[1].Model != "a2" {
+		t.Fatalf("turns = %+v", turns)
+	}
+	second := active(first.Chat.ID)
+	f.EmitTurnCompleted(second.ThreadID, second.TurnID, "completed", "好")
+	waitUntil(t, 5*time.Second, "the second turn to end", func() bool {
+		page, _ := h.app.ChatPage(ctx, h.user, first.Chat.ID, "")
+		done := 0
+		for _, r := range page.Runs {
+			if r.Status == domain.RunCompleted {
+				done++
+			}
+		}
+		return done == 2
+	})
+
+	// Another vendor: a new thread, told of the old record.
+	if _, err := h.app.SendChat(ctx, h.user, first.Chat.ID, app.ChatSendInput{RequestID: "v-3", Text: "换个厂商接着聊", ProviderID: "beta", Model: "b1"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "the third turn", func() bool { return len(f.Turns()) == 3 })
+	third := f.Turns()[2]
+	if third.ThreadID == run.ThreadID {
+		t.Fatal("another vendor's model was given the old thread")
+	}
+	if !strings.Contains(third.Text, "接着之前的会话继续工作") || !strings.HasSuffix(third.Text, "换个厂商接着聊") {
+		t.Fatalf("the first turn of the new thread = %q", third.Text)
+	}
+}

@@ -44,6 +44,7 @@ export default function TeamConversation() {
   const [maximized, setMaximized] = useState(false);
   const [model, setModel] = useState('gpt-6.1-sol');
   const [effort, setEffort] = useState('high');
+  const [thinkOn, setThinkOn] = useState(true);
 
   return (
     <Chapter id="team" title="成员与会话" intro="CoBot 自己的组件。成员 = 头像 + 名字，在哪里提到成员都一起出现；状态由头像表达（工作中会动、等你处理时睁大眼睛），同时用文字告诉读屏器。">
@@ -225,7 +226,7 @@ export default function TeamConversation() {
         id="model-picker"
         name="ModelEffortPicker 模型与思考强度"
         file="components/ui/ModelPicker.tsx"
-        use="输入框左下角选择模型和思考强度，和 Codex 一样：按钮上显示当前强度（强调色）和模型；点开后顶部居中是强度和模型名，点模型名换模型；下面是分档滑块，可以拖、点刻度或用方向键；右上角恢复默认（已是默认时不可点）。"
+        use="输入框左下角选择模型和思考强度，和 Codex 一样：按钮上显示当前强度（强调色）和模型；点开后顶部居中是强度和模型名，点模型名换模型；下面是分档滑块，可以拖、点刻度或用方向键；右上角恢复默认（已是默认时不可点）。只能开关思考的模型传 thinking，面板里是一个开关，关着时滑块变灰、按钮上写“思考已关闭”；上下文很长的模型在名字后用 badge 标 1M。"
         a11y="滑块以 slider 读出档位名称；面板打开后 Esc 或点外面关闭。"
       >
         <Demo>
@@ -258,6 +259,23 @@ export default function TeamConversation() {
               />
               <p className="mt-2 text-xs text-neutral-500">输入框里的样子，点开向上弹出</p>
             </div>
+          </div>
+        </Demo>
+        <Demo title="只能开关思考、上下文 1M 的模型">
+          <div className="pt-40">
+            <ModelEffortPicker
+              triggerLabel="思考强度：开 · MiMo"
+              models={[{ id: 'mimo', label: 'MiMo-V2.6-Flash', badge: '1M' }]}
+              model="mimo"
+              onModel={() => undefined}
+              levels={[]}
+              effort=""
+              onEffort={() => undefined}
+              isDefault={thinkOn}
+              thinking={{ on: thinkOn, label: thinkOn ? '思考' : '思考已关闭', onChange: setThinkOn }}
+              onReset={() => setThinkOn(true)}
+              labels={{ effort: '思考强度', reset: '恢复默认', chooseModel: '选择模型', back: '返回' }}
+            />
           </div>
         </Demo>
       </Doc>

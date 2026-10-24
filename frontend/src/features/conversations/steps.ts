@@ -139,6 +139,13 @@ export function describeStep(step: { kind: string; status: string; detail: RunSt
   }
 }
 
+/** Whether a thing the member said is one of the pieces the reply was made of
+ * (the reply joins them with a blank line), not merely words the reply happens to contain. */
+export function isPartOfReply(said: string, reply: string): boolean {
+  const text = reply.trim();
+  return text === said || text.startsWith(said + '\n\n') || text.endsWith('\n\n' + said) || text.includes('\n\n' + said + '\n\n');
+}
+
 /** Steps worth listing: an empty thought would only add noise, an ongoing
  * reconnect is already the status line itself, and what the member said that
  * the reply already holds (the closing words of the turn) would be said twice. */
@@ -147,7 +154,7 @@ export function visibleSteps(steps: RunStep[], live: LiveRun | undefined, replyT
     if (step.kind === 'reasoning') return text(step.detail?.text).trim() !== '' || (live?.reasoning[step.id] ?? '') !== '';
     if (step.kind === 'message') {
       const said = text(step.detail?.text).trim();
-      if (said !== '' && replyText.includes(said)) return false;
+      if (said !== '' && isPartOfReply(said, replyText)) return false;
       return said !== '' || (live?.commentary[step.id] ?? '') !== '';
     }
     if (step.kind === 'retry') return step.status !== 'in_progress';
