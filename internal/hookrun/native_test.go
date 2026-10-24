@@ -83,6 +83,63 @@ func TestNativeGuardRequiresExactLiveTurn(t *testing.T) {
 	check("turn_not_bound")
 }
 
+func TestNativeChatGuardUsesItsOwnLeaseAndRejectsMixedIdentity(t *testing.T) {
+	root := t.TempDir()
+	instance, _ := json.Marshal(platform.InstanceInfo{InstanceID: "instance", ServiceEpoch: "service"})
+	if err := writeAtomic(filepath.Join(root, "runtime", "instance.json"), instance); err != nil {
+		t.Fatal(err)
+	}
+	binding := NativeBinding{ThreadID: "chat-thread", TurnID: "turn", ChatID: "chat", RunID: "run", EngineEpoch: "epoch", InstanceID: "instance", ServiceEpoch: "service"}
+	if err := WriteNativeBinding(root, binding); err != nil {
+		t.Fatal(err)
+	}
+	input := `{"hook_event_name":"PreToolUse","session_id":"chat-thread","turn_id":"turn","tool_name":"Bash"}`
+	check := func(want string) {
+		t.Helper()
+		var out bytes.Buffer
+		RunNativeCodex(strings.NewReader(input), &out, root)
+		if want == "" {
+			if strings.TrimSpace(out.String()) != "{}" {
+				t.Fatal(out.String())
+			}
+		} else if !strings.Contains(out.String(), want) {
+			t.Fatal(out.String())
+		}
+	}
+	if err := platform.WriteLease(root, platform.Lease{BotID: "chat", RunID: "run", InstanceID: "instance", Epoch: "epoch", UpdatedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	check("lease_missing")
+	lease := platform.ChatLease{ChatID: "chat", RunID: "run", InstanceID: "instance", Epoch: "epoch", UpdatedAt: time.Now()}
+	if err := platform.WriteChatLease(root, lease); err != nil {
+		t.Fatal(err)
+	}
+	check("")
+	lease.RunID = "other"
+	if err := platform.WriteChatLease(root, lease); err != nil {
+		t.Fatal(err)
+	}
+	check("run_not_live")
+	lease.RunID = "run"
+	lease.Epoch = "old"
+	if err := platform.WriteChatLease(root, lease); err != nil {
+		t.Fatal(err)
+	}
+	check("engine_changed")
+	lease.Epoch = "epoch"
+	lease.UpdatedAt = time.Now().Add(-platform.LeaseTTL - time.Second)
+	if err := platform.WriteChatLease(root, lease); err != nil {
+		t.Fatal(err)
+	}
+	check("lease_expired")
+	binding.BotID = "bot"
+	if err := WriteNativeBinding(root, binding); err == nil {
+		t.Fatal("mixed chat/member identity accepted")
+	}
+	platform.RemoveChatLease(root, "chat")
+	check("lease_missing")
+}
+
 func TestNativeConfigNeverTrustsOrOverwritesUserHooks(t *testing.T) {
 	paths := platform.Paths{Root: t.TempDir()}
 	binary := filepath.Join(paths.Root, "CoBot app", "cobot.exe")

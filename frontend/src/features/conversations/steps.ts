@@ -60,7 +60,7 @@ const providerFailureCodes = new Set([
 ]);
 
 /** One-line description of a step. */
-export function describeStep(step: RunStep, nameOf: (botId: string) => string): Phrase {
+export function describeStep(step: { kind: string; status: string; detail: RunStep['detail'] }, nameOf: (botId: string) => string): Phrase {
   const d = step.detail ?? {};
   switch (step.kind) {
     case 'reasoning':

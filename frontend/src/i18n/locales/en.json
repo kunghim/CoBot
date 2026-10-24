@@ -1,7 +1,24 @@
 {
-  "app": { "title": "CoBot" },
-  "window": { "minimize": "Minimize", "maximize": "Maximize", "restore": "Restore", "close": "Close" },
-  "common": { "close": "Close", "cancel": "Cancel", "clearSearch": "Clear search", "decrease": "Decrease", "increase": "Increase" },
+  "app": {
+    "title": "CoBot"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "clearSearch": "Clear search",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "loading": "Loading…",
+    "back": "Back",
+    "save": "Save",
+    "delete": "Delete"
+  },
   "nav": {
     "home": "Home",
     "settings": "Settings",
@@ -65,7 +82,7 @@
     "directoryNested": "Nested with the directory of team {{teamName}}",
     "deleteConfirmTitle": "Delete team “{{name}}”?",
     "archiveConfirmTitle": "Archive team “{{name}}”?",
-    "archiveConfirmBody": "The team moves from the team list to Settings › Archived teams, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
+    "archiveConfirmBody": "The team moves from the team list to Settings › Archived, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
     "deleteMissingConfirmBody": "The team's project folder is no longer where it was. Deleting permanently removes its members, conversations, tasks, memories and Codex sessions, including any unfinished work. This cannot be undone.",
     "deleteMemberConfirmBody": "Its conversation, memories, runs, the finished tasks it owned and its Codex session in this team are permanently removed. This cannot be undone. Messages it sent to other members stay. The role itself is not affected and stays available to other teams.",
     "actions": "Actions for {{name}}",
@@ -113,14 +130,31 @@
     }
   },
   "scenario": {
-    "software": { "name": "Software development" }
+    "software": {
+      "name": "Software development"
+    }
   },
   "role": {
-    "leader": { "name": "Project manager", "summary": "Talks the need through with you, writes the requirement document, drafts the route and reports back at the end." },
-    "productManager": { "name": "Product manager", "summary": "Turns the requirement document into a product design and prototype." },
-    "fullstackEngineer": { "name": "Full-stack engineer", "summary": "Builds the interface, interactions, server logic and data." },
-    "qaEngineer": { "name": "QA engineer", "summary": "Writes test cases and runs the tests, sending failures back." },
-    "codeReviewer": { "name": "Reviewer", "summary": "Reviews requirements, designs, test cases and code against the checklist; a failing review sends the work back." }
+    "leader": {
+      "name": "Project manager",
+      "summary": "Talks the need through with you, writes the requirement document, drafts the route and reports back at the end."
+    },
+    "productManager": {
+      "name": "Product manager",
+      "summary": "Turns the requirement document into a product design and prototype."
+    },
+    "fullstackEngineer": {
+      "name": "Full-stack engineer",
+      "summary": "Builds the interface, interactions, server logic and data."
+    },
+    "qaEngineer": {
+      "name": "QA engineer",
+      "summary": "Writes test cases and runs the tests, sending failures back."
+    },
+    "codeReviewer": {
+      "name": "Reviewer",
+      "summary": "Reviews requirements, designs, test cases and code against the checklist; a failing review sends the work back."
+    }
   },
   "stats": {
     "turns": "{{turns}} turns {{steps}} steps",
@@ -157,12 +191,23 @@
     "chooseModel": "Choose model",
     "back": "Back",
     "saveFailed": "Thinking effort was not changed",
-    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" },
+    "level": {
+      "none": "None",
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high"
+    },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
   "permission": {
     "label": "Permission mode",
-    "mode": { "read_only": "Read only", "default": "Default", "full": "Full access" },
+    "mode": {
+      "read_only": "Read only",
+      "default": "Default",
+      "full": "Full access"
+    },
     "hint": {
       "read_only": "Can look and analyse; asks before changing anything",
       "default": "Free to read, write and run inside the team folder; asks beyond it",
@@ -212,9 +257,19 @@
       "network": "Cannot reach the provider's endpoint; check the address and the network, then send again",
       "engine_internal": "The provider's model service had an internal error; send again later"
     },
-    "file": { "open": "Open file", "reveal": "Show in folder" },
-    "fileKind": { "add": "Added", "update": "Modified", "delete": "Deleted" },
-    "duration": { "seconds": "{{s}}s", "minutes": "{{m}}m {{s}}s" },
+    "file": {
+      "open": "Open file",
+      "reveal": "Show in folder"
+    },
+    "fileKind": {
+      "add": "Added",
+      "update": "Modified",
+      "delete": "Deleted"
+    },
+    "duration": {
+      "seconds": "{{s}}s",
+      "minutes": "{{m}}m {{s}}s"
+    },
     "phase": {
       "preparing": "Getting ready…",
       "starting": "Starting",
@@ -230,7 +285,8 @@
       "waitingInput": "Waiting for your reply"
     },
     "process": {
-      "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
+      "done": "Worked for {{duration}} · {{count}} steps",
+      "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",
@@ -522,8 +578,18 @@
     "ownerUser": "You",
     "empty": "No requirements yet",
     "loadFailed": "Failed to load requirements",
-    "status": { "todo": "Handed over", "doing": "In progress", "done": "Handed off", "cancelled": "Cancelled" },
-    "requirementStatus": { "active": "In progress", "accepting": "Awaiting acceptance", "done": "Done", "cancelled": "Cancelled" },
+    "status": {
+      "todo": "Handed over",
+      "doing": "In progress",
+      "done": "Handed off",
+      "cancelled": "Cancelled"
+    },
+    "requirementStatus": {
+      "active": "In progress",
+      "accepting": "Awaiting acceptance",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
     "at": "Stage {{index}}/{{total}} · {{name}} · {{owner}}",
     "route": "Route",
     "document": "Requirement document",
@@ -541,9 +607,23 @@
       "draft": "Revise the requirement document",
       "escalation": "Handle an escalation"
     },
-    "reviewType": { "requirements": "requirements", "design": "design", "test_plan": "test cases", "code": "code", "general": "general" },
-    "outcome": { "done": "done", "back": "sent back", "escalate": "escalated", "resume": "resumed" },
-    "mode": { "rerun": "rerun the route", "return_to_me": "back to the reviewer" },
+    "reviewType": {
+      "requirements": "requirements",
+      "design": "design",
+      "test_plan": "test cases",
+      "code": "code",
+      "general": "general"
+    },
+    "outcome": {
+      "done": "done",
+      "back": "sent back",
+      "escalate": "escalated",
+      "resume": "resumed"
+    },
+    "mode": {
+      "rerun": "rerun the route",
+      "return_to_me": "back to the reviewer"
+    },
     "handoffs": "Handoffs",
     "handoffsEmpty": "No handoffs yet",
     "suggestions": "Suggestions",
@@ -688,18 +768,42 @@
     "modelSummary_other": "{{count}} models, {{usable}} usable"
   },
   "preset": {
-    "openai": { "name": "OpenAI" },
-    "anthropic": { "name": "Anthropic" },
-    "deepseek": { "name": "DeepSeek" },
-    "kimi": { "name": "Moonshot Kimi" },
-    "zhipu": { "name": "Zhipu BigModel" },
-    "zai": { "name": "Z.ai" },
-    "minimax": { "name": "MiniMax" },
-    "dashscope": { "name": "Alibaba Bailian" },
-    "mimo": { "name": "Xiaomi MiMo" },
-    "xai": { "name": "xAI" },
-    "openrouter": { "name": "OpenRouter" },
-    "opencode-zen": { "name": "OpenCode Zen" }
+    "openai": {
+      "name": "OpenAI"
+    },
+    "anthropic": {
+      "name": "Anthropic"
+    },
+    "deepseek": {
+      "name": "DeepSeek"
+    },
+    "kimi": {
+      "name": "Moonshot Kimi"
+    },
+    "zhipu": {
+      "name": "Zhipu BigModel"
+    },
+    "zai": {
+      "name": "Z.ai"
+    },
+    "minimax": {
+      "name": "MiniMax"
+    },
+    "dashscope": {
+      "name": "Alibaba Bailian"
+    },
+    "mimo": {
+      "name": "Xiaomi MiMo"
+    },
+    "xai": {
+      "name": "xAI"
+    },
+    "openrouter": {
+      "name": "OpenRouter"
+    },
+    "opencode-zen": {
+      "name": "OpenCode Zen"
+    }
   },
   "settings": {
     "authorizations": "Live authorizations",
@@ -722,7 +826,7 @@
       "models": "Default model",
       "providers": "Model providers",
       "collaboration": "Collaboration & budget",
-      "archived": "Archived teams",
+      "archived": "Archived",
       "security": "Security",
       "about": "About"
     },
@@ -734,13 +838,17 @@
       "models": "Used by a member until it is given its own model in the conversation; applies to work that starts afterwards.",
       "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
-      "archived": "Archived teams leave the team list; restore them or delete them for good here.",
+      "archived": "View, restore, or delete archived chats and teams.",
       "security": "Bridge authorizations members currently hold; revoke them at any time.",
       "about": "Version and where data is stored on this machine."
     },
     "language": "Language",
     "colorMode": "Mode",
-    "colorModes": { "system": "System", "light": "Light", "dark": "Dark" },
+    "colorModes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "theme": "Theme",
     "avatarCatalog": "Avatar catalog",
     "avatarCatalogNone": "The avatar catalog has not been downloaded yet; members show the default avatar for now.",
@@ -751,10 +859,22 @@
     "avatarCatalogRejected": "The avatar catalog downloaded in the last check could not be used; the previous version is kept.",
     "avatarCatalogCheck": "Check for updates",
     "themes": {
-      "graphite": { "name": "Graphite", "summary": "Sage-tinted graphite with a cobalt accent" },
-      "harbor": { "name": "Harbor", "summary": "Cool blue-slate with a sea-green accent" },
-      "classic": { "name": "Classic", "summary": "Rice paper and ink: soft black, white and gray" },
-      "dusk": { "name": "Dusk", "summary": "Plum-tinted warm gray with a plum-blossom accent" }
+      "graphite": {
+        "name": "Graphite",
+        "summary": "Sage-tinted graphite with a cobalt accent"
+      },
+      "harbor": {
+        "name": "Harbor",
+        "summary": "Cool blue-slate with a sea-green accent"
+      },
+      "classic": {
+        "name": "Classic",
+        "summary": "Rice paper and ink: soft black, white and gray"
+      },
+      "dusk": {
+        "name": "Dusk",
+        "summary": "Plum-tinted warm gray with a plum-blossom accent"
+      }
     },
     "engineNotConfigured": "No configured engine detected",
     "engineReady": "Engine ready",
@@ -797,7 +917,7 @@
   "errors": {
     "error.approval.file_preview_unavailable": "The exact file changes are unavailable. Approval is disabled; reject or stop this execution.",
     "error.internal": "Internal error; check the service log",
-    "error.path.outside_team": "Only existing files inside the team folder can be opened",
+    "error.path.outside_team": "Only existing files inside the current conversation workspace can be opened",
     "error.path.open_executable": "This is a program or script and would run if opened, so it is not opened; use the folder icon beside it to see it in the file manager",
     "error.team.permission_mode_invalid": "Unsupported permission mode",
     "error.team.patch_one_field": "Change one thing at a time",
@@ -975,10 +1095,123 @@
     "error.scope.other_team": "This member belongs to another team.",
     "error.chain.decision_stale": "This decision belongs to an earlier chain authorization.",
     "error.engine.interrupt_unconfirmed": "The stop request was saved, but delivery is unconfirmed.",
-    "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked."
+    "error.recovery.end_unverified": "The exact previous execution has not been proven ended. The member stays locked.",
+    "error.chat.revision_conflict": "This chat changed elsewhere. Refresh and try again.",
+    "error.chat.engine_unavailable": "The chat engine is not ready.",
+    "error.chat.busy": "Resolve the current execution or pending requests first.",
+    "error.chat.model_fixed": "Start a new chat to use another model.",
+    "error.chat.model_mismatch": "The engine reported a different model or provider. The message was not sent.",
+    "error.chat.title_required": "Enter a chat name of up to 120 characters.",
+    "error.chat.request_expired": "This request has expired. Refresh the chat.",
+    "error.chat.answers_required": "Answer all questions.",
+    "error.chat.not_running": "This turn cannot be stopped yet. Try again shortly.",
+    "error.chat.not_unknown": "This turn does not need verification.",
+    "error.chat.failed": "This turn did not complete. Check the engine, account and model settings. Sending again starts a new turn.",
+    "error.chat.restarted": "The app restarted. Verify the previous execution state.",
+    "error.chat.unknown": "The execution state is unverified. This turn will not be automatically repeated.",
+    "error.chat.archived": "This chat is archived or has an unconfirmed archive operation. Restore or verify it first.",
+    "error.chat.archive_pending": "Verify the pending archive operation first.",
+    "error.chat.archive_unknown": "The native thread archive state could not be confirmed. Verify it to continue.",
+    "error.chat.archive_state": "The archive state changed. Refresh and try again.",
+    "error.chat.section_missing": "This section no longer exists. Refresh and try again.",
+    "error.chat.order_conflict": "The list order changed. Refresh and try again."
   },
   "paging": {
     "more": "Load more",
     "failed": "Could not load the next page. Try again."
+  },
+  "chat": {
+    "expandHistory": "Expand chats",
+    "collapseHistory": "Collapse chats",
+    "mode": "Mode",
+    "chat": "Chat",
+    "work": "Teams",
+    "new": "New chat",
+    "history": "Chats",
+    "emptyHistory": "No chats yet",
+    "loadMore": "Load more",
+    "earlier": "Earlier messages",
+    "defaultModel": "Default model",
+    "chooseModel": "Choose model",
+    "modelFixed": "Start a new chat to change models",
+    "placeholder": "Send a message",
+    "send": "Send",
+    "stop": "Stop generating",
+    "copy": "Copy",
+    "copied": "Copied",
+    "menu": "Chat actions",
+    "rename": "Rename",
+    "delete": "Delete chat",
+    "deleteNote": "This deletes the conversation. Actions are not undone and generated files are kept.",
+    "title": "Chat name",
+    "bottom": "Back to bottom",
+    "unknown": "The previous execution is unverified. Verify it ended before continuing, or start a new chat.",
+    "verify": "Verify execution status",
+    "process": "Process · {{count}} items",
+    "tool": "Tool activity",
+    "inputRequired": "Your answer is needed",
+    "approvalRequired": "Approval needed",
+    "submitAnswers": "Submit answers",
+    "status": {
+      "queued": "Waiting to start",
+      "starting": "Connecting",
+      "running": "Responding",
+      "waiting_approval": "Waiting for approval",
+      "waiting_input": "Waiting for an answer",
+      "completed": "Completed",
+      "failed": "Failed",
+      "interrupted": "Stopped",
+      "unknown": "Execution state unknown"
+    },
+    "greeting": {
+      "morning": "Good morning. What’s on your mind today?",
+      "forenoon": "Good morning. Any new ideas?",
+      "noon": "Good afternoon. Let’s chat for a while.",
+      "afternoon": "Good afternoon. What’s on your mind?",
+      "evening": "Good evening. Anything to share from today?",
+      "night": "Still awake? What’s on your mind?"
+    }
+  },
+  "chatNav": {
+    "organize": "Organize chats",
+    "display": "Display",
+    "bySection": "Group by section",
+    "merged": "Combined list",
+    "sort": "Sort chats",
+    "recent": "Recently updated",
+    "manual": "Manual order",
+    "newSection": "New section",
+    "sectionName": "Section name",
+    "renameSection": "Rename section",
+    "deleteSection": "Delete section",
+    "deleteSectionNote": "Chats return to the unsectioned list. Their history and files are preserved.",
+    "sectionMenu": "Section actions: {{name}}",
+    "unsectioned": "Unsectioned",
+    "emptySection": "No chats yet",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "move": "Move to section",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "openFolder": "Open chat folder",
+    "archive": "Archive chat",
+    "restore": "Restore chat",
+    "archived": "Archived chats",
+    "verifyArchive": "Verify archive operation",
+    "archivePending": "The archive operation is unconfirmed. Verify it to continue. Chat history and files are preserved.",
+    "pendingShort": "Unconfirmed",
+    "archivedNotice": "This chat is archived. Restore it to send messages."
+  },
+  "archivePage": {
+    "type": "Archive type",
+    "chatSearch": "Search archived chats",
+    "chatEmpty": "No archived chats",
+    "chatNoMatch": "No matching chats",
+    "chatMeta": "Created {{created}} · Archived {{archived}}",
+    "chatRestored": "Restored “{{name}}” to the chat list",
+    "chatsDeleted": "Deleted {{count}} chats",
+    "chatDeleteFailed": "Failed to delete {{count}} chats: {{reason}}",
+    "chatDeleteMany": "Delete {{count}} chats?"
   }
 }

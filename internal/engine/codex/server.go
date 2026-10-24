@@ -198,6 +198,11 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 
 func (s *Server) handleRequest(req InboundRequest) {
 	switch req.Method {
+	case "item/tool/requestUserInput":
+		if s.callbacks.OnInput == nil {
+			_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
+			return
+		}
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
 		// Only verified native contracts become actionable product cards.
 	case "mcpServer/elicitation/request":
@@ -268,7 +273,11 @@ func (s *Server) handleRequest(req InboundRequest) {
 		approval.Permissions = base.Permissions
 	}
 	approval.Network = len(base.NetworkApprovalContext) > 0 && string(base.NetworkApprovalContext) != "null"
-	if s.callbacks.OnApproval == nil {
+	callback := s.callbacks.OnApproval
+	if req.Method == "item/tool/requestUserInput" {
+		callback = s.callbacks.OnInput
+	}
+	if callback == nil {
 		return
 	}
 	if req.Method == "item/fileChange/requestApproval" && len(approval.Changes) == 0 && s.client != nil {
@@ -288,7 +297,7 @@ func (s *Server) handleRequest(req InboundRequest) {
 		}()
 		return
 	}
-	s.callbacks.OnApproval(approval)
+	callback(approval)
 }
 
 func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemID string) ([]engine.FileChange, error) {
@@ -635,6 +644,25 @@ func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
 		return fmt.Errorf("thread/unarchive: %w", err)
 	}
 	return nil
+}
+
+// ThreadArchiveState uses the exact persisted log path returned by Codex,
+// not the continued existence of an app-server process, as archive evidence.
+func (s *Server) ThreadArchiveState(ctx context.Context, threadID string) (bool, error) {
+	path, err := s.ThreadPath(ctx, threadID)
+	if err != nil {
+		return false, err
+	}
+	parts := strings.Split(strings.ReplaceAll(path, "\\", "/"), "/")
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] == "archived_sessions" {
+			return true, nil
+		}
+		if parts[i] == "sessions" {
+			return false, nil
+		}
+	}
+	return false, errors.New("thread archive path could not be verified")
 }
 
 // ThreadLoaded reports whether this app-server has the thread loaded: it

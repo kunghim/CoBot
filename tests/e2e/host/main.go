@@ -178,7 +178,9 @@ func handleRequest(req message) {
 		reply(req.ID, map[string]any{"serverInfo": map[string]any{"name": "fake-codex", "version": "0.0.1"}})
 	case "thread/start":
 		var params struct {
-			Cwd string `json:"cwd"`
+			Cwd      string `json:"cwd"`
+			Model    string `json:"model"`
+			Provider string `json:"modelProvider"`
 		}
 		_ = json.Unmarshal(req.Params, &params)
 		threadSeq++
@@ -186,10 +188,16 @@ func handleRequest(req message) {
 		mu.Lock()
 		threads[id] = true
 		mu.Unlock()
+		if params.Model == "" {
+			params.Model = "fake-model"
+		}
+		if params.Provider == "" {
+			params.Provider = "openai"
+		}
 		reply(req.ID, map[string]any{
 			"thread": map[string]any{"id": id},
 			"cwd":    params.Cwd,
-			"model":  "fake-model", "modelProvider": "fake",
+			"model":  params.Model, "modelProvider": params.Provider,
 		})
 	case "thread/resume":
 		var params struct {
@@ -200,6 +208,28 @@ func handleRequest(req message) {
 		threads[params.ThreadID] = true // resume may reconnect after restart
 		mu.Unlock()
 		reply(req.ID, map[string]any{"thread": map[string]any{"id": params.ThreadID}})
+	case "thread/archive", "thread/unarchive", "thread/read":
+		var p struct {
+			ThreadID string `json:"threadId"`
+		}
+		_ = json.Unmarshal(req.Params, &p)
+		cwd, _ := os.Getwd()
+		file := filepath.Join(cwd, ".fake-archive-"+p.ThreadID)
+		if req.Method == "thread/archive" {
+			_ = os.WriteFile(file, []byte("archived"), 0600)
+			reply(req.ID, map[string]any{})
+			return
+		}
+		if req.Method == "thread/unarchive" {
+			_ = os.Remove(file)
+			reply(req.ID, map[string]any{"thread": map[string]any{"id": p.ThreadID}})
+			return
+		}
+		dir := "sessions"
+		if _, err := os.Stat(file); err == nil {
+			dir = "archived_sessions"
+		}
+		reply(req.ID, map[string]any{"thread": map[string]any{"id": p.ThreadID, "path": "C:/fake-codex/" + dir + "/rollout-" + p.ThreadID + ".jsonl", "turns": []any{}}})
 	case "turn/start":
 		var params struct {
 			ThreadID string `json:"threadId"`

@@ -15,7 +15,7 @@ import {
   ProviderSection,
   SecuritySection,
 } from './SettingsSections';
-import ArchivedTeamsSection from './ArchivedTeamsSection';
+import ArchivedSection from './ArchivedSection';
 import { useSettingSaver } from './useSettingSaver';
 
 type SectionId = 'general' | 'appearance' | 'roles' | 'engine' | 'models' | 'providers' | 'collaboration' | 'archived' | 'security' | 'about';
@@ -75,7 +75,7 @@ export default function SettingsPage() {
       models: <ModelsSection {...props} />,
       providers: <ProviderSection />,
       collaboration: <CollaborationSection {...props} />,
-      archived: <ArchivedTeamsSection />,
+      archived: <ArchivedSection />,
       security: <SecuritySection />,
       about: <AboutSection />,
     }[current.id];

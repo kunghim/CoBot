@@ -2,12 +2,14 @@
 // the window is narrow. The list always sits in the layout beside the
 // conversation, never over it; on a narrow window it steps aside so the
 // conversation keeps its room. The toggle lives at the left end of the
-// desktop title bar when the app draws one, otherwise at the left end of the
-// page header, so it never moves. The workspace on the right and the info
+// compact app title bar after the mode switch, in both web and desktop,
+// and moves next to the logo when the list is folded. The workspace on the right and the info
 // card over the conversation have their own state (features/workspace).
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { PanelToggle } from '../components/ui';
+import { SidebarToggle } from './SidebarToggle';
 
 interface Shell {
   listOpen: boolean;
@@ -54,14 +56,12 @@ export function useShell(): Shell {
 export function ShellToggle({ place = 'header' }: { place?: 'header' | 'titlebar' }) {
   const { t } = useTranslation();
   const shell = useShell();
+  const chat = useLocation().pathname.startsWith('/chat');
   if (place === 'header' && shell.titleBar) return null;
-  return (
-    <PanelToggle
-      side="left"
-      open={shell.listOpen}
-      onToggle={() => shell.setListOpen(!shell.listOpen)}
-      openLabel={t('nav.openTeamList')}
-      closeLabel={t('nav.closeTeamList')}
-    />
-  );
+  const labels = {
+    openLabel: t(chat ? 'chat.expandHistory' : 'nav.openTeamList'),
+    closeLabel: t(chat ? 'chat.collapseHistory' : 'nav.closeTeamList'),
+  };
+  if (place === 'titlebar') return <SidebarToggle open={shell.listOpen} onToggle={() => shell.setListOpen(!shell.listOpen)} {...labels} />;
+  return <PanelToggle side="left" open={shell.listOpen} onToggle={() => shell.setListOpen(!shell.listOpen)} {...labels} />;
 }

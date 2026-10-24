@@ -50,6 +50,7 @@ type App struct {
 	// Scheduler dispatches queued deliveries to team app-servers; it is
 	// assigned during composition so tests can inject a fake factory.
 	Scheduler *Scheduler
+	Chats     *ChatRunner
 
 	// CollaborationTokens is the bridge credential authority. Tokens are
 	// minted when a thread starts and are only valid for this core lifetime.

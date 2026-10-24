@@ -292,6 +292,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		}
 	}
 	application.Scheduler = scheduler
+	application.Chats = app.NewChatRunner(application, func(spec app.ServerSpec) (engine.Server, error) {
+		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
+	})
 	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
 		return newServer(startCtx, cwd, engine.Callbacks{
 			OnNotification: func(n engine.Notification) {
@@ -307,6 +310,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	startupComplete := false
 	defer func() {
 		if !startupComplete {
+			if application.Chats != nil {
+				stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = application.Chats.Stop(stopCtx)
+				cancel()
+			}
 			_ = listener.Close()
 			_ = closeLog()
 			_ = db.Close()
@@ -331,6 +339,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// approvals, and one recovery card per unresolved run.
 	if err := application.ReconcileAfterRestart(ctx); err != nil {
 		return nil, fmt.Errorf("reconcile after restart: %w", err)
+	}
+	if err := application.Chats.Start(); err != nil {
+		return nil, fmt.Errorf("reconcile chats: %w", err)
 	}
 
 	// Collaboration composition: the token store is the bridge credential
@@ -456,6 +467,11 @@ func (c *Core) SetEngineStatus(p apihttp.EngineStatusProvider) {
 // touches resources of another instance.
 func (c *Core) Shutdown(ctx context.Context) error {
 	var errs []error
+	if c.App != nil && c.App.Chats != nil {
+		if err := c.App.Chats.Stop(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("chat shutdown: %w", err))
+		}
+	}
 	// Order: stop dispatch and engines first, then HTTP, then storage.
 	if c.scheduler != nil {
 		if err := c.scheduler.Stop(ctx); err != nil {

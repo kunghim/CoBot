@@ -48,7 +48,7 @@ export default function NavigationOverlays() {
           <div className="w-56 space-y-4">
             <NavItem icon={Settings2} label="返回工作区" onClick={() => undefined} />
             <NavSection title="设置">
-              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档团队', Archive]].map(([id, label, Icon]) => (
+              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档', Archive]].map(([id, label, Icon]) => (
                 <NavItem key={id as string} icon={Icon as typeof Settings2} label={label as string} current={nav === id} onClick={() => setNav(id as string)} />
               ))}
             </NavSection>
@@ -105,7 +105,7 @@ export default function NavigationOverlays() {
       <Doc id="breadcrumbs" name="Breadcrumbs 面包屑 · Steps 步骤 · Pagination 分页" file="components/ui/Navigation.tsx" use="面包屑：页面在哪一层。步骤：一个短流程走到哪一步。分页：很长的列表（短列表用“加载更多”）。">
         <Demo surface="raised">
           <div className="space-y-5">
-            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档团队', onClick: () => undefined }, { label: '官网改版' }]} />
+            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档', onClick: () => undefined }, { label: '官网改版' }]} />
             <Steps label="新建团队" current={1} steps={['选择目录', '选择成员', '完成']} />
             <Pagination label="分页" page={page} pages={12} onChange={setPage} previousLabel="上一页" nextLabel="下一页" />
           </div>

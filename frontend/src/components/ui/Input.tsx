@@ -45,13 +45,14 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
 });
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  variant?: 'default' | 'plain';
   invalid?: boolean;
   /** Grow with the text up to this many pixels. */
   autoGrowMax?: number;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { invalid, autoGrowMax, className, id, value, ...rest },
+  { invalid, autoGrowMax, className, id, value, variant = 'default', ...rest },
   forwarded,
 ) {
   const field = useField();
@@ -64,7 +65,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   }, [value, autoGrowMax]);
   const isInvalid = invalid ?? field?.invalid ?? false;
   return (
-    <div className={cx(controlFrame, 'px-3 py-2', isInvalid && invalidFrame, rest.disabled && disabledFrame, className)}>
+    <div className={cx(variant === 'default' && controlFrame, 'px-3 py-2', isInvalid && invalidFrame, rest.disabled && disabledFrame, className)}>
       <textarea
         ref={(element) => {
           inner.current = element;

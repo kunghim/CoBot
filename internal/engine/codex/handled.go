@@ -19,6 +19,7 @@ var HandledMessages = []string{
 	"item/permissions/requestApproval",
 	"item/reasoning/summaryTextDelta",
 	"item/started",
+	"item/tool/requestUserInput",
 	"mcpServer/elicitation/request",
 	"serverRequest/resolved",
 	"thread/closed",

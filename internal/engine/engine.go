@@ -216,6 +216,7 @@ type Problem struct {
 // Callbacks is the handler set an app-server delivers events through.
 type Callbacks struct {
 	OnApproval     func(ApprovalRequest)
+	OnInput        func(ApprovalRequest)
 	OnNotification func(Notification)
 	OnExit         func(err error)
 }

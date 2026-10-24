@@ -5,6 +5,7 @@ import { authorize, seedRequirement, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The work-panel pages are all real: the requirement board shows a route
