@@ -1,7 +1,8 @@
 // PermissionModeSelect is the composer's permission switch, like Codex's: a
 // small pill that opens a menu of read only, default and full access. The
 // mode belongs to the team and applies from each member's next turn; full
-// access asks for confirmation first.
+// access asks for confirmation first. A chat uses the same menu for its own
+// mode (PermissionModeMenu), which applies from the next message.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSetTeamPermissionMode } from '../../api/queries';
@@ -12,25 +13,38 @@ import { apiErrorMessage } from '../../i18n/errors';
 const modes: PermissionMode[] = ['read_only', 'default', 'full'];
 const icons = { read_only: Icons.readOnly, default: Icons.permission, full: Icons.fullAccess } as const;
 
-export default function PermissionModeSelect({ team, disabled }: { team: Team; disabled?: boolean }) {
-  const { t } = useTranslation();
-  const setMode = useSetTeamPermissionMode();
-  const [confirmFull, setConfirmFull] = useState(false);
-  const [error, setError] = useState('');
-  const current: PermissionMode = modes.includes(team.permissionMode as PermissionMode) ? (team.permissionMode as PermissionMode) : 'default';
+/** The mode as the menu shows it: anything unknown reads as the default. */
+export function permissionModeOf(value: string | undefined): PermissionMode {
+  return modes.includes(value as PermissionMode) ? (value as PermissionMode) : 'default';
+}
 
-  const apply = (mode: PermissionMode) => {
+/**
+ * The menu itself. `onChange` takes the mode chosen (after the confirmation
+ * full access asks for) and may be asynchronous: the menu shows its failure.
+ */
+export function PermissionModeMenu({ value, onChange, disabled }: { value: PermissionMode; onChange: (mode: PermissionMode) => void | Promise<unknown>; disabled?: boolean }) {
+  const { t } = useTranslation();
+  const [confirmFull, setConfirmFull] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const apply = async (mode: PermissionMode) => {
     setError('');
-    setMode.mutate(
-      { teamId: team.id, mode, expectedRevision: team.revision },
-      { onSuccess: () => setConfirmFull(false), onError: (err) => setError(apiErrorMessage(t, err)) },
-    );
+    setBusy(true);
+    try {
+      await onChange(mode);
+      setConfirmFull(false);
+    } catch (err) {
+      setError(apiErrorMessage(t, err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const choose = (mode: PermissionMode) => {
-    if (mode === current) return;
+    if (mode === value) return;
     if (mode === 'full') setConfirmFull(true);
-    else apply(mode);
+    else void apply(mode);
   };
 
   return (
@@ -43,17 +57,17 @@ export default function PermissionModeSelect({ team, disabled }: { team: Team; d
           label: t(`permission.mode.${mode}`),
           description: t(`permission.hint.${mode}`),
           icon: icons[mode],
-          checked: mode === current,
+          checked: mode === value,
           onSelect: () => choose(mode),
         }))}
         trigger={
           <ComposerOption
-            icon={icons[current]}
-            tone={current === 'full' ? 'danger' : 'neutral'}
-            disabled={disabled || setMode.isPending}
-            aria-label={`${t('permission.label')}：${t(`permission.mode.${current}`)}`}
+            icon={icons[value]}
+            tone={value === 'full' ? 'danger' : 'neutral'}
+            disabled={disabled || busy}
+            aria-label={`${t('permission.label')}：${t(`permission.mode.${value}`)}`}
           >
-            {t(`permission.mode.${current}`)}
+            {t(`permission.mode.${value}`)}
           </ComposerOption>
         }
       />
@@ -64,14 +78,25 @@ export default function PermissionModeSelect({ team, disabled }: { team: Team; d
         description={t('permission.confirmFull.body')}
         confirmLabel={t('permission.confirmFull.confirm')}
         cancelLabel={t('common.cancel')}
-        busy={setMode.isPending}
+        busy={busy}
         error={confirmFull && error ? error : undefined}
-        onConfirm={() => apply('full')}
+        onConfirm={() => void apply('full')}
         onCancel={() => {
           setConfirmFull(false);
           setError('');
         }}
       />
     </div>
+  );
+}
+
+export default function PermissionModeSelect({ team, disabled }: { team: Team; disabled?: boolean }) {
+  const setMode = useSetTeamPermissionMode();
+  return (
+    <PermissionModeMenu
+      value={permissionModeOf(team.permissionMode)}
+      disabled={disabled}
+      onChange={(mode) => setMode.mutateAsync({ teamId: team.id, mode, expectedRevision: team.revision })}
+    />
   );
 }

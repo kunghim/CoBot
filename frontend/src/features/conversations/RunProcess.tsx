@@ -1,7 +1,9 @@
-// RunProcess shows what a member did in one turn, the way Codex does: while
-// it runs, a live status line ("正在执行命令 · 12秒") with the steps so far and
-// the reply as it streams; once finished, a collapsed "已处理 1分23秒" line that
-// expands into the same steps.
+// RunProcess shows one turn the way Codex does, in the order it happened:
+// what the member said stays in view between stretches of work, each stretch
+// folded to a line ("运行了 2 条命令") that opens into its steps. While it runs,
+// a live status line ("正在执行命令 · 12秒") heads it and the reply streams
+// in; once finished, a "已处理 1分23秒" line folds or opens all the work. A
+// team's turns and a chat's both use it (see Scope).
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Minus, X } from 'lucide-react';
@@ -16,6 +18,15 @@ import Markdown from './Markdown';
 import { stripToolCallText } from './toolCallText';
 import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
 
+/** Where the files a turn names live: a team's folder, or a chat's own. */
+export interface Scope {
+  teamId?: string;
+  chatId?: string;
+}
+
+/** What a turn needs of a run: its place in time, its state and its steps. */
+export type ProcessRun = Pick<RunWithSteps, 'id' | 'status' | 'startedAt' | 'endedAt' | 'steps'>;
+
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -27,7 +38,7 @@ function useNow(active: boolean): number {
 }
 
 /** Whether a turn has anything to show above its reply: what is being done, what went wrong, or what was done. */
-export function runHasContent(run: RunWithSteps, active: boolean, replyText: string): boolean {
+export function runHasContent(run: ProcessRun, active: boolean, replyText: string): boolean {
   if (active || run.status === 'failed' || run.status === 'interrupted') return true;
   return visibleSteps(mergeSteps(run.steps, undefined), undefined, replyText).length > 0;
 }
@@ -36,16 +47,16 @@ export default function RunProcess({
   run,
   active,
   live,
-  teamId,
+  scope,
   nameOf,
   replyText = '',
   onRetry,
   retrying = false,
 }: {
-  run: RunWithSteps;
+  run: ProcessRun;
   active: boolean;
   live: LiveRun | undefined;
-  teamId: string;
+  scope: Scope;
   nameOf: (botId: string) => string;
   /** The turn's reply, shown right under it: what it holds is not said twice. */
   replyText?: string;
@@ -104,15 +115,15 @@ export default function RunProcess({
       )}
       {blocks.map((block) =>
         block.kind === 'text' ? (
-          <StepRow key={block.step.id} step={block.step} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} />
+          <StepRow key={block.step.id} step={block.step} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
         ) : (
-          <WorkGroup key={block.id} steps={block.steps} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} say={say} />
+          <WorkGroup key={block.id} steps={block.steps} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
         ),
       )}
       {retry}
       {active && live?.reply && (
         <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
-          <Markdown text={stripToolCallText(live.reply)} teamId={teamId} />
+          <Markdown text={stripToolCallText(live.reply)} teamId={scope.teamId} chatId={scope.chatId} />
         </div>
       )}
     </div>
@@ -121,7 +132,7 @@ export default function RunProcess({
 
 /** A stretch of work between two things the member said: a line saying what it
  * held, which opens into the steps. A running or failed turn shows them open. */
-function WorkGroup({ steps, expanded, active, live, teamId, nameOf, say }: { steps: RunStep[]; expanded: boolean; active: boolean; live: LiveRun | undefined; teamId: string; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
+function WorkGroup({ steps, expanded, active, live, scope, nameOf, say }: { steps: RunStep[]; expanded: boolean; active: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
   const [own, setOwn] = useState<boolean | null>(null);
   const open = own ?? expanded;
   const summary = workSummary(steps).map(say).join('、');
@@ -142,7 +153,7 @@ function WorkGroup({ steps, expanded, active, live, teamId, nameOf, say }: { ste
         <ol className="ml-1.5 mt-1 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
           {steps.map((step) => (
             <li key={step.id}>
-              <StepRow step={step} running={active && step.status === 'in_progress'} live={live} teamId={teamId} nameOf={nameOf} />
+              <StepRow step={step} running={active && step.status === 'in_progress'} live={live} scope={scope} nameOf={nameOf} />
             </li>
           ))}
         </ol>
@@ -172,7 +183,7 @@ function StatusMark({ status, running }: { status: string; running: boolean }) {
   return <Check size={11} className="text-neutral-400" aria-hidden="true" />;
 }
 
-function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; running: boolean; live: LiveRun | undefined; teamId: string; nameOf: (botId: string) => string }) {
+function StepRow({ step, running, live, scope, nameOf }: { step: RunStep; running: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const phrase = describeStep(step, nameOf);
@@ -188,7 +199,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
     const said = (typeof d.text === 'string' && d.text) || live?.commentary[step.id] || '';
     return (
       <div className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="run-commentary">
-        <Markdown text={stripToolCallText(said)} teamId={teamId} />
+        <Markdown text={stripToolCallText(said)} teamId={scope.teamId} chatId={scope.chatId} />
       </div>
     );
   }
@@ -198,12 +209,12 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
     return (
       <div className="text-xs text-neutral-500 dark:text-neutral-400">
         <p className="flex items-center gap-1.5"><Icon size={12} aria-hidden="true" />{t(phrase.key, phrase.params)}</p>
-        <div className="mt-0.5 pl-[18px] italic"><Markdown text={thought} teamId={teamId} /></div>
+        <div className="mt-0.5 pl-[18px] italic"><Markdown text={thought} teamId={scope.teamId} chatId={scope.chatId} /></div>
       </div>
     );
   }
 
-  const body = stepBody(step, live, teamId, t);
+  const body = stepBody(step, live, scope, t);
   return (
     <div className={`text-xs ${tone}`}>
       <button
@@ -225,7 +236,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
   );
 }
 
-function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (key: string, params?: Record<string, unknown>) => string) {
+function stepBody(step: RunStep, live: LiveRun | undefined, scope: Scope, t: (key: string, params?: Record<string, unknown>) => string) {
   const d = step.detail ?? {};
   switch (step.kind) {
     case 'command': {
@@ -241,7 +252,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       const changes = Array.isArray(d.changes) ? (d.changes as Array<Record<string, unknown>>) : [];
       return (
         <ul className="space-y-1">
-          {changes.map((change, index) => <FileChangeRow key={index} change={change} teamId={teamId} />)}
+          {changes.map((change, index) => <FileChangeRow key={index} change={change} scope={scope} />)}
         </ul>
       );
     }
@@ -253,7 +264,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       return (
         <div className="space-y-1">
           {message ? (
-            <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={teamId} /></div>
+            <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={scope.teamId} chatId={scope.chatId} /></div>
           ) : (
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-2xs dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
           )}
@@ -262,11 +273,11 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       );
     }
     case 'plan':
-      return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={teamId} /> : null;
+      return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={scope.teamId} chatId={scope.chatId} /> : null;
     case 'diff':
       return typeof d.diff === 'string' && d.diff ? <DiffView diff={d.diff} /> : null;
     case 'agent':
-      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={teamId} /></div> : null;
+      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={scope.teamId} chatId={scope.chatId} /></div> : null;
     case 'retry':
     case 'notice':
       return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-500 dark:text-neutral-400">{d.message}</p> : null;
@@ -275,7 +286,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
   }
 }
 
-function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; teamId: string }) {
+function FileChangeRow({ change, scope }: { change: Record<string, unknown>; scope: Scope }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -297,7 +308,7 @@ function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; te
             icon={Icons.openExternal}
             onClick={() => {
               setError('');
-              api.openTeamPath(teamId, path).catch((err) => setError(apiErrorMessage(t, err)));
+              (scope.chatId ? api.openChatPath(scope.chatId, path) : api.openTeamPath(scope.teamId ?? '', path)).catch((err) => setError(apiErrorMessage(t, err)));
             }}
           >
             {t('conversation.file.open')}

@@ -121,6 +121,13 @@ const (
 	ChatNavigationInputSortRecent ChatNavigationInputSort = "recent"
 )
 
+// Defines values for ChatSendInputPermissionMode.
+const (
+	ChatSendInputPermissionModeDefault  ChatSendInputPermissionMode = "default"
+	ChatSendInputPermissionModeFull     ChatSendInputPermissionMode = "full"
+	ChatSendInputPermissionModeReadOnly ChatSendInputPermissionMode = "read_only"
+)
+
 // Defines values for CollaborationRequestTool.
 const (
 	AskUser          CollaborationRequestTool = "ask_user"
@@ -903,12 +910,20 @@ type ChatSection struct {
 
 // ChatSendInput defines model for ChatSendInput.
 type ChatSendInput struct {
-	Model           *string `json:"model,omitempty"`
-	ProviderId      *string `json:"providerId,omitempty"`
+	Model *string `json:"model,omitempty"`
+
+	// PermissionMode Empty keeps the chat's. Holds from this message on.
+	PermissionMode *ChatSendInputPermissionMode `json:"permissionMode,omitempty"`
+	ProviderId     *string                      `json:"providerId,omitempty"`
+
+	// ReasoningEffort Sent with a model: the thinking level for the model chosen (empty is the model's own).
 	ReasoningEffort *string `json:"reasoningEffort,omitempty"`
 	RequestId       string  `json:"requestId"`
 	Text            string  `json:"text"`
 }
+
+// ChatSendInputPermissionMode Empty keeps the chat's. Holds from this message on.
+type ChatSendInputPermissionMode string
 
 // ChatStep defines model for ChatStep.
 type ChatStep struct {

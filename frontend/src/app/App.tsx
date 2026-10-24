@@ -67,7 +67,6 @@ function TitleBar({ desktop }: { desktop: DesktopWindow | null }) {
   return (
     <AppTitleBar
       platform={desktop?.platform ?? 'windows'}
-      title={desktop ? 'CoBot' : undefined}
       flushLeft
       left={workspace ? <div className={modeHeaderClass(listOpen)}><AppModeHeader brandLabel={t('app.title')} compact={!!desktop} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader></div> : undefined}
       windowControls={desktop ? {

@@ -429,7 +429,7 @@ function TurnRow({
   const replyText = replies.map((reply) => stripToolCallText(messageText(reply))).filter((text) => text !== '').join('\n\n');
   if (replies.length > 0 && replyText === '' && !runHasContent(run, active, '')) return null;
   const process = runHasContent(run, active, replyText) ? (
-    <RunProcess run={run} active={active} live={live} teamId={teamId} nameOf={nameOf} replyText={replyText} onRetry={onRetry} retrying={retrying} />
+    <RunProcess run={run} active={active} live={live} scope={{ teamId }} nameOf={nameOf} replyText={replyText} onRetry={onRetry} retrying={retrying} />
   ) : null;
   if (!process && replyText === '') return null;
   return (

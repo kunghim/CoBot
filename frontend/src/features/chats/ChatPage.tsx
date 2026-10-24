@@ -12,6 +12,8 @@ import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
 import NativeApprovalBody from '../approvals/NativeApprovalBody';
+import { effortChoices } from '../conversations/ReasoningEffortSelect';
+import { PermissionModeMenu, permissionModeOf } from '../conversations/PermissionModeSelect';
 import { choiceKey, defaultChoice, engineDefaultModel, selectableModels } from '../providers/providerModels';
 import { useProviderName } from '../providers/useProviderName';
 import { useChat } from './queries';
@@ -49,14 +51,30 @@ function ChatPage({ id }: { id?: string }) {
   const providerName = useProviderName();
   const offered = selectableModels(providers.data?.providers, engineModels.data?.models, engine.data?.loggedIn ?? false, providerName);
   const initial = defaultChoice(settings.data, providers.data?.providers, engineDefaultModel(engineModels.data?.models), engine.data?.loggedIn ?? false);
+  // What is chosen under the composer holds from the next message on, as in a
+  // team: the model, how it thinks and what it may do. Nothing picked means what
+  // the chat has (or, for a new chat, the defaults).
   const [picked, setPicked] = useState<string | null>(null);
-  const [effort, setEffort] = useState('');
-  const choice = offered.find((m) => m.key === (picked ?? choiceKey(initial.providerId, initial.model)));
-  const chosenModel = engineModels.data?.models.find((m) => (m.slug ?? m.id) === choice?.model) ?? engineModels.data?.models[0];
+  const [effort, setEffort] = useState<string | null>(null);
+  const [permission, setPermission] = useState<string | null>(null);
+  const ownKey = chat ? choiceKey(chat.providerId, chat.model) : choiceKey(initial.providerId, initial.model);
+  const choice = offered.find((m) => m.key === (picked ?? ownKey));
+  const chosenProvider = providers.data?.providers.find((p) => p.id === choice?.providerId);
+  const { levels, toggle, defaultEffort } = effortChoices(chosenProvider, choice?.model ?? '', engineModels.data?.models ?? []);
+  const asked = effort ?? (picked === null ? (chat?.reasoningEffort ?? '') : '');
+  const thinkingOff = toggle && asked === 'none';
+  const levelNow = thinkingOff ? '' : levels.some((level) => level.effort === asked) ? asked : '';
+  const mode = permissionModeOf(permission ?? chat?.permissionMode);
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['chat', id] }); void qc.invalidateQueries({ queryKey: ['chats'] }); };
   const action = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), onSuccess: refresh });
   const send = useMutation({
-    mutationFn: (text: string) => api.sendChat(id ?? null, { text, ...(!id ? { providerId: choice?.providerId ?? initial.providerId, model: choice?.model ?? initial.model, reasoningEffort: effort } : {}) }),
+    mutationFn: (text: string) =>
+      api.sendChat(id ?? null, {
+        text,
+        permissionMode: mode as 'read_only' | 'default' | 'full',
+        // The model with its thinking level go together; a model that is not on offer (its provider switched off) is left as the chat has it.
+        ...(choice || !id ? { providerId: choice?.providerId ?? initial.providerId, model: choice?.model ?? initial.model, reasoningEffort: thinkingOff ? 'none' : levelNow } : {}),
+      }),
     onSuccess: (result, text) => {
       if (readLocal(key) === text) { setDraft(''); writeLocal(key, ''); }
       qc.setQueryData<{ pages: typeof result[]; pageParams: string[] }>(['chat', result.chat.id], (old) => old?.pages.length ? {
@@ -86,14 +104,20 @@ function ChatPage({ id }: { id?: string }) {
   const toBottom = () => { stick.current = true; setBottom(true); scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); };
   const error = send.error ?? action.error ?? query.error;
   const modelLoading = engine.isPending || engineModels.isPending || providers.isPending || settings.isPending;
-  const modelOptions = !id && !offered.length ? <Button size="sm" variant="ghost" disabled={modelLoading} onClick={() => navigate('/settings/models')}>{t(modelLoading ? 'common.loading' : 'chat.chooseModel')}</Button>
-    : !id ? <ModelEffortPicker triggerLabel={choice?.label ?? (initial.model || t('chat.defaultModel'))}
-    models={offered.map((m) => ({ id: m.key, label: m.label, group: m.group, disabled: m.unavailable }))}
-    model={picked ?? choiceKey(initial.providerId, initial.model)} onModel={setPicked}
-    levels={(chosenModel?.reasoningEfforts ?? []).map(({ effort: value }) => ({ value, label: t(`effort.level.${value}`, { defaultValue: value }) }))}
-    effort={effort} onEffort={setEffort} isDefault={!picked && !effort} onReset={() => { setPicked(null); setEffort(''); }}
-    labels={{ effort: t('effort.title'), reset: t('chat.defaultModel'), chooseModel: t('chat.chooseModel'), back: t('common.back') }} />
-    : <span className="truncate px-2 text-xs text-neutral-500" title={t('chat.modelFixed')}>{chat?.model || t('chat.defaultModel')}</span>;
+  const label = (value: string) => t(`effort.level.${value}`, { defaultValue: value });
+  const shownLevel = levelNow || defaultEffort || levels[0]?.effort || '';
+  const modelOptions = <>
+    <PermissionModeMenu value={mode} onChange={setPermission} disabled={!!active} />
+    {!offered.length ? <Button size="sm" variant="ghost" disabled={modelLoading} onClick={() => navigate('/settings/models')}>{t(modelLoading ? 'common.loading' : 'chat.chooseModel')}</Button>
+      : <ModelEffortPicker triggerLabel={levels.length > 0 || toggle ? `${t('effort.label')}：${thinkingOff ? t('effort.off') : levelNow ? label(levelNow) : t('effort.default')} · ${choice?.label ?? chat?.model ?? t('chat.defaultModel')}` : (choice?.label ?? chat?.model ?? initial.model ?? t('chat.defaultModel'))}
+        models={offered.map((m) => ({ id: m.key, label: m.label, group: m.group, disabled: m.unavailable, badge: m.contextBadge }))}
+        model={picked ?? ownKey} onModel={(key) => { setPicked(key); setEffort(null); }}
+        levels={levels.map(({ effort: value }) => ({ value, label: label(value) }))}
+        effort={shownLevel} onEffort={setEffort} isDefault={picked === null && effort === null && permission === null}
+        thinking={toggle ? { on: !thinkingOff, label: thinkingOff ? t('effort.off') : t('effort.on'), onChange: (on) => setEffort(on ? '' : 'none') } : undefined}
+        onReset={() => { setPicked(null); setEffort(null); setPermission(null); }}
+        labels={{ effort: t('effort.label'), reset: t('effort.reset'), chooseModel: t('effort.chooseModel'), back: t('effort.back') }} />}
+  </>;
 
   return <section className="flex min-h-0 flex-1 flex-col" aria-label={t('chat.chat')}>
     <header className="flex min-h-14 items-center gap-2 px-4">
@@ -105,14 +129,17 @@ function ChatPage({ id }: { id?: string }) {
       {id && <div ref={scroll} onScroll={() => { const el = scroll.current!; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setBottom(stick.current); }} className="min-h-0 flex-1 overflow-y-auto px-5">
         <div className="mx-auto w-full max-w-3xl space-y-6 py-6">
           {query.hasNextPage && <Button variant="ghost" size="sm" loading={query.isFetchingNextPage} onClick={() => { const el = scroll.current; const height = el?.scrollHeight ?? 0; void query.fetchNextPage().then(() => requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; })); }}>{t('chat.earlier')}</Button>}
-          {messages.map((message) => <div key={message.id} className="space-y-3">
-            {message.kind === 'assistant' && runs.has(message.runId) && <ChatProcess run={runs.get(message.runId)!} chatId={id!} replyText={message.text} />}
-            <MessageBubble from={message.kind === 'user' ? 'user' : 'member'} meta={<CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} />}>
-              {message.kind === 'user' ? message.text : <Markdown text={message.text} chatId={id} />}
-            </MessageBubble>
-          </div>)}
-          {[...runs.values()].filter((run) => !messages.some((m) => m.runId === run.id && m.kind === 'assistant')).map((run) => <ChatProcess key={run.id} run={run} chatId={id!} />)}
-          {active && live[active.id]?.reply && <div className="text-sm leading-7" data-testid="chat-streaming"><Markdown text={live[active.id].reply} chatId={id} /></div>}
+          {messages.map((message) => {
+            const copy = <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"><CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} /></span>;
+            if (message.kind === 'user') return <div key={message.id} className="group"><MessageBubble from="user" meta={copy}>{message.text}</MessageBubble></div>;
+            // The reply closes its turn: what was said and done on the way is above it, in order.
+            const run = runs.get(message.runId);
+            return <div key={message.id} className="group space-y-2">
+              {run && <ChatProcess run={run} chatId={id!} live={live[run.id]} replyText={message.text} />}
+              <MessageBubble from="member" meta={copy}><Markdown text={message.text} chatId={id} /></MessageBubble>
+            </div>;
+          })}
+          {[...runs.values()].filter((run) => !messages.some((m) => m.runId === run.id && m.kind === 'assistant')).map((run) => <ChatProcess key={run.id} run={run} chatId={id!} live={live[run.id]} />)}
           {active?.status === 'unknown' && <div className="rounded-xl bg-sunk p-4"><p className="text-sm">{t('chat.unknown')}</p><Button size="sm" className="mt-3" loading={action.isPending} onClick={() => action.mutate(() => api.chatRunAction(id!, active.id, 'verify'))}>{t('chat.verify')}</Button></div>}
         </div>
       </div>}

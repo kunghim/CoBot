@@ -18,6 +18,8 @@ type ChatSendInput struct {
 	ProviderID      string `json:"providerId,omitempty"`
 	Model           string `json:"model,omitempty"`
 	ReasoningEffort string `json:"reasoningEffort,omitempty"`
+	// PermissionMode is read_only, default or full; empty keeps what the chat has.
+	PermissionMode string `json:"permissionMode,omitempty"`
 }
 type ChatActionInput struct {
 	SectionID        string              `json:"sectionId,omitempty"`
@@ -124,14 +126,15 @@ func (a *App) SendChat(ctx context.Context, p auth.Principal, id string, in Chat
 		if len(title) > 24 {
 			title = append(title[:24], '…')
 		}
-		chat = domain.Chat{ManualOrder: now.UnixNano(), ID: id, Title: string(title), ProviderID: choice.ProviderID, Model: choice.Model, PermissionMode: domain.PermissionDefault, ReasoningEffort: in.ReasoningEffort, Workspace: filepath.Join(a.Paths.Root, "chat-workspaces", id), Revision: 1, CreatedAt: now, UpdatedAt: now}
+		mode, e := chatPermission(in.PermissionMode, domain.PermissionDefault)
+		if e != nil {
+			return domain.ChatPage{}, e
+		}
+		chat = domain.Chat{ManualOrder: now.UnixNano(), ID: id, Title: string(title), ProviderID: choice.ProviderID, Model: choice.Model, PermissionMode: mode, ReasoningEffort: in.ReasoningEffort, Workspace: filepath.Join(a.Paths.Root, "chat-workspaces", id), Revision: 1, CreatedAt: now, UpdatedAt: now}
 	} else {
 		chat, err = sqlite.GetChat(ctx, a.DB, id)
 		if err != nil {
 			return domain.ChatPage{}, sqlite.NormalizeError(err)
-		}
-		if in.Model != "" || in.ProviderID != "" || in.ReasoningEffort != "" {
-			return domain.ChatPage{}, domain.InvalidRequest("error.chat.model_fixed", nil)
 		}
 		if chat.ArchivedAt != "" || chat.ArchiveOperation != "" {
 			return domain.ChatPage{}, domain.Conflict("error.chat.archived", nil)
@@ -144,6 +147,25 @@ func (a *App) SendChat(ctx context.Context, p auth.Principal, id string, in Chat
 			if domain.ChatRunActive(r.Status) {
 				return domain.ChatPage{}, domain.Conflict("error.chat.busy", nil)
 			}
+		}
+		// What is chosen with this message holds from this turn on: the model
+		// (another vendor's starts a new thread, see ChatRunner.thread), the
+		// thinking level and the permission mode.
+		if in.Model != "" {
+			provider := in.ProviderID
+			if provider == "" {
+				provider = chat.ProviderID
+			}
+			choice, e := a.chatChoice(ctx, provider, in.Model)
+			if e != nil {
+				return domain.ChatPage{}, e
+			}
+			chat.ProviderID, chat.Model, chat.ReasoningEffort = choice.ProviderID, choice.Model, in.ReasoningEffort
+		}
+		if mode, e := chatPermission(in.PermissionMode, chat.PermissionMode); e != nil {
+			return domain.ChatPage{}, e
+		} else {
+			chat.PermissionMode = mode
 		}
 		if _, e = a.chatChoice(ctx, chat.ProviderID, chat.Model); e != nil {
 			return domain.ChatPage{}, e
@@ -181,6 +203,18 @@ func (a *App) SendChat(ctx context.Context, p auth.Principal, id string, in Chat
 	a.chatChanged(ctx, id, "chat.message.updated")
 	a.Chats.wake(id, run.ID, in.Text)
 	return page, nil
+}
+
+// chatPermission is the permission mode asked for, or the one the chat has
+// when none is asked for.
+func chatPermission(asked, current string) (string, error) {
+	switch asked {
+	case "":
+		return current, nil
+	case domain.PermissionReadOnly, domain.PermissionDefault, domain.PermissionFull:
+		return asked, nil
+	}
+	return "", domain.InvalidRequest("error.chat.permission_mode", nil)
 }
 
 func (a *App) ChangeChat(ctx context.Context, p auth.Principal, id, action string, in ChatActionInput) (domain.Chat, error) {

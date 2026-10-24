@@ -332,3 +332,41 @@ func TestChatHistoryPagingAndDeletingOnlyConversationContent(t *testing.T) {
 		t.Fatal("late callback resurrected deleted chat")
 	}
 }
+
+// What is chosen with a message (model, thinking level, permission) holds from
+// that turn on, and goes to the engine with the turn.
+func TestAChatKeepsWhatIsChosenWithEachMessage(t *testing.T) {
+	h := newM2Harness(t)
+	made := attachChats(t, h, nil)
+	ctx := context.Background()
+	first, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "choose-1", Text: "你好"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	page := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	run := page.Runs[0]
+	f.EmitTurnCompleted(run.ThreadID, run.TurnID, "completed", "好")
+	chatWait(t, h, first.Chat.ID, domain.RunCompleted)
+
+	if _, err := h.app.SendChat(ctx, h.user, first.Chat.ID, app.ChatSendInput{RequestID: "choose-bad", Text: "x", PermissionMode: "root"}); err == nil {
+		t.Fatal("a permission mode that does not exist was accepted")
+	}
+	second, err := h.app.SendChat(ctx, h.user, first.Chat.ID, app.ChatSendInput{RequestID: "choose-2", Text: "继续", ProviderID: first.Chat.ProviderID, Model: "gpt-test", ReasoningEffort: "high", PermissionMode: domain.PermissionReadOnly})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := second.Chat; c.Model != "gpt-test" || c.ReasoningEffort != "high" || c.PermissionMode != domain.PermissionReadOnly {
+		t.Fatalf("chat = %+v", c)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for len(f.Turns()) < 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	turns := f.Turns()
+	if len(turns) != 2 || turns[1].ThreadID != run.ThreadID || turns[1].Model != "gpt-test" || turns[1].Permission != domain.PermissionReadOnly || turns[1].Effort != "high" {
+		t.Fatalf("turns = %+v", turns)
+	}
+	// A message that says nothing of them leaves them as they are.
+	chatWait(t, h, first.Chat.ID, domain.RunRunning)
+}

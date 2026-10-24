@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -223,39 +224,69 @@ func (r *ChatRunner) ensure(chat domain.Chat) (*chatRuntime, error) {
 	return rt, nil
 }
 
-func (r *ChatRunner) thread(rt *chatRuntime, chat domain.Chat) (domain.ChatSession, error) {
+// thread is the chat's engine thread for its next turn. mayStartFresh lets it
+// start a new one when the model chosen now cannot take the old thread's
+// history (another vendor's, as for a team member, see needsFreshThread); the
+// note it returns then opens that turn, saying where the old record is.
+func (r *ChatRunner) thread(rt *chatRuntime, chat domain.Chat, mayStartFresh bool) (domain.ChatSession, string, error) {
 	choice, err := r.a.chatChoice(r.ctx, chat.ProviderID, chat.Model)
 	if err != nil {
-		return domain.ChatSession{}, err
+		return domain.ChatSession{}, "", err
 	}
 	config := map[string]any{}
-	if choice.EngineProvider != officialEngineProvider {
+	if choice.EngineProvider != officialEngineProvider && !r.a.webSearchAllowed(r.ctx, choice) {
 		config["web_search"] = "disabled"
 	}
-	spec := engine.ThreadSpec{Cwd: chat.Workspace, Permission: chat.PermissionMode, ApprovalsReviewer: "user", Model: chat.Model, ModelProvider: choice.EngineProvider, Config: codex.ThreadConfig(config)}
+	// The window the model has, which the engine cannot know of a model it
+	// has no entry for (see the engine's model catalog).
+	if spec, ok := r.a.specOfChoice(r.ctx, choice, chat.Model); ok && spec.ContextWindow > 0 {
+		config["model_context_window"] = spec.ContextWindow
+	}
+	instructions := ""
+	if choice.EngineProvider != officialEngineProvider {
+		// What a model without the engine's own tools is told (see threadInstructions).
+		instructions = strings.TrimSpace(fileEditGuide(runtime.GOOS) + toolCallGuide)
+	}
+	spec := engine.ThreadSpec{Cwd: chat.Workspace, Permission: chat.PermissionMode, ApprovalsReviewer: "user", Model: chat.Model, ModelProvider: choice.EngineProvider, DeveloperInstructions: instructions, Config: codex.ThreadConfig(config)}
 	session, err := sqlite.GetChatSession(r.ctx, r.a.DB, chat.ID)
 	var info engine.ThreadInfo
+	note := ""
+	switching := false
 	if errors.Is(err, sqlite.ErrNotFound) {
 		info, err = rt.server.StartThread(r.ctx, spec)
 	} else if err == nil {
-		info, err = rt.server.ResumeThread(r.ctx, session.ThreadID, spec)
+		old := domain.ProviderSession{ProviderThreadID: session.ThreadID, ModelProvider: session.Provider, Model: session.Model}
+		if mayStartFresh && r.a.needsFreshThread(r.ctx, old, choice) {
+			handover := handoverFrom(r.ctx, rt.server, old)
+			note = r.a.handoverIntro(r.ctx, *handover, domain.ProviderSession{ModelProvider: choice.EngineProvider, Model: chat.Model}) +
+				"\n先用一两句话说清楚之前聊到哪，再回答用户下面的新消息。\n\n用户的新消息：\n"
+			info, err = rt.server.StartThread(r.ctx, spec)
+		} else {
+			switching = session.Model != "" && chat.Model != "" && session.Model != chat.Model
+			info, err = rt.server.ResumeThread(r.ctx, session.ThreadID, spec)
+		}
 	}
 	if err != nil {
-		return session, err
+		return session, "", err
 	}
-	if chat.Model != "" && info.Model != "" && chat.Model != info.Model {
-		return session, domain.Conflict("error.chat.model_mismatch", nil)
+	// Moving to another model of the same vendor, the thread keeps the one it
+	// began with in its own record; the turn carries the model asked for.
+	if !switching && chat.Model != "" && info.Model != "" && chat.Model != info.Model {
+		return session, "", domain.Conflict("error.chat.model_mismatch", nil)
 	}
 	if info.ModelProvider != "" && info.ModelProvider != choice.EngineProvider {
-		return session, domain.Conflict("error.chat.model_mismatch", nil)
+		return session, "", domain.Conflict("error.chat.model_mismatch", nil)
+	}
+	if switching {
+		info.Model = chat.Model
 	}
 	session = domain.ChatSession{ChatID: chat.ID, ThreadID: info.ThreadID, Epoch: rt.server.Epoch(), Model: info.Model, Provider: info.ModelProvider}
 	if session.ThreadID == "" {
-		return session, errors.New("missing chat thread identity")
+		return session, "", errors.New("missing chat thread identity")
 	}
 	err = sqlite.SaveChatSession(r.ctx, r.a.DB, session)
 	if err != nil {
-		return session, err
+		return session, "", err
 	}
 	release := r.lock(chat.ID)
 	rt.thread = session.ThreadID
@@ -268,11 +299,11 @@ func (r *ChatRunner) thread(rt *chatRuntime, chat domain.Chat) (domain.ChatSessi
 		}
 		if e != nil {
 			release()
-			return session, e
+			return session, "", e
 		}
 	}
 	release()
-	return session, nil
+	return session, note, nil
 }
 
 func (r *ChatRunner) dispatch(chatID, runID, text string) {
@@ -300,7 +331,7 @@ func (r *ChatRunner) dispatch(chatID, runID, text string) {
 		r.preDispatchFailed(run)
 		return
 	}
-	session, err := r.thread(rt, chat)
+	session, note, err := r.thread(rt, chat, true)
 	if err != nil {
 		r.preDispatchFailed(run)
 		return
@@ -343,7 +374,15 @@ func (r *ChatRunner) dispatch(chatID, runID, text string) {
 		return
 	}
 	r.a.chatChanged(r.ctx, chatID, "chat.run.updated")
-	turnID, err := rt.server.StartTurn(r.ctx, session.ThreadID, text, engine.TurnOptions{Model: chat.Model, Effort: chat.ReasoningEffort, Permission: chat.PermissionMode})
+	if note != "" {
+		text = note + text
+	}
+	// The level asked for goes only if this model offers it, as for a team.
+	effort := chat.ReasoningEffort
+	if choice, e := r.a.chatChoice(r.ctx, chat.ProviderID, chat.Model); e == nil {
+		effort = r.a.effortFor(r.ctx, choice, chat.Model, chat.ReasoningEffort)
+	}
+	turnID, err := rt.server.StartTurn(r.ctx, session.ThreadID, text, engine.TurnOptions{Model: chat.Model, Effort: effort, Permission: chat.PermissionMode})
 	release = r.lock(chatID)
 	defer release()
 	if r.runtime(chatID) != rt {
@@ -779,7 +818,7 @@ func (r *ChatRunner) runAction(ctx context.Context, p auth.Principal, id, runID,
 		if err != nil {
 			return run, err
 		}
-		if _, err = r.thread(rt, chat); err != nil {
+		if _, _, err = r.thread(rt, chat, false); err != nil {
 			return run, err
 		}
 	}

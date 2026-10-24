@@ -3543,6 +3543,11 @@ components:
           type: "string"
         reasoningEffort:
           type: "string"
+          description: "Sent with a model: the thinking level for the model chosen (empty is the model's own)."
+        permissionMode:
+          type: "string"
+          enum: [read_only, default, full]
+          description: "Empty keeps the chat's. Holds from this message on."
     ChatActionInput:
       type: "object"
       required:

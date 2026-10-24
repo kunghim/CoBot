@@ -1582,7 +1582,13 @@ export interface components {
             text: string;
             providerId?: string;
             model?: string;
+            /** @description Sent with a model: the thinking level for the model chosen (empty is the model's own). */
             reasoningEffort?: string;
+            /**
+             * @description Empty keeps the chat's. Holds from this message on.
+             * @enum {string}
+             */
+            permissionMode?: "read_only" | "default" | "full";
         };
         ChatActionInput: {
             sectionId?: string;

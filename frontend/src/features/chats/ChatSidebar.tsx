@@ -87,7 +87,7 @@ function ChatBucket({ nav, pinned = false, section, heading, sectionMenu, empty 
     {(list.error || reorder.error) && <Alert tone="danger">{apiErrorMessage(t, reorder.error ?? list.error)}</Alert>}
     {!closed && <>
       {list.isPending && <p role="status" className="p-3 text-xs text-neutral-500">{t('common.loading')}</p>}
-      {items.map((chat) => <div key={chat.id} data-chat-id={chat.id} draggable={nav.sort === 'manual' && !reorder.isPending} onDragStart={(e) => { e.dataTransfer.setData('application/x-cobot-chat', JSON.stringify(chat)); e.dataTransfer.effectAllowed = 'move'; }}
+      <div className="space-y-0.5">{items.map((chat) => <div key={chat.id} data-chat-id={chat.id} draggable={nav.sort === 'manual' && !reorder.isPending} onDragStart={(e) => { e.dataTransfer.setData('application/x-cobot-chat', JSON.stringify(chat)); e.dataTransfer.effectAllowed = 'move'; }}
         onDragOver={(e) => { if (nav.sort === 'manual' && e.dataTransfer.types.includes('application/x-cobot-chat')) e.preventDefault(); }}
         onDrop={(e) => { e.preventDefault(); if (nav.sort !== 'manual') return; try { const source = JSON.parse(e.dataTransfer.getData('application/x-cobot-chat')) as Chat; if (source.id && source.id !== chat.id && !!source.pinned === !!chat.pinned && (nav.grouping === 'merged' || pinned || (source.sectionId ?? '') === (chat.sectionId ?? ''))) reorder.mutate({ source, beforeId: chat.id }); } catch { /* Ignore unrelated native drag data. */ } }}
         className={cx('group flex min-w-0 items-center rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5', chat.id === chatId && 'bg-neutral-900/5 dark:bg-white/10')}>
@@ -95,7 +95,7 @@ function ChatBucket({ nav, pinned = false, section, heading, sectionMenu, empty 
           {chat.title}{chat.archiveOperation && <span className="ml-1 text-amber-600">· {t('chatNav.pendingShort')}</span>}
         </button>
         <span className="flex shrink-0 items-center pr-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100"><ChatMenu chat={chat} /></span>
-      </div>)}
+      </div>)}</div>
       {!items.length && !list.isPending && (empty || heading) && <p className="px-3 py-2 text-xs text-neutral-500">{t(heading ? 'chatNav.emptySection' : 'chat.emptyHistory')}</p>}
       {list.hasNextPage && <Button size="sm" variant="ghost" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>{t('chat.loadMore')}</Button>}
     </>}
