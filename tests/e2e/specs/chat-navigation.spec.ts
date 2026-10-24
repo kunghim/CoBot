@@ -109,8 +109,12 @@ test('manual drag and keyboard order agree; nested choices stay inside a narrow 
   await page.getByRole('button', { name: '整理聊天列表' }).click();
   await page.getByRole('menuitem', { name: '聊天排序方式' }).press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '手动排序' }).click();
+  // Reopen only once the menu has closed, or the second click toggles it shut.
+  await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByRole('button', { name: '整理聊天列表' }).click();
-  await page.getByRole('menuitem', { name: '显示方式', exact: true }).press('ArrowRight');
+  const display = page.getByRole('menuitem', { name: '显示方式', exact: true });
+  await display.focus();
+  await display.press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '合并显示' }).click();
   const order = () => page.locator('[data-chat-id]').evaluateAll((rows, targets) => rows.map((row) => row.getAttribute('data-chat-id')).filter((id) => targets.includes(id!)), ids);
   await expect.poll(order).toEqual(ids);
