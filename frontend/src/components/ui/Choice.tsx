@@ -296,6 +296,8 @@ export function Chip({
   title,
   className,
   action,
+  centered = false,
+  mark = true,
 }: {
   pressed: boolean;
   onClick: () => void;
@@ -316,6 +318,10 @@ export function Chip({
    * also be reached without a mouse.
    */
   action?: { label: string; onClick: () => void; busy?: boolean; visible?: boolean; kind?: 'check' | 'retry' };
+  /** Short fixed labels in a row: the text sits in the middle, the check mark's room balanced on both sides. */
+  centered?: boolean;
+  /** Whether the chosen state also shows a leading check mark. Off where the check mark means something else (a model that passed its check). */
+  mark?: boolean;
 }) {
   const chip = (
     <button
@@ -325,7 +331,9 @@ export function Chip({
       onClick={onClick}
       title={title}
       className={cx(
-        'inline-flex max-w-full items-center gap-1.5 rounded-lg border py-1 pl-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex max-w-full items-center gap-1.5 rounded-lg border py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        mark ? 'pl-2.5' : 'pl-3',
+        centered && 'justify-center',
         action ? 'pr-7' : 'pr-2.5',
         mono && 'font-mono',
         pressed
@@ -336,10 +344,17 @@ export function Chip({
         !action && className,
       )}
     >
-      <span aria-hidden className={cx('text-[9px] leading-none', !pressed && 'opacity-0')}>
-        ✓
-      </span>
+      {mark && (
+        <span aria-hidden className={cx('text-[9px] leading-none', !pressed && 'opacity-0')}>
+          ✓
+        </span>
+      )}
       <span className="min-w-0 truncate">{children}</span>
+      {centered && mark && (
+        <span aria-hidden className="text-[9px] leading-none opacity-0">
+          ✓
+        </span>
+      )}
       {trailing}
     </button>
   );

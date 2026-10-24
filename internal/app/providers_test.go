@@ -567,3 +567,35 @@ func TestRebindProvidersHandsStoredKeyProvidersToTheEngineAgain(t *testing.T) {
 		t.Fatalf("bound after rebind = %+v, want only the key provider", binder.bound)
 	}
 }
+
+func TestAThinkingLevelReachesOnlyTheModelsThatDeclaredIt(t *testing.T) {
+	a := providerTestApp(t, newFakeBinder())
+	ctx := context.Background()
+	gateway := testProvider()
+	gateway.Models = []domain.ProviderModel{
+		{ID: "plain"},
+		{ID: "thinker", SupportedEfforts: []string{"low", "high"}},
+	}
+	if _, err := a.SaveProvider(ctx, gateway, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name   string
+		choice ModelChoice
+		model  string
+		effort string
+		want   string
+	}{
+		{"no level set", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "", ""},
+		{"a gateway model that declared nothing gets the defaults", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "high", "high"},
+		{"but not a level beyond them", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "xhigh", ""},
+		{"a model that lists the level", ModelChoice{ProviderID: gateway.ID, Model: "thinker"}, "thinker", "high", "high"},
+		{"a model that does not list this level", ModelChoice{ProviderID: gateway.ID, Model: "thinker"}, "thinker", "ultra", ""},
+		{"the engine's own account", ModelChoice{}, "gpt", "ultra", "ultra"},
+		{"a provider that is gone", ModelChoice{ProviderID: "gone", Model: "x"}, "x", "high", ""},
+	} {
+		if got := a.effortFor(ctx, c.choice, c.model, c.effort); got != c.want {
+			t.Errorf("%s: effort = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

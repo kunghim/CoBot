@@ -130,3 +130,21 @@ func TestTurnDiffAndSettledRequests(t *testing.T) {
 		t.Fatalf("settled request = %+v", got[1])
 	}
 }
+
+// The engine folding the conversation into a summary shows in the flow, with
+// its start and its end.
+func TestContextCompactionIsAStep(t *testing.T) {
+	var got []engine.Notification
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{OnNotification: func(n engine.Notification) { got = append(got, n) }}}
+	server.handleNotify("item/started", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"contextCompaction","id":"cc1"}}`))
+	server.handleNotify("item/completed", json.RawMessage(`{"threadId":"th","turnId":"tu","item":{"type":"contextCompaction","id":"cc1"}}`))
+	if len(got) != 2 {
+		t.Fatalf("notifications = %+v", got)
+	}
+	if s := got[0].Step; s == nil || s.Kind != engine.StepCompaction || s.Status != engine.StepInProgress {
+		t.Fatalf("start = %+v", got[0])
+	}
+	if s := got[1].Step; s == nil || s.Kind != engine.StepCompaction || s.Status != engine.StepCompleted {
+		t.Fatalf("done = %+v", got[1])
+	}
+}

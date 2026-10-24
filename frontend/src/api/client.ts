@@ -164,6 +164,11 @@ export const api = {
     request<{ limit: number | null; clamped: number }>('PUT', `/api/v1/bots/${botId}/budget`, { limit }),
   resetTeamBudget: (teamId: string) => request<{ reset: boolean }>('POST', `/api/v1/teams/${teamId}/budget/reset`, {}),
   resetBotBudget: (botId: string) => request<{ reset: boolean }>('POST', `/api/v1/bots/${botId}/budget/reset`, {}),
+  modelCatalog: () => request<import('./types').ModelCatalogStatus>('GET', '/api/v1/model-catalog'),
+  updateModelCatalog: () => request<import('./types').ModelCatalogUpdate>('POST', '/api/v1/model-catalog/update', {}),
+  applyEngineCatalog: () => request<import('./types').ApplyEngineCatalogResult>('POST', '/api/v1/model-catalog/apply', {}),
+  resolveModels: (models: import('./types').ProviderModel[]) =>
+    request<{ specs: Record<string, import('./types').ModelSpec> }>('POST', '/api/v1/model-catalog/resolve', { models }),
   checkForUpdate: () => request<import('./types').UpdateCheck>('POST', '/api/v1/updates/check', {}),
   getSettings: () => request<import('./types').Settings>('GET', '/api/v1/settings'),
   updateSettings: (patch: import('./types').SettingsPatch, expectedRevision?: number) =>

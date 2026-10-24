@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { useDeleteProvider, useProviderPresets, useProviders, useSetProviderEnabled } from '../../api/queries';
+import { useDeleteProvider, useApplyEngineCatalog, useModelCatalog, useProviderPresets, useProviders, useSetProviderEnabled, useUpdateModelCatalog } from '../../api/queries';
 import type { Provider, ProviderPreset } from '../../api/types';
 import { Alert, AlertDialog, Badge, Button, Card, Icons, LogoTile, Skeleton, Switch, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
@@ -145,6 +145,67 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
   );
 }
 
+/** Which model catalog is in use, and the button that fetches the newest one. */
+function ModelCatalogCard() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const catalog = useModelCatalog();
+  const update = useUpdateModelCatalog();
+  const apply = useApplyEngineCatalog();
+  const data = catalog.data;
+  const result = update.data;
+  const when = data?.updatedAt ? new Date(data.updatedAt).toLocaleDateString(i18n.language) : '';
+  return (
+    <Card
+      title={t('providers.catalog.title')}
+      action={
+        <Button
+          icon={Icons.refresh}
+          loading={update.isPending}
+          onClick={() =>
+            update.mutate(undefined, {
+              onSuccess: (outcome) => outcome.state === 'updated' && toast.show({ tone: 'success', title: t('providers.catalog.updated', { count: outcome.models }) }),
+              onError: (error) => toast.show({ tone: 'warning', duration: 5000, title: apiErrorMessage(t, error) }),
+            })
+          }
+        >
+          {t('providers.catalog.update')}
+        </Button>
+      }
+    >
+      <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('providers.catalog.intro')}</p>
+      {data && (
+        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {t(`providers.catalog.source.${data.source}`, { count: data.models, date: when })}
+        </p>
+      )}
+      {data && data.engine.stale > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">{t('providers.catalog.stale', { count: data.engine.stale })}</p>
+          <Button
+            size="sm"
+            loading={apply.isPending}
+            onClick={() =>
+              apply.mutate(undefined, {
+                onSuccess: (outcome) =>
+                  toast.show({ tone: outcome.busy > 0 ? 'info' : 'success', title: t('providers.catalog.applied', { count: outcome.restarted, busy: outcome.busy }) }),
+                onError: (error) => toast.show({ tone: 'warning', duration: 5000, title: apiErrorMessage(t, error) }),
+              })
+            }
+          >
+            {t('providers.catalog.apply')}
+          </Button>
+        </div>
+      )}
+      {result && result.state !== 'updated' && (
+        <div className="mt-3">
+          <Alert tone="warning">{t(`providers.catalog.${result.state}`)}</Alert>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function ProviderSection() {
   const { t } = useTranslation();
   const toast = useToast();
@@ -260,6 +321,8 @@ export default function ProviderSection() {
           </div>
         )}
       </Card>
+
+      <ModelCatalogCard />
 
       <AddProviderDialog
         open={dialogOpen}

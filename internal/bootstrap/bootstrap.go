@@ -31,6 +31,7 @@ import (
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/logging"
+	"github.com/kunghim/CoBot/internal/modelcatalog"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/secrets"
@@ -234,6 +235,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	}
 	application.Avatars = catalog
 	application.Updates = updates.New(opts.Version, "")
+	if modelCatalog, err := modelcatalog.Open(filepath.Join(paths.CacheDir(), "model-catalog.json")); err != nil {
+		logger.Warn("model catalog unavailable", "error", err)
+	} else {
+		application.ModelCatalog = modelCatalog
+	}
 	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
 
 	// The credential store holds the model providers' API keys, encrypted
@@ -256,7 +262,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// and every HTTP exchange. It records nothing until switched on.
 	trace := wiretrace.New(paths.Root, "core")
 	application.Trace = trace
-	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
+	application.ClientCatalogs = &codex.CatalogBuilder{Home: paths.CodexHome()}
+	// withCatalog: a team's engine knows the third-party models' context
+	// windows; the profile-wide control engine keeps the engine's own model
+	// list, which it refreshes, and which the account's model picker shows.
+	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks, withCatalog bool) (*codex.Server, error) {
 		settings, err := application.GetSettings(startCtx)
 		if err != nil {
 			return nil, err
@@ -272,7 +282,17 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		if err != nil {
 			return nil, err
 		}
+		var clientCatalog codex.ClientCatalog
+		if withCatalog {
+			var catalogErr error
+			if clientCatalog, catalogErr = application.EngineCatalog(startCtx); catalogErr != nil {
+				// Without it the models keep the engine's fallback window.
+				logger.Warn("model catalog for the engine not used", "error", catalogErr)
+				clientCatalog = codex.ClientCatalog{}
+			}
+		}
 		return codex.Start(startCtx, codex.ServerOptions{
+			Catalog:   clientCatalog,
 			Binary:    binary,
 			Cwd:       cwd,
 			Env:       codex.EngineEnv(paths, secrets),
@@ -283,7 +303,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		})
 	}
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
-		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
+		return newServer(spec.Context, spec.Cwd, spec.Callbacks, true)
 	})
 	// A developer can shorten the idle engine shutdown to watch it happen
 	// (for example COBOT_IDLE_ENGINE_TIMEOUT=30s); it is not a user setting.
@@ -306,7 +326,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 					application.EngineStatusInvalidated()
 				}
 			},
-		})
+		}, false)
 	}
 	startupComplete := false
 	defer func() {

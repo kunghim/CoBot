@@ -304,3 +304,30 @@ func (a *App) SetProviderEnabled(ctx context.Context, id string, enabled bool, e
 	a.Hub.Publish()
 	return a.providerView(ctx, saved), nil
 }
+
+// effortFor is the thinking level a turn is sent with. The team keeps one
+// level for all its members, chosen on whichever model was in front of the
+// user; a member on another vendor's model gets it only if that model offers
+// it: one of its levels, or "none" when thinking can be switched off.
+// Otherwise the turn is sent without one, so a gateway is never handed a level
+// the model does not have.
+func (a *App) effortFor(ctx context.Context, choice ModelChoice, model, effort string) string {
+	if effort == "" || choice.ProviderID == "" {
+		return effort
+	}
+	provider, err := sqlite.GetProvider(ctx, a.DB, choice.ProviderID)
+	if err != nil {
+		return ""
+	}
+	if provider.AuthMode == domain.ProviderAuthChatGPT {
+		return effort
+	}
+	spec, ok := a.specOfChoice(ctx, choice, model)
+	if !ok {
+		return ""
+	}
+	if contains(spec.Thinking.Efforts, effort) || (effort == "none" && spec.Thinking.Toggle) {
+		return effort
+	}
+	return ""
+}

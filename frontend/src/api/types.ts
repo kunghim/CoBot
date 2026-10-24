@@ -44,6 +44,10 @@ export type EngineLogin = components['schemas']['EngineLogin'];
 export type Provider = components['schemas']['Provider'];
 export type ProviderEndpoint = components['schemas']['ProviderEndpoint'];
 export type ProviderModel = components['schemas']['ProviderModel'];
+export type ModelSpec = components['schemas']['ModelSpec'];
+export type ModelCatalogStatus = components['schemas']['ModelCatalogStatus'];
+export type ModelCatalogUpdate = components['schemas']['ModelCatalogUpdate'];
+export type ApplyEngineCatalogResult = components['schemas']['ApplyEngineCatalogResult'];
 export type ProviderRetries = components['schemas']['ProviderRetries'];
 /** The body of a provider write. The request id is not part of it: the api
  * client adds one to every write, the way it does for every other endpoint. */

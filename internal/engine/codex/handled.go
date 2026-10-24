@@ -37,6 +37,7 @@ var HandledItemTypes = []string{
 	"agentMessage",
 	"collabAgentToolCall",
 	"commandExecution",
+	"contextCompaction",
 	"dynamicToolCall",
 	"fileChange",
 	"mcpToolCall",

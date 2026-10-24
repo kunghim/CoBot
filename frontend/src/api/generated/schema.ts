@@ -278,6 +278,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/model-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which model catalog is in use */
+        get: operations["getModelCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What is known about models that are not stored yet (catalog and the entries given, put together) */
+        post: operations["resolveModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop the idle team engines that run an older model catalog; their next turn starts with the current one */
+        post: operations["applyEngineCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download the newest model catalog now; an unreachable or unusable source is reported in state, not as an error */
+        post: operations["updateModelCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/engine/check": {
         parameters: {
             query?: never;
@@ -1303,17 +1371,66 @@ export interface components {
         };
         ProviderModel: {
             id: string;
+            /** @description The user's own name for the model */
             displayName?: string;
             contextWindow?: number;
+            maxOutput?: number;
             defaultEffort?: string;
             supportedEfforts?: string[];
+            thinkingToggle?: boolean;
             inputModalities?: string[];
+            webSearch?: boolean;
+            spec?: components["schemas"]["ModelSpec"];
             /** @enum {string} */
             status?: "ok" | "failed" | "unknown";
             /** @description Stable machine code of the last check. */
             failure?: string;
             /** @description Human-readable detail of the last check. */
             message?: string;
+        };
+        /** @description What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored. */
+        ModelSpec: {
+            name?: string;
+            alias?: string;
+            displayName: string;
+            contextWindow: number;
+            maxOutput: number;
+            inputModalities: string[];
+            webSearch: boolean;
+            thinking: {
+                toggle: boolean;
+                efforts: string[];
+                defaultEffort?: string;
+            };
+            /** @enum {string} */
+            source: "catalog" | "custom";
+            catalogId?: string;
+            /** @description Fields the catalog gives and the user cannot change. */
+            locked: ("contextWindow" | "maxOutput" | "inputModalities" | "thinking")[];
+        };
+        /** @description How the running engines stand against the model catalog now wanted (the context windows of third-party models). */
+        EngineCatalogState: {
+            /** @description Whether a generated catalog is wanted at all. */
+            active: boolean;
+            /** @description Running team engines started without the catalog now wanted. */
+            stale: number;
+        };
+        ModelCatalogStatus: {
+            /** @enum {string} */
+            source: "bundled" | "downloaded";
+            /** Format: date-time */
+            updatedAt?: string;
+            models: number;
+            from?: string;
+            engine: components["schemas"]["EngineCatalogState"];
+        };
+        ApplyEngineCatalogResult: {
+            restarted: number;
+            busy: number;
+        };
+        ModelCatalogUpdate: components["schemas"]["ModelCatalogStatus"] & {
+            /** @enum {string} */
+            state: "updated" | "unreachable" | "rejected";
         };
         /** @description How often the engine may retry a request to this provider. */
         ProviderRetries: {
@@ -1928,7 +2045,7 @@ export interface components {
              * @description The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
              * @enum {string}
              */
-            kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "notice" | "retry";
+            kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "compaction" | "notice" | "retry";
             /** @enum {string} */
             status: "in_progress" | "completed" | "failed" | "declined" | "interrupted";
             /** @description Kind-specific payload. */
@@ -2504,6 +2621,124 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: components["schemas"]["UpdateCheck"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getModelCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source, date and size of the catalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ModelCatalogStatus"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    resolveModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    models: components["schemas"]["ProviderModel"][];
+                };
+            };
+        };
+        responses: {
+            /** @description A spec for each model id */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            specs: {
+                                [key: string]: components["schemas"]["ModelSpec"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    applyEngineCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description How many engines were stopped, and how many were left because a turn is running */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ApplyEngineCatalogResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    updateModelCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Outcome, and the catalog now in use */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ModelCatalogUpdate"];
                     };
                 };
             };

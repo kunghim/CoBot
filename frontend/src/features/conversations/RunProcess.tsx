@@ -117,6 +117,7 @@ const kindIcon: Record<string, (typeof Icons)[keyof typeof Icons]> = {
   notice: Icons.warning,
   agent: Icons.subagent,
   diff: Icons.diff,
+  compaction: Icons.compaction,
 };
 
 function StatusMark({ status, running }: { status: string; running: boolean }) {

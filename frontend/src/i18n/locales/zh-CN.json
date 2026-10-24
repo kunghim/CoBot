@@ -149,6 +149,8 @@
     "resets": "重置时间：{{time}}"
   },
   "effort": {
+    "on": "思考",
+    "off": "思考已关闭",
     "label": "思考强度",
     "default": "默认",
     "modelDefault": "由模型决定（当前模型默认：{{level}}）",
@@ -158,7 +160,7 @@
     "chooseModel": "选择模型",
     "back": "返回",
     "saveFailed": "思考强度没有改成",
-    "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高" },
+    "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高", "max": "最高", "ultra": "Ultra" },
     "modelSwitched": "{{name}} 改用 {{provider}} · {{model}}，下一轮起生效"
   },
   "permission": {
@@ -226,6 +228,7 @@
       "editing": "正在修改文件",
       "tool": "正在协作",
       "searching": "正在搜索网页",
+      "compacting": "正在压缩上下文",
       "reconnecting": "正在重新连接模型（第 {{attempt}} 次）",
       "waitingApproval": "等待你审批",
       "waitingInput": "等待你回复"
@@ -266,6 +269,8 @@
       "fileChange": "修改了 {{count}} 个文件",
       "webSearch": "搜索网页：{{query}}",
       "plan": "制定计划",
+      "compacting": "正在压缩上下文…",
+      "compacted": "已自动压缩上下文",
       "retrying": "正在重新连接模型（第 {{attempt}} 次）",
       "retried": "重新连接 {{attempt}} 次后恢复",
       "warning": "提示：{{message}}",
@@ -599,6 +604,21 @@
     "loginTimeout": "登录等待超时，请检查浏览器中的 Codex 登录窗口"
   },
   "providers": {
+    "catalog": {
+      "stale": "有 {{count}} 个团队的引擎还在用旧的目录，更长的上下文要重启后才生效。",
+      "apply": "重启空闲的引擎",
+      "applied": "已重启 {{count}} 个引擎，下一轮对话时用新目录启动；另有 {{busy}} 个正在对话，结束后会自动用新目录。",
+      "title": "模型目录",
+      "intro": "目录记着各个模型的上下文长度、能接收的输入类型和思考档位，添加模型时按模型名自动匹配，匹配上的项不用你填。数据来自 models.dev。",
+      "update": "更新模型目录",
+      "updated": "模型目录已更新，共 {{count}} 个模型",
+      "unreachable": "连不上 models.dev，请检查网络后再试，现用的目录没有变化。",
+      "rejected": "models.dev 返回的内容不能用，现用的目录没有变化。",
+      "source": {
+        "bundled": "正在使用随程序附带的目录：{{count}} 个模型，整理于 {{date}}。",
+        "downloaded": "正在使用下载的目录：{{count}} 个模型，更新于 {{date}}。"
+      }
+    },
     "title": "模型供应商",
     "add": "添加供应商",
     "edit": "编辑",
@@ -644,6 +664,35 @@
       "discovered": "从 {{base}} 拉到 {{count}} 个模型",
       "models": "可用模型",
       "selectedCount": "已选 {{count}} / {{total}}",
+      "adv": {
+        "title": "高级设置",
+        "noModel": "先在上面选好要纳入的模型。",
+        "model": "设置哪个模型",
+        "fromCatalog": "{{name}}：标注“来自模型目录”的项不能改；没有的项可以自己填。",
+        "custom": "模型目录里没有这个模型，下面的项都由你填写。",
+        "alias": "别名",
+        "aliasHint": "显示模型时优先用别名，不填就用模型名。",
+        "context": "上下文长度",
+        "contextHint": "单位是 token。填了以后，接近上限时会自动压缩上下文。",
+        "maxOutput": "最大输出长度",
+        "maxOutputHint": "单位是 token，仅供参考，引擎不支持限制。",
+        "lockedHint": "来自模型目录，不能修改。",
+        "input": "输入类型",
+        "inputHint": "文字一定支持。没勾的类型，对话里不会让你发给这个模型。",
+        "kind": {
+          "text": "文字",
+          "image": "图片",
+          "video": "视频",
+          "pdf": "PDF"
+        },
+        "abilities": "能力",
+        "webSearch": "互联网搜索",
+        "webSearchHint": "服务商支持联网搜索时再打开，不支持的会让整轮对话报错。",
+        "thinking": "思考",
+        "thinkingToggle": "可以关闭思考",
+        "thinkingToggleHint": "打开后，对话里可以直接开关思考。",
+        "thinkingHint": "勾选这个模型支持的思考档位；都不选时用低、中、高。"
+      },
       "selectAll": "全选",
       "clearAll": "清空",
       "testOne": "测试 {{id}}",
@@ -870,6 +919,9 @@
     "error.provider.invalid_endpoint": "端点地址无效：{{baseUrl}}",
     "error.provider.invalid_id": "供应商标识无效：{{id}}",
     "error.provider.invalid_kind": "不支持的供应商类型 {{kind}}",
+    "error.provider.invalid_effort": "思考档位不合法",
+    "error.provider.invalid_model_limit": "上下文长度或最大输出超出范围",
+    "error.provider.invalid_input_kind": "输入类型不合法",
     "error.provider.model_id_required": "模型名称不能为空",
     "error.provider.model_not_kept": "供应商没有纳入模型 {{model}}",
     "error.provider.model_required": "请选择一个模型",

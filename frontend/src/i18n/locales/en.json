@@ -149,6 +149,8 @@
     "resets": "Resets: {{time}}"
   },
   "effort": {
+    "on": "Thinking",
+    "off": "Thinking off",
     "label": "Reasoning effort",
     "default": "Default",
     "modelDefault": "Left to the model (its default: {{level}})",
@@ -158,7 +160,7 @@
     "chooseModel": "Choose model",
     "back": "Back",
     "saveFailed": "Thinking effort was not changed",
-    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high" },
+    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high", "max": "Max", "ultra": "Ultra" },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
   "permission": {
@@ -226,6 +228,7 @@
       "editing": "Editing files",
       "tool": "Collaborating",
       "searching": "Searching the web",
+      "compacting": "Compacting the context",
       "reconnecting": "Reconnecting to the model (attempt {{attempt}})",
       "waitingApproval": "Waiting for your approval",
       "waitingInput": "Waiting for your reply"
@@ -266,6 +269,8 @@
       "fileChange": "Changed {{count}} files",
       "webSearch": "Searched the web: {{query}}",
       "plan": "Made a plan",
+      "compacting": "Compacting the context…",
+      "compacted": "Compacted the context automatically",
       "retrying": "Reconnecting to the model (attempt {{attempt}})",
       "retried": "Reconnected after {{attempt}} attempts",
       "warning": "Note: {{message}}",
@@ -607,6 +612,21 @@
     "loginTimeout": "Sign-in timed out; check the Codex login window in the browser"
   },
   "providers": {
+    "catalog": {
+      "stale": "{{count}} team engine(s) still run the old catalog; longer context windows apply after a restart.",
+      "apply": "Restart idle engines",
+      "applied": "Restarted {{count}} engine(s); they start with the new catalog on the next turn. {{busy}} more are in a turn and take it when they next start.",
+      "title": "Model catalog",
+      "intro": "The catalog knows each model's context length, the input types it takes and its thinking levels. A model you add is matched by name, and what matches does not have to be filled in. The data comes from models.dev.",
+      "update": "Update model catalog",
+      "updated": "Model catalog updated: {{count}} models",
+      "unreachable": "Could not reach models.dev. Check the network and try again; the catalog in use is unchanged.",
+      "rejected": "models.dev returned something unusable; the catalog in use is unchanged.",
+      "source": {
+        "bundled": "Using the catalog shipped with the program: {{count}} models, from {{date}}.",
+        "downloaded": "Using a downloaded catalog: {{count}} models, updated {{date}}."
+      }
+    },
     "title": "Model providers",
     "add": "Add provider",
     "edit": "Edit",
@@ -652,6 +672,35 @@
       "discovered": "Found {{count}} models on {{base}}",
       "models": "Available models",
       "selectedCount": "{{count}} / {{total}} selected",
+      "adv": {
+        "title": "Advanced settings",
+        "noModel": "Pick the models to keep above first.",
+        "model": "Model to set up",
+        "fromCatalog": "{{name}}: items marked as from the model catalog cannot be changed; the rest are yours to fill in.",
+        "custom": "The model catalog does not know this model, so everything below is yours to fill in.",
+        "alias": "Alias",
+        "aliasHint": "Shown in place of the model name when set.",
+        "context": "Context length",
+        "contextHint": "In tokens. Once set, the context is compacted automatically as it nears the limit.",
+        "maxOutput": "Max output length",
+        "maxOutputHint": "In tokens, for reference only; the engine cannot limit it.",
+        "lockedHint": "From the model catalog; cannot be changed.",
+        "input": "Input types",
+        "inputHint": "Text is always supported. A type left unticked cannot be sent to this model in a conversation.",
+        "kind": {
+          "text": "Text",
+          "image": "Image",
+          "video": "Video",
+          "pdf": "PDF"
+        },
+        "abilities": "Abilities",
+        "webSearch": "Web search",
+        "webSearchHint": "Turn on only if the provider supports web search; one that does not fails the whole turn.",
+        "thinking": "Thinking",
+        "thinkingToggle": "Thinking can be switched off",
+        "thinkingToggleHint": "When on, a conversation can turn thinking on and off.",
+        "thinkingHint": "Tick the thinking levels this model supports; with none ticked, low, medium and high apply."
+      },
       "selectAll": "Select all",
       "clearAll": "Clear",
       "testOne": "Test {{id}}",
@@ -880,6 +929,9 @@
     "error.provider.invalid_endpoint": "Invalid endpoint address: {{baseUrl}}",
     "error.provider.invalid_id": "Invalid provider id: {{id}}",
     "error.provider.invalid_kind": "Unsupported provider type {{kind}}",
+    "error.provider.invalid_effort": "A thinking level is not valid",
+    "error.provider.invalid_model_limit": "A context length or output limit is out of range",
+    "error.provider.invalid_input_kind": "An input type is not valid",
     "error.provider.model_id_required": "A model needs a name",
     "error.provider.model_not_kept": "The provider does not keep the model {{model}}",
     "error.provider.model_required": "Choose a model",

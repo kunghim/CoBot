@@ -15,9 +15,10 @@ import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useReprobeProvider, useSaveProvider } from '../../api/queries';
-import type { Provider, ProviderEndpoint, ProviderModel, ProviderPreset, ProviderProbeResult, ProviderRequest } from '../../api/types';
+import type { ModelSpec, Provider, ProviderEndpoint, ProviderModel, ProviderPreset, ProviderProbeResult, ProviderRequest } from '../../api/types';
 import { Alert, Badge, Button, Dialog, Field, Icons, LogoTile, SearchInput, TextInput, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import ModelAdvanced from './ModelAdvanced';
 import ModelPick, { modelsToProbe, withSelection } from './ModelPick';
 
 // ---------------------------------------------------------------------------
@@ -104,6 +105,11 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  // What the user entered for each kept model (alias, limits, abilities, thinking);
+  // only what they changed, the model catalog answers for the rest.
+  const [entries, setEntries] = useState<Record<string, ProviderModel>>({});
+  // What is known about each kept model, worked out by the core from the catalog and the entries.
+  const [specs, setSpecs] = useState<Record<string, ModelSpec>>({});
   const [statuses, setStatuses] = useState<Record<string, ProviderProbeResult>>({});
   const [discovering, setDiscovering] = useState(false);
   const [probing, setProbing] = useState(false);
@@ -114,6 +120,25 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const [note, setNote] = useState('');
 
   const editing = provider ?? null;
+  const changeEntry = (id: string, patch: Partial<ProviderModel>) => setEntries((current) => ({ ...current, [id]: { ...current[id], id, ...patch } }));
+  // Ask the core what is known about the kept models whenever they or the entries change.
+  useEffect(() => {
+    if (!open || selected.length === 0) {
+      setSpecs({});
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      api
+        .resolveModels(selected.map((id) => entries[id] ?? { id }))
+        .then((result) => live && setSpecs(result.specs))
+        .catch(() => undefined);
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, selected, entries]);
   // The form starts fresh every time the dialog opens.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resetKey = open ? (editing?.id ?? 'new') : null;
@@ -135,6 +160,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       const ids = editing.models.map((model) => model.id);
       setModels(ids);
       setSelected(ids);
+      // The stored entries, without the computed spec and the last check.
+      setEntries(Object.fromEntries(editing.models.map(({ spec: _spec, status: _status, failure: _failure, message: _message, ...own }) => [own.id, own])));
       setStatuses(
         Object.fromEntries(
           editing.models
@@ -148,7 +175,9 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       setAnthropicBase('');
       setModels([]);
       setSelected([]);
+      setEntries({});
     }
+    setSpecs({});
   }, [resetKey]);
 
   const addedIds = useMemo(() => new Set(providers.map((entry) => entry.presetId).filter((id): id is string => !!id)), [providers]);
@@ -362,12 +391,14 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       toast.show({ tone: 'warning', title: t('providers.dialog.needModels') });
       return;
     }
+    // Each model is kept with what the user entered; the core drops what the catalog answers for.
     const kept: ProviderModel[] = selected.map((id) => {
       const status = answers[id];
-      if (force) return { id, status: 'failed', failure: status?.code ?? '', message: status?.message ?? '' };
-      if (!status) return { id, status: 'unknown' };
-      if (status.ok) return { id, status: 'ok' };
-      return { id, status: 'failed', failure: status.code, message: status.message };
+      const declared = { ...entries[id] };
+      if (force) return { ...declared, id, status: 'failed', failure: status?.code ?? '', message: status?.message ?? '' };
+      if (!status) return { ...declared, id, status: 'unknown' };
+      if (status.ok) return { ...declared, id, status: 'ok' };
+      return { ...declared, id, status: 'failed', failure: status.code, message: status.message };
     });
     const body: ProviderRequest = {
       // A vendor from the catalogue keeps its own id; a gateway of the
@@ -562,6 +593,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
         }}
       />
 
+      <ModelAdvanced selected={selected} entries={entries} specs={specs} onChange={changeEntry} />
+
       {probed && okCount === 0 && (
         <div className="space-y-2">
           <Alert tone="warning">
@@ -613,9 +646,16 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       </Button>
     ) : (
       <>
-        <Button variant="ghost" onClick={() => setView('pick')}>
-          {t('providers.dialog.back')}
-        </Button>
+        {/* Editing a provider has no vendor list to go back to. */}
+        {editing ? (
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => setView('pick')}>
+            {t('providers.dialog.back')}
+          </Button>
+        )}
         <Button
           variant="primary"
           loading={probing || saving}

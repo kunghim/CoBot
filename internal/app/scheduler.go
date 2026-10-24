@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -548,7 +549,7 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if model == "" {
 		model = turnModel(turnCtx, choice, server)
 	}
-	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: team.ReasoningEffort})
+	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: s.app.effortFor(turnCtx, choice, model, team.ReasoningEffort)})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
 		// The engine answered with a refusal, so no turn exists: the run
@@ -820,6 +821,50 @@ func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64)
 	}()
 }
 
+// catalogCarrier is an engine that knows which model catalog it was started with.
+type catalogCarrier interface{ CatalogFingerprint() string }
+
+// StaleEngines counts the running team engines started with a model catalog
+// other than the one now wanted (the empty one means none).
+func (s *Scheduler) StaleEngines(wanted string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stale := 0
+	for _, rt := range s.teams {
+		if carrier, ok := rt.server.(catalogCarrier); ok && carrier.CatalogFingerprint() != wanted {
+			stale++
+		}
+	}
+	return stale
+}
+
+// RestartStaleEngines stops the stale engines whose teams have nothing
+// running; the next turn starts them again with the catalog now wanted, and
+// resumes the members' threads. It reports how many it stopped and how many
+// it had to leave because a turn was running.
+func (s *Scheduler) RestartStaleEngines(ctx context.Context, wanted string) (stopped, busy int) {
+	s.mu.Lock()
+	var stale []string
+	for teamID, rt := range s.teams {
+		if carrier, ok := rt.server.(catalogCarrier); ok && carrier.CatalogFingerprint() != wanted {
+			stale = append(stale, teamID)
+		}
+	}
+	s.mu.Unlock()
+	for _, teamID := range stale {
+		s.stopIfIdle(ctx, teamID, math.MaxInt64)
+		s.mu.Lock()
+		_, still := s.teams[teamID]
+		s.mu.Unlock()
+		if still {
+			busy++
+		} else {
+			stopped++
+		}
+	}
+	return stopped, busy
+}
+
 func (s *Scheduler) teamLock(teamID string) *sync.Mutex {
 	value, _ := s.teamLocks.LoadOrStore(teamID, &sync.Mutex{})
 	return value.(*sync.Mutex)
@@ -911,12 +956,13 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	if err != nil {
 		return "", err
 	}
-	if providerID != officialEngineProvider {
+	if providerID != officialEngineProvider && !s.app.webSearchAllowed(ctx, choice) {
 		// Web search is a tool OpenAI runs on its own side. The engine
 		// offers it with every request, and a provider that does not run
 		// it may refuse the whole turn over it (Xiaomi MiMo does, with
 		// responses_feature_not_supported), so a member on any provider
-		// but the ChatGPT account goes without it.
+		// but the ChatGPT account goes without it, unless the user has said
+		// the model can use it (its advanced settings).
 		if config == nil {
 			config = map[string]any{}
 		}
@@ -1025,6 +1071,14 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 // the core refuses it rather than trusting a stale credential.
 func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot domain.Bot, engineEpoch, runID string) (map[string]any, error) {
 	extra := map[string]any{}
+	// A model of another vendor has the context window the catalog (or the user)
+	// says; the engine compacts before reaching it, which it cannot do for a
+	// model it knows nothing about.
+	if choice, err := s.app.MemberModel(ctx, team.ID, bot.ID); err == nil {
+		if spec, ok := s.app.specOfChoice(ctx, choice, ""); ok && spec.ContextWindow > 0 {
+			extra["model_context_window"] = spec.ContextWindow
+		}
+	}
 	if s.app.MCPBinary == "" || s.app.MCPEndpoint == "" || s.app.CollaborationTokens == nil {
 		// No bridge available (for example a test factory); the tools simply
 		// are not offered rather than being offered and always failing.

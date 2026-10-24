@@ -529,6 +529,127 @@ paths:
                         $ref: "#/components/schemas/UpdateCheck"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/model-catalog:
+    get:
+      operationId: getModelCatalog
+      security:
+        - SessionCookie: []
+      summary: Which model catalog is in use
+      responses:
+        "200":
+          description: Source, date and size of the catalog
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ModelCatalogStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/resolve:
+    post:
+      operationId: resolveModels
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: What is known about models that are not stored yet (catalog and the entries given, put together)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, models]
+              properties:
+                requestId: { type: string, format: uuid }
+                models:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: "#/components/schemas/ProviderModel"
+      responses:
+        "200":
+          description: A spec for each model id
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [specs]
+                        properties:
+                          specs:
+                            type: object
+                            additionalProperties:
+                              $ref: "#/components/schemas/ModelSpec"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/apply:
+    post:
+      operationId: applyEngineCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Stop the idle team engines that run an older model catalog; their next turn starts with the current one
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: How many engines were stopped, and how many were left because a turn is running
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ApplyEngineCatalogResult"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/update:
+    post:
+      operationId: updateModelCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Download the newest model catalog now; an unreachable or unusable source is reported in state, not as an error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Outcome, and the catalog now in use
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ModelCatalogUpdate"
+        "401":
+          $ref: "#/components/responses/Error"
   /api/v1/engine/check:
     post:
       operationId: checkEngine
@@ -2789,18 +2910,82 @@ components:
       required: [id]
       properties:
         id: { type: string }
-        displayName: { type: string }
+        displayName: { type: string, description: The user's own name for the model, shown in its place. }
         contextWindow: { type: integer }
+        maxOutput: { type: integer }
         defaultEffort: { type: string }
         supportedEfforts:
           type: array
           items: { type: string }
+        thinkingToggle: { type: boolean }
         inputModalities:
           type: array
           items: { type: string }
+        webSearch: { type: boolean }
+        spec:
+          $ref: "#/components/schemas/ModelSpec"
         status: { type: string, enum: [ok, failed, unknown] }
         failure: { type: string, description: Stable machine code of the last check. }
         message: { type: string, description: Human-readable detail of the last check. }
+    ModelSpec:
+      type: object
+      description: What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+      required: [displayName, contextWindow, maxOutput, inputModalities, webSearch, thinking, source, locked]
+      properties:
+        name: { type: string }
+        alias: { type: string }
+        displayName: { type: string }
+        contextWindow: { type: integer }
+        maxOutput: { type: integer }
+        inputModalities:
+          type: array
+          items: { type: string }
+        webSearch: { type: boolean }
+        thinking:
+          type: object
+          required: [toggle, efforts]
+          properties:
+            toggle: { type: boolean }
+            efforts:
+              type: array
+              items: { type: string }
+            defaultEffort: { type: string }
+        source: { type: string, enum: [catalog, custom] }
+        catalogId: { type: string }
+        locked:
+          type: array
+          description: Fields the catalog gives and the user cannot change.
+          items: { type: string, enum: [contextWindow, maxOutput, inputModalities, thinking] }
+    EngineCatalogState:
+      type: object
+      description: How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+      required: [active, stale]
+      properties:
+        active: { type: boolean, description: Whether a generated catalog is wanted at all. }
+        stale: { type: integer, description: Running team engines started without the catalog now wanted. }
+    ModelCatalogStatus:
+      type: object
+      required: [source, models, engine]
+      properties:
+        source: { type: string, enum: [bundled, downloaded] }
+        updatedAt: { type: string, format: date-time }
+        models: { type: integer }
+        from: { type: string }
+        engine:
+          $ref: "#/components/schemas/EngineCatalogState"
+    ApplyEngineCatalogResult:
+      type: object
+      required: [restarted, busy]
+      properties:
+        restarted: { type: integer }
+        busy: { type: integer }
+    ModelCatalogUpdate:
+      allOf:
+        - $ref: "#/components/schemas/ModelCatalogStatus"
+        - type: object
+          required: [state]
+          properties:
+            state: { type: string, enum: [updated, unreachable, rejected] }
     ProviderRetries:
       type: object
       description: How often the engine may retry a request to this provider.
@@ -3466,7 +3651,7 @@ components:
         seq: { type: integer }
         kind:
           type: string
-          enum: [reasoning, command, file_change, tool, web_search, plan, message, agent, diff, notice, retry]
+          enum: [reasoning, command, file_change, tool, web_search, plan, message, agent, diff, compaction, notice, retry]
           description: The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
         status:
           type: string

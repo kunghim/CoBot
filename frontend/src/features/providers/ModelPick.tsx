@@ -156,6 +156,7 @@ export default function ModelPick({ models, selected, statuses, onToggle, onProb
                   pressed={selected.includes(id)}
                   onClick={() => onToggle(id)}
                   mono
+                  mark={false}
                   tone={broken ? 'danger' : 'neutral'}
                   title={broken && status ? labels.reason(status) : undefined}
                   action={

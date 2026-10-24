@@ -87,6 +87,8 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: 'conversation.step.webSearch', params: { query: text(d.query) } };
     case 'plan':
       return { key: 'conversation.step.plan' };
+    case 'compaction':
+      return { key: step.status === 'in_progress' ? 'conversation.step.compacting' : 'conversation.step.compacted' };
     case 'retry':
       return step.status === 'in_progress'
         ? { key: 'conversation.step.retrying', params: { attempt: Number(d.attempt) || 1 } }
@@ -189,6 +191,8 @@ export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveR
       return { key: 'conversation.phase.searching' };
     case 'message':
       return { key: 'conversation.phase.replying' };
+    case 'compaction':
+      return { key: 'conversation.phase.compacting' };
   }
   if ((live?.reply ?? '') !== '') return { key: 'conversation.phase.replying' };
   if (run.status === 'starting' && steps.length === 0) return { key: 'conversation.phase.starting' };

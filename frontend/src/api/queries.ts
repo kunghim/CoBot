@@ -69,6 +69,34 @@ export function useResetBotBudget(teamId: string) {
   });
 }
 
+/** GET /model-catalog: which model catalog is in use. */
+export function useModelCatalog() {
+  return useQuery({ queryKey: ['modelCatalog'], queryFn: api.modelCatalog });
+}
+
+/** POST /model-catalog/apply: stops the idle engines that run an older model catalog. */
+export function useApplyEngineCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.applyEngineCatalog(),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['modelCatalog'] }),
+  });
+}
+
+/** POST /model-catalog/update: downloads the newest model catalog when the user presses the button. */
+export function useUpdateModelCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.updateModelCatalog(),
+    onSuccess: (result) => {
+      if (result.state !== 'updated') return;
+      qc.invalidateQueries({ queryKey: ['modelCatalog'] });
+      // What providers know about their models comes from the catalog.
+      qc.invalidateQueries({ queryKey: queryKeys.providers });
+    },
+  });
+}
+
 /** POST /updates/check: asks GitHub for the newest release when the user presses the button. */
 export function useCheckForUpdate() {
   return useMutation({ mutationFn: () => api.checkForUpdate() });
@@ -309,6 +337,8 @@ export function useSaveProvider() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.providers });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      // A provider's models decide what the engines should be started with.
+      void qc.invalidateQueries({ queryKey: ['modelCatalog'] });
     },
   });
 }

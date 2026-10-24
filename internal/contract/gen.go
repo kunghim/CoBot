@@ -59,8 +59,8 @@ const (
 
 // Defines values for AvatarRefKind.
 const (
-	Catalog AvatarRefKind = "catalog"
-	Upload  AvatarRefKind = "upload"
+	AvatarRefKindCatalog AvatarRefKind = "catalog"
+	AvatarRefKindUpload  AvatarRefKind = "upload"
 )
 
 // Defines values for BotStatus.
@@ -165,6 +165,39 @@ const (
 	MessagePreviewKindUser      MessagePreviewKind = "user"
 )
 
+// Defines values for ModelCatalogStatusSource.
+const (
+	ModelCatalogStatusSourceBundled    ModelCatalogStatusSource = "bundled"
+	ModelCatalogStatusSourceDownloaded ModelCatalogStatusSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateSource.
+const (
+	ModelCatalogUpdateSourceBundled    ModelCatalogUpdateSource = "bundled"
+	ModelCatalogUpdateSourceDownloaded ModelCatalogUpdateSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateState.
+const (
+	ModelCatalogUpdateStateRejected    ModelCatalogUpdateState = "rejected"
+	ModelCatalogUpdateStateUnreachable ModelCatalogUpdateState = "unreachable"
+	ModelCatalogUpdateStateUpdated     ModelCatalogUpdateState = "updated"
+)
+
+// Defines values for ModelSpecLocked.
+const (
+	ContextWindow   ModelSpecLocked = "contextWindow"
+	InputModalities ModelSpecLocked = "inputModalities"
+	MaxOutput       ModelSpecLocked = "maxOutput"
+	Thinking        ModelSpecLocked = "thinking"
+)
+
+// Defines values for ModelSpecSource.
+const (
+	ModelSpecSourceCatalog ModelSpecSource = "catalog"
+	ModelSpecSourceCustom  ModelSpecSource = "custom"
+)
+
 // Defines values for ProviderAuthMode.
 const (
 	ProviderAuthModeApiKey  ProviderAuthMode = "api_key"
@@ -246,6 +279,7 @@ const (
 const (
 	RunStepKindAgent      RunStepKind = "agent"
 	RunStepKindCommand    RunStepKind = "command"
+	RunStepKindCompaction RunStepKind = "compaction"
 	RunStepKindDiff       RunStepKind = "diff"
 	RunStepKindFileChange RunStepKind = "file_change"
 	RunStepKindMessage    RunStepKind = "message"
@@ -423,11 +457,11 @@ const (
 
 // Defines values for UpdateCheckState.
 const (
-	Available   UpdateCheckState = "available"
-	Rejected    UpdateCheckState = "rejected"
-	Unknown     UpdateCheckState = "unknown"
-	Unreachable UpdateCheckState = "unreachable"
-	UpToDate    UpdateCheckState = "upToDate"
+	UpdateCheckStateAvailable   UpdateCheckState = "available"
+	UpdateCheckStateRejected    UpdateCheckState = "rejected"
+	UpdateCheckStateUnknown     UpdateCheckState = "unknown"
+	UpdateCheckStateUnreachable UpdateCheckState = "unreachable"
+	UpdateCheckStateUpToDate    UpdateCheckState = "upToDate"
 )
 
 // Defines values for ListApprovalsParamsState.
@@ -493,6 +527,12 @@ type AnswerQuestionRequestDecision string
 
 // AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
 type AnswerQuestionRequestMode string
+
+// ApplyEngineCatalogResult defines model for ApplyEngineCatalogResult.
+type ApplyEngineCatalogResult struct {
+	Busy      int `json:"busy"`
+	Restarted int `json:"restarted"`
+}
 
 // Approval defines model for Approval.
 type Approval struct {
@@ -689,6 +729,15 @@ type ConversationPage struct {
 	Runs []RunWithSteps `json:"runs"`
 }
 
+// EngineCatalogState How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+type EngineCatalogState struct {
+	// Active Whether a generated catalog is wanted at all.
+	Active bool `json:"active"`
+
+	// Stale Running team engines started without the catalog now wanted.
+	Stale int `json:"stale"`
+}
+
 // EngineLogin defines model for EngineLogin.
 type EngineLogin struct {
 	AuthUrl string          `json:"authUrl"`
@@ -852,6 +901,63 @@ type Model struct {
 	Slug *string `json:"slug,omitempty"`
 }
 
+// ModelCatalogStatus defines model for ModelCatalogStatus.
+type ModelCatalogStatus struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogStatusSource `json:"source"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogStatusSource defines model for ModelCatalogStatus.Source.
+type ModelCatalogStatusSource string
+
+// ModelCatalogUpdate defines model for ModelCatalogUpdate.
+type ModelCatalogUpdate struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogUpdateSource `json:"source"`
+	State     ModelCatalogUpdateState  `json:"state"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogUpdateSource defines model for ModelCatalogUpdate.Source.
+type ModelCatalogUpdateSource string
+
+// ModelCatalogUpdateState defines model for ModelCatalogUpdate.State.
+type ModelCatalogUpdateState string
+
+// ModelSpec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+type ModelSpec struct {
+	Alias           *string  `json:"alias,omitempty"`
+	CatalogId       *string  `json:"catalogId,omitempty"`
+	ContextWindow   int      `json:"contextWindow"`
+	DisplayName     string   `json:"displayName"`
+	InputModalities []string `json:"inputModalities"`
+
+	// Locked Fields the catalog gives and the user cannot change.
+	Locked    []ModelSpecLocked `json:"locked"`
+	MaxOutput int               `json:"maxOutput"`
+	Name      *string           `json:"name,omitempty"`
+	Source    ModelSpecSource   `json:"source"`
+	Thinking  struct {
+		DefaultEffort *string  `json:"defaultEffort,omitempty"`
+		Efforts       []string `json:"efforts"`
+		Toggle        bool     `json:"toggle"`
+	} `json:"thinking"`
+	WebSearch bool `json:"webSearch"`
+}
+
+// ModelSpecLocked defines model for ModelSpec.Locked.
+type ModelSpecLocked string
+
+// ModelSpecSource defines model for ModelSpec.Source.
+type ModelSpecSource string
+
 // Provider A model vendor or gateway the engine can call. The secret is never part of it.
 type Provider struct {
 	AuthMode      ProviderAuthMode `json:"authMode"`
@@ -898,17 +1004,25 @@ type ProviderEndpointDialect string
 type ProviderModel struct {
 	ContextWindow *int    `json:"contextWindow,omitempty"`
 	DefaultEffort *string `json:"defaultEffort,omitempty"`
-	DisplayName   *string `json:"displayName,omitempty"`
+
+	// DisplayName The user's own name for the model
+	DisplayName *string `json:"displayName,omitempty"`
 
 	// Failure Stable machine code of the last check.
 	Failure         *string   `json:"failure,omitempty"`
 	Id              string    `json:"id"`
 	InputModalities *[]string `json:"inputModalities,omitempty"`
+	MaxOutput       *int      `json:"maxOutput,omitempty"`
 
 	// Message Human-readable detail of the last check.
-	Message          *string              `json:"message,omitempty"`
+	Message *string `json:"message,omitempty"`
+
+	// Spec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+	Spec             *ModelSpec           `json:"spec,omitempty"`
 	Status           *ProviderModelStatus `json:"status,omitempty"`
 	SupportedEfforts *[]string            `json:"supportedEfforts,omitempty"`
+	ThinkingToggle   *bool                `json:"thinkingToggle,omitempty"`
+	WebSearch        *bool                `json:"webSearch,omitempty"`
 }
 
 // ProviderModelStatus defines model for ProviderModel.Status.
@@ -1502,6 +1616,22 @@ type CancelMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// ApplyEngineCatalogJSONBody defines parameters for ApplyEngineCatalog.
+type ApplyEngineCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ResolveModelsJSONBody defines parameters for ResolveModels.
+type ResolveModelsJSONBody struct {
+	Models    []ProviderModel    `json:"models"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// UpdateModelCatalogJSONBody defines parameters for UpdateModelCatalog.
+type UpdateModelCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DetectProviderJSONBody defines parameters for DetectProvider.
 type DetectProviderJSONBody struct {
 	ApiKey    string             `json:"apiKey"`
@@ -1817,6 +1947,15 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// ApplyEngineCatalogJSONRequestBody defines body for ApplyEngineCatalog for application/json ContentType.
+type ApplyEngineCatalogJSONRequestBody ApplyEngineCatalogJSONBody
+
+// ResolveModelsJSONRequestBody defines body for ResolveModels for application/json ContentType.
+type ResolveModelsJSONRequestBody ResolveModelsJSONBody
+
+// UpdateModelCatalogJSONRequestBody defines body for UpdateModelCatalog for application/json ContentType.
+type UpdateModelCatalogJSONRequestBody UpdateModelCatalogJSONBody
 
 // CreateProviderJSONRequestBody defines body for CreateProvider for application/json ContentType.
 type CreateProviderJSONRequestBody = ProviderRequest

@@ -167,6 +167,9 @@ const (
 	// StepDiff is the turn's code changes so far, kept as one step that
 	// always holds the newest diff.
 	StepDiff = "diff"
+	// StepCompaction is the engine folding the conversation so far into a
+	// summary because it neared the model's context window.
+	StepCompaction = "compaction"
 )
 
 // Step statuses.
@@ -190,6 +193,7 @@ const (
 //	message:     {text}  (what the model says while working)
 //	agent:       {tool, agents, prompt?} | {activity, agent}  (Codex sub-agents)
 //	diff:        {diff, files}  (the turn's changes so far)
+//	compaction:  {}
 type Step struct {
 	ID     string
 	Kind   string

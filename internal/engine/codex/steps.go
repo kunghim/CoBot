@@ -181,6 +181,9 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 		_ = json.Unmarshal(raw, &item)
 		step.Kind = engine.StepWebSearch
 		detail = map[string]any{"query": item.Query}
+	case "contextCompaction":
+		step.Kind = engine.StepCompaction
+		detail = map[string]any{}
 	case "plan":
 		var item struct {
 			Text string `json:"text"`

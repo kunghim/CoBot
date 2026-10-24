@@ -24,6 +24,9 @@ import (
 type ServerOptions struct {
 	Binary    string   // resolved codex executable
 	ExtraArgs []string // e.g. -c key=value overrides
+	// Catalog is the model catalog the process is started with, when it is
+	// (ExtraArgs does not have to carry it).
+	Catalog   ClientCatalog
 	Cwd       string   // team working directory (startup cwd = writable root)
 	Env       []string // full environment for the child; nil inherits ours
 	Client    ClientInfo
@@ -51,6 +54,10 @@ type Server struct {
 	waitOnce  sync.Once
 	waitDone  chan struct{}
 	waitErr   error
+
+	// catalog is the fingerprint of the model catalog this process was
+	// started with; empty when it knows only the engine's own models.
+	catalog string
 
 	loaded map[string]bool   // threads this app-server has loaded
 	phases map[string]string // agent message item -> phase, while it streams
@@ -117,6 +124,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		opts.Logger = slog.Default()
 	}
 	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
+	args = append(args, opts.Catalog.CatalogArgs()...)
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
@@ -169,6 +177,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		cwd:       opts.Cwd,
 		fileItems: map[nativeItemKey][]engine.FileChange{},
 		callbacks: opts.Callbacks,
+		catalog:   opts.Catalog.Fingerprint,
 	}
 	s.trace, s.tracePeer, s.traceStderr = opts.Trace, peer, stderrLines
 	s.client = NewClient(stdin, stdout, ClientHooks{
@@ -557,6 +566,10 @@ func secretEnvName(name string) bool {
 
 // Epoch identifies this app-server lifetime (leases/requests reference it).
 func (s *Server) Epoch() string { return s.epoch }
+
+// CatalogFingerprint identifies the model catalog this process was started
+// with; empty when there is none.
+func (s *Server) CatalogFingerprint() string { return s.catalog }
 
 // StartThread creates a new provider thread for one bot.
 func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engine.ThreadInfo, error) {

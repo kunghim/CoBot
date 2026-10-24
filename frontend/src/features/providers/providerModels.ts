@@ -17,6 +17,8 @@ export interface ProviderModelOption {
   label: string;
   /** The provider's name, which the picker groups the models under. */
   group: string;
+  /** "1M" and the like, for a model with a long context. */
+  contextBadge?: string;
   /** A model that failed its last check is shown but cannot be chosen. */
   unavailable?: boolean;
 }
@@ -29,6 +31,19 @@ export interface ModelChoice {
 }
 
 export const choiceKey = (providerId: string, model: string) => `${providerId}\u0001${model}`;
+
+/** The levels a vendor's models start with, and have when none are listed. */
+export const DEFAULT_EFFORTS = ['low', 'medium', 'high'];
+
+/** Every level a model may offer, lowest first; "none" is not among them, it is the switch. */
+export const EFFORT_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
+
+/** The mark after a model's name when it reads a million tokens or more. */
+export function contextBadge(tokens: number | undefined): string {
+  if (!tokens || tokens < 1_000_000) return '';
+  const millions = tokens / 1_000_000;
+  return `${Number.isInteger(millions) ? millions : Math.floor(millions * 10) / 10}M`;
+}
 
 /** The ChatGPT account: the engine's own login, with no endpoint or key. */
 export const isOfficial = (provider: Provider) => provider.authMode === 'chatgpt';
@@ -62,6 +77,7 @@ export function selectableModels(
         providerId: provider.id,
         model: entry.id,
         label: entry.displayName || entry.id,
+        contextBadge: contextBadge(entry.spec?.contextWindow),
         group,
         unavailable: entry.status === 'failed',
       });
