@@ -5,12 +5,22 @@ import Markdown from '../conversations/Markdown';
 import { describeStep } from '../conversations/steps';
 import { isChatRunning } from './state';
 
-export default function ChatProcess({ run, chatId }: { run: ChatRun; chatId: string }) {
+/** What the model said that the reply already holds (a model that marks no phase says its closing words as a step too) is not said twice. */
+function shownSteps(run: ChatRun, replyText: string): ChatStep[] {
+  return (run.steps ?? []).filter((step) => {
+    if (step.kind !== 'message') return true;
+    const said = typeof (step.detail as Record<string, unknown> | undefined)?.text === 'string' ? ((step.detail as Record<string, unknown>).text as string).trim() : '';
+    return said === '' || !replyText.includes(said);
+  });
+}
+
+export default function ChatProcess({ run, chatId, replyText = '' }: { run: ChatRun; chatId: string; replyText?: string }) {
   const { t } = useTranslation();
+  const steps = shownSteps(run, replyText);
   return <div className="space-y-2 text-xs text-neutral-500">
     <p role={isChatRunning(run.status) ? 'status' : undefined}>{t(`chat.status.${run.status}`, { defaultValue: run.status })}</p>
-    {!!run.steps?.length && <details open={isChatRunning(run.status) || undefined}><summary className="cursor-pointer">{t('chat.process', { count: run.steps.length })}</summary><ol className="mt-2 space-y-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
-      {run.steps.map((step) => <li key={step.id}><ChatStepView step={step} chatId={chatId} /></li>)}
+    {steps.length > 0 && <details open={isChatRunning(run.status) || undefined}><summary className="cursor-pointer">{t('chat.process', { count: steps.length })}</summary><ol className="mt-2 space-y-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
+      {steps.map((step) => <li key={step.id}><ChatStepView step={step} chatId={chatId} /></li>)}
     </ol></details>}
     {run.errorKey && <p className="text-red-600 dark:text-red-400">{errorMessage(t, run.errorKey)}</p>}
   </div>;

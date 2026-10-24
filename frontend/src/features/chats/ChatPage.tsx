@@ -106,7 +106,7 @@ function ChatPage({ id }: { id?: string }) {
         <div className="mx-auto w-full max-w-3xl space-y-6 py-6">
           {query.hasNextPage && <Button variant="ghost" size="sm" loading={query.isFetchingNextPage} onClick={() => { const el = scroll.current; const height = el?.scrollHeight ?? 0; void query.fetchNextPage().then(() => requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; })); }}>{t('chat.earlier')}</Button>}
           {messages.map((message) => <div key={message.id} className="space-y-3">
-            {message.kind === 'assistant' && runs.has(message.runId) && <ChatProcess run={runs.get(message.runId)!} chatId={id!} />}
+            {message.kind === 'assistant' && runs.has(message.runId) && <ChatProcess run={runs.get(message.runId)!} chatId={id!} replyText={message.text} />}
             <MessageBubble from={message.kind === 'user' ? 'user' : 'member'} meta={<CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} />}>
               {message.kind === 'user' ? message.text : <Markdown text={message.text} chatId={id} />}
             </MessageBubble>
