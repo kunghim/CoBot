@@ -35,5 +35,6 @@ test('a fresh bootstrap works with a stale profile cookie',async({page,context})
   await context.addCookies([{name:names.sessionCookieName,value:'prior-expired-session',url:endpoint,httpOnly:true,sameSite:'Strict'}]);
   await authorize(context);
   await page.goto('/');
-  await expect(page.getByRole('button',{name:/新建团队|create team/i}).first()).toBeVisible();
+  await expect.poll(async()=>((await (await context.request.get(endpoint+'/api/v1/status')).json()).data.authorized)).toBe(true);
+  await expect(page.getByRole('button',{name:/^设置$|^settings$/i}).first()).toBeVisible();
 });
