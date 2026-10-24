@@ -97,7 +97,7 @@ jobs:
         run: |
           npm ci --prefix frontend
           if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
           if ($LASTEXITCODE -ne 0) { throw "Wails install failed" }
           dotnet tool install --tool-path "$env:RUNNER_TEMP/wix" wix --version 6.0.2
           if ($LASTEXITCODE -ne 0) { throw "WiX install failed" }
@@ -154,7 +154,7 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           npm ci --prefix frontend
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
       - name: Build and inspect Apple Silicon DMG
         run: |
           bash scripts/build.sh --target desktop --version "$RELEASE_VERSION" --arch arm64
