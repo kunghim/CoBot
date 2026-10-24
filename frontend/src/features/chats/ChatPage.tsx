@@ -54,9 +54,17 @@ function ChatPage({ id }: { id?: string }) {
   // What is chosen under the composer holds from the next message on, as in a
   // team: the model, how it thinks and what it may do. Nothing picked means what
   // the chat has (or, for a new chat, the defaults).
-  const [picked, setPicked] = useState<string | null>(null);
-  const [effort, setEffort] = useState<string | null>(null);
-  const [permission, setPermission] = useState<string | null>(null);
+  // Kept with the draft: leaving for the team and coming back, or for another chat, must not undo it.
+  const choiceStore = 'cobot.chat.choice.' + (id ?? 'new');
+  const [kept] = useState(() => {
+    try { return JSON.parse(readLocal(choiceStore) || '{}') as { picked?: string | null; effort?: string | null; permission?: string | null }; } catch { return {}; }
+  });
+  const [picked, setPicked] = useState<string | null>(kept.picked ?? null);
+  const [effort, setEffort] = useState<string | null>(kept.effort ?? null);
+  const [permission, setPermission] = useState<string | null>(kept.permission ?? null);
+  useEffect(() => {
+    writeLocal(choiceStore, picked === null && effort === null && permission === null ? '' : JSON.stringify({ picked, effort, permission }));
+  }, [choiceStore, picked, effort, permission]);
   const ownKey = chat ? choiceKey(chat.providerId, chat.model) : choiceKey(initial.providerId, initial.model);
   const choice = offered.find((m) => m.key === (picked ?? ownKey));
   const chosenProvider = providers.data?.providers.find((p) => p.id === choice?.providerId);
@@ -77,6 +85,8 @@ function ChatPage({ id }: { id?: string }) {
       }),
     onSuccess: (result, text) => {
       if (readLocal(key) === text) { setDraft(''); writeLocal(key, ''); }
+      // What was chosen is now the chat's own.
+      setPicked(null); setEffort(null); setPermission(null); writeLocal(choiceStore, '');
       qc.setQueryData<{ pages: typeof result[]; pageParams: string[] }>(['chat', result.chat.id], (old) => old?.pages.length ? {
         ...old, pages: [{ ...result, messages: [...new Map([...old.pages[0].messages, ...result.messages].map((m) => [m.id, m])).values()], nextCursor: old.pages[0].nextCursor }, ...old.pages.slice(1)],
       } : { pages: [result], pageParams: [''] });
