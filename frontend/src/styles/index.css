@@ -248,3 +248,71 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * The highest thinking level: the filled track turns to a flowing aurora that
+ * runs towards the low end, light specks stream the same way, the knob glows
+ * and a ring leaves it once when the level is reached. With reduced motion the
+ * rule above stops every animation, which leaves the aurora colors still.
+ */
+.effort-max-fill {
+  background-image: linear-gradient(90deg, #22c55e 0, #06b6d4 25%, #3b82f6 50%, #8b5cf6 75%, #22c55e 100%);
+  background-size: 260px 100%;
+  animation: effort-flow 2.4s linear infinite;
+  box-shadow: 0 0 16px 1px rgb(59 130 246 / 0.55), 0 0 4px rgb(6 182 212 / 0.8);
+}
+@keyframes effort-flow {
+  to { background-position: -260px 0; }
+}
+
+.effort-spark {
+  position: absolute;
+  top: var(--y);
+  right: 10px;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 6px 1px rgb(255 255 255 / 0.9);
+  opacity: 0;
+  animation: effort-spark var(--duration) linear infinite;
+  animation-delay: var(--delay);
+}
+@keyframes effort-spark {
+  0% { transform: translateX(0) scaleX(1); opacity: 0; }
+  12% { opacity: 0.95; }
+  100% { transform: translateX(var(--travel, -260px)) scaleX(5); opacity: 0; }
+}
+
+.effort-max-knob {
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.95), 0 0 18px 4px rgb(99 102 241 / 0.75);
+  animation: effort-knob 1.6s ease-in-out infinite;
+}
+@keyframes effort-knob {
+  50% { box-shadow: 0 0 0 3px rgb(255 255 255), 0 0 28px 8px rgb(139 92 246 / 0.85); }
+}
+
+.effort-burst {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid rgb(139 92 246 / 0.9);
+  pointer-events: none;
+  animation: effort-burst 0.7s ease-out forwards;
+}
+@keyframes effort-burst {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(3.2); opacity: 0; }
+}
+
+.effort-max-text {
+  background-image: linear-gradient(90deg, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #22c55e);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: effort-text 2.4s linear infinite;
+}
+@keyframes effort-text {
+  to { background-position: -200% 0; }
+}

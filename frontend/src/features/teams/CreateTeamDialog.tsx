@@ -64,9 +64,10 @@ export default function CreateTeamDialog({
     checkedPath.current = '';
   }, [open]);
 
-  // A scenario preselects its usual members; switching scenarios resets them.
+  // Only the project manager, who always comes, is there to start with; the
+  // rest of the team is the user's to pick. Switching scenarios starts over.
   useEffect(() => {
-    if (open && scenario) setSelectedRoles(new Set(scenario.defaultRoleIds));
+    if (open) setSelectedRoles(new Set());
   }, [open, scenario]);
 
   if (!open) return null;
@@ -171,9 +172,6 @@ export default function CreateTeamDialog({
       <div className="space-y-5">
         <Field label={t('team.directory')}>
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Icons.openFolder} onClick={choose} loading={picking} className="shrink-0">
-              {picking ? t('team.choosing') : t('team.chooseDirectory')}
-            </Button>
             <TextInput
               mono
               className="min-w-0 flex-1"
@@ -190,10 +188,15 @@ export default function CreateTeamDialog({
               }}
               placeholder={t('team.directoryPlaceholder')}
             />
+            <Button variant="secondary" icon={Icons.openFolder} onClick={choose} loading={picking} className="shrink-0">
+              {picking ? t('team.choosing') : t('team.chooseDirectory')}
+            </Button>
           </div>
           {/* One line is kept for the check result, so the dialog does not
-              shift under the pointer when leaving the field starts a check. */}
-          <div className="min-h-[1.25rem]">
+              shift under the pointer when leaving the field starts a check;
+              the space the next field already leaves covers it, so the gap is not
+              doubled. */}
+          <div className="-mb-4 min-h-4">
             {checking && (
               <p role="status" className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                 <Spinner size={12} />
@@ -201,7 +204,7 @@ export default function CreateTeamDialog({
               </p>
             )}
             {verdict && (
-              <p role="status" className={cx('flex items-start gap-1.5 break-all text-xs leading-5', verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400')}>
+              <p role="status" className={cx('flex items-start gap-1.5 break-all text-xs leading-4', verdict.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400')}>
                 {verdict.ok ? <Icons.success size={14} className="mt-0.5 shrink-0" aria-hidden /> : <Icons.warning size={14} className="mt-0.5 shrink-0" aria-hidden />}
                 <span>
                   {verdictText(verdict)}

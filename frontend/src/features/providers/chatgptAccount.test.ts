@@ -13,6 +13,9 @@ const fixture = vi.hoisted(() => ({
   mutate: vi.fn(),
 }));
 vi.mock('../../api/queries', () => ({
+  useModelCatalog: () => ({ data: undefined }),
+  useUpdateModelCatalog: () => ({ mutate: vi.fn(), isPending: false, data: undefined }),
+  useApplyEngineCatalog: () => ({ mutate: vi.fn(), isPending: false }),
   useEngine: () => ({ data: fixture.info, refetch: fixture.refetch }),
   useEngineLogin: () => ({ mutate: fixture.mutate, isPending: false }),
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),

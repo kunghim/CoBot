@@ -14,7 +14,7 @@ type SortKey = 'archivedAt' | 'createdAt' | 'name';
  * sidebar or deleted outright, one at a time or several at once. A team id
  * in ?team= (from the new-team dialog) is highlighted.
  */
-export default function ArchivedTeamsSection() {
+export default function ArchivedTeamsSection({ onBusyChange }: { onBusyChange?: (busy: boolean) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const teams = useTeams(true);
@@ -28,6 +28,7 @@ export default function ArchivedTeamsSection() {
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [errorText, setErrorText] = useState('');
+  useEffect(() => { onBusyChange?.(deleting || restore.isPending); return () => onBusyChange?.(false); }, [deleting, restore.isPending, onBusyChange]);
   const focusRef = useRef<HTMLLIElement | null>(null);
 
   // The archived list must be complete to search and sort it.

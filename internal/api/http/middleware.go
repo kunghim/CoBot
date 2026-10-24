@@ -23,7 +23,19 @@ type ctxKey int
 const (
 	ctxRequestID ctxKey = iota
 	ctxPrincipal
+	ctxFailure
 )
+
+// failureSlot carries the cause of an unexpected failure from writeError, which
+// only sees the request, back to the middleware that owns the logger. The wire
+// body never carries the cause, so without this it would be lost.
+type failureSlot struct{ err error }
+
+func recordFailure(r *http.Request, err error) {
+	if slot, ok := r.Context().Value(ctxFailure).(*failureSlot); ok && slot.err == nil {
+		slot.err = err
+	}
+}
 
 func requestIDOf(r *http.Request) string {
 	if v, ok := r.Context().Value(ctxRequestID).(string); ok {
@@ -54,8 +66,14 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 		if reqID == "" || len(reqID) > 128 {
 			reqID = newRequestID()
 		}
-		ctx := context.WithValue(r.Context(), ctxRequestID, reqID)
+		failure := &failureSlot{}
+		ctx := context.WithValue(context.WithValue(r.Context(), ctxRequestID, reqID), ctxFailure, failure)
 		r = r.WithContext(ctx)
+		defer func() {
+			if failure.err != nil {
+				s.Logger.Error("request failed", "requestId", reqID, "method", r.Method, "path", r.URL.Path, "error", failure.err)
+			}
+		}()
 
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -80,7 +98,7 @@ func (s *Server) withBaseMiddleware(next http.Handler) http.Handler {
 			w.Header().Add("Vary", "Origin")
 		}
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-Id, X-Instance-Secret, Last-Event-ID, Idempotency-Key, If-Match")
 			w.Header().Set("Access-Control-Max-Age", "600")
 			w.WriteHeader(http.StatusNoContent)
@@ -304,18 +322,21 @@ func (s *Server) holdsLiveSession(r *http.Request) bool {
 }
 
 // opensSessionFor reports whether a request that carries no credential may
-// be issued one. A document request is the user's own browser opening the
-// address; a request from an allowed origin is a page that is already running
-// (the development server, the desktop shell) talking to the core.
+// be issued one. Only a document request does: it is the user's own browser
+// opening the address, and the cookie it receives is stored for that origin.
+//
+// A request that names an Origin is a page served from somewhere else (the
+// desktop shell, a development server) talking to the core across sites. A
+// SameSite=Strict cookie is never stored for it, so a session minted here
+// would be reported as authorized yet could never be presented again, and its
+// CSRF token could never be read. Such a page redeems a bootstrap secret for
+// a bearer token instead.
 //
 // An API request with no origin is left anonymous: it is a program on the
 // machine rather than a page, and a program that wants a session can ask for
 // one the way it always did.
 func (s *Server) opensSessionFor(r *http.Request, asset bool) bool {
-	if origin := r.Header.Get("Origin"); origin != "" {
-		return s.originAllowed(origin)
-	}
-	if !asset {
+	if r.Header.Get("Origin") != "" || !asset {
 		return false
 	}
 	// Only a document load opens a session. The page asks for its scripts

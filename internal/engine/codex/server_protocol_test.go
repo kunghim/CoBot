@@ -33,6 +33,19 @@ func TestFileApprovalUsesExactNativeItemPreview(t *testing.T) {
 	}
 }
 
+func TestNativeUserInputIsRoutedSeparatelyFromToolApproval(t *testing.T) {
+	var got engine.ApprovalRequest
+	server := &Server{pending: map[string]pendingApproval{}, callbacks: engine.Callbacks{
+		OnApproval: func(engine.ApprovalRequest) { t.Fatal("user input became a command approval") },
+		OnInput:    func(req engine.ApprovalRequest) { got = req },
+	}}
+	raw := json.RawMessage(`{"threadId":"chat","turnId":"turn","itemId":"input","questions":[{"id":"q","header":"Choice","question":"Which one?"}],"isBlocking":true}`)
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`42`), Method: "item/tool/requestUserInput", Params: raw})
+	if got.ThreadID != "chat" || got.TurnID != "turn" || string(got.RawParams) != string(raw) || string(got.RequestID) != "42" {
+		t.Fatal(got)
+	}
+}
+
 func TestMissingFilePreviewReadsExactItemWithoutBlockingReader(t *testing.T) {
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
