@@ -1,26 +1,27 @@
 version: 2
+# Disable scheduled version-update PRs; security updates are managed separately.
 updates:
   - package-ecosystem: gomod
     directory: /
     target-branch: dev
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
   - package-ecosystem: npm
     directory: /frontend
     target-branch: dev
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
   - package-ecosystem: npm
     directory: /tests/e2e
     target-branch: dev
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
