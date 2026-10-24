@@ -107,7 +107,7 @@ function ChatPage({ id }: { id?: string }) {
   const label = (value: string) => t(`effort.level.${value}`, { defaultValue: value });
   const shownLevel = levelNow || defaultEffort || levels[0]?.effort || '';
   const modelOptions = <>
-    <PermissionModeMenu value={mode} onChange={setPermission} disabled={!!active} />
+    <PermissionModeMenu kind="chat" value={mode} onChange={setPermission} disabled={!!active} />
     {!offered.length ? <Button size="sm" variant="ghost" disabled={modelLoading} onClick={() => navigate('/settings/models')}>{t(modelLoading ? 'common.loading' : 'chat.chooseModel')}</Button>
       : <ModelEffortPicker triggerLabel={levels.length > 0 || toggle ? `${t('effort.label')}：${thinkingOff ? t('effort.off') : levelNow ? label(levelNow) : t('effort.default')} · ${choice?.label ?? chat?.model ?? t('chat.defaultModel')}` : (choice?.label ?? chat?.model ?? initial.model ?? t('chat.defaultModel'))}
         models={offered.map((m) => ({ id: m.key, label: m.label, group: m.group, disabled: m.unavailable, badge: m.contextBadge }))}

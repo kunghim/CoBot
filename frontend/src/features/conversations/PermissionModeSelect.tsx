@@ -19,14 +19,16 @@ export function permissionModeOf(value: string | undefined): PermissionMode {
 }
 
 /**
- * The menu itself. `onChange` takes the mode chosen (after the confirmation
+ * The menu itself (`kind` says whose words: a team's or a chat's). `onChange` takes the mode chosen (after the confirmation
  * full access asks for) and may be asynchronous: the menu shows its failure.
  */
-export function PermissionModeMenu({ value, onChange, disabled }: { value: PermissionMode; onChange: (mode: PermissionMode) => void | Promise<unknown>; disabled?: boolean }) {
+export function PermissionModeMenu({ value, onChange, disabled, kind = 'team' }: { value: PermissionMode; onChange: (mode: PermissionMode) => void | Promise<unknown>; disabled?: boolean; kind?: 'team' | 'chat' }) {
   const { t } = useTranslation();
   const [confirmFull, setConfirmFull] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // A chat has no team folder and no members: the words that name them are the team's.
+  const words = kind === 'chat' ? 'permission.chat' : 'permission';
 
   const apply = async (mode: PermissionMode) => {
     setError('');
@@ -55,7 +57,7 @@ export function PermissionModeMenu({ value, onChange, disabled }: { value: Permi
         items={modes.map((mode) => ({
           id: mode,
           label: t(`permission.mode.${mode}`),
-          description: t(`permission.hint.${mode}`),
+          description: t(`${words}.hint.${mode}`),
           icon: icons[mode],
           checked: mode === value,
           onSelect: () => choose(mode),
@@ -75,7 +77,7 @@ export function PermissionModeMenu({ value, onChange, disabled }: { value: Permi
       <AlertDialog
         open={confirmFull}
         title={t('permission.confirmFull.title')}
-        description={t('permission.confirmFull.body')}
+        description={t(`${words}.confirmFull.body`)}
         confirmLabel={t('permission.confirmFull.confirm')}
         cancelLabel={t('common.cancel')}
         busy={busy}

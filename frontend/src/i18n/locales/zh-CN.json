@@ -198,6 +198,16 @@
     "modelSwitched": "{{name}} 改用 {{provider}} · {{model}}，下一轮起生效"
   },
   "permission": {
+    "chat": {
+      "hint": {
+        "read_only": "只能查看和分析，修改前都会问你",
+        "default": "可在这个聊天的文件夹里自由读写和执行，超出范围时会问你",
+        "full": "不再询问，也不受文件夹限制"
+      },
+      "confirmFull": {
+        "body": "它执行任何命令、修改任何文件都不会再问你，也不受聊天文件夹和网络限制。从你的下一条消息开始生效。"
+      }
+    },
     "label": "权限模式",
     "mode": {
       "read_only": "只读",

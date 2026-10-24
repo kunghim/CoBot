@@ -198,6 +198,16 @@
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
   "permission": {
+    "chat": {
+      "hint": {
+        "read_only": "Can look and analyse; asks before changing anything",
+        "default": "Free to read, write and run inside this chat's folder; asks beyond it",
+        "full": "Never asks; not limited to the chat's folder"
+      },
+      "confirmFull": {
+        "body": "It will run any command and change any file without asking, beyond the chat folder and network limits. Applies from your next message."
+      }
+    },
     "label": "Permission mode",
     "mode": {
       "read_only": "Read only",
