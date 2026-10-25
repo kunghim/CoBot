@@ -23,13 +23,15 @@ Replies are best effort, with no fixed deadline.
 For a first contribution, look for `good first issue` or `help wanted`.
 Comment `/claim` alone on an open, unassigned issue to take it, and `/unclaim`
 (after a short handoff note) to release it; `/help` shows the commands.
+Assigning yourself on the issue page works the same way.
 Claiming does not approve the proposal or schedule a release. Discuss
 substantial features or architecture changes before implementing them.
 
 欢迎中文或英文的 Issue 和 PR，无需为翻译另开重复帖子。Bug 和功能建议进 Issues，安装和使用问题进
 Discussions 的 Q&A，成果分享进 Show and tell。维护者尽力回复，不承诺固定时限。
 首次贡献可找 `good first issue` 或 `help wanted`。在开放且无人负责的 Issue 下单独评论 `/claim` 认领，
-留言交代进度后评论 `/unclaim` 取消，`/help` 查看说明。认领不代表需求获批。较大的功能或架构改动先讨论。
+留言交代进度后评论 `/unclaim` 取消，`/help` 查看说明。在 Issue 页面直接指派自己也同样生效。
+认领不代表需求获批。较大的功能或架构改动先讨论。
 命令细节与分诊标签见 [Issue 分诊](docs/reference/triage.md)。
 
 ## Reporting issues / 报告问题

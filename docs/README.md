@@ -63,5 +63,5 @@
 | [升级与回滚](reference/upgrading.md) | 迁移对用户数据的影响、发行形态替换与回滚 |
 | [原生 hook 手动审查](reference/hook-review.md) | hook 自动授权被拒绝 |
 | [分支、审查与合并](reference/branching.md) | 维护者合并 PR、晋级 `main`、清理分支 |
-| [Issue 分诊与认领命令](reference/triage.md) | 分诊标签、`ai-discovered`、`/claim` |
+| [Issue 分诊与认领命令](reference/triage.md) | 分诊标签、`ai-discovered`、`/claim` 与直接指派 |
 | [自动发布](reference/release.md) | main 更新后检查、打包与发布，及手动草稿入口 |
