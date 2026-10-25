@@ -152,11 +152,35 @@ function pageQuery(params: Record<string, string | number | undefined>): string 
 }
 
 export const api = {
+  listChats: (cursor = '', filter: { pinned?: string; archived?: boolean; sort?: string; search?: string; section?: string } = {}) => request<import('./types').ChatList>('GET', '/api/v1/chats' + pageQuery({ cursor, ...filter, archived: filter.archived ? 'true' : undefined })),
+  chatNavigation: () => request<import('./types').ChatNavigation>('GET', '/api/v1/chat-navigation'),
+  changeChatNavigation: (body: import('./types').ChatNavigationInput) => request<import('./types').ChatNavigation>('POST', '/api/v1/chat-navigation', body),
+  organizeChat: (id: string, action: 'pin' | 'unpin' | 'move' | 'reorder' | 'archive' | 'restore', body: { expectedRevision: number; sectionId?: string; beforeId?: string }) => request<import('./types').Chat>('POST', `/api/v1/chats/${encodeURIComponent(id)}/actions/${action}`, body),
+  getChat: (id: string, cursor = '') => request<import('./types').ChatPage>('GET', `/api/v1/chats/${encodeURIComponent(id)}` + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  sendChat: (id: string | null, body: import('./types').ChatSendInput) => request<import('./types').ChatPage>('POST', id ? `/api/v1/chats/${encodeURIComponent(id)}/messages` : '/api/v1/chats', body),
+  renameChat: (id: string, title: string, expectedRevision: number) => request<import('./types').Chat>('PATCH', `/api/v1/chats/${encodeURIComponent(id)}`, { title, expectedRevision }),
+  deleteChat: (id: string, expectedRevision: number) => request<import('./types').Chat>('DELETE', `/api/v1/chats/${encodeURIComponent(id)}`, { expectedRevision }),
+  chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
+  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
+  openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {
     const status = await request<import('./types').Status>('GET', '/api/v1/status');
     if (status.csrfCookieName) csrfCookieName = status.csrfCookieName;
     return status;
   },
+  getTeamBudget: (teamId: string) => request<import('./types').TeamBudget>('GET', `/api/v1/teams/${teamId}/budget`),
+  setTeamBudget: (teamId: string, limit: number | null) =>
+    request<{ limit: number | null; clamped: number }>('PUT', `/api/v1/teams/${teamId}/budget`, { limit }),
+  setBotBudget: (botId: string, limit: number | null) =>
+    request<{ limit: number | null; clamped: number }>('PUT', `/api/v1/bots/${botId}/budget`, { limit }),
+  resetTeamBudget: (teamId: string) => request<{ reset: boolean }>('POST', `/api/v1/teams/${teamId}/budget/reset`, {}),
+  resetBotBudget: (botId: string) => request<{ reset: boolean }>('POST', `/api/v1/bots/${botId}/budget/reset`, {}),
+  modelCatalog: () => request<import('./types').ModelCatalogStatus>('GET', '/api/v1/model-catalog'),
+  updateModelCatalog: () => request<import('./types').ModelCatalogUpdate>('POST', '/api/v1/model-catalog/update', {}),
+  applyEngineCatalog: () => request<import('./types').ApplyEngineCatalogResult>('POST', '/api/v1/model-catalog/apply', {}),
+  resolveModels: (models: import('./types').ProviderModel[]) =>
+    request<{ specs: Record<string, import('./types').ModelSpec> }>('POST', '/api/v1/model-catalog/resolve', { models }),
+  checkForUpdate: () => request<import('./types').UpdateCheck>('POST', '/api/v1/updates/check', {}),
   getSettings: () => request<import('./types').Settings>('GET', '/api/v1/settings'),
   updateSettings: (patch: import('./types').SettingsPatch, expectedRevision?: number) =>
     request<import('./types').Settings>('PATCH', '/api/v1/settings', {
@@ -289,15 +313,6 @@ export const api = {
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
-  // sessionLogout ends this page's session on the core. The interface is told
-  // right away, so it shows the sign-in screen instead of waiting for the
-  // next request to come back unauthorized.
-  sessionLogout: async () => {
-    const result = await request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {});
-    clearBearer();
-    notifyUnauthorized();
-    return result;
-  },
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
   // Requirements, cards and questions.
@@ -359,10 +374,6 @@ export const api = {
     request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
-  listAuthorizations: () =>
-    request<{ items: import('./types').AuthorizationBinding[] }>('GET', '/api/v1/authorizations'),
-  revokeAuthorization: (botId: string) =>
-    request<{ revoked: boolean }>('POST', `/api/v1/authorizations/${botId}/revoke`, {}),
 };
 
 import { desktopBridge } from '../platform/native-bridge';

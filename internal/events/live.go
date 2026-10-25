@@ -7,6 +7,7 @@ import "sync"
 // client that misses one converges on the stored steps at its next read.
 type Live struct {
 	Type   string `json:"type"` // step | delta
+	ChatID string `json:"chatId,omitempty"`
 	TeamID string `json:"teamId"`
 	BotID  string `json:"botId"`
 	RunID  string `json:"runId"`

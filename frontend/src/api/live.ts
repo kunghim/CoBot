@@ -18,6 +18,7 @@ export interface LiveRun {
 
 const maxStream = 64 * 1024;
 let runs: Record<string, LiveRun> = {};
+let chatRuns: Record<string, LiveRun> = {};
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -30,7 +31,8 @@ function clip(text: string): string {
 
 export function applyLiveSignal(signal: LiveSignal): void {
   if (!signal.runId) return;
-  const current = runs[signal.runId] ?? { steps: {}, reply: '', reasoning: {}, output: {}, commentary: {} };
+  const collection = signal.chatId ? chatRuns : runs;
+  const current = collection[signal.runId] ?? { steps: {}, reply: '', reasoning: {}, output: {}, commentary: {} };
   let next: LiveRun = current;
   if (signal.type === 'step' && signal.step) {
     next = { ...current, steps: { ...current.steps, [signal.step.id]: signal.step } };
@@ -42,7 +44,8 @@ export function applyLiveSignal(signal: LiveSignal): void {
     else if (signal.kind === 'output') next = { ...current, output: { ...current.output, [id]: clip((current.output[id] ?? '') + signal.text) } };
   }
   if (next === current) return;
-  runs = { ...runs, [signal.runId]: next };
+  if (signal.chatId) chatRuns = { ...chatRuns, [signal.runId]: next };
+  else runs = { ...runs, [signal.runId]: next };
   emit();
 }
 
@@ -67,6 +70,15 @@ export function useLiveRuns(): Record<string, LiveRun> {
   return useSyncExternalStore(subscribe, liveRunsSnapshot, liveRunsSnapshot);
 }
 
+export function useChatLiveRuns(): Record<string, LiveRun> {
+  return useSyncExternalStore(subscribe, () => chatRuns, () => chatRuns);
+}
+
+export function forgetChatRun(id: string): void {
+  if (!chatRuns[id]) return;
+  const next = { ...chatRuns }; delete next[id]; chatRuns = next; emit();
+}
+
 /** Stored steps merged with live ones; the newer form of a step wins. */
 export function mergeSteps(stored: RunStep[], live: LiveRun | undefined): RunStep[] {
   const byId = new Map(stored.map((step) => [step.id, step]));
@@ -80,5 +92,6 @@ export function mergeSteps(stored: RunStep[], live: LiveRun | undefined): RunSte
 /** Test seam: resets the store between cases. */
 export function resetLiveStore(): void {
   runs = {};
+  chatRuns = {};
   emit();
 }

@@ -7,8 +7,9 @@ import type { TeamWithBots } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import { Alert, AlertDialog, Button, Checkbox, DescriptionList, Dialog, Field, Fieldset, IconButton, Icons, Menu, RadioGroup, TextInput, type MenuItem } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
+import TeamBudgetDialog from './TeamBudgetDialog';
 
-type DialogId = 'archive' | 'deleteTeam' | 'edit' | 'deleteMember' | null;
+type DialogId = 'archive' | 'deleteTeam' | 'edit' | 'budget' | 'deleteMember' | null;
 
 /**
  * TeamMenu keeps the team list clean: every team action sits behind one
@@ -39,6 +40,7 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
   const entries: MenuItem[] = [];
   if (team.status === 'active') {
     entries.push({ id: 'edit', label: t('team.edit'), icon: Icons.edit, onSelect: () => choose('edit') });
+    entries.push({ id: 'budget', label: t('team.budget'), icon: Icons.model, onSelect: () => choose('budget') });
     if (bots.some((bot) => !bot.isLeader)) {
       entries.push({ id: 'deleteMember', label: t('team.deleteMember'), icon: Icons.delete, onSelect: () => choose('deleteMember') });
     }
@@ -97,6 +99,7 @@ export default function TeamMenu({ item }: { item: TeamWithBots }) {
         }
       />
       {dialog === 'edit' && <EditTeamDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === 'budget' && <TeamBudgetDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === 'deleteMember' && <DeleteMemberDialog item={item} onClose={() => setDialog(null)} />}
     </>
   );

@@ -28,6 +28,80 @@ export function useStatus() {
   return useQuery({ queryKey: queryKeys.status, queryFn: api.getStatus, retry: false });
 }
 
+/** GET /teams/{id}/budget: a team's daily limit, each member's, and today's spend. */
+export function useTeamBudget(teamId: string, enabled = true) {
+  return useQuery({ queryKey: ['teamBudget', teamId], queryFn: () => api.getTeamBudget(teamId), enabled, staleTime: 0 });
+}
+
+/** Sets the team's own daily limit (null follows the default, 0 is none). */
+export function useSetTeamBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (limit: number | null) => api.setTeamBudget(teamId, limit),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Sets a member's own daily limit the same way. */
+export function useSetBotBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, limit }: { botId: string; limit: number | null }) => api.setBotBudget(botId, limit),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Starts counting today's spend again from now, for the team and its members. */
+export function useResetTeamBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.resetTeamBudget(teamId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Starts counting one member's spend again from now. */
+export function useResetBotBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (botId: string) => api.resetBotBudget(botId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** GET /model-catalog: which model catalog is in use. */
+export function useModelCatalog() {
+  return useQuery({ queryKey: ['modelCatalog'], queryFn: api.modelCatalog });
+}
+
+/** POST /model-catalog/apply: stops the idle engines that run an older model catalog. */
+export function useApplyEngineCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.applyEngineCatalog(),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['modelCatalog'] }),
+  });
+}
+
+/** POST /model-catalog/update: downloads the newest model catalog when the user presses the button. */
+export function useUpdateModelCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.updateModelCatalog(),
+    onSuccess: (result) => {
+      if (result.state !== 'updated') return;
+      qc.invalidateQueries({ queryKey: ['modelCatalog'] });
+      // What providers know about their models comes from the catalog.
+      qc.invalidateQueries({ queryKey: queryKeys.providers });
+    },
+  });
+}
+
+/** POST /updates/check: asks GitHub for the newest release when the user presses the button. */
+export function useCheckForUpdate() {
+  return useMutation({ mutationFn: () => api.checkForUpdate() });
+}
+
 export function useSnapshot(enabled: boolean) {
   return useQuery({ queryKey: queryKeys.snapshot, queryFn: api.getSnapshot, enabled });
 }
@@ -263,6 +337,8 @@ export function useSaveProvider() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.providers });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      // A provider's models decide what the engines should be started with.
+      void qc.invalidateQueries({ queryKey: ['modelCatalog'] });
     },
   });
 }
@@ -468,17 +544,6 @@ export function useEngineLogout() {
     mutationFn: () => api.engineLogout(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.engine });
-    },
-  });
-}
-
-/** POST /session/logout: ends the page session on the core. */
-export function useSessionLogout() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.sessionLogout(),
-    onSuccess: () => {
-      void qc.clear();
     },
   });
 }
@@ -691,24 +756,5 @@ export function useDeleteBot() {
   return useMutation({
     mutationFn: ({ botId, expectedRevision }: { botId: string; expectedRevision?: number }) => api.deleteBot(botId, expectedRevision),
     onSuccess: invalidate,
-  });
-}
-
-/** GET /authorizations: live bridge credentials without token values. */
-export function useAuthorizations(enabled = true) {
-  return useQuery({
-    queryKey: ['authorizations'],
-    queryFn: api.listAuthorizations,
-    enabled,
-  });
-}
-
-export function useRevokeAuthorization() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (botId: string) => api.revokeAuthorization(botId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['authorizations'] });
-    },
   });
 }

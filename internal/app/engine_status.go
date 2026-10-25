@@ -71,15 +71,6 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		return info
 	}
 	info.Version = version
-	if !codex.VersionSupported(version) {
-		info.Status = "error"
-		info.ErrorKey = "error.engine.version_unsupported"
-		if runtime.GOOS == "darwin" {
-			info.ErrorKey = "error.engine.version_unsupported_macos"
-		}
-		a.cacheEngineStatus(info)
-		return info
-	}
 	probe := codex.Probe(ctx, binary, version)
 	info.Protocol = probe.Protocol
 	info.Capabilities = probe.Capabilities

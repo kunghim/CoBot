@@ -16,6 +16,11 @@ Go 直接依赖表依据 `go.mod` 和对应版本的模块 LICENSE 核对；前�
 前端遍历锁文件中的生产依赖，而非只收集第一层包。
 脚本发现缺失许可证时会失败，不能通过删减名单跳过。
 
+## 随程序附带的数据
+
+- `internal/modelcatalog/bundled.json`：由 `go run ./internal/modelcatalog/gen` 从 [models.dev](https://models.dev)（MIT）的公开数据整理出的模型目录快照，只保留模型名、上下文长度、最大输出、输入类型和思考方式。
+  设置里“更新模型目录”会下载同一来源的最新数据，存到用户数据目录，不改动安装目录。
+
 ## Go 直接依赖
 
 | 模块 | 版本 | 包内声明 |

@@ -57,7 +57,7 @@ func (a *App) providerView(ctx context.Context, p domain.Provider) ProviderView 
 			has = true
 		}
 	}
-	return ProviderView{Provider: p, HasCredential: has}
+	return ProviderView{Provider: a.withSpecs(p), HasCredential: has}
 }
 
 // SaveProvider validates a provider, makes it reachable for the engine and
@@ -82,6 +82,8 @@ func (a *App) SaveProvider(ctx context.Context, p domain.Provider, expectedRevis
 	if err := p.Validate(); err != nil {
 		return ProviderView{}, err
 	}
+	// What the catalog answers for is not kept; the computed spec never is.
+	p.Models = a.clearedOfWhatTheCatalogGives(p.Models)
 	if err := a.bindProvider(ctx, p); err != nil {
 		return ProviderView{}, err
 	}

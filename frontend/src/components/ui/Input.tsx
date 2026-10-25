@@ -22,11 +22,14 @@ export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
 }
 
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { size = 'md', prefix, suffix, invalid, mono, className, id, disabled, ...rest },
+  { size = 'md', prefix, suffix, invalid, mono, className, id, disabled, autoComplete, ...rest },
   ref,
 ) {
   const field = useField();
   const isInvalid = invalid ?? field?.invalid ?? false;
+  // The browser's saved-entries list would open over the form (it offered an
+  // endpoint address under a number field); only a password lets it help.
+  const complete = autoComplete ?? (rest.type === 'password' ? undefined : 'off');
   return (
     <div className={cx('flex items-center gap-2 px-3', controlFrame, controlHeight[size], isInvalid && invalidFrame, disabled && disabledFrame, className)}>
       {prefix && <span className="flex shrink-0 items-center text-neutral-400">{prefix}</span>}
@@ -36,6 +39,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
         aria-describedby={field?.describedBy}
         aria-invalid={isInvalid || undefined}
         disabled={disabled}
+        autoComplete={complete}
         className={cx('min-w-0 flex-1 bg-transparent outline-none disabled:cursor-not-allowed', mono && 'font-mono text-[0.92em]')}
         {...rest}
       />
@@ -45,13 +49,14 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
 });
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  variant?: 'default' | 'plain';
   invalid?: boolean;
   /** Grow with the text up to this many pixels. */
   autoGrowMax?: number;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { invalid, autoGrowMax, className, id, value, ...rest },
+  { invalid, autoGrowMax, className, id, value, variant = 'default', ...rest },
   forwarded,
 ) {
   const field = useField();
@@ -64,7 +69,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   }, [value, autoGrowMax]);
   const isInvalid = invalid ?? field?.invalid ?? false;
   return (
-    <div className={cx(controlFrame, 'px-3 py-2', isInvalid && invalidFrame, rest.disabled && disabledFrame, className)}>
+    <div className={cx(variant === 'default' && controlFrame, 'px-3 py-2', isInvalid && invalidFrame, rest.disabled && disabledFrame, className)}>
       <textarea
         ref={(element) => {
           inner.current = element;

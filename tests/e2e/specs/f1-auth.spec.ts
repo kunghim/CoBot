@@ -7,7 +7,7 @@ test('official login exposes the browser link and cancel uses its loginId', asyn
   await authorize(context);
   // The ChatGPT account signs in on its own card in the provider list.
   await page.goto('/settings/providers');
-  await page.getByRole('button',{name:/登录 Codex|Sign in to Codex/i}).click();
+  await page.getByRole('button',{name:/登录 ChatGPT 账号|Sign in with ChatGPT/i}).click();
   const loginLink=page.getByRole('link',{name:/在浏览器中打开登录页面|Open sign-in page in browser/i});
   await expect(loginLink).toHaveAttribute('href','https://example.invalid/login');
   await page.getByRole('button',{name:/取消登录|Cancel sign-in/i}).click();

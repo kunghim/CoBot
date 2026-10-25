@@ -57,9 +57,21 @@ func TestBotDeleteRefusesOpenWorkAndPurges(t *testing.T) {
 	if _, err := h.app.CancelRequirement(ctx, h.user, req.ID); err != nil {
 		t.Fatalf("cancel: %v", err)
 	}
+	// The cancel wakes the member and interrupts its work in the background, so
+	// "work-free" is reached a moment after CancelRequirement returns.
+	var open sqlite.OpenWorkCounts
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		var err error
+		if open, err = sqlite.BotOpenWork(ctx, h.app.DB, owner.ID); err == nil && open == (sqlite.OpenWorkCounts{}) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the member still has open work after the requirement was cancelled: %+v (err %v)", open, err)
+		}
+	}
 	deleted, err := h.app.DeleteBot(ctx, h.user, owner.ID, 0)
 	if err != nil {
-		t.Fatalf("delete work-free member: %v", err)
+		t.Fatalf("delete work-free member (open work %+v): %v", open, err)
 	}
 	if deleted.ID != owner.ID {
 		t.Fatalf("deleted = %s, want %s", deleted.ID, owner.ID)

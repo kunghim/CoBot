@@ -11,6 +11,6 @@
 - Codex 客户端的读循环同时负责接收回应，不在读循环里同步处理需要回应的请求。
 - 原生 hook 只注册在私有环境的 `PreToolUse`，匹配 `Bash|apply_patch`；只自动信任 CoBot 自己生成且内容逐字匹配的定义，
   不为通过测试放宽沙箱、审批或 hook 信任。授权被拒绝时的手动审查见 [hook 排障](../reference/hook-review.md)。
-- 最低 Codex 版本以 `internal/engine/codex/locate.go` 的 `MinSupportedVersion` 为准；这是兼容下限，不代表该平台已完整验收。
+- 不限制 Codex 版本：只要 `codex --version` 能读出且 app-server 能握手就放行，版本不兼容时按实际报错处理。
 
 做完：`go test ./internal/engine/...` 通过。涉及真实 Codex 行为时按 [验证流程](../workflows/verify.md) 单独做真实验证。

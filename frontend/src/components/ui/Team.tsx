@@ -245,7 +245,7 @@ export function QuestionCard({ asker, question, answer, onAnswer, placeholder, o
  * sends. The box grows with its text up to its max height. While a turn
  * runs and nothing is typed, the button stops it; stopping shows a spinner.
  */
-export function Composer({ value, onChange, onSend, placeholder, running = false, stopping = false, onStop, sendLabel, stopLabel, options, disabled = false, sending = false }: { value: string; onChange: (value: string) => void; onSend: () => void; placeholder: string; running?: boolean; stopping?: boolean; onStop?: () => void; sendLabel: string; stopLabel: string; options?: ReactNode; disabled?: boolean; sending?: boolean }) {
+export function Composer({ value, onChange, onSend, placeholder, running = false, stopping = false, onStop, sendLabel, stopLabel, options, disabled = false, sending = false, canSend = true }: { value: string; onChange: (value: string) => void; onSend: () => void; placeholder: string; running?: boolean; stopping?: boolean; onStop?: () => void; sendLabel: string; stopLabel: string; options?: ReactNode; disabled?: boolean; sending?: boolean; canSend?: boolean }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const empty = value.trim() === '';
   useLayoutEffect(() => {
@@ -267,13 +267,13 @@ export function Composer({ value, onChange, onSend, placeholder, running = false
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
           event.preventDefault();
-          if (!empty && !disabled && !sending) onSend();
+          if (!empty && !disabled && !sending && canSend) onSend();
         }}
         className="block max-h-60 min-h-[44px] w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm leading-6 placeholder:text-neutral-400 focus:outline-none disabled:opacity-60"
       />
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
         <div className="flex min-w-0 items-center gap-1">{options}</div>
-        {running && empty ? (
+        {running && (empty || !canSend) ? (
           <IconButton
             icon={stopping ? (props) => <Loader2 {...props} size={14} className="animate-spin" /> : (props) => <Square {...props} size={11} fill="currentColor" />}
             label={stopLabel}
@@ -284,7 +284,7 @@ export function Composer({ value, onChange, onSend, placeholder, running = false
             onClick={onStop}
           />
         ) : (
-          <IconButton icon={ArrowUp} label={sendLabel} variant="primary" size="sm" shape="circle" disabled={disabled || empty || sending} onClick={onSend} className="disabled:opacity-30" />
+          <IconButton icon={ArrowUp} label={sendLabel} variant="primary" size="sm" shape="circle" disabled={disabled || empty || sending || !canSend} onClick={onSend} className="disabled:opacity-30" />
         )}
       </div>
     </div>

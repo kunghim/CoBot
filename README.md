@@ -82,8 +82,8 @@ flowchart LR
   queued if the turn has already ended.
 - **Runaway control.** Each collaboration chain may wake members a limited number of times
   (10 by default). Past the limit the chain waits for you: Continue grants a fresh budget of
-  the same size, Stop ends it. An optional token budget, per member or per team, pauses new
-  turns.
+  the same size, Stop ends it. An optional daily token budget, per team or per member and
+  adjustable for each, pauses new turns and starts again the next day.
 - **Visible work.** Each turn's steps, tool calls and file changes show in the conversation.
   Session stats under the composer show turns, model and tool time, tokens and cache, context
   in use and account limits. Each team chooses the reasoning effort from the levels the model
@@ -148,7 +148,7 @@ not yet.
 | [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | Copy **CoBot.app** to Applications, eject the image, then open the installed app (Codex CLI 0.146.0 or newer) |
 
 The two Windows downloads contain the same application files. On Windows you need **Windows 10/11 x64**, an existing
-**WebView2 Runtime**, and the official **Codex CLI 0.161.0 or newer on `PATH`**, with an eligible
+**WebView2 Runtime**, and the official **Codex CLI on `PATH`**, with an eligible
 account and network access to Codex services. Codex is not bundled; a copy that only ships inside
 the Codex desktop app is not found. Members can run on the official ChatGPT account or on API-key
 providers that speak the OpenAI Responses API.
@@ -171,7 +171,7 @@ Windows x64 and Apple Silicon downloads; a macOS desktop package can also be bui
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
 For agent work, install the [Codex CLI](https://github.com/openai/codex) on `PATH`
-(Windows/Linux minimum: 0.161.0; macOS minimum: 0.146.0), with an account that can use Codex and
+(the latest release is recommended), with an account that can use Codex and
 network access to its service. Go and Node are build tools; the resulting CoBot
 executable still needs Codex for agent work. Local-first does not mean offline
 model execution.

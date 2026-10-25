@@ -45,6 +45,7 @@ const (
 
 // Defines values for ApprovalType.
 const (
+	Budget     ApprovalType = "budget"
 	Chain      ApprovalType = "chain"
 	NativeTool ApprovalType = "native_tool"
 	Recovery   ApprovalType = "recovery"
@@ -58,8 +59,8 @@ const (
 
 // Defines values for AvatarRefKind.
 const (
-	Catalog AvatarRefKind = "catalog"
-	Upload  AvatarRefKind = "upload"
+	AvatarRefKindCatalog AvatarRefKind = "catalog"
+	AvatarRefKindUpload  AvatarRefKind = "upload"
 )
 
 // Defines values for BotStatus.
@@ -71,6 +72,60 @@ const (
 	BotStatusWaitingApproval BotStatus = "waiting_approval"
 	BotStatusWaitingInput    BotStatus = "waiting_input"
 	BotStatusWorking         BotStatus = "working"
+)
+
+// Defines values for BudgetLineLimitedBy.
+const (
+	BudgetLineLimitedByDefault BudgetLineLimitedBy = "default"
+	BudgetLineLimitedByNone    BudgetLineLimitedBy = "none"
+	BudgetLineLimitedByOwn     BudgetLineLimitedBy = "own"
+	BudgetLineLimitedByTeam    BudgetLineLimitedBy = "team"
+)
+
+// Defines values for ChatArchiveOperation.
+const (
+	ChatArchiveOperationArchive ChatArchiveOperation = "archive"
+	ChatArchiveOperationRestore ChatArchiveOperation = "restore"
+)
+
+// Defines values for ChatNavigationGrouping.
+const (
+	ChatNavigationGroupingMerged   ChatNavigationGrouping = "merged"
+	ChatNavigationGroupingSections ChatNavigationGrouping = "sections"
+)
+
+// Defines values for ChatNavigationSort.
+const (
+	ChatNavigationSortManual ChatNavigationSort = "manual"
+	ChatNavigationSortRecent ChatNavigationSort = "recent"
+)
+
+// Defines values for ChatNavigationInputAction.
+const (
+	Create      ChatNavigationInputAction = "create"
+	Delete      ChatNavigationInputAction = "delete"
+	Preferences ChatNavigationInputAction = "preferences"
+	Rename      ChatNavigationInputAction = "rename"
+	Reorder     ChatNavigationInputAction = "reorder"
+)
+
+// Defines values for ChatNavigationInputGrouping.
+const (
+	ChatNavigationInputGroupingMerged   ChatNavigationInputGrouping = "merged"
+	ChatNavigationInputGroupingSections ChatNavigationInputGrouping = "sections"
+)
+
+// Defines values for ChatNavigationInputSort.
+const (
+	ChatNavigationInputSortManual ChatNavigationInputSort = "manual"
+	ChatNavigationInputSortRecent ChatNavigationInputSort = "recent"
+)
+
+// Defines values for ChatSendInputPermissionMode.
+const (
+	ChatSendInputPermissionModeDefault  ChatSendInputPermissionMode = "default"
+	ChatSendInputPermissionModeFull     ChatSendInputPermissionMode = "full"
+	ChatSendInputPermissionModeReadOnly ChatSendInputPermissionMode = "read_only"
 )
 
 // Defines values for CollaborationRequestTool.
@@ -124,6 +179,14 @@ const (
 	EvidenceOutcomeResume   EvidenceOutcome = "resume"
 )
 
+// Defines values for MemberBudgetLimitedBy.
+const (
+	MemberBudgetLimitedByDefault MemberBudgetLimitedBy = "default"
+	MemberBudgetLimitedByNone    MemberBudgetLimitedBy = "none"
+	MemberBudgetLimitedByOwn     MemberBudgetLimitedBy = "own"
+	MemberBudgetLimitedByTeam    MemberBudgetLimitedBy = "team"
+)
+
 // Defines values for MessageDeliveryStatus.
 const (
 	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
@@ -146,6 +209,39 @@ const (
 const (
 	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
 	MessagePreviewKindUser      MessagePreviewKind = "user"
+)
+
+// Defines values for ModelCatalogStatusSource.
+const (
+	ModelCatalogStatusSourceBundled    ModelCatalogStatusSource = "bundled"
+	ModelCatalogStatusSourceDownloaded ModelCatalogStatusSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateSource.
+const (
+	ModelCatalogUpdateSourceBundled    ModelCatalogUpdateSource = "bundled"
+	ModelCatalogUpdateSourceDownloaded ModelCatalogUpdateSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateState.
+const (
+	ModelCatalogUpdateStateRejected    ModelCatalogUpdateState = "rejected"
+	ModelCatalogUpdateStateUnreachable ModelCatalogUpdateState = "unreachable"
+	ModelCatalogUpdateStateUpdated     ModelCatalogUpdateState = "updated"
+)
+
+// Defines values for ModelSpecLocked.
+const (
+	ContextWindow   ModelSpecLocked = "contextWindow"
+	InputModalities ModelSpecLocked = "inputModalities"
+	MaxOutput       ModelSpecLocked = "maxOutput"
+	Thinking        ModelSpecLocked = "thinking"
+)
+
+// Defines values for ModelSpecSource.
+const (
+	ModelSpecSourceCatalog ModelSpecSource = "catalog"
+	ModelSpecSourceCustom  ModelSpecSource = "custom"
 )
 
 // Defines values for ProviderAuthMode.
@@ -229,6 +325,7 @@ const (
 const (
 	RunStepKindAgent      RunStepKind = "agent"
 	RunStepKindCommand    RunStepKind = "command"
+	RunStepKindCompaction RunStepKind = "compaction"
 	RunStepKindDiff       RunStepKind = "diff"
 	RunStepKindFileChange RunStepKind = "file_change"
 	RunStepKindMessage    RunStepKind = "message"
@@ -388,10 +485,10 @@ const (
 
 // Defines values for TeamStatus.
 const (
-	Active           TeamStatus = "active"
-	Archived         TeamStatus = "archived"
-	Deleted          TeamStatus = "deleted"
-	DirectoryMissing TeamStatus = "directory_missing"
+	TeamStatusActive           TeamStatus = "active"
+	TeamStatusArchived         TeamStatus = "archived"
+	TeamStatusDeleted          TeamStatus = "deleted"
+	TeamStatusDirectoryMissing TeamStatus = "directory_missing"
 )
 
 // Defines values for ToolResultStatus.
@@ -404,10 +501,50 @@ const (
 	ToolResultStatusWaiting     ToolResultStatus = "waiting"
 )
 
+// Defines values for UpdateCheckState.
+const (
+	UpdateCheckStateAvailable   UpdateCheckState = "available"
+	UpdateCheckStateRejected    UpdateCheckState = "rejected"
+	UpdateCheckStateUnknown     UpdateCheckState = "unknown"
+	UpdateCheckStateUnreachable UpdateCheckState = "unreachable"
+	UpdateCheckStateUpToDate    UpdateCheckState = "upToDate"
+)
+
 // Defines values for ListApprovalsParamsState.
 const (
 	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
 	ListApprovalsParamsStatePending ListApprovalsParamsState = "pending"
+)
+
+// Defines values for ListChatsParamsPinned.
+const (
+	Exclude ListChatsParamsPinned = "exclude"
+	Only    ListChatsParamsPinned = "only"
+)
+
+// Defines values for ListChatsParamsSort.
+const (
+	ListChatsParamsSortArchived ListChatsParamsSort = "archived"
+	ListChatsParamsSortCreated  ListChatsParamsSort = "created"
+	ListChatsParamsSortManual   ListChatsParamsSort = "manual"
+	ListChatsParamsSortName     ListChatsParamsSort = "name"
+	ListChatsParamsSortRecent   ListChatsParamsSort = "recent"
+)
+
+// Defines values for OrganizeChatParamsAction.
+const (
+	OrganizeChatParamsActionArchive OrganizeChatParamsAction = "archive"
+	OrganizeChatParamsActionMove    OrganizeChatParamsAction = "move"
+	OrganizeChatParamsActionPin     OrganizeChatParamsAction = "pin"
+	OrganizeChatParamsActionReorder OrganizeChatParamsAction = "reorder"
+	OrganizeChatParamsActionRestore OrganizeChatParamsAction = "restore"
+	OrganizeChatParamsActionUnpin   OrganizeChatParamsAction = "unpin"
+)
+
+// Defines values for ChatRunActionParamsAction.
+const (
+	Interrupt ChatRunActionParamsAction = "interrupt"
+	Verify    ChatRunActionParamsAction = "verify"
 )
 
 // Defines values for ListQuestionsParamsStatus.
@@ -467,6 +604,12 @@ type AnswerQuestionRequestDecision string
 
 // AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
 type AnswerQuestionRequestMode string
+
+// ApplyEngineCatalogResult defines model for ApplyEngineCatalogResult.
+type ApplyEngineCatalogResult struct {
+	Busy      int `json:"busy"`
+	Restarted int `json:"restarted"`
+}
 
 // Approval defines model for Approval.
 type Approval struct {
@@ -596,6 +739,201 @@ type BrowserViewport struct {
 	Width  int   `json:"width"`
 }
 
+// BudgetLimitRequest defines model for BudgetLimitRequest.
+type BudgetLimitRequest struct {
+	Limit     *int64             `json:"limit"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// BudgetLimitResult defines model for BudgetLimitResult.
+type BudgetLimitResult struct {
+	// Clamped How many members had a limit above the team's, or none, and were brought down to the team's.
+	Clamped int    `json:"clamped"`
+	Limit   *int64 `json:"limit"`
+}
+
+// BudgetLine One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+type BudgetLine struct {
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy BudgetLineLimitedBy `json:"limitedBy"`
+	Override  *int64              `json:"override"`
+	UsedToday int64               `json:"usedToday"`
+}
+
+// BudgetLineLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type BudgetLineLimitedBy string
+
+// BudgetResetResult defines model for BudgetResetResult.
+type BudgetResetResult struct {
+	Reset bool `json:"reset"`
+}
+
+// Chat defines model for Chat.
+type Chat struct {
+	ArchiveError     *string               `json:"archiveError,omitempty"`
+	ArchiveOperation *ChatArchiveOperation `json:"archiveOperation,omitempty"`
+	ArchivedAt       *string               `json:"archivedAt,omitempty"`
+	Busy             *bool                 `json:"busy,omitempty"`
+	CreatedAt        string                `json:"createdAt"`
+	Id               string                `json:"id"`
+	ManualOrder      *int64                `json:"manualOrder,omitempty"`
+	Model            string                `json:"model"`
+	PermissionMode   string                `json:"permissionMode"`
+	Pinned           *bool                 `json:"pinned,omitempty"`
+	ProviderId       string                `json:"providerId"`
+	ReasoningEffort  string                `json:"reasoningEffort"`
+	Revision         int64                 `json:"revision"`
+	SectionId        *string               `json:"sectionId,omitempty"`
+	Title            string                `json:"title"`
+	UpdatedAt        string                `json:"updatedAt"`
+	Workspace        string                `json:"workspace"`
+}
+
+// ChatArchiveOperation defines model for Chat.ArchiveOperation.
+type ChatArchiveOperation string
+
+// ChatActionInput defines model for ChatActionInput.
+type ChatActionInput struct {
+	Answers          *map[string][]string `json:"answers,omitempty"`
+	BeforeId         *string              `json:"beforeId,omitempty"`
+	ExpectedRevision *int64               `json:"expectedRevision,omitempty"`
+	OptionId         *string              `json:"optionId,omitempty"`
+	RequestId        string               `json:"requestId"`
+	SectionId        *string              `json:"sectionId,omitempty"`
+	Title            *string              `json:"title,omitempty"`
+}
+
+// ChatList defines model for ChatList.
+type ChatList struct {
+	Items      []Chat `json:"items"`
+	NextCursor string `json:"nextCursor"`
+}
+
+// ChatMessage defines model for ChatMessage.
+type ChatMessage struct {
+	ChatId    string `json:"chatId"`
+	CreatedAt string `json:"createdAt"`
+	Id        string `json:"id"`
+	Kind      string `json:"kind"`
+	RunId     string `json:"runId"`
+	Text      string `json:"text"`
+}
+
+// ChatNavigation defines model for ChatNavigation.
+type ChatNavigation struct {
+	Grouping ChatNavigationGrouping `json:"grouping"`
+	Revision int64                  `json:"revision"`
+	Sections []ChatSection          `json:"sections"`
+	Sort     ChatNavigationSort     `json:"sort"`
+}
+
+// ChatNavigationGrouping defines model for ChatNavigation.Grouping.
+type ChatNavigationGrouping string
+
+// ChatNavigationSort defines model for ChatNavigation.Sort.
+type ChatNavigationSort string
+
+// ChatNavigationInput defines model for ChatNavigationInput.
+type ChatNavigationInput struct {
+	Action           ChatNavigationInputAction    `json:"action"`
+	BeforeId         *string                      `json:"beforeId,omitempty"`
+	ExpectedRevision int64                        `json:"expectedRevision"`
+	Grouping         *ChatNavigationInputGrouping `json:"grouping,omitempty"`
+	Id               *string                      `json:"id,omitempty"`
+	Name             *string                      `json:"name,omitempty"`
+	RequestId        string                       `json:"requestId"`
+	Sort             *ChatNavigationInputSort     `json:"sort,omitempty"`
+}
+
+// ChatNavigationInputAction defines model for ChatNavigationInput.Action.
+type ChatNavigationInputAction string
+
+// ChatNavigationInputGrouping defines model for ChatNavigationInput.Grouping.
+type ChatNavigationInputGrouping string
+
+// ChatNavigationInputSort defines model for ChatNavigationInput.Sort.
+type ChatNavigationInputSort string
+
+// ChatPage defines model for ChatPage.
+type ChatPage struct {
+	Chat       Chat          `json:"chat"`
+	Messages   []ChatMessage `json:"messages"`
+	NextCursor string        `json:"nextCursor"`
+	Requests   []ChatRequest `json:"requests"`
+	Runs       []ChatRun     `json:"runs"`
+}
+
+// ChatRequest defines model for ChatRequest.
+type ChatRequest struct {
+	ChatId        string                  `json:"chatId"`
+	Decision      *string                 `json:"decision,omitempty"`
+	Id            string                  `json:"id"`
+	Method        string                  `json:"method"`
+	Options       []ApprovalOption        `json:"options"`
+	Params        *map[string]interface{} `json:"params,omitempty"`
+	Reason        string                  `json:"reason"`
+	ResponseState string                  `json:"responseState"`
+	Revision      int64                   `json:"revision"`
+	RunId         string                  `json:"runId"`
+	State         string                  `json:"state"`
+	Summary       string                  `json:"summary"`
+	Type          string                  `json:"type"`
+}
+
+// ChatRun defines model for ChatRun.
+type ChatRun struct {
+	ChatId        string     `json:"chatId"`
+	EndedAt       string     `json:"endedAt"`
+	Epoch         string     `json:"epoch"`
+	ErrorKey      string     `json:"errorKey"`
+	Id            string     `json:"id"`
+	MessageId     string     `json:"messageId"`
+	StartedAt     string     `json:"startedAt"`
+	Status        string     `json:"status"`
+	Steps         []ChatStep `json:"steps"`
+	StopRequested *bool      `json:"stopRequested,omitempty"`
+	ThreadId      string     `json:"threadId"`
+	TurnId        string     `json:"turnId"`
+}
+
+// ChatSection defines model for ChatSection.
+type ChatSection struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Order int64  `json:"order"`
+}
+
+// ChatSendInput defines model for ChatSendInput.
+type ChatSendInput struct {
+	Model *string `json:"model,omitempty"`
+
+	// PermissionMode Empty keeps the chat's. Holds from this message on.
+	PermissionMode *ChatSendInputPermissionMode `json:"permissionMode,omitempty"`
+	ProviderId     *string                      `json:"providerId,omitempty"`
+
+	// ReasoningEffort Sent with a model: the thinking level for the model chosen (empty is the model's own).
+	ReasoningEffort *string `json:"reasoningEffort,omitempty"`
+	RequestId       string  `json:"requestId"`
+	Text            string  `json:"text"`
+}
+
+// ChatSendInputPermissionMode Empty keeps the chat's. Holds from this message on.
+type ChatSendInputPermissionMode string
+
+// ChatStep defines model for ChatStep.
+type ChatStep struct {
+	Detail map[string]interface{} `json:"detail"`
+	Id     string                 `json:"id"`
+	Kind   string                 `json:"kind"`
+	Seq    int64                  `json:"seq"`
+	Status string                 `json:"status"`
+}
+
 // CollaborationRequest defines model for CollaborationRequest.
 type CollaborationRequest struct {
 	Arguments *map[string]interface{} `json:"arguments,omitempty"`
@@ -627,6 +965,15 @@ type ConversationPage struct {
 
 	// Runs Runs started between this page's messages, with their visible steps.
 	Runs []RunWithSteps `json:"runs"`
+}
+
+// EngineCatalogState How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+type EngineCatalogState struct {
+	// Active Whether a generated catalog is wanted at all.
+	Active bool `json:"active"`
+
+	// Stale Running team engines started without the catalog now wanted.
+	Stale int `json:"stale"`
 }
 
 // EngineLogin defines model for EngineLogin.
@@ -717,6 +1064,24 @@ type Execution struct {
 	Files []string `json:"files"`
 }
 
+// MemberBudget defines model for MemberBudget.
+type MemberBudget struct {
+	BotId string `json:"botId"`
+
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy MemberBudgetLimitedBy `json:"limitedBy"`
+	Override  *int64                `json:"override"`
+	UsedToday int64                 `json:"usedToday"`
+}
+
+// MemberBudgetLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type MemberBudgetLimitedBy string
+
 // Memory defines model for Memory.
 type Memory struct {
 	Body         string    `json:"body"`
@@ -774,6 +1139,72 @@ type Model struct {
 	Slug *string `json:"slug,omitempty"`
 }
 
+// ModelCatalogStatus defines model for ModelCatalogStatus.
+type ModelCatalogStatus struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogStatusSource `json:"source"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogStatusSource defines model for ModelCatalogStatus.Source.
+type ModelCatalogStatusSource string
+
+// ModelCatalogUpdate defines model for ModelCatalogUpdate.
+type ModelCatalogUpdate struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogUpdateSource `json:"source"`
+	State     ModelCatalogUpdateState  `json:"state"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogUpdateSource defines model for ModelCatalogUpdate.Source.
+type ModelCatalogUpdateSource string
+
+// ModelCatalogUpdateState defines model for ModelCatalogUpdate.State.
+type ModelCatalogUpdateState string
+
+// ModelSpec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+type ModelSpec struct {
+	Alias     *string `json:"alias,omitempty"`
+	CatalogId *string `json:"catalogId,omitempty"`
+
+	// ContextLimit The most the catalog says the model reads; 0 when it does not know the model.
+	ContextLimit int `json:"contextLimit"`
+
+	// ContextWindow In use. The user's own number when it is below the limit
+	ContextWindow   int      `json:"contextWindow"`
+	DisplayName     string   `json:"displayName"`
+	InputModalities []string `json:"inputModalities"`
+
+	// InputOptions The kinds of input the model may be said to take.
+	InputOptions []string `json:"inputOptions"`
+
+	// Locked Fields the catalog gives and the user cannot change; the others only have limits.
+	Locked         []ModelSpecLocked `json:"locked"`
+	MaxOutput      int               `json:"maxOutput"`
+	MaxOutputLimit int               `json:"maxOutputLimit"`
+	Name           *string           `json:"name,omitempty"`
+	Source         ModelSpecSource   `json:"source"`
+	Thinking       struct {
+		DefaultEffort *string  `json:"defaultEffort,omitempty"`
+		Efforts       []string `json:"efforts"`
+		Toggle        bool     `json:"toggle"`
+	} `json:"thinking"`
+	WebSearch bool `json:"webSearch"`
+}
+
+// ModelSpecLocked defines model for ModelSpec.Locked.
+type ModelSpecLocked string
+
+// ModelSpecSource defines model for ModelSpec.Source.
+type ModelSpecSource string
+
 // Provider A model vendor or gateway the engine can call. The secret is never part of it.
 type Provider struct {
 	AuthMode      ProviderAuthMode `json:"authMode"`
@@ -820,17 +1251,25 @@ type ProviderEndpointDialect string
 type ProviderModel struct {
 	ContextWindow *int    `json:"contextWindow,omitempty"`
 	DefaultEffort *string `json:"defaultEffort,omitempty"`
-	DisplayName   *string `json:"displayName,omitempty"`
+
+	// DisplayName The user's own name for the model
+	DisplayName *string `json:"displayName,omitempty"`
 
 	// Failure Stable machine code of the last check.
 	Failure         *string   `json:"failure,omitempty"`
 	Id              string    `json:"id"`
 	InputModalities *[]string `json:"inputModalities,omitempty"`
+	MaxOutput       *int      `json:"maxOutput,omitempty"`
 
 	// Message Human-readable detail of the last check.
-	Message          *string              `json:"message,omitempty"`
+	Message *string `json:"message,omitempty"`
+
+	// Spec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+	Spec             *ModelSpec           `json:"spec,omitempty"`
 	Status           *ProviderModelStatus `json:"status,omitempty"`
 	SupportedEfforts *[]string            `json:"supportedEfforts,omitempty"`
+	ThinkingToggle   *bool                `json:"thinkingToggle,omitempty"`
+	WebSearch        *bool                `json:"webSearch,omitempty"`
 }
 
 // ProviderModelStatus defines model for ProviderModel.Status.
@@ -1211,6 +1650,14 @@ type TeamPermissionMode string
 // TeamStatus defines model for Team.Status.
 type TeamStatus string
 
+// TeamBudget defines model for TeamBudget.
+type TeamBudget struct {
+	Members []MemberBudget `json:"members"`
+
+	// Team One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+	Team BudgetLine `json:"team"`
+}
+
 // TeamWithBots defines model for TeamWithBots.
 type TeamWithBots struct {
 	Bots []Bot `json:"bots"`
@@ -1237,6 +1684,21 @@ type ToolResult struct {
 
 // ToolResultStatus defines model for ToolResult.Status.
 type ToolResultStatus string
+
+// UpdateCheck defines model for UpdateCheck.
+type UpdateCheck struct {
+	CheckedAt   time.Time  `json:"checkedAt"`
+	Current     string     `json:"current"`
+	Latest      *string    `json:"latest,omitempty"`
+	PublishedAt *time.Time `json:"publishedAt,omitempty"`
+	ReleaseUrl  *string    `json:"releaseUrl,omitempty"`
+
+	// State upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+	State UpdateCheckState `json:"state"`
+}
+
+// UpdateCheckState upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+type UpdateCheckState string
 
 // Error defines model for Error.
 type Error = ErrorEnvelope
@@ -1310,6 +1772,11 @@ type PatchBotJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ResetBotBudgetJSONBody defines parameters for ResetBotBudget.
+type ResetBotBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // ListCollaborationParams defines parameters for ListCollaboration.
 type ListCollaborationParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1363,6 +1830,40 @@ type SetBotModelJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ListChatsParams defines parameters for ListChats.
+type ListChatsParams struct {
+	Cursor   *string                `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Pinned   *ListChatsParamsPinned `form:"pinned,omitempty" json:"pinned,omitempty"`
+	Archived *bool                  `form:"archived,omitempty" json:"archived,omitempty"`
+	Sort     *ListChatsParamsSort   `form:"sort,omitempty" json:"sort,omitempty"`
+	Search   *string                `form:"search,omitempty" json:"search,omitempty"`
+	Section  *string                `form:"section,omitempty" json:"section,omitempty"`
+}
+
+// ListChatsParamsPinned defines parameters for ListChats.
+type ListChatsParamsPinned string
+
+// ListChatsParamsSort defines parameters for ListChats.
+type ListChatsParamsSort string
+
+// GetChatParams defines parameters for GetChat.
+type GetChatParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// OrganizeChatParamsAction defines parameters for OrganizeChat.
+type OrganizeChatParamsAction string
+
+// OpenChatPathJSONBody defines parameters for OpenChatPath.
+type OpenChatPathJSONBody struct {
+	Path      string `json:"path"`
+	RequestId string `json:"requestId"`
+	Reveal    *bool  `json:"reveal,omitempty"`
+}
+
+// ChatRunActionParamsAction defines parameters for ChatRunAction.
+type ChatRunActionParamsAction string
+
 // ListDirectoriesParams defines parameters for ListDirectories.
 type ListDirectoriesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
@@ -1393,6 +1894,22 @@ type StreamEventsParams struct {
 
 // CancelMessageJSONBody defines parameters for CancelMessage.
 type CancelMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ApplyEngineCatalogJSONBody defines parameters for ApplyEngineCatalog.
+type ApplyEngineCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ResolveModelsJSONBody defines parameters for ResolveModels.
+type ResolveModelsJSONBody struct {
+	Models    []ProviderModel    `json:"models"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// UpdateModelCatalogJSONBody defines parameters for UpdateModelCatalog.
+type UpdateModelCatalogJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -1613,6 +2130,11 @@ type SetTeamBrowserTabViewportJSONBody struct {
 // SetTeamBrowserTabViewportJSONBodyPreset defines parameters for SetTeamBrowserTabViewport.
 type SetTeamBrowserTabViewportJSONBodyPreset string
 
+// ResetTeamBudgetJSONBody defines parameters for ResetTeamBudget.
+type ResetTeamBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // OpenTeamPathJSONBody defines parameters for OpenTeamPath.
 type OpenTeamPathJSONBody struct {
 	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
@@ -1641,6 +2163,11 @@ type ListTasksParams struct {
 
 // WarmTeamJSONBody defines parameters for WarmTeam.
 type WarmTeamJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// CheckForUpdateJSONBody defines parameters for CheckForUpdate.
+type CheckForUpdateJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -1678,11 +2205,44 @@ type SaveAvatarUploadJSONRequestBody SaveAvatarUploadJSONBody
 // PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
 type PatchBotJSONRequestBody PatchBotJSONBody
 
+// SetBotBudgetJSONRequestBody defines body for SetBotBudget for application/json ContentType.
+type SetBotBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetBotBudgetJSONRequestBody defines body for ResetBotBudget for application/json ContentType.
+type ResetBotBudgetJSONRequestBody ResetBotBudgetJSONBody
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
 
 // SetBotModelJSONRequestBody defines body for SetBotModel for application/json ContentType.
 type SetBotModelJSONRequestBody SetBotModelJSONBody
+
+// ChangeChatNavigationJSONRequestBody defines body for ChangeChatNavigation for application/json ContentType.
+type ChangeChatNavigationJSONRequestBody = ChatNavigationInput
+
+// CreateChatJSONRequestBody defines body for CreateChat for application/json ContentType.
+type CreateChatJSONRequestBody = ChatSendInput
+
+// DeleteChatJSONRequestBody defines body for DeleteChat for application/json ContentType.
+type DeleteChatJSONRequestBody = ChatActionInput
+
+// RenameChatJSONRequestBody defines body for RenameChat for application/json ContentType.
+type RenameChatJSONRequestBody = ChatActionInput
+
+// OrganizeChatJSONRequestBody defines body for OrganizeChat for application/json ContentType.
+type OrganizeChatJSONRequestBody = ChatActionInput
+
+// SendChatMessageJSONRequestBody defines body for SendChatMessage for application/json ContentType.
+type SendChatMessageJSONRequestBody = ChatSendInput
+
+// OpenChatPathJSONRequestBody defines body for OpenChatPath for application/json ContentType.
+type OpenChatPathJSONRequestBody OpenChatPathJSONBody
+
+// ReplyChatRequestJSONRequestBody defines body for ReplyChatRequest for application/json ContentType.
+type ReplyChatRequestJSONRequestBody = ChatActionInput
+
+// ChatRunActionJSONRequestBody defines body for ChatRunAction for application/json ContentType.
+type ChatRunActionJSONRequestBody = ChatActionInput
 
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
@@ -1695,6 +2255,15 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// ApplyEngineCatalogJSONRequestBody defines body for ApplyEngineCatalog for application/json ContentType.
+type ApplyEngineCatalogJSONRequestBody ApplyEngineCatalogJSONBody
+
+// ResolveModelsJSONRequestBody defines body for ResolveModels for application/json ContentType.
+type ResolveModelsJSONRequestBody ResolveModelsJSONBody
+
+// UpdateModelCatalogJSONRequestBody defines body for UpdateModelCatalog for application/json ContentType.
+type UpdateModelCatalogJSONRequestBody UpdateModelCatalogJSONBody
 
 // CreateProviderJSONRequestBody defines body for CreateProvider for application/json ContentType.
 type CreateProviderJSONRequestBody = ProviderRequest
@@ -1759,6 +2328,12 @@ type OpenTeamBrowserTabJSONRequestBody OpenTeamBrowserTabJSONBody
 // SetTeamBrowserTabViewportJSONRequestBody defines body for SetTeamBrowserTabViewport for application/json ContentType.
 type SetTeamBrowserTabViewportJSONRequestBody SetTeamBrowserTabViewportJSONBody
 
+// SetTeamBudgetJSONRequestBody defines body for SetTeamBudget for application/json ContentType.
+type SetTeamBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetTeamBudgetJSONRequestBody defines body for ResetTeamBudget for application/json ContentType.
+type ResetTeamBudgetJSONRequestBody ResetTeamBudgetJSONBody
+
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
 
@@ -1767,6 +2342,9 @@ type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
 // WarmTeamJSONRequestBody defines body for WarmTeam for application/json ContentType.
 type WarmTeamJSONRequestBody WarmTeamJSONBody
+
+// CheckForUpdateJSONRequestBody defines body for CheckForUpdate for application/json ContentType.
+type CheckForUpdateJSONRequestBody CheckForUpdateJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest

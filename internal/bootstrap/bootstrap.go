@@ -31,10 +31,12 @@ import (
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/logging"
+	"github.com/kunghim/CoBot/internal/modelcatalog"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/internal/updates"
 	"github.com/kunghim/CoBot/internal/webui"
 	"github.com/kunghim/CoBot/internal/wiretrace"
 )
@@ -85,6 +87,8 @@ type Core struct {
 	closeLog    func() error
 	scheduler   *app.Scheduler
 	stopStreams context.CancelFunc
+	// stopBudgetWatch ends the check that wakes held work at midnight.
+	stopBudgetWatch context.CancelFunc
 }
 
 // Start brings up the core: lock, storage, migrations, HTTP listener.
@@ -230,6 +234,12 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		catalog, _ = avatars.New(paths.AvatarsDir(), "")
 	}
 	application.Avatars = catalog
+	application.Updates = updates.New(opts.Version, "")
+	if modelCatalog, err := modelcatalog.Open(filepath.Join(paths.CacheDir(), "model-catalog.json")); err != nil {
+		logger.Warn("model catalog unavailable", "error", err)
+	} else {
+		application.ModelCatalog = modelCatalog
+	}
 	application.Browser = browser.NewManager(paths.BrowserDir(), logger)
 
 	// The credential store holds the model providers' API keys, encrypted
@@ -252,7 +262,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// and every HTTP exchange. It records nothing until switched on.
 	trace := wiretrace.New(paths.Root, "core")
 	application.Trace = trace
-	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks) (*codex.Server, error) {
+	application.ClientCatalogs = &codex.CatalogBuilder{Home: paths.CodexHome()}
+	// withCatalog: a team's engine knows the third-party models' context
+	// windows; the profile-wide control engine keeps the engine's own model
+	// list, which it refreshes, and which the account's model picker shows.
+	newServer := func(startCtx context.Context, cwd string, callbacks engine.Callbacks, withCatalog bool) (*codex.Server, error) {
 		settings, err := application.GetSettings(startCtx)
 		if err != nil {
 			return nil, err
@@ -268,7 +282,17 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		if err != nil {
 			return nil, err
 		}
+		var clientCatalog codex.ClientCatalog
+		if withCatalog {
+			var catalogErr error
+			if clientCatalog, catalogErr = application.EngineCatalog(startCtx); catalogErr != nil {
+				// Without it the models keep the engine's fallback window.
+				logger.Warn("model catalog for the engine not used", "error", catalogErr)
+				clientCatalog = codex.ClientCatalog{}
+			}
+		}
 		return codex.Start(startCtx, codex.ServerOptions{
+			Catalog:   clientCatalog,
 			Binary:    binary,
 			Cwd:       cwd,
 			Env:       codex.EngineEnv(paths, secrets),
@@ -279,7 +303,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		})
 	}
 	scheduler := app.NewScheduler(application, func(spec app.ServerSpec) (engine.Server, error) {
-		return newServer(spec.Context, spec.Cwd, spec.Callbacks)
+		return newServer(spec.Context, spec.Cwd, spec.Callbacks, true)
 	})
 	// A developer can shorten the idle engine shutdown to watch it happen
 	// (for example COBOT_IDLE_ENGINE_TIMEOUT=30s); it is not a user setting.
@@ -292,6 +316,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		}
 	}
 	application.Scheduler = scheduler
+	application.Chats = app.NewChatRunner(application, func(spec app.ServerSpec) (engine.Server, error) {
+		return newServer(spec.Context, spec.Cwd, spec.Callbacks, true)
+	})
 	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
 		return newServer(startCtx, cwd, engine.Callbacks{
 			OnNotification: func(n engine.Notification) {
@@ -302,11 +329,16 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 					application.EngineStatusInvalidated()
 				}
 			},
-		})
+		}, false)
 	}
 	startupComplete := false
 	defer func() {
 		if !startupComplete {
+			if application.Chats != nil {
+				stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = application.Chats.Stop(stopCtx)
+				cancel()
+			}
 			_ = listener.Close()
 			_ = closeLog()
 			_ = db.Close()
@@ -331,6 +363,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// approvals, and one recovery card per unresolved run.
 	if err := application.ReconcileAfterRestart(ctx); err != nil {
 		return nil, fmt.Errorf("reconcile after restart: %w", err)
+	}
+	if err := application.Chats.Start(); err != nil {
+		return nil, fmt.Errorf("reconcile chats: %w", err)
 	}
 
 	// Collaboration composition: the token store is the bridge credential
@@ -405,11 +440,14 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		closeLog:         closeLog,
 		scheduler:        scheduler,
 	}
+	budgetCtx, stopBudgetWatch := context.WithCancel(context.Background())
+	core.stopBudgetWatch = stopBudgetWatch
 
 	// Ownership transfers only after all fallible startup work has finished;
 	// no dispatch worker may outlive a failed Start call.
 	startupComplete = true
 	scheduler.Start()
+	application.StartBudgetDayWatch(budgetCtx)
 	if opts.AvatarSync {
 		application.StartAvatarSync()
 	}
@@ -456,6 +494,14 @@ func (c *Core) SetEngineStatus(p apihttp.EngineStatusProvider) {
 // touches resources of another instance.
 func (c *Core) Shutdown(ctx context.Context) error {
 	var errs []error
+	if c.stopBudgetWatch != nil {
+		c.stopBudgetWatch()
+	}
+	if c.App != nil && c.App.Chats != nil {
+		if err := c.App.Chats.Stop(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("chat shutdown: %w", err))
+		}
+	}
 	// Order: stop dispatch and engines first, then HTTP, then storage.
 	if c.scheduler != nil {
 		if err := c.scheduler.Stop(ctx); err != nil {

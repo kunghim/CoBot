@@ -133,6 +133,15 @@ type Run struct {
 const (
 	ApprovalNativeTool = "native_tool"
 	ApprovalRecovery   = "recovery"
+	// ApprovalBudget asks whether to start a held daily budget's count again.
+	ApprovalBudget = "budget"
+)
+
+// Option ids on the budget card: count today from now, or stay held until
+// the day turns over.
+const (
+	BudgetOptionReset = "reset"
+	BudgetOptionWait  = "wait"
 )
 
 // Recovery option ids on the unresolved-execution card. This build cannot
