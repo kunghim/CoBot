@@ -203,6 +203,12 @@
     "chooseModel": "选择模型",
     "back": "返回",
     "saveFailed": "思考强度没有改成",
+    "switchOthersTitle": "也给其他 {{count}} 位成员换成 {{model}} 吗？",
+    "switchOthersNote": "模型属于每位成员；正在工作的成员从下一轮起生效。",
+    "switchAll": "全部换",
+    "switchThisOnly": "只换这一位",
+    "modelSwitchedAll": "已把 {{count}} 位成员换成 {{model}}",
+    "modelSwitchedAllFailed": "这些成员没有换成：{{names}}",
     "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高", "max": "最高", "ultra": "Ultra" },
     "modelSwitched": "{{name}} 改用 {{provider}} · {{model}}，下一轮起生效"
   },
@@ -318,6 +324,7 @@
     "step": {
       "reasoning": "思考",
       "message": "说明",
+      "switchModel": "换模型",
       "diff": "本轮改动 {{count}} 个文件",
       "agent": {
         "badge": "子智能体",

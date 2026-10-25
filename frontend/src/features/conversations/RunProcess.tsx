@@ -17,6 +17,7 @@ import DiffView from '../../components/DiffView';
 import Markdown from './Markdown';
 import { stripToolCallText } from './toolCallText';
 import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
+import { openModelPicker } from './modelPicker';
 
 /** Where the files a turn names live: a team's folder, or a chat's own. */
 export interface Scope {
@@ -25,7 +26,7 @@ export interface Scope {
 }
 
 /** What a turn needs of a run: its place in time, its state and its steps. */
-export type ProcessRun = Pick<RunWithSteps, 'id' | 'status' | 'startedAt' | 'endedAt' | 'steps'>;
+export type ProcessRun = Pick<RunWithSteps, 'id' | 'status' | 'startedAt' | 'endedAt' | 'steps' | 'botId'>;
 
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -115,9 +116,9 @@ export default function RunProcess({
       )}
       {blocks.map((block) =>
         block.kind === 'text' ? (
-          <StepRow key={block.step.id} step={block.step} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
+          <StepRow key={block.step.id} step={block.step} botId={run.botId} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
         ) : (
-          <WorkGroup key={block.id} steps={block.steps} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
+          <WorkGroup key={block.id} steps={block.steps} botId={run.botId} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
         ),
       )}
       {retry}
@@ -132,7 +133,7 @@ export default function RunProcess({
 
 /** A stretch of work between two things the member said: a line saying what it
  * held, which opens into the steps. A running or failed turn shows them open. */
-function WorkGroup({ steps, expanded, active, live, scope, nameOf, say }: { steps: RunStep[]; expanded: boolean; active: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
+function WorkGroup({ steps, botId, expanded, active, live, scope, nameOf, say }: { steps: RunStep[]; botId: string; expanded: boolean; active: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
   const [own, setOwn] = useState<boolean | null>(null);
   const open = own ?? expanded;
   const summary = workSummary(steps).map(say).join('、');
@@ -153,7 +154,7 @@ function WorkGroup({ steps, expanded, active, live, scope, nameOf, say }: { step
         <ol className="ml-1.5 mt-1 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
           {steps.map((step) => (
             <li key={step.id}>
-              <StepRow step={step} running={active && step.status === 'in_progress'} live={live} scope={scope} nameOf={nameOf} />
+              <StepRow step={step} botId={botId} running={active && step.status === 'in_progress'} live={live} scope={scope} nameOf={nameOf} />
             </li>
           ))}
         </ol>
@@ -183,7 +184,7 @@ function StatusMark({ status, running }: { status: string; running: boolean }) {
   return <Check size={11} className="text-neutral-400" aria-hidden="true" />;
 }
 
-function StepRow({ step, running, live, scope, nameOf }: { step: RunStep; running: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string }) {
+function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep; botId: string; running: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const phrase = describeStep(step, nameOf);
@@ -232,6 +233,17 @@ function StepRow({ step, running, live, scope, nameOf }: { step: RunStep; runnin
         <span className="ml-auto shrink-0"><StatusMark status={step.status} running={running} /></span>
       </button>
       {open && body && <div className="mt-1 pl-[18px]">{body}</div>}
+      {/* An exhausted account or a spent balance is what switching models
+          answers, so the failure row carries the entry to its picker. */}
+      {step.status === 'failed' && step.kind === 'notice' && (d.code === 'usageLimitExceeded' || d.failureCode === 'quota') && (
+        <button
+          type="button"
+          onClick={() => openModelPicker(botId)}
+          className="ml-[18px] mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-signal-600 transition-colors hover:bg-signal-500/10 hover:text-signal-700 dark:text-signal-400 dark:hover:text-signal-300"
+        >
+          {t('conversation.step.switchModel')}
+        </button>
+      )}
     </div>
   );
 }

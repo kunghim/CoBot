@@ -203,6 +203,16 @@
     "chooseModel": "Choose model",
     "back": "Back",
     "saveFailed": "Thinking effort was not changed",
+    "switchOthersTitle": "{{count}} other member(s) still on the old provider — also switch them to {{model}}?",
+    "switchOthersTitle_one": "{{count}} other member is still on the old provider — also switch them to {{model}}?",
+    "switchOthersTitle_other": "{{count}} other members are still on the old provider — also switch them to {{model}}?",
+    "switchOthersNote": "Models belong to each member; a member at work picks the new one up from its next turn.",
+    "switchAll": "Switch all",
+    "switchThisOnly": "Only this member",
+    "modelSwitchedAll": "Switched {{count}} member(s) to {{model}}",
+    "modelSwitchedAll_one": "Switched {{count}} member to {{model}}",
+    "modelSwitchedAll_other": "Switched {{count}} members to {{model}}",
+    "modelSwitchedAllFailed": "Failed to switch: {{names}}",
     "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high", "max": "Max", "ultra": "Ultra" },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
@@ -318,6 +328,7 @@
     "step": {
       "reasoning": "Thinking",
       "message": "Note",
+      "switchModel": "Switch model",
       "diff": "Changes this turn: {{count}} file(s)",
       "agent": {
         "badge": "Sub-agent",
