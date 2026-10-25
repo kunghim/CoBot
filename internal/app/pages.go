@@ -164,7 +164,11 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 			// The stages of a requirement never change, so this projection
 			// is computed where the question is served, not stored.
 			if err == nil && question.Kind == domain.QuestionKindConfirm && question.RequirementID != "" {
-				if req, e := sqlite.GetRequirement(ctx, q, question.RequirementID); e == nil {
+				req, e := sqlite.GetRequirement(ctx, q, question.RequirementID)
+				if e != nil && !errors.Is(e, sqlite.ErrNotFound) {
+					return nil, e
+				}
+				if e == nil {
 					question.CanSkipChecks = routeCanSkipChecks(req, question.StageIndex)
 				}
 			}

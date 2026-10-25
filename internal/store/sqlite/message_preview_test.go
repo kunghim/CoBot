@@ -77,8 +77,9 @@ func TestLatestMessagePreviewsCardsAndNotes(t *testing.T) {
 	}
 	card := `[{"type":"text","text":"【接力卡片】实现登录接口"},{"type":"task","text":"{\"taskId\":\"c1\",\"title\":\"实现登录接口\"}"}]`
 	// The plain notice is the newest: it must not become the preview, so the
-	// card before it is what shows.
-	insert(0, domain.Message{Kind: domain.MessageKindSystem, Blocks: []byte(card), SourceBotID: "leader"})
+	// card before it is what shows. A card the user dispatched has no
+	// sender and still previews, by its title.
+	insert(0, domain.Message{Kind: domain.MessageKindSystem, Blocks: []byte(card)})
 	insert(1, domain.Message{Kind: domain.MessageKindSystem, Blocks: []byte(`[{"type":"text","text":"你取消了需求"}]`)})
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
@@ -89,7 +90,7 @@ func TestLatestMessagePreviewsCardsAndNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := previews[botID]
-	if got.Kind != domain.MessageKindSystem || got.SenderBotID != "leader" || got.Text != "实现登录接口" {
-		t.Fatalf("preview = %+v, want the card's title with its sender", got)
+	if got.Kind != domain.MessageKindSystem || got.SenderBotID != "" || got.Text != "实现登录接口" {
+		t.Fatalf("preview = %+v, want the dispatched card's title without a sender", got)
 	}
 }

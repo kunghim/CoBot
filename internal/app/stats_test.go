@@ -85,3 +85,39 @@ func TestBotStatsRateLimitsFollowTheProvider(t *testing.T) {
 		t.Fatal("a member on the default third-party model still sees the account quota")
 	}
 }
+
+// The team's own provider candidate sits between the member's choice and
+// the settings default, exactly as it does for a turn.
+func TestBotStatsRateLimitsFollowTheTeamProvider(t *testing.T) {
+	ctx := context.Background()
+	binder := newFakeBinder()
+	a := providerTestApp(t, binder)
+	seedQuotaAccount(t, `{"primary":{"used_percent":7}}`)
+	if _, err := a.SaveProvider(ctx, testProvider(), 0); err != nil {
+		t.Fatal(err)
+	}
+
+	var bots []domain.Bot
+	for _, id := range []string{"lead", "dev"} {
+		bots = append(bots, domain.Bot{ID: id, TeamID: "t2", Name: id, RoleID: "fullstack-engineer", IsLeader: id == "lead"})
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	team := domain.Team{ID: "t2", Name: "t2", ProfileInstance: "p", LeaderID: "lead", Status: domain.TeamStatusActive, ProviderID: "cobot_deepseek"}
+	if err := sqlite.InsertTeam(ctx, tx, team, "C:/t2", "t2", bots); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := a.BotStats(ctx, auth.NewPrincipalUser(""), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.RateLimits != nil {
+		t.Fatal("a member running on the team's third-party provider still sees the account quota")
+	}
+}

@@ -729,7 +729,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		}
 		effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 		if decision == domain.AcceptanceAccept {
-			if err := systemNoteLocked(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+req.Title+"」。"); err != nil {
+			if err := systemNoteLocked(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
 				return domain.Question{}, err
 			}
 		} else {
@@ -861,11 +861,11 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		return domain.Requirement{}, err
 	}
 	if err := noteLocked(ctx, tx, req.TeamID, team.LeaderID, team.LeaderID, req.ID,
-		"用户取消了需求「"+req.Title+"」，想先继续讨论；讨论清楚后请重新提交需求。"); err != nil {
+		"用户取消了需求「"+summarizeLine(req.Title)+"」；方向谈清楚后请重新提交需求。"); err != nil {
 		return domain.Requirement{}, err
 	}
 	if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID,
-		"你取消了需求「"+req.Title+"」。可以先和项目经理继续讨论，讨论清楚后它会重新提交需求。"); err != nil {
+		"你取消了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
 		return domain.Requirement{}, err
 	}
 	if req, err = sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementCancelled); err != nil {
@@ -1110,14 +1110,16 @@ func systemNoteLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text strin
 	})
 }
 
-// confirmAcceptedNote says what the user's confirmation set in motion.
+// confirmAcceptedNote says what the user's confirmation set in motion. The
+// title and stage names are the project manager's wording, so they get the
+// same one-line budget as user comments: the note reads as CoBot's own.
 func confirmAcceptedNote(req domain.Requirement, next int, names map[string]string) string {
 	stage := req.Stages[next]
 	owner := stageOwnerName(stage, names)
 	if stage.Kind == domain.StageConfirm {
 		owner = "你"
 	}
-	return fmt.Sprintf("你确认了需求「%s」。下一环：%s（%s）。", req.Title, stage.Name, owner)
+	return fmt.Sprintf("你确认了需求「%s」。下一环：%s（%s）。", summarizeLine(req.Title), summarizeLine(stage.Name), owner)
 }
 
 // confirmRevisedNote says where the user's revision went and what happens
@@ -1127,7 +1129,7 @@ func confirmRevisedNote(req domain.Requirement, idx, producer int, mode, comment
 	if producer >= 0 {
 		to = stageOwnerName(req.Stages[producer], names)
 	}
-	note := fmt.Sprintf("你对「%s」提了修改意见：%s，已交给 %s 修改。", req.Stages[idx].Name, summarizeLine(comment), to)
+	note := fmt.Sprintf("你对「%s」提了修改意见：%s，已交给 %s 修改。", summarizeLine(req.Stages[idx].Name), summarizeLine(comment), to)
 	if mode == domain.ReworkReturnToMe {
 		return note + "改完后直接回到你确认。"
 	}

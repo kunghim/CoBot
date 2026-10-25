@@ -227,8 +227,10 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	}
 	// The user's ignore is recorded where the question was asked, so the
 	// conversation shows what happened to the card. The member itself is
-	// not told what to do next; it is woken as before.
-	if principal.Kind == auth.KindUser {
+	// not told what to do next; it is woken as before. A confirm or
+	// acceptance question is cancelled through its requirement instead,
+	// which leaves its own record.
+	if principal.Kind == auth.KindUser && question.Kind == domain.QuestionKindAsk {
 		if err := systemNoteLocked(ctx, tx, question.TeamID, question.RequesterBotID, "你忽略了提问："+summarizeLine(question.Question)); err != nil {
 			return domain.Question{}, err
 		}

@@ -227,6 +227,19 @@ func TestCancelledRequirementNotifiesLeader(t *testing.T) {
 	if note != 1 {
 		t.Fatalf("leader collaboration notes = %d, want the resubmission note", note)
 	}
+	messages, err = sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = messages
+	var noteText string
+	if err := h.app.DB.QueryRowContext(ctx,
+		`SELECT json_extract(blocks, '$[0].text') FROM messages WHERE bot_id = ? AND kind = ? AND source_bot_id = ?`, pm.ID, domain.MessageKindCollaboration, pm.ID).Scan(&noteText); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(noteText, "方向谈清楚后请重新提交需求") {
+		t.Fatalf("cancel note = %q, want the neutral resubmission wording", noteText)
+	}
 }
 
 // The straight-return offer on a confirm card follows the route: there has
@@ -269,6 +282,75 @@ func TestConfirmCardSkipChecksFollowsTheRoute(t *testing.T) {
 	// confirmation: a straight return would skip it.
 	if second := openConfirm(); !second.CanSkipChecks {
 		t.Fatal("the second confirmation does not offer skipping the test stage")
+	}
+}
+
+// A requirements review before the first confirmation is exactly what a
+// straight return skips: the confirm card offers it, and a revision sent
+// with return_to_me comes back past the review, straight to a new
+// confirmation.
+func TestConfirmAfterRequirementsReviewOffersSkippingIt(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "code-reviewer"})
+	pm, dev, reviewer := bots[0], bots[1], bots[2]
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Name: "需求评审", Kind: domain.StageReview, OwnerID: reviewer.ID, ReviewType: "requirements"},
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	ctx := context.Background()
+	openConfirm := func() domain.Question {
+		page, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "questions", TeamID: team.ID, State: "open"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page["items"].([]any) {
+			if q := item.(domain.Question); q.RequirementID == req.ID && q.Kind == domain.QuestionKindConfirm {
+				return q
+			}
+		}
+		t.Fatal("no open confirm question")
+		return domain.Question{}
+	}
+
+	// The review sits between the document and the confirmation.
+	d.handoff(d.open(req), domain.HandoffDone, "")
+	first := openConfirm()
+	if !first.CanSkipChecks {
+		t.Fatal("the confirmation behind a requirements review does not offer skipping it")
+	}
+
+	// Revising with return_to_me sends the document to the project manager;
+	// once it hands the fix back, the work skips the review and a fresh
+	// confirmation waits.
+	if _, err := h.app.AnswerDecision(ctx, h.user, first.ID, domain.AcceptanceRevise, domain.ReworkReturnToMe, "范围去掉导出", first.Revision); err != nil {
+		t.Fatal(err)
+	}
+	draft := d.open(req)
+	if draft.StageKind != domain.CardDraft || draft.OwnerID != pm.ID {
+		t.Fatalf("rework card = %+v, want the project manager's draft", draft)
+	}
+	if _, err := h.app.Handoff(ctx, auth.NewPrincipalBot(pm.ID, team.ID), app.HandoffInput{
+		CardID: draft.ID, Outcome: domain.HandoffDone, Summary: "文档已按要求修改", Document: "修改后的需求文档",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	second := openConfirm()
+	if second.StageIndex != 1 {
+		t.Fatalf("fresh confirmation at stage %d, want 1", second.StageIndex)
+	}
+	for _, card := range func() []domain.Task {
+		cards, err := sqlite.ListRequirementTasks(ctx, h.app.DB, req.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cards
+	}() {
+		if !card.IsTerminal() && card.OwnerID == reviewer.ID {
+			t.Fatal("the review stage ran again although the revision skipped it")
+		}
 	}
 }
 
