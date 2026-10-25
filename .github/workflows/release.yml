@@ -1,24 +1,31 @@
-name: release draft
-run-name: Release draft v${{ inputs.version }}
+name: release
+run-name: Release ${{ inputs.version || 'automatic' }}
 
-# Maintainers dispatch from main after promotion. No tag push or branch push
-# publishes a release; this workflow only creates an unpublished draft.
+# Promoting dev to main is the release decision. All builds stay pinned to
+# that main commit; only the final job can publish the verified assets.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Product version without v (for example 0.1.0-beta.2)"
-        required: true
+        description: "Optional product version; empty increments the current release channel"
+        required: false
         type: string
       msi_version:
-        description: "Increasing numeric MSI version (for example 0.1.2)"
-        required: true
+        description: "Optional MSI version; empty increments the previous installer version"
+        required: false
         type: string
+      draft_only:
+        description: "Build a verified draft without publishing (manual runs only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
+  # Keep the existing mutex so older manual runs cannot overlap the rollout.
   group: release-draft
   cancel-in-progress: false
 
@@ -31,6 +38,7 @@ jobs:
       version: ${{ steps.request.outputs.version }}
       msi_version: ${{ steps.request.outputs.msi_version }}
       previous_tag: ${{ steps.request.outputs.previous_tag }}
+      should_release: ${{ steps.request.outputs.should_release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,7 +57,15 @@ jobs:
 
   checks:
     needs: prepare
+    if: ${{ needs.prepare.outputs.should_release == 'true' }}
     uses: ./.github/workflows/ci.yml
+
+  upgrade:
+    needs: [prepare, checks]
+    if: ${{ needs.prepare.outputs.previous_tag != '' }}
+    uses: ./.github/workflows/upgrade.yml
+    with:
+      base_tag: ${{ needs.prepare.outputs.previous_tag }}
 
   windows:
     name: package Windows x64
@@ -81,7 +97,7 @@ jobs:
         run: |
           npm ci --prefix frontend
           if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
           if ($LASTEXITCODE -ne 0) { throw "Wails install failed" }
           dotnet tool install --tool-path "$env:RUNNER_TEMP/wix" wix --version 6.0.2
           if ($LASTEXITCODE -ne 0) { throw "WiX install failed" }
@@ -138,7 +154,7 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           npm ci --prefix frontend
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
       - name: Build and inspect Apple Silicon DMG
         run: |
           bash scripts/build.sh --target desktop --version "$RELEASE_VERSION" --arch arm64
@@ -154,9 +170,10 @@ jobs:
           compression-level: 0
           include-hidden-files: true
 
-  draft:
-    name: create unpublished release draft
-    needs: [prepare, windows, macos]
+  publish:
+    name: publish verified release
+    needs: [prepare, checks, windows, macos, upgrade]
+    if: ${{ !cancelled() && needs.prepare.outputs.should_release == 'true' && needs.checks.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && (needs.upgrade.result == 'success' || (needs.prepare.outputs.previous_tag == '' && needs.upgrade.result == 'skipped')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -173,9 +190,11 @@ jobs:
           pattern: release-*
           merge-multiple: true
           path: .tmp/release-assets
-      - name: Verify exact asset set and create draft with provenance
+      - name: Verify uploaded assets and publish with provenance
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           MSI_VERSION: ${{ needs.prepare.outputs.msi_version }}
-        run: node scripts/release.mjs draft .tmp/release-assets
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          RELEASE_DRAFT_ONLY: ${{ inputs.draft_only || false }}
+        run: node scripts/release.mjs publish .tmp/release-assets

@@ -69,15 +69,17 @@ text. Explain changes to locks, generated contracts or migrations. Label
 `breaking-change` only when users or callers must change how they use CoBot
 after upgrading, and describe the migration. CI must pass and material review
 feedback must be resolved; the maintainer decides whether and when to merge.
-Merging is not a release. Commit messages are in English.
+Merging into `dev` does not publish a release. Promoting `dev` to `main`
+triggers the checked packaging and publication workflow. Commit messages are
+in English.
 
 在自己的 fork 中从上游 `dev` 建短期分支，PR 以 `dev` 为目标（依赖更新也是）。流程为
 `主题分支 → dev → main → 发布`，只有本仓库的 `dev` 能晋级 `main`，CI 会拒绝其他路线。
 每个 PR 聚焦一项改动，未完成用 Draft。按模板写清问题与关联、改动后的行为、实际验证、兼容与数据影响；
 界面改动附脱敏截图并提供中英文文案；改锁文件、生成契约或迁移时说明原因。
 只有升级后用户或调用方必须调整用法时才标 `breaking-change`，并写明迁移方法。
-CI 通过、重要意见解决后由维护者决定是否合并；合并不等于发布。提交信息用英文。
-维护者流程见[分支、审查与合并](docs/reference/branching.md)和[发布草稿](docs/reference/release.md)。
+CI 通过、重要意见解决后由维护者决定是否合并；合入 `dev` 不发布，晋级 `main` 后触发检查、打包与自动发布。提交信息用英文。
+维护者流程见[分支、审查与合并](docs/reference/branching.md)和[自动发布](docs/reference/release.md)。
 
 ## AI-assisted contributions / AI 辅助贡献
 

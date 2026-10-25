@@ -42,4 +42,4 @@
 | [原生 hook 手动审查](reference/hook-review.md) | hook 自动授权被拒绝 |
 | [分支、审查与合并](reference/branching.md) | 维护者合并 PR、晋级 `main`、清理分支 |
 | [Issue 分诊与认领命令](reference/triage.md) | 分诊标签、`ai-discovered`、`/claim` |
-| [发布草稿](reference/release.md) | 打包并发布版本 |
+| [自动发布](reference/release.md) | main 更新后检查、打包与发布，及手动草稿入口 |
