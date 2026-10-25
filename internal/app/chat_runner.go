@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,9 +45,12 @@ type chatRuntime struct {
 	commentary string
 	// loose are the messages the engine gave no phase (a third-party model's),
 	// each with the work steps begun before it; see looseReply.
-	loose      []loosePiece
-	work       int
-	workSeen   map[string]bool
+	loose    []loosePiece
+	work     int
+	workSeen map[string]bool
+	// retryOpen is set while the engine reconnects: the one "retry" step is
+	// in progress until the turn makes progress again.
+	retryOpen  bool
 	lastActive time.Time
 	bindings   map[string][2]string
 }
@@ -346,7 +350,7 @@ func (r *ChatRunner) dispatch(chatID, runID, text string) {
 	rt.texts = map[string]string{}
 	rt.order = nil
 	rt.commentary = ""
-	rt.loose, rt.work, rt.workSeen = nil, 0, nil
+	rt.loose, rt.work, rt.workSeen, rt.retryOpen = nil, 0, nil, false
 	if run.StopRequested {
 		rt.run = run
 		err = r.finish(rt, domain.RunInterrupted)
@@ -484,6 +488,11 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 	if !sub && n.TurnID != "" && rt.run.TurnID != "" && n.TurnID != rt.run.TurnID {
 		return
 	}
+	// Any progress after a reconnect means the connection is back.
+	if !sub && rt.retryOpen && (n.Delta != "" || n.Step != nil || (n.Problem != nil && !n.Problem.WillRetry)) {
+		rt.retryOpen = false
+		r.report(r.settleRetry(ctx, rt))
+	}
 	if n.Delta != "" {
 		if !sub && n.DeltaKind == "message" {
 			if _, ok := rt.texts[n.ItemID]; !ok {
@@ -523,7 +532,20 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 			rt.texts[n.ItemID] = n.Text
 		}
 	}
-	if n.Problem != nil {
+	if n.Problem != nil && n.Problem.WillRetry {
+		// The engine is reconnecting and the turn may still finish: it is shown
+		// as a reconnect, not as the failure a notice would claim.
+		attempt := 1
+		if m := attemptPattern.FindStringSubmatch(n.Problem.Message); m != nil {
+			if reported, err := strconv.Atoi(m[1]); err == nil && reported > 0 {
+				attempt = reported
+			}
+		}
+		rt.retryOpen = true
+		b, _ := json.Marshal(map[string]any{"attempt": attempt, "code": n.Problem.Code})
+		r.report(sqlite.SaveChatStep(ctx, r.a.DB, rt.run.ID, domain.ChatStep{ID: retryStepID, Kind: domain.StepKindRetry, Status: engine.StepInProgress, Detail: b}))
+		r.a.chatChanged(ctx, rt.id, "chat.run.updated")
+	} else if n.Problem != nil {
 		// Vendor bodies can echo credentials. Keep only stable discriminators.
 		b, _ := json.Marshal(map[string]string{"level": n.Problem.Level, "code": n.Problem.Code, "failureCode": n.Problem.FailureCode})
 		r.report(sqlite.SaveChatStep(ctx, r.a.DB, rt.run.ID, domain.ChatStep{ID: domain.NewID(), Kind: "notice", Status: engine.StepCompleted, Detail: b}))
@@ -547,6 +569,13 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 		r.report(r.finish(rt, status))
 		r.a.chatChanged(ctx, rt.id, "chat.run.updated")
 	}
+}
+
+// settleRetry closes the open "reconnecting" step of the running turn.
+func (r *ChatRunner) settleRetry(ctx context.Context, rt *chatRuntime) error {
+	_, err := r.a.DB.ExecContext(ctx, `UPDATE chat_run_steps SET data=json_set(data,'$.status',?) WHERE run_id=? AND item_id=? AND json_extract(data,'$.status')=?`,
+		engine.StepCompleted, rt.run.ID, retryStepID, engine.StepInProgress)
+	return err
 }
 
 func (r *ChatRunner) finish(rt *chatRuntime, status string) error {

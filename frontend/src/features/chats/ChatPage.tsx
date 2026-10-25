@@ -98,8 +98,13 @@ function ChatPage({ id }: { id?: string }) {
   const submit = () => { if (!draft.trim() || active || chat?.archivedAt || chat?.archiveOperation || send.isPending) return; send.mutate(draft); };
   useEffect(() => { writeLocal(key, draft); }, [key, draft]);
   useEffect(() => {
-    if (id && query.error instanceof ApiError && query.error.status === 404) writeLocal('cobot.chat.selected', '');
-  }, [id, query.error]);
+    // A chat that is not there (deleted elsewhere, or remembered from another
+    // data root) leaves nothing to show: forget it and start a new chat.
+    if (id && query.error instanceof ApiError && query.error.status === 404) {
+      writeLocal('cobot.chat.selected', '');
+      navigate('/chat/new', { replace: true });
+    }
+  }, [id, query.error, navigate]);
   useEffect(() => { if (page) for (const run of page.runs) if (!isChatRunning(run.status)) forgetChatRun(run.id); }, [page]);
   useEffect(() => {
     const el = scroll.current;
