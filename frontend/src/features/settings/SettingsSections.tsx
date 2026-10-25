@@ -328,8 +328,11 @@ export function ModelsSection({ settings, save, errors }: SectionProps) {
   const models = useEngineModels(engine.data?.status === 'ready');
   const providerName = useProviderName();
 
-  // Until the provider list is in, there is no telling what is on offer.
-  if (providers.isPending) {
+  // Until the provider list and the engine's answers are in, there is no
+  // telling what is on offer: the official account's models and whether it is
+  // signed in both come from the engine, and reading them as absent would say
+  // "no model" for the moment before they arrive.
+  if (providers.isPending || engine.isPending || (engine.data?.status === 'ready' && models.isPending)) {
     return (
       <Card>
         <Skeleton className="h-9 w-64" />
