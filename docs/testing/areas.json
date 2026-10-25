@@ -1,0 +1,308 @@
+{
+  "$comment": "Maps source paths to live-test areas. A changed file re-runs the regression cases of every area it matches. 'shared' files only rely on the smoke cases. 'exempt' files never need a live test. Every tracked file must fall in one of the three; scripts/check-docs.mjs enforces it.",
+  "areas": [
+    {
+      "id": "gates",
+      "title": "自动化门禁与发布前检查",
+      "cases": "cases/gates.md",
+      "paths": []
+    },
+    {
+      "id": "start",
+      "title": "启动、引擎检测、首次使用",
+      "cases": "cases/start.md",
+      "paths": [
+        "cmd/cobot/**",
+        "internal/bootstrap/**",
+        "internal/cli/**",
+        "internal/config/**",
+        "internal/platform/**",
+        "internal/logging/**",
+        "internal/app/engine_status.go",
+        "internal/api/http/handlers_engine.go",
+        "internal/api/http/handlers_status.go",
+        "frontend/src/features/home/**"
+      ]
+    },
+    {
+      "id": "engine",
+      "title": "Codex 引擎与版本兼容",
+      "cases": "cases/engine.md",
+      "paths": [
+        "internal/engine/**",
+        "internal/hookrun/**",
+        "internal/app/lease.go",
+        "internal/app/engine_events.go",
+        "internal/app/tool_run.go"
+      ]
+    },
+    {
+      "id": "teams",
+      "title": "团队与成员",
+      "cases": "cases/teams.md",
+      "paths": [
+        "internal/app/teams.go",
+        "internal/app/team_lifecycle.go",
+        "internal/app/pages.go",
+        "internal/dirpicker/**",
+        "internal/opener/**",
+        "internal/app/open_path.go",
+        "internal/api/http/handlers_teams.go",
+        "internal/api/http/handlers_pages.go",
+        "frontend/src/features/teams/**"
+      ]
+    },
+    {
+      "id": "relay",
+      "title": "会话、接力、审批与恢复",
+      "cases": "cases/relay.md",
+      "paths": [
+        "internal/app/relay.go",
+        "internal/app/relay_context.go",
+        "internal/app/chains.go",
+        "internal/app/card_reminder.go",
+        "internal/app/collaboration.go",
+        "internal/app/context.go",
+        "internal/app/conversations.go",
+        "internal/app/steer.go",
+        "internal/app/interrupt_request.go",
+        "internal/app/run_retry.go",
+        "internal/app/run_progress.go",
+        "internal/app/recovery.go",
+        "internal/app/scheduler.go",
+        "internal/app/subagents.go",
+        "internal/app/idempotency.go",
+        "internal/app/write_request.go",
+        "internal/app/batch.go",
+        "internal/app/approvals.go",
+        "internal/app/approval_*.go",
+        "internal/app/questions.go",
+        "internal/app/activity.go",
+        "internal/app/events_import.go",
+        "internal/collaboration/**",
+        "internal/roles/**",
+        "internal/events/**",
+        "internal/eventsink/**",
+        "internal/api/http/handlers_approvals.go",
+        "internal/api/http/handlers_collaboration*.go",
+        "internal/api/http/handlers_conversations.go",
+        "internal/api/http/handlers_questions.go",
+        "internal/api/http/handlers_run_retry.go",
+        "internal/api/http/handlers_tasks.go",
+        "internal/api/http/stream.go",
+        "frontend/src/features/conversations/**",
+        "frontend/src/features/tasks/**",
+        "frontend/src/features/approvals/**",
+        "frontend/src/features/questions/**",
+        "frontend/src/features/activity/**"
+      ]
+    },
+    {
+      "id": "chats",
+      "title": "聊天（无项目会话）与统一归档",
+      "cases": "cases/chats.md",
+      "paths": [
+        "internal/app/chat*.go",
+        "internal/api/http/handlers_chats.go",
+        "frontend/src/features/chats/**",
+        "frontend/src/app/ModeSelector.tsx",
+        "frontend/src/app/ModeSwitch.tsx",
+        "frontend/src/app/SidebarToggle.tsx",
+        "frontend/src/app/mode.ts"
+      ]
+    },
+    {
+      "id": "budget",
+      "title": "每日预算",
+      "cases": "cases/budget.md",
+      "paths": [
+        "internal/app/budget*.go",
+        "internal/api/http/handlers_budget.go",
+        "frontend/src/features/budget/**"
+      ]
+    },
+    {
+      "id": "models",
+      "title": "模型与供应商",
+      "cases": "cases/models.md",
+      "paths": [
+        "internal/provider/**",
+        "internal/providers/**",
+        "internal/secrets/**",
+        "internal/failure/**",
+        "internal/app/providers.go",
+        "internal/app/model_selection.go",
+        "internal/app/handover.go",
+        "internal/app/engine_catalog.go",
+        "internal/app/model_spec.go",
+        "internal/modelcatalog/**",
+        "internal/api/http/handlers_providers.go",
+        "internal/api/http/handlers_model_selection.go",
+        "frontend/src/features/providers/**"
+      ]
+    },
+    {
+      "id": "workspace",
+      "title": "团队浏览器与工作区",
+      "cases": "cases/workspace.md",
+      "paths": [
+        "internal/browser/**",
+        "internal/app/browser.go",
+        "internal/app/browser_panel.go",
+        "internal/app/web_surface.go",
+        "internal/api/http/handlers_browser.go",
+        "internal/api/http/handlers_web.go",
+        "frontend/src/features/workspace/**",
+        "frontend/src/components/WorkPanel.tsx",
+        "frontend/src/app/workPanelNav.ts",
+        "frontend/src/app/workspacePath.ts"
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "设置、用量与记忆",
+      "cases": "cases/settings.md",
+      "paths": [
+        "frontend/src/features/settings/**",
+        "frontend/src/features/memories/**",
+        "internal/app/memories.go",
+        "internal/app/usage.go",
+        "internal/app/stats.go",
+        "internal/app/update_check.go",
+        "internal/updates/**",
+        "internal/api/http/handlers_settings.go"
+      ]
+    },
+    {
+      "id": "security",
+      "title": "会话授权与访问控制",
+      "cases": "cases/security.md",
+      "paths": [
+        "internal/auth/**",
+        "internal/api/http/middleware.go",
+        "internal/api/http/handlers_session.go",
+        "internal/api/http/router.go",
+        "internal/api/http/write.go",
+        "frontend/src/app/authState.ts"
+      ]
+    },
+    {
+      "id": "avatars",
+      "title": "头像库与头像",
+      "cases": "cases/avatars.md",
+      "paths": [
+        "internal/avatars/**",
+        "assets/avatars/**",
+        "internal/app/avatars.go",
+        "internal/app/avatar_uploads.go",
+        "internal/api/http/handlers_avatars.go",
+        "frontend/src/features/avatars/**"
+      ]
+    },
+    {
+      "id": "upgrade",
+      "title": "数据存储与升级",
+      "cases": "cases/upgrade.md",
+      "paths": [
+        "internal/store/**"
+      ]
+    },
+    {
+      "id": "ui",
+      "title": "界面外观与国际化",
+      "cases": "cases/ui.md",
+      "paths": [
+        "frontend/src/i18n/**",
+        "frontend/src/components/**",
+        "frontend/src/styles/**",
+        "frontend/src/app/appearance.ts",
+        "frontend/src/app/App.tsx",
+        "frontend/src/app/Layout.tsx",
+        "frontend/src/app/shell.tsx",
+        "frontend/src/app/SelectedBotContext.tsx",
+        "frontend/src/platform/**",
+        "frontend/src/assets/**",
+        "frontend/src/main.tsx",
+        "frontend/index.html",
+        "frontend/vite.config.ts",
+        "frontend/tailwind.config.*"
+      ]
+    },
+    {
+      "id": "packaging",
+      "title": "打包产物与桌面壳",
+      "cases": "cases/packaging.md",
+      "paths": [
+        "packaging/**",
+        "cmd/cobot-desktop/**",
+        "cmd/cobot-helper/**",
+        "internal/desktop/**",
+        "internal/webui/**",
+        "assets/branding/**",
+        "scripts/build*.ps1",
+        "scripts/build*.sh",
+        "scripts/package-windows.ps1",
+        "scripts/prepare-*.ps1",
+        "scripts/prepare-branding.mjs",
+        "scripts/test-msi.ps1",
+        "scripts/verify-macos-package.sh",
+        "scripts/release.mjs",
+        "scripts/third-party-notices.mjs",
+        ".github/workflows/release.yml",
+        "tests/installer/**"
+      ]
+    }
+  ],
+  "shared": [
+    "api/**",
+    "internal/contract/**",
+    "internal/domain/**",
+    "internal/api/http/**",
+    "internal/app/app.go",
+    "internal/testutil/**",
+    "frontend/src/api/**",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "frontend/tsconfig*.json",
+    "go.mod",
+    "go.sum",
+    "cmd/**"
+  ],
+  "exempt": [
+    "docs/**",
+    "**/*.md",
+    ".claude/**",
+    ".local/**",
+    ".gitignore",
+    "LICENSE",
+    ".github/CODEOWNERS",
+    ".github/dependabot.yml",
+    ".github/pull_request_template.md",
+    ".github/ISSUE_TEMPLATE/**",
+    ".github/workflows/ci.yml",
+    ".github/workflows/issue-management.yml",
+    "scripts/check*",
+    "scripts/dev.*",
+    "scripts/generate.*",
+    "scripts/issue-commands*",
+    "scripts/live-test-*",
+    "scripts/public-files-policy.json",
+    "scripts/release.test.mjs",
+    "scripts/repository-policy.test.mjs",
+    "tests/e2e/**",
+    "tests/integration/**",
+    "internal/wiretrace/**",
+    "frontend/src/gallery/**",
+    "frontend/gallery.html",
+    "frontend/scripts/**",
+    "frontend/eslint.config.*",
+    "frontend/vitest.config.*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.test.mjs",
+    "**/*_test.go",
+    "assets/avatars/build.mjs",
+    "package.json",
+    "package-lock.json"
+  ]
+}

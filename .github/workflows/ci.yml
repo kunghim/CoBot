@@ -34,7 +34,7 @@ jobs:
       - name: Check pull request routing
         run: node scripts/check-pr-route.mjs
       - name: Test repository policy enforcement
-        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/check-docs.test.mjs
+        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs
       - name: Check docs and UI message keys
         run: node scripts/check-docs.mjs
       - name: Test release input and artifact validation
