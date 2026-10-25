@@ -10,6 +10,7 @@ interface WailsRuntime {
   WindowMinimise(): void;
   WindowToggleMaximise(): void;
   WindowIsMaximised(): Promise<boolean>;
+  WindowIsFullscreen(): Promise<boolean>;
   Quit(): void;
 }
 
@@ -26,6 +27,7 @@ export type TitleBarPlatform = 'windows' | 'mac';
 export interface DesktopWindow {
   platform: TitleBarPlatform;
   maximized: boolean;
+  fullscreen: boolean;
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
@@ -35,6 +37,7 @@ export interface DesktopWindow {
 export function useDesktopWindow(): DesktopWindow | null {
   const [platform, setPlatform] = useState<TitleBarPlatform | null>(null);
   const [maximized, setMaximized] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
     const rt = runtime();
     if (!rt) return;
@@ -45,7 +48,17 @@ export function useDesktopWindow(): DesktopWindow | null {
       else if (env.platform === 'darwin') setPlatform('mac');
     });
     // Maximizing resizes the page; that is when to read the state again.
-    const refresh = () => void rt.WindowIsMaximised().then((value) => !cancelled && setMaximized(value));
+    // An injected runtime that predates WindowIsFullscreen must not also
+    // freeze the maximize state.
+    const readFullscreen = () => (typeof rt.WindowIsFullscreen === 'function' ? rt.WindowIsFullscreen() : Promise.resolve(false));
+    const refresh = () => void Promise.all([rt.WindowIsMaximised(), readFullscreen()])
+      .then(([maximized, isFullscreen]) => {
+        if (!cancelled) {
+          setMaximized(maximized);
+          setFullscreen(isFullscreen);
+        }
+      })
+      .catch(() => undefined);
     refresh();
     window.addEventListener('resize', refresh);
     return () => {
@@ -58,6 +71,7 @@ export function useDesktopWindow(): DesktopWindow | null {
   return {
     platform,
     maximized,
+    fullscreen,
     minimize: () => rt.WindowMinimise(),
     toggleMaximize: () => rt.WindowToggleMaximise(),
     close: () => rt.Quit(),

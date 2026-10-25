@@ -36,6 +36,20 @@ test('workspace opens with tabs, the info card closes on Escape', async ({ page 
   await expect(workspace.getByRole('tab', { name: '新建标签页' })).toHaveAttribute('aria-selected', 'true');
   await expect(create).toHaveCount(0);
 
+  // If the workspace squeezes the list out, the title bar follows the
+  // actual conversation edge. Expanding the list gives it room again.
+  await page.setViewportSize({ width: 900, height: 900 });
+  const toggle = page.getByTestId('app-mode-header').getByRole('button', { name: '展开团队列表', exact: true });
+  await expect(toggle).toBeVisible();
+  // The squeeze-out follows a resize listener; the geometry settles async.
+  await expect.poll(async () => Math.abs((await toggle.boundingBox())!.x - (await page.getByRole('main').boundingBox())!.x)).toBeLessThan(1);
+  await toggle.click();
+  await expect(page.getByRole('complementary', { name: '团队列表', exact: true })).toBeVisible();
+  await expect(workspace).toHaveCount(0);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await create.click();
+  await expect(workspace).toBeVisible();
+
   // The info card floats over the conversation; Escape closes it and the
   // focus returns to the button that opened it.
   const info = page.getByRole('button', { name: '展开信息面板' });

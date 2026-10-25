@@ -8,7 +8,6 @@ import ChatLayout from '../features/chats/ChatLayout';
 import ChatRoute from '../features/chats/ChatPage';
 import { savedMode, lastChatPath, writeLocal } from './mode';
 import ModeSwitch from './ModeSwitch';
-import { modeHeaderClass } from './ModeSelector';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
@@ -61,14 +60,15 @@ function TitleBar({ desktop }: { desktop: DesktopWindow | null }) {
   const { t } = useTranslation();
   // The toggle belongs to the workspace; Settings has no side panels.
   const path = useLocation().pathname;
-  const { listOpen } = useShell();
+  const { listVisible } = useShell();
   const workspace = !path.startsWith('/settings');
   if (!desktop && !workspace) return null;
   return (
     <AppTitleBar
       platform={desktop?.platform ?? 'windows'}
+      fullscreen={desktop?.fullscreen}
       flushLeft
-      left={workspace ? <div className={modeHeaderClass(listOpen)}><AppModeHeader brandLabel={t('app.title')} compact={!!desktop} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader></div> : undefined}
+      left={workspace ? <AppModeHeader listVisible={listVisible} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader> : undefined}
       windowControls={desktop ? {
         minimizeLabel: t('window.minimize'),
         maximizeLabel: t('window.maximize'),

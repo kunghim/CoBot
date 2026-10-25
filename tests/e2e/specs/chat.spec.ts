@@ -73,7 +73,7 @@ test('chat layout stays usable in dark and narrow windows', async ({ page }) => 
   await expect(page.getByRole('radio', { name: '团队', exact: true })).toBeVisible();
 });
 
-test('chat has one greeting, a compact four-slot title bar and safe keyboard input', async ({ page }) => {
+test('chat has one greeting, controls aligned with the sidebar and conversation and safe keyboard input', async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 24, 8, 30));
   await page.goto('/chat/new');
   const welcome = page.getByTestId('chat-welcome');
@@ -81,12 +81,13 @@ test('chat has one greeting, a compact four-slot title bar and safe keyboard inp
   await expect(page.getByRole('heading')).toHaveCount(1);
   await expect(page.getByTestId('chat-composer')).toBeVisible();
   const header = page.getByTestId('app-mode-header');
-  const brand = await header.getByText('CoBot', { exact: true }).boundingBox();
+  await expect(header.getByText('CoBot', { exact: true })).toHaveCount(0);
+  await expect(header.locator('img')).toHaveCount(0);
   const mode = await header.getByRole('radio', { name: '团队', exact: true }).boundingBox();
-  expect(mode!.x).toBeGreaterThan(brand!.x + brand!.width);
-  const logo = await header.getByTestId('chrome-logo').boundingBox();
+  const logo = await page.getByTestId('rail-logo').boundingBox();
+  const home = await page.getByRole('navigation', { name: 'CoBot', exact: true }).getByRole('button', { name: '新建聊天', exact: true }).boundingBox();
+  expect(logo!.y + logo!.height).toBeLessThanOrEqual(home!.y);
   const toggle = await header.getByRole('button', { name: '收起聊天记录', exact: true }).boundingBox();
-  expect(brand!.x).toBeGreaterThanOrEqual(logo!.x + logo!.width);
   expect(toggle!.x).toBeGreaterThanOrEqual(mode!.x + mode!.width);
   expect((await page.getByTestId('app-title-bar').boundingBox())!.height).toBe(40);
   expect((await page.getByRole('main').boundingBox())!.y).toBe(48);
@@ -107,7 +108,6 @@ test('chat has one greeting, a compact four-slot title bar and safe keyboard inp
   const toggleX = toggle!.x;
   await header.getByRole('button', { name: '收起聊天记录', exact: true }).click();
   expect((await header.getByRole('button', { name: '展开聊天记录', exact: true }).boundingBox())!.x).toBeLessThan(toggleX);
-  await expect(header.getByTestId('chrome-wordmark')).toBeHidden();
   await expect(header.getByRole('radiogroup', { name: '使用模式' })).toBeHidden();
   expect((await header.getByRole('button', { name: '展开聊天记录', exact: true }).boundingBox())!.height).toBe(36);
   await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'chat-collapsed.png'), animations: 'disabled' });
@@ -141,6 +141,7 @@ test('desktop uses a single compact title bar and protects native controls from 
     target.runtime = {
       Environment: async () => ({ platform: 'windows' }),
       WindowIsMaximised: async () => false,
+      WindowIsFullscreen: async () => false,
       WindowMinimise: () => undefined,
       WindowToggleMaximise: () => { target.chromeMaximizeCalls += 1; },
       Quit: () => undefined,
@@ -213,3 +214,83 @@ test('a remembered chat that is gone opens a new chat instead of an error', asyn
   await expect(page.getByTestId('chat-welcome')).toBeVisible();
   await expect(page.getByText('资源不存在')).toHaveCount(0);
 });
+
+for (const platform of ['web', 'windows', 'mac'] as const) {
+  test(`${platform} keeps navigation controls on their column edges at every width`, async ({ page }) => {
+    if (platform !== 'web') {
+      await page.addInitScript((platform) => {
+        const target = window as unknown as { go: object; runtime: object; chromeFullscreen: boolean };
+        target.go = {};
+        target.chromeFullscreen = false;
+        target.runtime = {
+          Environment: async () => ({ platform: platform === 'mac' ? 'darwin' : 'windows' }),
+          WindowIsMaximised: async () => false,
+          WindowIsFullscreen: async () => target.chromeFullscreen,
+          WindowMinimise: () => undefined,
+          WindowToggleMaximise: () => undefined,
+          Quit: () => undefined,
+        };
+      }, platform);
+    }
+    await page.goto('/chat/new');
+    const header = page.getByTestId('app-mode-header');
+    const sidebar = page.getByRole('complementary', { name: '聊天记录', exact: true });
+    const toggle = header.getByRole('button', { name: /聊天记录/ });
+    const modes = header.getByRole('radiogroup', { name: '使用模式' });
+    let windowedToggleX = 0;
+    for (const fullscreen of platform === 'mac' ? [false, true] : [false]) {
+      await page.evaluate((fullscreen) => {
+        (window as unknown as { chromeFullscreen: boolean }).chromeFullscreen = fullscreen;
+        window.dispatchEvent(new Event('resize'));
+      }, fullscreen);
+      await expect(page.getByTestId('native-titlebar-inset')).toHaveCount(platform === 'mac' && !fullscreen ? 1 : 0);
+      if (platform === 'mac' && !fullscreen) {
+        // The reservation is its own full-width row above the controls row;
+        // the conversation sheet starts below both.
+        const inset = (await page.getByTestId('native-titlebar-inset').boundingBox())!;
+        const bar = (await page.getByTestId('app-title-bar').boundingBox())!;
+        const main = (await page.getByRole('main').boundingBox())!;
+        expect(inset.y).toBe(0);
+        expect(inset.height).toBe(40);
+        expect(bar.y).toBe(40);
+        expect(main.y).toBe(88);
+      }
+      for (const width of [320, 390, 640, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const open of [true, false]) {
+          await expect(toggle).toHaveAttribute('aria-expanded', String(open));
+          await expect.poll(async () => {
+            const control = (await toggle.boundingBox())!;
+            const canvas = (await page.getByRole('main').boundingBox())!;
+            return Math.abs(control.x - canvas.x);
+          }).toBeLessThan(1);
+          if (open) {
+            const side = (await sidebar.boundingBox())!;
+            const mode = (await modes.boundingBox())!;
+            expect(mode.x + mode.width).toBeCloseTo(side.x + side.width - 8, 0);
+            expect(mode.y + mode.height).toBeLessThanOrEqual(side.y);
+            // Toggling the reservation never shifts controls sideways.
+            if (platform === 'mac' && width === 1024) {
+              const x = (await toggle.boundingBox())!.x;
+              if (!fullscreen) windowedToggleX = x;
+              else expect(windowedToggleX).toBe(x);
+            }
+          } else {
+            await expect(sidebar).toHaveCount(0);
+            await expect(modes).toHaveCount(0);
+          }
+          expect(await page.locator('body').evaluate((element) => element.scrollWidth <= window.innerWidth)).toBe(true);
+          if (open && [390, 1440].includes(width)) {
+            await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, `chrome-${platform}-${fullscreen ? 'full' : 'window'}-${width}.png`), animations: 'disabled' });
+          }
+          await toggle.click();
+        }
+      }
+    }
+    const logo = (await page.getByTestId('rail-logo').boundingBox())!;
+    const home = (await page.getByRole('navigation', { name: 'CoBot', exact: true }).getByRole('button', { name: '新建聊天', exact: true }).boundingBox())!;
+    expect(logo.y + logo.height).toBeLessThanOrEqual(home.y);
+    await expect(header.locator('img')).toHaveCount(0);
+    await expect(header.getByText('CoBot', { exact: true })).toHaveCount(0);
+  });
+}

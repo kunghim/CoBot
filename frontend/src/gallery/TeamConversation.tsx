@@ -1,5 +1,5 @@
 import { SidebarToggle } from '../app/SidebarToggle';
-import { ModeSelector, modeHeaderClass } from '../app/ModeSelector';
+import { ModeSelector } from '../app/ModeSelector';
 // Gallery: members and conversations — CoBot's own components.
 import { useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
@@ -7,7 +7,7 @@ import dangoSeries from '../../../assets/avatars/dango/dist/dango.json';
 import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
-import { AppModeHeader, AppTitleBar, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
+import { AppModeHeader, AppTitleBar, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const dango: AvatarSeries = { id: 'dango', name: dangoSeries.name, kind: 'composed', version: dangoSeries.version, data: dangoSeries as unknown as AvatarSeries['data'] };
@@ -283,7 +283,7 @@ export default function TeamConversation() {
         id="title-bar"
         name="AppTitleBar 桌面标题栏"
         file="components/ui/Layout.tsx"
-        use="桌面客户端隐藏系统标题栏，由 CoBot 自己画：左侧四槽为 Logo、CoBot 字标、模式切换、二级菜单开关；空白区域可以拖动窗口、双击最大化，颜色跟着 CoBot 的主题和明暗。Windows 上右侧自己画最小化、最大化、关闭；macOS 左侧保留系统的红绿灯位置。"
+        use="桌面客户端隐藏系统标题栏，由 CoBot 自己画：Logo 在主导航的主页按钮上方，不显示字标；模式切换固定在二级菜单右上角，开关固定在会话区左上角；空白区域可以拖动窗口、双击最大化，颜色跟着 CoBot 的主题和明暗。Windows 上右侧自己画最小化、最大化、关闭；macOS 窗口态顶部单独避让系统红绿灯，全屏取消避让；不横向移动业务控件。"
         avoid="网页复用紧凑栏但不显示原生窗口按钮，不另加品牌大顶栏。"
         a11y="窗口按钮都有文字标签；关闭按钮悬停变红，和系统一致。"
       >
@@ -293,12 +293,13 @@ export default function TeamConversation() {
               platform="windows"
               title="CoBot — 待办应用 · 项目经理"
               flushLeft
-              left={<div className={modeHeaderClass(left)}><AppModeHeader brandLabel="CoBot" compact toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader></div>}
+              left={<AppModeHeader listVisible={left} toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader>}
               right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
               windowControls={{ minimizeLabel: '最小化', maximizeLabel: '最大化', restoreLabel: '还原', closeLabel: '关闭', maximized, onMinimize: () => undefined, onToggleMaximize: () => setMaximized(!maximized), onClose: () => undefined }}
             />
             <div className="flex h-24 text-xs text-neutral-500">
-              {left && <div className="w-36 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>}
+              <div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-2"><BrandMark size={26} /><Icons.home size={18} /></div>
+              {left && <div className="w-[min(16rem,40vw)] shrink-0 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>}
               <div className="flex-1 p-3">会话</div>
               {right && <div className="w-36 border-l border-neutral-200 p-3 dark:border-neutral-800">工作面板</div>}
             </div>
@@ -310,7 +311,7 @@ export default function TeamConversation() {
               platform="mac"
               title="CoBot — 待办应用 · 项目经理"
               flushLeft
-              left={<div className={modeHeaderClass(left)}><AppModeHeader brandLabel="CoBot" compact toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader></div>}
+              left={<AppModeHeader listVisible={left} toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader>}
               right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
             />
           </div>
