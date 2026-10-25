@@ -218,7 +218,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           label={t('workspace.infoPanel')}
           closeLabel={t('common.close')}
           onClose={closeCard}
-          className="absolute bottom-3 right-3 top-3 z-10"
+          // Grown from the top by its content; the bottom margin keeps the
+          // card clear of the conversation's own bottom edge.
+          className="absolute right-3 top-3 max-h-[calc(100%-1.5rem)] z-10"
         >
           <WorkPanel />
         </FloatingCard>

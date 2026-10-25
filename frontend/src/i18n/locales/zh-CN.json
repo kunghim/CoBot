@@ -546,6 +546,7 @@
   "panel": {
     "noSelection": "先在左侧选择一个成员",
     "tablist": "工作面板页面",
+    "end": "已经到底了",
     "tabs": {
       "tasks": "任务",
       "approvals": "审批",

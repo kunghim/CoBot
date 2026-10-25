@@ -209,7 +209,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，打开时内容为它让位。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，按内容决定高度、从打开处向下展开，最高到会话区底缘，超出后内部滚动；关闭按钮在内容第一行的行尾。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
         <Demo surface="sunken">
           <div className="flex h-64 w-full">
             <div className="min-w-0 flex-1">

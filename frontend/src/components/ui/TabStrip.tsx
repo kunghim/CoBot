@@ -108,8 +108,8 @@ export function TabStrip({
         })}
       </div>
       {onNew && newTabLabel && <IconButton size="sm" icon={Icons.add} label={newTabLabel} onClick={onNew} />}
-      // The strip only collapses; expanding happens at the workspace's
-      // other edge, so the toggle always shows the collapsed state's icon.
+      {/* The strip only collapses; expanding happens at the workspace's
+          other edge, so the toggle always shows the collapsed state's icon. */}
       {onCollapse && collapseLabel && <PanelToggle side="right" open onToggle={onCollapse} openLabel={collapseLabel} closeLabel={collapseLabel} />}
     </div>
   );

@@ -39,8 +39,9 @@ export default function WorkPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* The conversation header already names the member and the team, so
-          the panel opens straight on its tabs. */}
-      <div className="flex min-h-14 items-center gap-2 px-3 py-2">
+          the panel opens straight on its tabs. The trailing padding keeps
+          the tabs clear of the card's close button on the same line. */}
+      <div className="flex items-center gap-2 py-2 pl-3 pr-12">
         <div className="min-w-0 flex-1">
           {context ? (
             <Tabs variant="pill" idPrefix="workpanel" label={t('panel.tablist')} value={tab} onChange={setTab} tabs={TABS.map((id) => ({ id, label: t(`panel.tabs.${id}`) }))} />
@@ -63,6 +64,7 @@ export default function WorkPanel() {
         {context && tab === 'activity' && <ActivityList key={context.bot.id} teamId={context.team.id} viewBotId={context.bot.id} bots={context.item.bots} />}
         {context && tab === 'memory' && <MemoryList key={context.bot.id} botId={context.bot.id} />}
         </fieldset>
+        {context && <p className="py-2 text-center text-2xs text-neutral-400 dark:text-neutral-600">{t('panel.end')}</p>}
       </TabPanel>
     </div>
   );

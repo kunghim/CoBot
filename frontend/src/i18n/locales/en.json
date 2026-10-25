@@ -548,6 +548,7 @@
   "panel": {
     "noSelection": "Pick a member on the left first",
     "tablist": "Work panel pages",
+    "end": "That's everything",
     "tabs": {
       "tasks": "Tasks",
       "approvals": "Approvals",
