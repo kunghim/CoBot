@@ -1,6 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { request as pwRequest } from '@playwright/test';
@@ -14,6 +14,8 @@ const teamDir = join(root, '.tmp', 'test-runs', runId, 'team');
 const binDir = join(root, '.tmp', 'bin');
 const isWindows = process.platform === 'win32';
 const exe = (name: string) => join(binDir, isWindows ? `${name}.exe` : name);
+const desktopRoot = join(root, '.tmp', 'test-runs', runId, isWindows ? 'ChatGPT-package' : 'ChatGPT.app');
+const fakeEngine = isWindows ? join(desktopRoot, 'app', 'resources', 'codex.exe') : join(desktopRoot, 'Contents', 'Resources', 'codex-cli', 'CodexCLI.app', 'Contents', 'MacOS', 'codex');
 const port = process.env.COBOT_E2E_PORT ?? '18777';
 const baseURL = `http://127.0.0.1:${port}`;
 
@@ -25,6 +27,14 @@ function build(): void {
   execFileSync('npm', ['run', 'build', '--prefix', 'frontend'], { cwd: root, stdio: 'inherit' });
   execFileSync('go', ['build', '-o', exe('cobot'), './cmd/cobot'], { cwd: root, stdio: 'inherit' });
   execFileSync('go', ['build', '-o', exe('fake-codex'), './tests/e2e/host'], { cwd: root, stdio: 'inherit' });
+  // Exercise the same desktop-only discovery boundary with a synthetic app.
+  mkdirSync(resolve(fakeEngine, '..'), { recursive: true });
+  copyFileSync(exe('fake-codex'), fakeEngine);
+  if (isWindows) {
+    writeFileSync(join(desktopRoot, 'AppxManifest.xml'), '<Package><Identity Name="OpenAI.Codex" Publisher="CN=OpenAI" /></Package>');
+  } else {
+    writeFileSync(join(desktopRoot, 'Contents', 'Info.plist'), '<plist><dict><key>CFBundleIdentifier</key><string>com.openai.codex</string></dict></plist>');
+  }
 }
 
 async function waitJSON(url: string, attempts = 100): Promise<any> {
@@ -116,7 +126,7 @@ export default async function globalSetup(): Promise<void> {
   const settings = (await (await api.get('/api/v1/settings')).json()).data;
   const patch = await api.patch('/api/v1/settings', {
     headers: { 'X-CSRF-Token': csrf },
-    data: { requestId: `e2e-engine-${Date.now()}`, expectedRevision: settings.revision, patch: { enginePath: exe('fake-codex') } },
+    data: { requestId: `e2e-engine-${Date.now()}`, expectedRevision: settings.revision, patch: { enginePath: fakeEngine } },
   });
   if (!patch.ok()) throw new Error(`enginePath patch failed: ${patch.status()} ${await patch.text()}`);
   // Startup may cache "not_configured" on clean machines without Codex.
@@ -146,7 +156,7 @@ export default async function globalSetup(): Promise<void> {
   process.env.COBOT_E2E_ADMIN_SECRET = adminSecret;
   process.env.COBOT_E2E_ROOT = join(root, '.tmp', 'test-runs', runId);
   process.env.COBOT_E2E_TEAM_DIR = teamDir;
-  process.env.COBOT_E2E_FAKE_ENGINE = exe('fake-codex');
+  process.env.COBOT_E2E_FAKE_ENGINE = fakeEngine;
   process.env.COBOT_E2E_CORE_PID = String(child.pid ?? '');
   // Keep a handle for teardown through the environment (same process tree).
   (globalThis as any).__cobotE2EChild = child;

@@ -147,7 +147,7 @@ not yet.
 | [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
 | [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | Copy **CoBot.app** to Applications, eject the image, then open the installed app (Codex CLI 0.146.0 or newer) |
 
-The two Windows downloads contain the same application files. On Windows you need **Windows 10/11 x64**, an existing
+The published beta.2 downloads above predate desktop-only engine discovery. The two Windows downloads contain the same application files. For those downloads, on Windows you need **Windows 10/11 x64**, an existing
 **WebView2 Runtime**, and the official **Codex CLI on `PATH`**, with an eligible
 account and network access to Codex services. Codex is not bundled; a copy that only ships inside
 the Codex desktop app is not found. Members can run on the official ChatGPT account or on API-key
@@ -170,11 +170,12 @@ Windows x64 and Apple Silicon downloads; a macOS desktop package can also be bui
 
 **Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
 (minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
-For agent work, install the [Codex CLI](https://github.com/openai/codex) on `PATH`
-(the latest release is recommended), with an account that can use Codex and
-network access to its service. Go and Node are build tools; the resulting CoBot
-executable still needs Codex for agent work. Local-first does not mean offline
-model execution.
+For agent work, install the [ChatGPT desktop app](https://learn.chatgpt.com/docs/app).
+Current source builds use only its bundled Codex engine, with a separate CoBot login
+and private environment; standalone CLI installations are not used. Automatic
+discovery supports macOS apps and Windows Store packages; Linux desktop layouts
+are not yet supported. Go and Node are build tools. Local-first does not mean
+offline model execution.
 
 #### Windows (PowerShell)
 
@@ -216,8 +217,8 @@ rejects this build; browser-download first launch and the manual approval flow
 have not been accepted.
 
 The macOS Codex 0.146.0 smoke test uses an isolated data root and real model turns;
-it is not the full Windows acceptance suite. With a minimal GUI `PATH`, CoBot also
-checks common standalone, Cargo and Homebrew installation directories. Codex inherits
+it is not the full Windows acceptance suite. Current source builds discover the
+ChatGPT desktop app independently of the terminal `PATH`. Codex inherits
 static macOS system proxies when no proxy environment variable was supplied; this
 does not change system settings or evaluate automatic proxy (PAC) scripts.
 
