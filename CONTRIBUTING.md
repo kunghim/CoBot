@@ -61,7 +61,7 @@ Keep one logical change per PR. Use Draft while unfinished. The PR template asks
 
 | Section | What to provide |
 | --- | --- |
-| Problem and related issue | The problem, trigger, and `Refs #123` if an issue exists |
+| Problem and related issue | The problem, trigger, and `Closes #123` when the PR resolves an issue (`Refs #123` for a partial fix); reply on the issue with the plan and status before opening the PR |
 | Resulting behavior | What changes for users or developers, before and after |
 | Validation | Commands actually run, results and limits; separate automated, real Codex and native-platform checks |
 | Compatibility and data impact | API/CLI/configuration, database, upgrade and rollback effects; write None if unaffected |
@@ -78,6 +78,7 @@ in English.
 在自己的 fork 中从上游 `dev` 建短期分支，PR 以 `dev` 为目标（依赖更新也是）。流程为
 `主题分支 → dev → main → 发布`，只有本仓库的 `dev` 能晋级 `main`，CI 会拒绝其他路线。
 每个 PR 聚焦一项改动，未完成用 Draft。按模板写清问题与关联、改动后的行为、实际验证、兼容与数据影响；
+提解决 Issue 的 PR 前先在该 Issue 回复处理方案和完成状态，并用 `Closes` 关联（部分处理用 `Refs`）；
 界面改动附脱敏截图并提供中英文文案；改锁文件、生成契约或迁移时说明原因。
 只有升级后用户或调用方必须调整用法时才标 `breaking-change`，并写明迁移方法。
 CI 通过、重要意见解决后由维护者决定是否合并；合入 `dev` 不发布，晋级 `main` 后触发检查、打包与自动发布。提交信息用英文。
