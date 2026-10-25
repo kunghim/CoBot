@@ -62,7 +62,7 @@ export default function ApprovalCardStack({
       initiator={
         <>
           {requester && <Avatar bot={requester} size="sm" />}
-          {requesterName}
+          <span className="min-w-0 truncate">{requesterName}</span>
         </>
       }
       position={{ index: current + 1, total }}

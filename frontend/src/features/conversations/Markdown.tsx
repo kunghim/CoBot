@@ -70,7 +70,7 @@ function WebLink({ href, teamId, children }: { href: string; teamId?: string; ch
       onSuccess: ({ tab }) => {
         workspace.openTab({ id: `browser:${tab.id}`, kind: 'browser', title: tab.title || host, ref: tab.id }, true);
       },
-      onError: (error) => toast.show({ tone: 'warning', title: t('conversation.webLink.tabLimit'), description: apiErrorMessage(t, error) }),
+      onError: (error) => toast.show({ tone: 'warning', title: t('conversation.webLink.openFailed'), description: apiErrorMessage(t, error) }),
     });
   };
   return (

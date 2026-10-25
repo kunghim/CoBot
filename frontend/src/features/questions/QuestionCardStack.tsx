@@ -31,15 +31,15 @@ export default function QuestionCardStack({ teamId, viewBotId }: { teamId: strin
   const current = clampPagerIndex(index, visible.length);
   const question = visible[current];
   if (questions.isError && !questions.data) return <Alert tone="danger">{t('questions.loadFailed')}</Alert>;
+  const reopen = dismissed.size > 0 && (
+    <div className="flex justify-end">
+      <Button size="sm" shape="pill" variant="secondary" onClick={() => setDismissed(new Set())}>
+        {t('questions.dismissed', { count: dismissed.size })}
+      </Button>
+    </div>
+  );
   if (!question) {
-    if (dismissed.size === 0) return null;
-    return (
-      <div className="flex justify-end">
-        <Button size="sm" shape="pill" variant="secondary" onClick={() => setDismissed(new Set())}>
-          {t('questions.dismissed', { count: dismissed.size })}
-        </Button>
-      </div>
-    );
+    return reopen ?? null;
   }
   const total = visible.length + (questions.hasNextPage ? 1 : 0);
 
@@ -53,16 +53,23 @@ export default function QuestionCardStack({ teamId, viewBotId }: { teamId: strin
     previousLabel: t('questions.prev'),
     nextLabel: t('questions.next'),
   };
-  // A card starts from nothing when the question changes.
+  // A card starts from nothing when the question changes. A dismissed
+  // acceptance keeps its reopen entry beside whatever else still waits.
   return question.kind === 'acceptance' || question.kind === 'confirm' ? (
-    <DecisionCard
-      key={question.id}
-      question={question}
-      frame={frame}
-      onDismiss={question.kind === 'acceptance' ? () => setDismissed((prev) => new Set(prev).add(question.id)) : undefined}
-    />
+    <>
+      <DecisionCard
+        key={question.id}
+        question={question}
+        frame={frame}
+        onDismiss={question.kind === 'acceptance' ? () => setDismissed((prev) => new Set(prev).add(question.id)) : undefined}
+      />
+      {reopen}
+    </>
   ) : (
-    <AskCard key={question.id} question={question} frame={frame} />
+    <>
+      <AskCard key={question.id} question={question} frame={frame} />
+      {reopen}
+    </>
   );
 }
 
@@ -82,7 +89,7 @@ function Asker({ question }: { question: Question }) {
   return (
     <>
       <Avatar bot={asker} size="sm" />
-      {asker.name}
+      <span className="min-w-0 truncate">{asker.name}</span>
     </>
   );
 }

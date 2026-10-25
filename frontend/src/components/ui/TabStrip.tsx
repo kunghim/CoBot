@@ -109,7 +109,7 @@ export function TabStrip({
         {/* The new tab follows the last one, the way a browser does; the
             scrollable list keeps it reachable when the tabs overflow. */}
         {onNew && newTabLabel && (
-          <span className="sticky right-0 shrink-0 bg-canvas">
+          <span className="sticky right-0 shrink-0 bg-side">
             <IconButton size="sm" icon={Icons.add} label={newTabLabel} onClick={onNew} />
           </span>
         )}

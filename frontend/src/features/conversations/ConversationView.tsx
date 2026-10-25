@@ -360,9 +360,9 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
               }
             />
           </div>
-          <div ref={cardsRef} className="absolute inset-x-0 bottom-0 z-20 space-y-2">
-            {/* The mist the card rises out of; clicks pass through. */}
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-card to-transparent" />
+          {/* The mist the card rises out of; clicks pass through, and with
+              no card waiting there is no mist to veil the composer. */}
+          <div ref={cardsRef} className="empty:before:hidden absolute inset-x-0 bottom-0 z-20 space-y-2 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-10 before:bg-gradient-to-t before:from-card before:to-transparent before:content-['']">
             <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
             <QuestionCardStack key={`q-${bot.id}`} teamId={team.id} viewBotId={bot.id} />
           </div>

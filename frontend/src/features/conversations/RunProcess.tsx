@@ -235,7 +235,7 @@ function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep;
       {open && body && <div className="mt-1 pl-[18px]">{body}</div>}
       {/* An exhausted account or a spent balance is what switching models
           answers, so the failure row carries the entry to its picker. */}
-      {step.status === 'failed' && step.kind === 'notice' && (d.code === 'usageLimitExceeded' || d.failureCode === 'quota') && (
+      {botId !== '' && step.status === 'failed' && step.kind === 'notice' && (d.code === 'usageLimitExceeded' || d.failureCode === 'quota') && (
         <button
           type="button"
           onClick={() => openModelPicker(botId)}

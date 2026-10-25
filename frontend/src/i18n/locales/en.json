@@ -399,7 +399,7 @@
       "unknown": "Needs verification"
     },
     "webLink": {
-      "tabLimit": "The built-in browser is out of tabs"
+      "openFailed": "Failed to open the page"
     }
   },
   "approvals": {

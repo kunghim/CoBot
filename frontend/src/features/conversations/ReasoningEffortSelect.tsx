@@ -51,7 +51,7 @@ export function effortChoices(provider: Provider | undefined, model: string, eng
 }
 
 export default function ReasoningEffortSelect({ team, bot, bots, disabled }: { team: Team; bot: Bot; bots?: Bot[]; disabled?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const settings = useSettings(true);
   const providers = useProviders();
@@ -164,18 +164,21 @@ export default function ReasoningEffortSelect({ team, bot, bots, disabled }: { t
   const switchAll = async () => {
     if (!batch) return;
     setBatchError('');
-    const failures: string[] = [];
+    const failed: Bot[] = [];
     await Promise.all(
       batch.targets.map(async (member) => {
         try {
           await setModel.mutateAsync({ botId: member.id, providerId: batch.providerId, model: batch.model, expectedRevision: member.revision });
         } catch {
-          failures.push(member.name);
+          failed.push(member);
         }
       }),
     );
-    if (failures.length > 0) {
-      setBatchError(t('effort.modelSwitchedAllFailed', { names: failures.join('、') }));
+    if (failed.length > 0) {
+      // A member that switched is done; a retry offers only the rest, so
+      // switched members are not re-sent against revisions they outgrew.
+      setBatch({ ...batch, targets: failed });
+      setBatchError(t('effort.modelSwitchedAllFailed', { names: new Intl.ListFormat(i18n.language, { type: 'unit' }).format(failed.map((member) => member.name)) }));
       return;
     }
     const count = batch.targets.length;

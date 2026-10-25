@@ -123,6 +123,7 @@ function TeamRow({
   // A team whose folder is gone stays visible, greyed and read-only.
   const missing = team.status === 'directory_missing';
   const Chevron = expanded ? Icons.expand : Icons.next;
+  const namesById = new Map(bots.map((member) => [member.id, member.name]));
 
   return (
     <li className={missing ? 'opacity-60' : undefined}>
@@ -152,7 +153,7 @@ function TeamRow({
         <ul className="mt-1 space-y-px">
           {orderBotsLeaderFirst(bots).map((bot) => (
             <li key={bot.id}>
-              <BotRow bot={bot} namesById={new Map(bots.map((member) => [member.id, member.name]))} directory={bot.isLeader ? team.directory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
+              <BotRow bot={bot} namesById={namesById} directory={bot.isLeader ? team.directory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
             </li>
           ))}
         </ul>

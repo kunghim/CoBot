@@ -56,6 +56,11 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
   useEffect(() => {
     if (blank) addressInput.current?.focus();
   }, [blank]);
+  // A size the page reports — ours committed, or another member's — is
+  // what the inputs show again.
+  useEffect(() => {
+    setSizing(null);
+  }, [frame.width, frame.height]);
 
   // Inputs go out one at a time and in order; a mouse move waiting behind
   // others is dropped, since the next one supersedes it.
@@ -63,7 +68,10 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
   const pendingMoves = useRef(0);
   const send = useCallback(
     (input: BrowserInput) => {
-      if (!panelTabId || blank) return;
+      if (!panelTabId) return;
+      // A blank page takes no picture and no pointer, but the address the
+      // user just typed is exactly what moves it off blank.
+      if (blank && input.kind !== 'nav') return;
       const move = input.kind === 'mouse' && input.action === 'move';
       if (move) {
         if (pendingMoves.current > 0) return;
@@ -291,7 +299,7 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
         <IconButton label={t('browser.openExternal')} icon={Icons.openExternal} size="sm" disabled={blank} onClick={() => page?.url && openExternal(page.url)} />
       </div>
       <div className="flex items-center gap-2 px-0.5" title={t('workspace.browser.viewportSizeTitle')}>
-        {busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-label={t('workspace.browser.memberBusy')} />}
+        {busy && <span role="img" className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-label={t('workspace.browser.memberBusy')} />}
         <form
           className="flex shrink-0 items-center gap-1 font-mono text-2xs tabular-nums text-neutral-500 dark:text-neutral-400"
           onSubmit={(e) => {
@@ -301,17 +309,21 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
         >
           <input
             aria-label={t('workspace.browser.viewportWidth')}
+            inputMode="numeric"
             value={sizing?.width ?? String(natural.width)}
             onChange={(e) => setSizing((current) => ({ width: e.target.value, height: current?.height ?? String(natural.height) }))}
             onBlur={commitSize}
+            onKeyDown={(e) => e.key === 'Enter' && commitSize()}
             className="w-14 rounded-md border border-transparent bg-neutral-900/[0.04] px-1.5 py-0.5 text-right outline-none transition-colors focus:border-signal-500 dark:bg-white/[0.06]"
           />
           <span aria-hidden>×</span>
           <input
             aria-label={t('workspace.browser.viewportHeight')}
+            inputMode="numeric"
             value={sizing?.height ?? String(natural.height)}
             onChange={(e) => setSizing((current) => ({ width: current?.width ?? String(natural.width), height: e.target.value }))}
             onBlur={commitSize}
+            onKeyDown={(e) => e.key === 'Enter' && commitSize()}
             className="w-14 rounded-md border border-transparent bg-neutral-900/[0.04] px-1.5 py-0.5 text-right outline-none transition-colors focus:border-signal-500 dark:bg-white/[0.06]"
           />
         </form>
