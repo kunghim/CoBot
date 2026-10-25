@@ -16,6 +16,8 @@ type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Setting
 const state = vi.hoisted(() => ({
   providers: [] as unknown[],
   providersPending: false,
+  enginePending: false,
+  modelsPending: false,
   engineModels: [] as unknown[],
   saveProvider: vi.fn(),
   toast: vi.fn(),
@@ -25,9 +27,9 @@ vi.mock('../../api/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/queries')>();
   return {
     ...actual,
-    useEngine: () => ({ data: { status: 'ready', loggedIn: true } }),
+    useEngine: () => ({ data: state.enginePending ? undefined : { status: 'ready', loggedIn: true }, isPending: state.enginePending }),
     useProviderPresets: () => ({ data: { presets: [] } }),
-    useEngineModels: () => ({ data: { models: state.engineModels } }),
+    useEngineModels: () => ({ data: state.modelsPending ? undefined : { models: state.engineModels }, isPending: state.modelsPending }),
     useProviders: () => ({ data: { providers: state.providers }, isPending: state.providersPending }),
     useSaveProvider: () => ({ mutate: state.saveProvider }),
   };
@@ -72,6 +74,8 @@ describe('the default model can come from any enabled provider', () => {
     save = vi.fn<Save>();
     state.providers = [official, gateway];
     state.providersPending = false;
+    state.enginePending = false;
+    state.modelsPending = false;
     state.engineModels = [engineModel];
     state.saveProvider.mockReset();
     state.toast.mockReset();
@@ -138,6 +142,25 @@ describe('the default model can come from any enabled provider', () => {
     state.providersPending = true;
     render();
     expect(host.querySelector('button[role="combobox"]')).toBeNull();
+  });
+
+  // The official account's models come from the engine, so the page does not
+  // know what is on offer, nor whether the account is signed in, until the
+  // engine has answered; saying there is nothing to choose before that is a
+  // wrong message that vanishes a moment later.
+  it('waits for the engine instead of saying there is nothing to choose', () => {
+    state.providers = [official];
+    state.enginePending = true;
+    render();
+    expect(host.textContent).not.toContain('还没有可选的模型');
+    expect(host.querySelector('button[role="combobox"]')).toBeNull();
+  });
+
+  it('waits for the engine models once the engine is ready', () => {
+    state.providers = [official];
+    state.modelsPending = true;
+    render();
+    expect(host.textContent).not.toContain('还没有可选的模型');
   });
 
   it('says what to do when no model is on offer', () => {

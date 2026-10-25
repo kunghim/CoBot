@@ -199,3 +199,17 @@ test('sidebar toggle clears its background immediately when moving away from the
     expect(moved.every((sample) => sample.background === 'rgba(0, 0, 0, 0)' && sample.backgroundAnimations === 0)).toBe(true);
   }
 });
+
+// The chat last opened is remembered by the page, and a window can come back
+// to a data root that never had it (the desktop shell keeps that memory when
+// the data root changes). It opens a new chat; it does not sit on "not found".
+test('a remembered chat that is gone opens a new chat instead of an error', async ({ page, context }) => {
+  await context.addInitScript(() => {
+    localStorage.setItem('cobot.mode', 'chat');
+    localStorage.setItem('cobot.chat.selected', '00000000-0000-4000-8000-000000000000');
+  });
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/chat\/new$/);
+  await expect(page.getByTestId('chat-welcome')).toBeVisible();
+  await expect(page.getByText('资源不存在')).toHaveCount(0);
+});
