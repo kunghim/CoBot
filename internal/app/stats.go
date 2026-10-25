@@ -163,8 +163,14 @@ func (a *App) BotStats(ctx context.Context, principal auth.Principal, botID stri
 		stats.Context.Used = snapshot.Last.InputTokens + snapshot.Last.OutputTokens
 		stats.Context.Window = snapshot.ContextWindow
 	}
-	accountRateLimits.mu.Lock()
-	stats.RateLimits = accountRateLimits.raw
-	accountRateLimits.mu.Unlock()
+	// The account's rate limits are the ChatGPT account's quota. A member
+	// resolved to another vendor's model — by its own choice, the default
+	// model, or the first enabled provider — spends none of it, so it is
+	// shown none.
+	if choice, err := a.MemberModel(ctx, "", botID); err == nil && choice.EngineProvider == officialEngineProvider {
+		accountRateLimits.mu.Lock()
+		stats.RateLimits = accountRateLimits.raw
+		accountRateLimits.mu.Unlock()
+	}
 	return stats, nil
 }
