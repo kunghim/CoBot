@@ -78,47 +78,61 @@ export interface WindowControls {
 }
 
 /**
- * The app's own title bar in the desktop shell, where the system bar is
- * hidden: the panel toggles sit at its two ends, the middle drags the
- * window, and it follows CoBot's theme instead of the system's. On macOS
- * the system traffic lights get their own row while windowed; on Windows the bar draws
- * minimize, maximize and close itself. The web app reuses the compact
- * strip without native controls, so its controls follow the content columns.
+ * The sidebar's top row: the search field and the mode capsule share it at
+ * the secondary menu's right end. `inset` clears the macOS windowed corner
+ * reservation so the row's controls never sit under the traffic lights.
+ * The row drags the window.
  */
-export function AppTitleBar({ platform, fullscreen = false, title, left, right, windowControls, flushLeft = false }: { platform: 'windows' | 'mac'; fullscreen?: boolean; title?: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls; flushLeft?: boolean }) {
+export function SidebarHead({ leading, children, inset = false }: { leading?: ReactNode; children?: ReactNode; inset?: boolean }) {
+  const drag = { ['--wails-draggable' as string]: 'drag' };
+  const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
+  return (
+    <div data-testid="app-mode-header" style={drag} className={cx('flex h-10 shrink-0 items-center bg-side', inset ? 'pl-8 pr-2' : 'px-2')}>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+        {leading}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The conversation column's own top row: the list toggle at its left edge
+ * (flush with the sheet below), an optional title, page actions at the
+ * right, and on Windows the window controls the bar used to carry. The row
+ * drags the window; controls opt out.
+ */
+export function ConversationHead({ title, left, right, windowControls, inset = false }: { title?: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls; inset?: boolean }) {
   const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
   const drag = { ['--wails-draggable' as string]: 'drag' };
   const control = 'flex h-full w-[clamp(1.75rem,8vw,2.75rem)] items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-900/[0.07] hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
   return (
-    <>
-      {platform === 'mac' && !fullscreen && <div data-testid="native-titlebar-inset" className="h-10 shrink-0 bg-side" style={drag} aria-hidden />}
-      <div
-        data-testid="app-title-bar"
-        style={drag}
-        className="flex h-10 shrink-0 select-none items-center bg-side"
-        onDoubleClick={windowControls?.onToggleMaximize}
-      >
-        <div className={cx('flex items-center gap-1', !flushLeft && 'px-2')} style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
-          {left}
-        </div>
-        <div className="min-w-0 flex-1 truncate text-center text-xs font-medium text-neutral-600 dark:text-neutral-300">{title}</div>
-        {right && <div className="flex items-center gap-1 px-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
-          {right}
-        </div>}
-        {platform === 'windows' && windowControls && (
-          <div className="flex h-full items-stretch" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
-            <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={control}>
-              <Minus size={15} aria-hidden />
-            </button>
-            <button type="button" aria-label={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} title={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} onClick={windowControls.onToggleMaximize} className={control}>
-              {windowControls.maximized ? <Copy size={13} aria-hidden /> : <Square size={12} aria-hidden />}
-            </button>
-            <button type="button" aria-label={windowControls.closeLabel} title={windowControls.closeLabel} onClick={windowControls.onClose} className={cx(control, 'hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white')}>
-              <X size={16} aria-hidden />
-            </button>
-          </div>
-        )}
+    <div
+      data-testid="app-title-bar"
+      style={drag}
+      className={cx('flex h-10 shrink-0 select-none items-center bg-side', inset && 'pl-8')}
+      onDoubleClick={windowControls?.onToggleMaximize}
+    >
+      <div className="flex items-center gap-1" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+        {left}
       </div>
-    </>
+      <div className="min-w-0 flex-1 truncate px-2 text-xs font-medium text-neutral-600 dark:text-neutral-300">{title}</div>
+      {right && <div className="flex items-center gap-1 px-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+        {right}
+      </div>}
+      {windowControls && (
+        <div className="flex h-full items-stretch" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+          <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={control}>
+            <Minus size={15} aria-hidden />
+          </button>
+          <button type="button" aria-label={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} title={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} onClick={windowControls.onToggleMaximize} className={control}>
+            {windowControls.maximized ? <Copy size={13} aria-hidden /> : <Square size={12} aria-hidden />}
+          </button>
+          <button type="button" aria-label={windowControls.closeLabel} title={windowControls.closeLabel} onClick={windowControls.onClose} className={cx(control, 'hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white')}>
+            <X size={16} aria-hidden />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

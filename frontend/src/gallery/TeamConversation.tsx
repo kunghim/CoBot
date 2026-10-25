@@ -7,7 +7,7 @@ import dangoSeries from '../../../assets/avatars/dango/dist/dango.json';
 import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
-import { AppModeHeader, AppTitleBar, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
+import { ConversationHead, SidebarHead, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const dango: AvatarSeries = { id: 'dango', name: dangoSeries.name, kind: 'composed', version: dangoSeries.version, data: dangoSeries as unknown as AvatarSeries['data'] };
@@ -281,22 +281,24 @@ export default function TeamConversation() {
       </Doc>
       <Doc
         id="title-bar"
-        name="AppTitleBar 桌面标题栏"
+        name="列头与窗口控件"
         file="components/ui/Layout.tsx"
-        use="桌面客户端隐藏系统标题栏，由 CoBot 自己画：Logo 在主导航的主页按钮上方，不显示字标；模式切换固定在二级菜单右上角，开关固定在会话区左上角；空白区域可以拖动窗口、双击最大化，颜色跟着 CoBot 的主题和明暗。Windows 上右侧自己画最小化、最大化、关闭；macOS 窗口态顶部单独避让系统红绿灯，全屏取消避让；不横向移动业务控件。"
-        avoid="网页复用紧凑栏但不显示原生窗口按钮，不另加品牌大顶栏。"
+        use="桌面客户端隐藏系统标题栏，栏目自己画头：二级菜单顶行（SidebarHead）左端是会话搜索、右端是模式切换；会话列顶行（ConversationHead）左端是列表开关、可与页面动作和标题同栏，空白区域拖动窗口、双击最大化，颜色跟 CoBot 主题。Windows 的最小化、最大化、关闭画在会话列头右端；macOS 窗口态左上角是单色系统按钮预留（88×40，盖住导航与菜单列），全屏取消，控件不横向移动。"
+        avoid="不再有整窗大顶栏；网页同构但没有窗口控件和预留。"
         a11y="窗口按钮都有文字标签；关闭按钮悬停变红，和系统一致。"
       >
         <Demo title="Windows">
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-            <AppTitleBar
-              platform="windows"
-              title="CoBot — 待办应用 · 项目经理"
-              flushLeft
-              left={<AppModeHeader listVisible={left} toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader>}
-              right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
-              windowControls={{ minimizeLabel: '最小化', maximizeLabel: '最大化', restoreLabel: '还原', closeLabel: '关闭', maximized, onMinimize: () => undefined, onToggleMaximize: () => setMaximized(!maximized), onClose: () => undefined }}
-            />
+            <div className="relative flex bg-side">
+              <div className="flex w-14 shrink-0 items-center justify-center text-2xs text-neutral-400">导航</div>
+              {left && <div className="w-[min(16rem,40vw)] shrink-0"><SidebarHead><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></SidebarHead></div>}
+              <ConversationHead
+                title="CoBot — 待办应用 · 项目经理"
+                left={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}
+                right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
+                windowControls={{ minimizeLabel: '最小化', maximizeLabel: '最大化', restoreLabel: '还原', closeLabel: '关闭', maximized, onMinimize: () => undefined, onToggleMaximize: () => setMaximized(!maximized), onClose: () => undefined }}
+              />
+            </div>
             <div className="flex h-24 text-xs text-neutral-500">
               <div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-2"><BrandMark size={26} /><Icons.home size={18} /></div>
               {left && <div className="w-[min(16rem,40vw)] shrink-0 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>}
@@ -305,15 +307,19 @@ export default function TeamConversation() {
             </div>
           </div>
         </Demo>
-        <Demo title="macOS">
+        <Demo title="macOS 窗口态">
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-            <AppTitleBar
-              platform="mac"
-              title="CoBot — 待办应用 · 项目经理"
-              flushLeft
-              left={<AppModeHeader listVisible={left} toggle={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></AppModeHeader>}
-              right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />}
-            />
+            <div className="relative flex bg-side">
+              <div className="absolute left-0 top-0 z-10 h-10 w-[88px] bg-side" aria-hidden />
+              <div className="flex w-14 shrink-0 items-center justify-center pt-10 text-2xs text-neutral-400">导航</div>
+              <div className="w-[min(16rem,40vw)] shrink-0"><SidebarHead inset><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></SidebarHead></div>
+              <ConversationHead title="CoBot — 待办应用 · 项目经理" left={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />} right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />} />
+            </div>
+            <div className="flex h-24 text-xs text-neutral-500">
+              <div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail pb-2 pt-12"><BrandMark size={26} /><Icons.home size={18} /></div>
+              <div className="w-[min(16rem,40vw)] shrink-0 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>
+              <div className="flex-1 p-3">会话</div>
+            </div>
           </div>
         </Demo>
       </Doc>

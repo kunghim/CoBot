@@ -1,9 +1,9 @@
 // The desktop window as the page sees it. The Wails shell hides the system
 // title bar on Windows (frameless) and macOS (hidden inset, traffic lights
-// kept), so the page draws its own: it needs the platform and the window
-// controls of the Wails runtime, which the shell injects as window.runtime.
-// In a browser there is no runtime and no title bar.
-import { useEffect, useState } from 'react';
+// kept), so the page draws its own header rows: it needs the platform and
+// the window controls of the Wails runtime, which the shell injects as
+// window.runtime. In a browser there is no runtime and no header rows.
+import { createContext, useContext, useEffect, useState } from 'react';
 
 interface WailsRuntime {
   Environment(): Promise<{ platform: string }>;
@@ -31,6 +31,15 @@ export interface DesktopWindow {
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
+}
+
+/** The app shell provides the window once, high above the layouts; column
+ * headers and the corner reservation read it through this context. */
+export const DesktopWindowContext = createContext<DesktopWindow | null>(null);
+
+/** The window frame, or null in a plain browser tab. */
+export function useWindowFrame(): DesktopWindow | null {
+  return useContext(DesktopWindowContext);
 }
 
 /** The desktop window, or null in a browser (and on Linux, which keeps the system bar). */

@@ -228,7 +228,8 @@
         "frontend/src/main.tsx",
         "frontend/index.html",
         "frontend/vite.config.ts",
-        "frontend/tailwind.config.*"
+        "frontend/tailwind.config.*",
+        "frontend/src/app/WindowChrome.tsx"
       ]
     },
     {

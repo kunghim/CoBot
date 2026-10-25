@@ -5,6 +5,8 @@ import { authorize, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  // These scenarios exercise teams; a fresh profile now opens in chat mode.
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The workspace beside the conversation: the new-tab button opens it on its
@@ -36,10 +38,10 @@ test('workspace opens with tabs, the info card closes on Escape', async ({ page 
   await expect(workspace.getByRole('tab', { name: '新建标签页' })).toHaveAttribute('aria-selected', 'true');
   await expect(create).toHaveCount(0);
 
-  // If the workspace squeezes the list out, the title bar follows the
-  // actual conversation edge. Expanding the list gives it room again.
+  // If the workspace squeezes the list out, the conversation head follows
+  // the actual conversation edge. Expanding the list gives it room again.
   await page.setViewportSize({ width: 900, height: 900 });
-  const toggle = page.getByTestId('app-mode-header').getByRole('button', { name: '展开团队列表', exact: true });
+  const toggle = page.getByTestId('app-title-bar').getByRole('button', { name: '展开团队列表', exact: true });
   await expect(toggle).toBeVisible();
   // The squeeze-out follows a resize listener; the geometry settles async.
   await expect.poll(async () => Math.abs((await toggle.boundingBox())!.x - (await page.getByRole('main').boundingBox())!.x)).toBeLessThan(1);
