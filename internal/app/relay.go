@@ -839,6 +839,22 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		domain.QuestionCancelled, req.ID, domain.QuestionOpen); err != nil {
 		return domain.Requirement{}, err
 	}
+	// A confirmation ignored from its card cancels the requirement so the
+	// user can keep talking first. The project manager learns why with its
+	// next turn, without a wake, and the user keeps a record where the card
+	// was.
+	team, _, err := sqlite.GetTeam(ctx, tx, req.TeamID)
+	if err != nil {
+		return domain.Requirement{}, err
+	}
+	if err := noteLocked(ctx, tx, req.TeamID, team.LeaderID, team.LeaderID, req.ID,
+		"用户取消了需求「"+req.Title+"」，想先继续讨论；讨论清楚后请重新提交需求。"); err != nil {
+		return domain.Requirement{}, err
+	}
+	if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID,
+		"你取消了需求「"+req.Title+"」。可以先和项目经理继续讨论，讨论清楚后它会重新提交需求。"); err != nil {
+		return domain.Requirement{}, err
+	}
 	if req, err = sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementCancelled); err != nil {
 		return domain.Requirement{}, err
 	}

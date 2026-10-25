@@ -674,7 +674,7 @@
       "title": "Needs your confirmation",
       "accept": "Confirm and continue",
       "revise": "Request changes",
-      "changesPlaceholder": "What needs to change (required to request changes)",
+      "changesPlaceholder": "Write your changes here; leave empty to confirm",
       "returnToMe": "Bring the changes straight back to me (skip the reviews again)"
     },
     "title": "Needs your answer",
@@ -685,10 +685,13 @@
       "title": "Delivery acceptance",
       "accept": "Accept",
       "revise": "Request changes",
-      "changesPlaceholder": "What needs to change (required to request changes)"
+      "changesPlaceholder": "Write your changes here; leave empty to accept"
     },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
-    "cancel": "No longer needed"
+    "dismissed": "{{count}} card(s) awaiting acceptance",
+    "dismissed_one": "{{count}} card awaiting acceptance",
+    "dismissed_other": "{{count}} cards awaiting acceptance",
+    "cancel": "Ignore"
   },
   "engine": {
     "hook": "Safety hook",

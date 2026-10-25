@@ -9,7 +9,7 @@
 // never a security authorization, and the card says so.
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAnswerQuestion, useCancelQuestion, useQuestions } from '../../api/queries';
+import { useAnswerQuestion, useCancelQuestion, useCancelRequirement, useQuestions } from '../../api/queries';
 import type { Question } from '../../api/types';
 import { Alert, Button, Checkbox, Icons, TextInput, WaitingCard } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
@@ -22,19 +22,32 @@ export default function QuestionCardStack({ teamId, viewBotId }: { teamId: strin
   const { t } = useTranslation();
   const questions = useQuestions(teamId, 'open', true, viewBotId);
   const [index, setIndex] = useState(0);
+  // An acceptance dismissed from its card comes back from this entry; a
+  // cancelled confirmation never does.
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   const items = questions.data?.items ?? [];
-  const current = clampPagerIndex(index, items.length);
-  const question = items[current];
+  const visible = items.filter((question) => !dismissed.has(question.id));
+  const current = clampPagerIndex(index, visible.length);
+  const question = visible[current];
   if (questions.isError && !questions.data) return <Alert tone="danger">{t('questions.loadFailed')}</Alert>;
-  if (!question) return null;
-  const total = items.length + (questions.hasNextPage ? 1 : 0);
+  if (!question) {
+    if (dismissed.size === 0) return null;
+    return (
+      <div className="flex justify-end">
+        <Button size="sm" shape="pill" variant="secondary" onClick={() => setDismissed(new Set())}>
+          {t('questions.dismissed', { count: dismissed.size })}
+        </Button>
+      </div>
+    );
+  }
+  const total = visible.length + (questions.hasNextPage ? 1 : 0);
 
   const frame = {
     position: { index: current + 1, total },
     onPrevious: () => setIndex(current - 1),
     onNext: () => {
-      if (current < items.length - 1) setIndex(current + 1);
+      if (current < visible.length - 1) setIndex(current + 1);
       else if (questions.hasNextPage) void questions.fetchNextPage().then((result) => { if (!result.isError) setIndex(current + 1); });
     },
     previousLabel: t('questions.prev'),
@@ -42,7 +55,12 @@ export default function QuestionCardStack({ teamId, viewBotId }: { teamId: strin
   };
   // A card starts from nothing when the question changes.
   return question.kind === 'acceptance' || question.kind === 'confirm' ? (
-    <DecisionCard key={question.id} question={question} frame={frame} />
+    <DecisionCard
+      key={question.id}
+      question={question}
+      frame={frame}
+      onDismiss={question.kind === 'acceptance' ? () => setDismissed((prev) => new Set(prev).add(question.id)) : undefined}
+    />
   ) : (
     <AskCard key={question.id} question={question} frame={frame} />
   );
@@ -133,17 +151,23 @@ function AskCard({ question, frame }: { question: Question; frame: Frame }) {
 }
 
 // DecisionCard puts a decision to the user: a confirm stage of a route or the
-// finished requirement. The user accepts, or asks for changes, which must say
-// what. What it is about is read in the conversation above.
-function DecisionCard({ question, frame }: { question: Question; frame: Frame }) {
+// finished requirement. One main button follows the input: with something
+// written it asks for changes, empty it confirms — Enter does the same.
+// Ignoring steps the card aside: a confirmation is cancelled outright (talk
+// first, the project manager submits anew), a finished requirement only
+// waits, reopenable from the composer. What it is about is read in the
+// conversation above.
+function DecisionCard({ question, frame, onDismiss }: { question: Question; frame: Frame; onDismiss?: () => void }) {
   const { t } = useTranslation();
   const answer = useAnswerQuestion();
+  const cancelRequirement = useCancelRequirement();
   const [changes, setChanges] = useState('');
   const [errorText, setErrorText] = useState('');
   // A confirmation's changes run the reviews again unless the user only
   // wants to see the fix itself.
   const [returnToMe, setReturnToMe] = useState(false);
   const kind = question.kind === 'confirm' ? 'confirm' : 'acceptance';
+  const revising = changes.trim() !== '';
 
   const decide = (decision: 'accept' | 'revise') => {
     if (decision === 'revise' && !changes.trim()) return;
@@ -160,6 +184,16 @@ function DecisionCard({ question, frame }: { question: Question; frame: Frame })
     );
   };
 
+  const ignore = () => {
+    setErrorText('');
+    if (kind === 'confirm') {
+      if (!question.requirementId) return;
+      cancelRequirement.mutate(question.requirementId, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
+      return;
+    }
+    onDismiss?.();
+  };
+
   return (
     <WaitingCard
       icon={<Icons.success size={16} />}
@@ -168,11 +202,18 @@ function DecisionCard({ question, frame }: { question: Question; frame: Frame })
       {...frame}
       actions={
         <>
-          <Button size="sm" shape="pill" variant="secondary" disabled={!changes.trim() || answer.isPending} onClick={() => decide('revise')}>
-            {t(`questions.${kind}.revise`)}
+          <Button size="sm" shape="pill" variant="ghost" loading={kind === 'confirm' && cancelRequirement.isPending} onClick={ignore}>
+            {t('questions.cancel')}
           </Button>
-          <Button size="sm" shape="pill" variant="primary" icon={Icons.done} onClick={() => decide('accept')} loading={answer.isPending}>
-            {t(`questions.${kind}.accept`)}
+          <Button
+            size="sm"
+            shape="pill"
+            variant="primary"
+            icon={revising ? undefined : Icons.done}
+            onClick={() => decide(revising ? 'revise' : 'accept')}
+            loading={answer.isPending}
+          >
+            {t(revising ? `questions.${kind}.revise` : `questions.${kind}.accept`)}
           </Button>
         </>
       }
@@ -184,7 +225,7 @@ function DecisionCard({ question, frame }: { question: Question; frame: Frame })
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          decide('revise');
+          decide(revising ? 'revise' : 'accept');
         }}
       >
         <TextInput size="sm" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t(`questions.${kind}.changesPlaceholder`)} aria-label={t(`questions.${kind}.changesPlaceholder`)} />

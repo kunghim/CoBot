@@ -11,12 +11,14 @@ const state = vi.hoisted(() => ({
   hasNextPage: false,
   answer: vi.fn(),
   cancel: vi.fn(),
+  cancelRequirement: vi.fn(),
 }));
 
 vi.mock('../../api/queries', () => ({
   useQuestions: () => ({ data: { items: state.items }, isError: false, hasNextPage: state.hasNextPage, fetchNextPage: vi.fn() }),
   useAnswerQuestion: () => ({ mutate: state.answer, isPending: false }),
   useCancelQuestion: () => ({ mutate: state.cancel, isPending: false }),
+  useCancelRequirement: () => ({ mutate: state.cancelRequirement, isPending: false }),
 }));
 vi.mock('../conversations/Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
 
@@ -25,13 +27,20 @@ const confirm = {
   kind: 'confirm',
   teamId: 't1',
   requesterBotId: 'b1',
+  requirementId: 'r1',
   question: '请确认：需求和链路',
   options: [],
   status: 'open',
   revision: 1,
   createdAt: '2026-10-24T00:00:00Z',
 };
-const ask = { ...confirm, id: 'q2', kind: '', question: '用哪个数据库？', options: ['SQLite', 'Postgres'] };
+const acceptance = {
+  ...confirm,
+  id: 'q3',
+  kind: 'acceptance',
+  question: '需求「回归」已完成，请按上面的汇报验收。',
+};
+const ask = { ...confirm, id: 'q2', kind: '', requirementId: '', question: '用哪个数据库？', options: ['SQLite', 'Postgres'] };
 
 describe('question cards', () => {
   let root: Root;
@@ -46,6 +55,7 @@ describe('question cards', () => {
     state.hasNextPage = false;
     state.answer.mockReset();
     state.cancel.mockReset();
+    state.cancelRequirement.mockReset();
   });
   afterEach(() => {
     act(() => root.unmount());
@@ -54,26 +64,63 @@ describe('question cards', () => {
 
   const render = () => act(() => root.render(h(QuestionCardStack, { teamId: 't1', viewBotId: 'b1' })));
   const byText = (text: string) => [...host.querySelectorAll('button')].find((button) => button.textContent?.includes(text));
+  const type = (text: string) => {
+    const input = host.querySelector('input[aria-label*="修改意见"], input[placeholder*="修改意见"]') as HTMLInputElement | null;
+    if (!input) throw new Error('no changes input');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    act(() => {
+      setter.call(input, text);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
 
   it('shows nothing when nothing waits', () => {
     render();
     expect(host.textContent).toBe('');
   });
 
-  it('puts a confirmation in a card that only asks, and accepts it from there', () => {
+  it('puts a confirmation in a card whose main button follows the input', () => {
     state.items = [confirm];
     render();
     expect(host.textContent).toContain('需要你确认');
     expect(host.textContent).toContain('请确认：需求和链路');
     // The document is in the conversation, not in the card.
     expect(byText('查看完整文档')).toBeUndefined();
-    // "Ask for changes" needs a word on what to change.
-    expect((byText('提修改意见') as HTMLButtonElement).disabled).toBe(true);
+    // Empty input: the main button confirms.
     act(() => byText('确认，继续')!.click());
     expect(state.answer).toHaveBeenCalledWith(
       expect.objectContaining({ questionId: 'q1', decision: 'accept', answerText: '', expectedRevision: 1 }),
       expect.anything(),
     );
+  });
+
+  it('asks for changes from the same button once something is written', () => {
+    state.items = [confirm];
+    render();
+    type('端口换成 8080');
+    expect(byText('提修改意见')).toBeDefined();
+    act(() => byText('提修改意见')!.click());
+    expect(state.answer).toHaveBeenCalledWith(
+      expect.objectContaining({ questionId: 'q1', decision: 'revise', answerText: '端口换成 8080' }),
+      expect.anything(),
+    );
+  });
+
+  it('ignores a confirmation by cancelling its requirement', () => {
+    state.items = [confirm];
+    render();
+    act(() => byText('忽略')!.click());
+    expect(state.cancelRequirement).toHaveBeenCalledWith('r1', expect.anything());
+  });
+
+  it('dismisses an acceptance card and brings it back from the composer', () => {
+    state.items = [acceptance];
+    render();
+    act(() => byText('忽略')!.click());
+    expect(state.cancelRequirement).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('1 张待验收');
+    act(() => byText('1 张待验收')!.click());
+    expect(host.textContent).toContain('交付验收');
   });
 
   it('answers a question with one of its options', () => {

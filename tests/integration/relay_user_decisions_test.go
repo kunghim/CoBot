@@ -194,6 +194,41 @@ func TestUserIgnoreQuestionLeavesNote(t *testing.T) {
 	}
 }
 
+// Ignoring a confirmation cancels its requirement: the project manager
+// learns why with its next turn, without a wake, and the user keeps a record
+// where the card was.
+func TestCancelledRequirementNotifiesLeader(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm, dev := bots[0], bots[1]
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	d.confirm(req)
+	if _, err := h.app.CancelRequirement(context.Background(), h.user, req.ID); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	messages, err := sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasMessageText(messages, "你取消了需求「回归」") {
+		t.Fatal("the project manager's conversation has no record of the cancellation")
+	}
+	var note int
+	if err := h.app.DB.QueryRowContext(ctx,
+		`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = ? AND source_bot_id = ?`, pm.ID, domain.MessageKindCollaboration, pm.ID).Scan(&note); err != nil {
+		t.Fatal(err)
+	}
+	if note != 1 {
+		t.Fatalf("leader collaboration notes = %d, want the resubmission note", note)
+	}
+}
+
 // hasMessageText reports whether one message renders to text containing the
 // given line.
 func hasMessageText(messages []domain.Message, text string) bool {
