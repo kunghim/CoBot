@@ -295,6 +295,7 @@
     "tests/e2e/**",
     "tests/integration/**",
     "tests/upgrade/**",
+    "**/__pycache__/**",
     "internal/wiretrace/**",
     "frontend/src/gallery/**",
     "frontend/gallery.html",
