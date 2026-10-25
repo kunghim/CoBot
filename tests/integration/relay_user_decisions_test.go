@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/kunghim/CoBot/internal/domain"
@@ -35,6 +36,33 @@ func TestCardAfterUserConfirmIsFromLeader(t *testing.T) {
 	if source != pm.ID {
 		t.Fatalf("card message source %q, want the project manager", source)
 	}
+}
+
+// The confirm text lists the route as an ordered list the user reads, one
+// stage per line with the current one marked.
+func TestConfirmTextRouteIsAnOrderedList(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm, dev := bots[0], bots[1]
+	d := relayDriver{t: t, h: h, team: team}
+	d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	messages, err := sqlite.ListMessages(context.Background(), h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range messages {
+		if text := m.RenderText(); strings.Contains(text, "### 链路") {
+			if !strings.Contains(text, "1. 用户确认（用户） ← 当前") || strings.Contains(text, "▶") {
+				t.Fatalf("confirm text route =\n%s", text)
+			}
+			return
+		}
+	}
+	t.Fatal("no confirm text posted to the project manager")
 }
 
 // A revision the user raises at a later confirmation sends the producing
