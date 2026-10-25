@@ -59,6 +59,12 @@ export default function ApprovalCardStack({
     <WaitingCard
       icon={<Icons.permission size={16} />}
       title={typeLabel}
+      initiator={
+        <>
+          {requester && <Avatar bot={requester} size="sm" />}
+          {requesterName}
+        </>
+      }
       position={{ index: current + 1, total }}
       onPrevious={() => setIndex(current - 1)}
       onNext={() => {
@@ -81,13 +87,6 @@ export default function ApprovalCardStack({
         </Button>
       ))}
     >
-      <p className="flex flex-wrap items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-50">
-          {requester && <Avatar bot={requester} size="sm" />}
-          {requesterName}
-        </span>
-        <span>{t('approvals.requesterAsks')}</span>
-      </p>
       {approval.type === 'native_tool' ? (
         <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />
       ) : (

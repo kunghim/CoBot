@@ -56,15 +56,16 @@ interface Frame {
   nextLabel: string;
 }
 
+// Asker renders the member that asked, for the card header's left side.
 function Asker({ question }: { question: Question }) {
   const members = useContext(TeamMembersContext);
   const asker = members.get(question.requesterBotId);
   if (!asker) return null;
   return (
-    <p className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+    <>
       <Avatar bot={asker} size="sm" />
       {asker.name}
-    </p>
+    </>
   );
 }
 
@@ -89,6 +90,7 @@ function AskCard({ question, frame }: { question: Question; frame: Frame }) {
     <WaitingCard
       icon={<Icons.help size={16} />}
       title={t('questions.title')}
+      initiator={<Asker question={question} />}
       {...frame}
       actions={
         <>
@@ -115,7 +117,6 @@ function AskCard({ question, frame }: { question: Question; frame: Frame }) {
         </>
       }
     >
-      <Asker question={question} />
       <p className="whitespace-pre-wrap font-medium leading-6">{question.question}</p>
       <form
         onSubmit={(event) => {
@@ -163,6 +164,7 @@ function DecisionCard({ question, frame }: { question: Question; frame: Frame })
     <WaitingCard
       icon={<Icons.success size={16} />}
       title={t(`questions.${kind}.title`)}
+      initiator={<Asker question={question} />}
       {...frame}
       actions={
         <>
@@ -175,7 +177,6 @@ function DecisionCard({ question, frame }: { question: Question; frame: Frame })
         </>
       }
     >
-      <Asker question={question} />
       {/* A short line. A question made before the document moved into the conversation still holds the whole of it: that scrolls here. */}
       <div className="max-h-40 overflow-y-auto text-neutral-800 dark:text-neutral-200">
         <Markdown text={question.question} teamId={question.teamId} />

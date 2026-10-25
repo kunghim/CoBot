@@ -404,7 +404,6 @@
       "budget": "每日预算"
     },
     "requester": "发起者：{{name}}",
-    "requesterAsks": "请求你批准",
     "reason": "理由",
     "prev": "上一张审批卡",
     "next": "下一张审批卡",
