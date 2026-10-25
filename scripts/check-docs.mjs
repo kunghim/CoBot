@@ -1,9 +1,12 @@
 // Checks what docs/workflows/docs.md promises and agents rely on: public
 // document names, working relative links and anchors, a complete docs index,
-// and identical message keys in both UI languages.
+// identical message keys in both UI languages, and that every tracked file
+// belongs to a live-test area (docs/testing/areas.json).
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { coverageProblems } from './live-test-plan.mjs';
 
 const pluralSuffix = /_(zero|one|two|few|many|other)$/;
 
@@ -53,7 +56,7 @@ export function checkDocs(root) {
   const problems = [];
   for (const file of files) {
     const name = relative(docs, file).split(sep).join('/');
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*\.md$/.test(name) && name !== 'README.md') problems.push(`docs/${name}: use lower-case English words joined by hyphens`);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*\.md$/.test(name) && !/(^|\/)README\.md$/.test(name)) problems.push(`docs/${name}: use lower-case English words joined by hyphens`);
   }
   const index = readFileSync(join(docs, 'README.md'), 'utf8');
   for (const file of files) {
@@ -63,6 +66,10 @@ export function checkDocs(root) {
   for (const file of [...files, join(root, 'AGENTS.md'), join(root, 'CONTRIBUTING.md')].filter(existsSync)) problems.push(...linkProblems(file, readFileSync(file, 'utf8'), root));
   const locales = join(root, 'frontend/src/i18n/locales');
   problems.push(...localeProblems(JSON.parse(readFileSync(join(locales, 'zh-CN.json'), 'utf8')), JSON.parse(readFileSync(join(locales, 'en.json'), 'utf8'))));
+  if (existsSync(join(root, 'docs/testing/areas.json'))) {
+    const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 }).split('\n').filter(Boolean);
+    problems.push(...coverageProblems(root, tracked));
+  }
   return problems;
 }
 

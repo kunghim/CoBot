@@ -34,7 +34,7 @@ jobs:
       - name: Check pull request routing
         run: node scripts/check-pr-route.mjs
       - name: Test repository policy enforcement
-        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/check-docs.test.mjs scripts/check-upgrade.test.mjs
+        run: node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/check-docs.test.mjs scripts/check-upgrade.test.mjs scripts/live-test-plan.test.mjs
       - name: Test browser evidence sanitization
         run: python3 -m unittest discover -s scripts -p 'test_sanitize_test_evidence.py'
       - name: Check docs and UI message keys

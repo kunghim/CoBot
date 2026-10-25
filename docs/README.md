@@ -25,6 +25,28 @@
 | [文档流程](workflows/docs.md) | 写方案和记录、整理或归档文档 |
 | [踩坑记录](pitfalls.md) | 每次都会碰到的环境与运行问题 |
 
+## 发布前实测（`testing/`）
+
+| 文档 | 触发 |
+| --- | --- |
+| [流程与重测集](testing/README.md) | 实测候选版本：这次要测什么、怎么记账 |
+| [操作指南](testing/guide.md) | 怎么装、启动、观察、记录；界面里东西在哪 |
+| [门禁](testing/cases/gates.md) | 每次必跑的自动化基线 |
+| [启动与首次使用](testing/cases/start.md) | 引擎检测、启动停止、重启 |
+| [Codex 引擎](testing/cases/engine.md) | 版本兼容、协议基线 |
+| [团队与成员](testing/cases/teams.md) | 建团队、归档、删成员 |
+| [会话与接力](testing/cases/relay.md) | 需求链路、审批、恢复（真实 Codex） |
+| [聊天与统一归档](testing/cases/chats.md) | 无项目聊天、模式切换、侧栏菜单与分区、归档 |
+| [每日预算](testing/cases/budget.md) | 团队与成员的每日 Token 上限、暂停与重置 |
+| [模型与供应商](testing/cases/models.md) | 供应商、成员换模型、跨厂商、模型目录 |
+| [团队浏览器与工作区](testing/cases/workspace.md) | 标签、视口、清理 |
+| [设置](testing/cases/settings.md) | 9 个分区、用量、记忆 |
+| [会话授权与访问控制](testing/cases/security.md) | 登录、来源校验、密钥不落盘 |
+| [头像库与头像](testing/cases/avatars.md) | 下载、缓存、覆盖、上传 |
+| [数据存储与升级](testing/cases/upgrade.md) | 从旧版本升级 |
+| [界面外观与国际化](testing/cases/ui.md) | 主题、中英文、窄屏 |
+| [打包产物与桌面壳](testing/cases/packaging.md) | ZIP、MSI、原生窗口、发布说明 |
+
 ## 产品（`product/`）
 
 | 文档 | 触发 |

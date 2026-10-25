@@ -27,6 +27,10 @@ test('a consistent tree passes, including plural-only English keys', t => {
   assert.deepEqual(checkDocs(fixture(t, {})), []);
 });
 
+test('a README is allowed in any docs directory', t => {
+  assert.deepEqual(checkDocs(fixture(t, { 'docs/README.md': '| [Frontend](rules/frontend.md) | [Index](sub/README.md) |\n', 'docs/sub/README.md': '# 子目录\n' })), []);
+});
+
 test('anchors follow GitHub heading rules', () => {
   assert.equal(anchor('私人资料（`.local/`）'), '私人资料local');
   assert.equal(anchor('Native lease hook'), 'native-lease-hook');
