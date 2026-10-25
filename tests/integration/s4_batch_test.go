@@ -264,13 +264,21 @@ func TestHandoffWakesTheNextStage(t *testing.T) {
 	if !sawCard {
 		t.Fatal("leader page: the card does not name the member")
 	}
-	// The record between the two members carries the card.
+	// The record between the two members carries both cards: the first one
+	// the confirmed route dispatched in the project manager's name, and the
+	// acceptance card the member handed off in its own name.
 	record, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "collaboration", TeamID: team.ID, BotID: member.ID, PeerBotID: leader.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if items := record["items"].([]any); len(items) != 1 || items[0].(domain.Message).Kind != domain.MessageKindSystem {
+	items := record["items"].([]any)
+	if len(items) != 2 {
 		t.Fatalf("exchange record = %+v", items)
+	}
+	first, second := items[0].(domain.Message), items[1].(domain.Message)
+	if first.Kind != domain.MessageKindSystem || first.SourceBotID != leader.ID ||
+		second.Kind != domain.MessageKindSystem || second.SourceBotID != member.ID {
+		t.Fatalf("exchange record = %s then %s (%s, %s)", first.SourceBotID, second.SourceBotID, first.Kind, second.Kind)
 	}
 }
 

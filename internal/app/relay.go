@@ -659,25 +659,48 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		if req.Status != domain.RequirementActive {
 			return domain.Question{}, domain.Conflict("error.requirement.not_active", map[string]any{"status": req.Status})
 		}
+		team, _, err := sqlite.GetTeam(ctx, tx, req.TeamID)
+		if err != nil {
+			return domain.Question{}, err
+		}
 		// The user's decision is fresh input: it opens its own chain.
 		chain, err := a.openChainLocked(ctx, tx, req.TeamID, question.ID, "")
 		if err != nil {
 			return domain.Question{}, err
 		}
-		e := relayEntry{chain: chain.ID, returnTo: -1}
 		if decision == domain.AcceptanceAccept {
-			effect, err = a.enterStageLocked(ctx, tx, req, question.StageIndex+1, e)
+			next := question.StageIndex + 1
+			e := relayEntry{chain: chain.ID, returnTo: -1}
+			// The confirmed route dispatches in the project manager's
+			// name, so the member sees where the card came from and can
+			// open it. A card that lands on the project manager itself
+			// (the acceptance report) stays the user's doing.
+			if owner := req.Stages[next].OwnerID; owner != "" && owner != team.LeaderID {
+				e.from = team.LeaderID
+			}
+			var err error
+			effect, err = a.enterStageLocked(ctx, tx, req, next, e)
+			if err != nil {
+				return domain.Question{}, err
+			}
 		} else {
+			producer := producingStage(req, question.StageIndex)
+			e := relayEntry{chain: chain.ID, returnTo: -1}
+			// A member's rework goes out in the project manager's name;
+			// a revision of the document itself stays the user's input.
+			if producer >= 0 {
+				e.from = team.LeaderID
+			}
 			after := "改完后按链路重新往下走，会再经过评审"
 			if mode == domain.ReworkReturnToMe {
 				e.returnTo = question.StageIndex
 				after = "改完后直接回到用户确认"
 			}
 			e.note = "用户在「" + req.Stages[question.StageIndex].Name + "」提出修改意见（" + after + "）：" + comment
-			effect, err = a.reworkLocked(ctx, tx, req, producingStage(req, question.StageIndex), e)
-		}
-		if err != nil {
-			return domain.Question{}, err
+			effect, err = a.reworkLocked(ctx, tx, req, producer, e)
+			if err != nil {
+				return domain.Question{}, err
+			}
 		}
 	} else {
 		if _, err := sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementDone); err != nil {
