@@ -397,6 +397,9 @@
       "accepted": "Sent",
       "cancelled": "Cancelled",
       "unknown": "Needs verification"
+    },
+    "webLink": {
+      "tabLimit": "The built-in browser is out of tabs"
     }
   },
   "approvals": {
@@ -580,8 +583,10 @@
     "reload": "Reload",
     "address": "Address",
     "view": "The team's browser; click and type to use it",
-    "userTab": "Your tab",
-    "sharedHint": "This browser is shared with the members: what you do acts on the page, and a member is told when you touched its tab. Sign in once and every member shares the login."
+    "emptyTitle": "Browser",
+    "emptyHint": "Paste or type a URL to open a page",
+    "addressPlaceholder": "Type a URL and press Enter",
+    "openExternal": "Open in system browser"
   },
   "workspace": {
     "tablist": "Workspace",
@@ -604,11 +609,7 @@
       "noMemberPages": "No member has opened a page yet"
     },
     "browser": {
-      "memberTab": "{{name}}'s tab",
       "memberBusy": "In use",
-      "memberHint": "Click and type as you like; it will not interrupt them",
-      "userOwn": "Yours",
-      "userHint": "a member can use it when needed",
       "closed": "The page was closed",
       "closeClosed": "Close this tab",
       "viewport": "Viewport size",
@@ -617,7 +618,10 @@
       "viewportDesktop": "Desktop 1280 × 744",
       "viewportTablet": "Tablet 768 × 1024",
       "viewportPhone": "Phone 390 × 844",
-      "notAvailable": "The browser is unavailable"
+      "notAvailable": "The browser is unavailable",
+      "viewportSizeTitle": "The page's real viewport: changed here, every member sees the same size",
+      "viewportWidth": "Page width (pixels)",
+      "viewportHeight": "Page height (pixels)"
     }
   },
   "tasks": {
@@ -912,7 +916,10 @@
   },
   "about": {
     "tagline": "Agents do the work, CoBot runs the team.",
-    "stage": { "beta": "Beta", "alpha": "Alpha" },
+    "stage": {
+      "beta": "Beta",
+      "alpha": "Alpha"
+    },
     "developmentBuild": "Development build",
     "checkUpdate": "Check for updates",
     "viewRelease": "View this release",

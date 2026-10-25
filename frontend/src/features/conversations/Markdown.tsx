@@ -4,13 +4,16 @@
 // opens files inside the team folder; web links open in a new tab; any other
 // scheme is dropped.
 import { memo, useState, type ReactNode, isValidElement } from 'react';
-import { CopyButton } from '../../components/ui';
+import { CopyButton, useToast } from '../../components/ui';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FolderOpen } from 'lucide-react';
+import { ExternalLink, FolderOpen } from 'lucide-react';
 import { api } from '../../api/client';
+import { useOpenBrowserTab } from '../../api/queries';
 import { apiErrorMessage } from '../../i18n/errors';
+import { openExternal } from '../../platform/native-bridge';
+import { useWorkspace } from '../workspace/WorkspaceProvider';
 import { linkTarget } from './links';
 
 function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; chatId?: string }) {
@@ -43,12 +46,70 @@ function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; cha
 
 export default memo(Markdown);
 
+// A web address opens in the team's browser: a user tab of its own in the
+// workspace, focused when it opens. When the tabs are full the toast says
+// so, and the hover entry still hands the address to the system browser.
+// A chat has no team browser, so its links fall back to a new tab.
+function WebLink({ href, teamId, children }: { href: string; teamId?: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const workspace = useWorkspace();
+  const openOwn = useOpenBrowserTab(teamId ?? '');
+  let host = href;
+  try {
+    host = new URL(href).host;
+  } catch {
+    // Keep the raw text; the address bar navigates it all the same.
+  }
+  const openHere = () => {
+    if (!teamId) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    openOwn.mutate(href, {
+      onSuccess: ({ tab }) => {
+        workspace.openTab({ id: `browser:${tab.id}`, kind: 'browser', title: tab.title || host, ref: tab.id }, true);
+      },
+      onError: (error) => toast.show({ tone: 'warning', title: t('conversation.webLink.tabLimit'), description: apiErrorMessage(t, error) }),
+    });
+  };
+  return (
+    <span className="group/web inline">
+      <a
+        href={href}
+        onClick={(event) => {
+          event.preventDefault();
+          openHere();
+        }}
+        title={host}
+        className="text-signal-600 underline underline-offset-2 dark:text-signal-400"
+      >
+        {children}
+      </a>
+      <button
+        type="button"
+        onClick={() => openExternal(href)}
+        aria-label={t('browser.openExternal')}
+        title={`${host} · ${t('browser.openExternal')}`}
+        className="ml-0.5 inline-flex align-middle text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus:opacity-100 group-hover/web:opacity-100 dark:hover:text-neutral-200"
+      >
+        <ExternalLink size={12} aria-hidden="true" />
+      </button>
+    </span>
+  );
+}
+
 function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId?: string; chatId?: string; children: ReactNode }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
   const target = linkTarget(href);
   if (target.kind === 'web') {
-    return <a href={href} target="_blank" rel="noopener noreferrer" className="text-signal-600 underline underline-offset-2 dark:text-signal-400">{children}</a>;
+    // Mail stays with the system; http(s) opens the team's own browser,
+    // where the page joins the workspace instead of leaving the app.
+    if (href.startsWith('mailto:')) {
+      return <a href={href} className="text-signal-600 underline underline-offset-2 dark:text-signal-400">{children}</a>;
+    }
+    return <WebLink href={href} teamId={teamId}>{children}</WebLink>;
   }
   if (target.kind === 'blocked') return <span>{children}</span>;
   const open = (reveal: boolean) => {
