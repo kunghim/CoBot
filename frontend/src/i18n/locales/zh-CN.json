@@ -122,6 +122,7 @@
     "collapse": "收起团队",
     "leader": "项目经理",
     "previewYou": "你：",
+    "previewFrom": "{{name}}：{{text}}",
     "loading": "加载团队中…",
     "loadFailed": "团队列表加载失败",
     "badge": {

@@ -4312,12 +4312,13 @@ components:
         lastMessage: { $ref: "#/components/schemas/MessagePreview" }
     MessagePreview:
       type: object
-      description: The start of the latest message between the user and a member, for the team list.
+      description: The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
       required: [kind, text, createdAt]
       properties:
-        kind: { type: string, enum: [user, assistant] }
+        kind: { type: string, enum: [user, assistant, system, collaboration] }
         text: { type: string }
         createdAt: { type: string, format: date-time }
+        senderBotId: { type: string, description: Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user. }
     TeamWithBots:
       type: object
       required: [team, bots]

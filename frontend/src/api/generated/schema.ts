@@ -2263,13 +2263,15 @@ export interface components {
             createdAt: string;
             lastMessage?: components["schemas"]["MessagePreview"];
         };
-        /** @description The start of the latest message between the user and a member, for the team list. */
+        /** @description The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list. */
         MessagePreview: {
             /** @enum {string} */
-            kind: "user" | "assistant";
+            kind: "user" | "assistant" | "system" | "collaboration";
             text: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Who sent it */
+            senderBotId?: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];

@@ -207,8 +207,10 @@ const (
 
 // Defines values for MessagePreviewKind.
 const (
-	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
-	MessagePreviewKindUser      MessagePreviewKind = "user"
+	MessagePreviewKindAssistant     MessagePreviewKind = "assistant"
+	MessagePreviewKindCollaboration MessagePreviewKind = "collaboration"
+	MessagePreviewKindSystem        MessagePreviewKind = "system"
+	MessagePreviewKindUser          MessagePreviewKind = "user"
 )
 
 // Defines values for ModelCatalogStatusSource.
@@ -713,7 +715,7 @@ type Bot struct {
 	Id           string     `json:"id"`
 	IsLeader     bool       `json:"isLeader"`
 
-	// LastMessage The start of the latest message between the user and a member, for the team list.
+	// LastMessage The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
 
 	// Model The model this member chose, one its provider serves.
@@ -1135,11 +1137,14 @@ type MessageDeliveryStatus string
 // MessageKind defines model for Message.Kind.
 type MessageKind string
 
-// MessagePreview The start of the latest message between the user and a member, for the team list.
+// MessagePreview The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 type MessagePreview struct {
 	CreatedAt time.Time          `json:"createdAt"`
 	Kind      MessagePreviewKind `json:"kind"`
-	Text      string             `json:"text"`
+
+	// SenderBotId Who sent it
+	SenderBotId *string `json:"senderBotId,omitempty"`
+	Text        string  `json:"text"`
 }
 
 // MessagePreviewKind defines model for MessagePreview.Kind.

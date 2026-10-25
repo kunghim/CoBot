@@ -122,6 +122,7 @@
     "collapse": "Collapse team",
     "leader": "Project manager",
     "previewYou": "You: ",
+    "previewFrom": "{{name}}: {{text}}",
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {

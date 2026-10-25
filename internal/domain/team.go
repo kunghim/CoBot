@@ -94,9 +94,12 @@ type Bot struct {
 // MessagePreview is the start of a conversation's latest message, for the
 // team list.
 type MessagePreview struct {
-	Kind      string    `json:"kind"` // user|assistant
-	Text      string    `json:"text"`
-	CreatedAt time.Time `json:"createdAt"`
+	Kind string `json:"kind"` // user|assistant|system|collaboration
+	// SenderBotID names the member that sent it, for cards and notes from
+	// other members; the member's exchange with the user has none.
+	SenderBotID string    `json:"senderBotId,omitempty"`
+	Text        string    `json:"text"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // ProviderSession maps a bot onto its engine thread.
