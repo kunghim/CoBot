@@ -246,8 +246,10 @@ func TestHandoffWakesTheNextStage(t *testing.T) {
 	if !strings.Contains(next.Text, "【接力卡片】验收汇报") || !strings.Contains(next.Text, "接口已实现，go test ./... 通过") || !strings.Contains(next.Text, "handoff") {
 		t.Fatalf("leader input:\n%s", next.Text)
 	}
+	// Card messages carry their card in run_id; the notes of the user's
+	// decisions do not, so they stay out of this count.
 	var leaderMessages int
-	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system'`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system' AND run_id != ''`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
 		t.Fatalf("leader cards = %d (%v)", leaderMessages, err)
 	}
 	// The leader's conversation shows the card as coming from the member.

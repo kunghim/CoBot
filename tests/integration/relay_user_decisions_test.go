@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kunghim/CoBot/internal/app"
+	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
@@ -35,6 +37,13 @@ func TestCardAfterUserConfirmIsFromLeader(t *testing.T) {
 	}
 	if source != pm.ID {
 		t.Fatalf("card message source %q, want the project manager", source)
+	}
+	messages, err := sqlite.ListMessages(context.Background(), h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasMessageText(messages, "你确认了需求「回归」") {
+		t.Fatal("the project manager's conversation has no note of the user's confirmation")
 	}
 }
 
@@ -112,4 +121,86 @@ func TestUserReviseReworkIsFromLeader(t *testing.T) {
 	if source != pm.ID {
 		t.Fatalf("rework message source %q, want the project manager", source)
 	}
+	messages, err := sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasMessageText(messages, "提了修改意见：端口换成 8080") || !hasMessageText(messages, "改完后按链路继续") {
+		t.Fatal("the project manager's conversation has no note of the user's revision")
+	}
+}
+
+// Accepting the finished requirement records the verdict in the project
+// manager's conversation.
+func TestAcceptanceAcceptLeavesNote(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm, dev := bots[0], bots[1]
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	d.confirm(req)
+	d.handoff(d.open(req), domain.HandoffDone, "")
+	d.handoff(d.open(req), domain.HandoffDone, "")
+	ctx := context.Background()
+	questions, err := sqlite.ListQuestions(ctx, h.app.DB, team.ID, domain.QuestionOpen, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acceptance := domain.Question{}
+	for _, q := range questions {
+		if q.RequirementID == req.ID && q.Kind == domain.QuestionKindAcceptance {
+			acceptance = q
+			break
+		}
+	}
+	if acceptance.ID == "" {
+		t.Fatal("no acceptance question")
+	}
+	if _, err := h.app.AnswerDecision(ctx, h.user, acceptance.ID, domain.AcceptanceAccept, "", "", acceptance.Revision); err != nil {
+		t.Fatal(err)
+	}
+	messages, err := sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasMessageText(messages, "你验收通过了需求「回归」") {
+		t.Fatal("the project manager's conversation has no note of the acceptance")
+	}
+}
+
+// Ignoring a member's question is recorded in its conversation.
+func TestUserIgnoreQuestionLeavesNote(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	dev := bots[1]
+	ctx := context.Background()
+	question, err := h.app.AskUser(ctx, auth.NewPrincipalBot(dev.ID, team.ID), app.AskUserInput{Question: "用哪个端口启动开发服务？"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.app.CancelQuestion(ctx, h.user, question.ID, question.Revision); err != nil {
+		t.Fatal(err)
+	}
+	messages, err := sqlite.ListMessages(ctx, h.app.DB, dev.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasMessageText(messages, "你忽略了提问：用哪个端口启动开发服务？") {
+		t.Fatal("the member's conversation has no note of the ignored question")
+	}
+}
+
+// hasMessageText reports whether one message renders to text containing the
+// given line.
+func hasMessageText(messages []domain.Message, text string) bool {
+	for _, m := range messages {
+		if strings.Contains(m.RenderText(), text) {
+			return true
+		}
+	}
+	return false
 }

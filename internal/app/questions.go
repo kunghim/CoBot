@@ -225,6 +225,14 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	if _, err := sqlite.CancelQuestionRow(ctx, tx, questionID, expectedRevision); err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
 	}
+	// The user's ignore is recorded where the question was asked, so the
+	// conversation shows what happened to the card. The member itself is
+	// not told what to do next; it is woken as before.
+	if principal.Kind == auth.KindUser {
+		if err := systemNoteLocked(ctx, tx, question.TeamID, question.RequesterBotID, "你忽略了提问："+summarizeLine(question.Question)); err != nil {
+			return domain.Question{}, err
+		}
+	}
 	cancelled, err := sqlite.GetQuestion(ctx, tx, questionID)
 	if err != nil {
 		return domain.Question{}, err

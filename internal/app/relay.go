@@ -683,6 +683,10 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 			if err != nil {
 				return domain.Question{}, err
 			}
+			names := memberNames(ctx, tx, req.TeamID)
+			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmAcceptedNote(req, next, names)); err != nil {
+				return domain.Question{}, err
+			}
 		} else {
 			producer := producingStage(req, question.StageIndex)
 			e := relayEntry{chain: chain.ID, returnTo: -1}
@@ -701,13 +705,21 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 			if err != nil {
 				return domain.Question{}, err
 			}
+			names := memberNames(ctx, tx, req.TeamID)
+			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmRevisedNote(req, question.StageIndex, producer, mode, comment, names)); err != nil {
+				return domain.Question{}, err
+			}
 		}
 	} else {
 		if _, err := sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementDone); err != nil {
 			return domain.Question{}, err
 		}
 		effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
-		if decision == domain.AcceptanceRevise {
+		if decision == domain.AcceptanceAccept {
+			if err := systemNoteLocked(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+req.Title+"」。"); err != nil {
+				return domain.Question{}, err
+			}
+		} else {
 			if messageID, err = a.reviseAsNewInputLocked(ctx, tx, question, comment); err != nil {
 				return domain.Question{}, err
 			}
@@ -1053,4 +1065,51 @@ func noteLocked(ctx context.Context, tx *sql.Tx, teamID, target, source, about, 
 		ID: domain.NewID(), TeamID: teamID, BotID: target,
 		Kind: domain.MessageKindCollaboration, Blocks: blocks, SourceBotID: source, RunID: about,
 	})
+}
+
+// systemNoteLocked leaves the user a note in a member's conversation, about a
+// decision made from a card there. It wakes nobody and the engine never reads
+// it: it is a record of what happened, not an instruction.
+func systemNoteLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text string) error {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return err
+	}
+	return sqlite.InsertMessage(ctx, tx, domain.Message{
+		ID: domain.NewID(), TeamID: teamID, BotID: botID,
+		Kind: domain.MessageKindSystem, Blocks: blocks, CreatedAt: time.Now().UTC(),
+	})
+}
+
+// confirmAcceptedNote says what the user's confirmation set in motion.
+func confirmAcceptedNote(req domain.Requirement, next int, names map[string]string) string {
+	stage := req.Stages[next]
+	owner := stageOwnerName(stage, names)
+	if stage.Kind == domain.StageConfirm {
+		owner = "你"
+	}
+	return fmt.Sprintf("你确认了需求「%s」。下一环：%s（%s）。", req.Title, stage.Name, owner)
+}
+
+// confirmRevisedNote says where the user's revision went and what happens
+// after the fix.
+func confirmRevisedNote(req domain.Requirement, idx, producer int, mode, comment string, names map[string]string) string {
+	to := "项目经理"
+	if producer >= 0 {
+		to = stageOwnerName(req.Stages[producer], names)
+	}
+	note := fmt.Sprintf("你对「%s」提了修改意见：%s，已交给 %s 修改。", req.Stages[idx].Name, summarizeLine(comment), to)
+	if mode == domain.ReworkReturnToMe {
+		return note + "改完后直接回到你确认。"
+	}
+	return note + "改完后按链路继续。"
+}
+
+// summarizeLine shortens a user comment for one line of a note.
+func summarizeLine(text string) string {
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= 80 {
+		return string(runes)
+	}
+	return string(runes[:80]) + "…"
 }
