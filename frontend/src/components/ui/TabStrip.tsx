@@ -5,6 +5,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { Icons } from './icons';
 import { IconButton } from './Button';
+import { PanelToggle } from './Layout';
 import { cx, interactive } from './foundation';
 
 export interface TabStripItem {
@@ -107,7 +108,9 @@ export function TabStrip({
         })}
       </div>
       {onNew && newTabLabel && <IconButton size="sm" icon={Icons.add} label={newTabLabel} onClick={onNew} />}
-      {onCollapse && collapseLabel && <IconButton size="sm" icon={Icons.panelRightClose} label={collapseLabel} onClick={onCollapse} />}
+      // The strip only collapses; expanding happens at the workspace's
+      // other edge, so the toggle always shows the collapsed state's icon.
+      {onCollapse && collapseLabel && <PanelToggle side="right" open onToggle={onCollapse} openLabel={collapseLabel} closeLabel={collapseLabel} />}
     </div>
   );
 }

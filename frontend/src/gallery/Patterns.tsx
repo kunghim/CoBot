@@ -34,7 +34,7 @@ export default function Patterns() {
         </Demo>
       </Doc>
 
-      <Doc id="panels" name="侧栏的展开与收起" file="PanelToggle" use="左右两栏的开关固定在会话标题栏的两端，用同一对“侧栏”图标表示开和关。侧栏始终在布局里，任何宽度都不盖住会话、不挡继续操作；窗口窄时，打开一边会收起另一边，让会话保留空间。">
+      <Doc id="panels" name="侧栏的展开与收起" file="PanelToggle" use="左右两栏的开关固定在会话标题栏的两端，用同一对“侧栏”图标表示开和关；工作区标签栏的收起、桌面标题栏的侧栏开关都是这一对图标，只按所在位置调整大小和浓淡。侧栏始终在布局里，任何宽度都不盖住会话、不挡继续操作；窗口窄时，打开一边会收起另一边，让会话保留空间。">
         <Demo>
           <div className="flex h-40 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
             {listOpen && <div className="w-40 border-r border-neutral-200 bg-neutral-100 p-3 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>}
