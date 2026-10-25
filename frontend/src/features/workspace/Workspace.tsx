@@ -71,7 +71,7 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
       <div role="tabpanel" aria-label={t('workspace.tablist')} id={`tabpanel-${state.activeId ?? 'none'}`} className="min-h-0 flex-1 overflow-hidden rounded-tl-xl bg-canvas">
         {active?.kind === 'new' && <NewTabPage teamId={teamId} bots={bots} />}
         {active?.kind === 'browser' && (
-          <BrowserTab teamId={teamId} panelTabId={active.ref} bots={bots} onClose={() => closeTab(active.id)} />
+          <BrowserTab teamId={teamId} panelTabId={active.ref} onClose={() => closeTab(active.id)} />
         )}
         {(active?.kind === 'file' || active?.kind === 'changes') && (
           <EmptyState icon={<Icons.view size={20} aria-hidden />} title={t('workspace.newPage.later')} />

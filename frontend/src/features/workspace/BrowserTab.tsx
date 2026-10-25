@@ -2,14 +2,16 @@
 // shared page, not a mirror. What the user clicks or types goes into the
 // same tab the member is using. The page renders at its real viewport and is
 // scaled to fit the workspace (or shown at 100%); the size the page really
-// has is a page property the user and every member share.
+// has is a page property the user and every member share, edited right
+// above the picture.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sendBrowserInput, streamBrowserTab, type BrowserFrame, type BrowserInput } from '../../api/client';
 import { useSetBrowserTabViewport, useTeamBrowser } from '../../api/queries';
-import type { Bot } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
+import { openExternal } from '../../platform/native-bridge';
 import { Alert, EmptyState, Icons, IconButton, Select, TextInput } from '../../components/ui';
+import { useElementSize } from './useElementSize';
 
 const MOVE_INTERVAL_MS = 40;
 
@@ -20,39 +22,40 @@ function modifiers(e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shi
 /** How the picture is shown: scaled into the workspace, or at 100%. */
 type Scale = 'fit' | 'full';
 
-export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { teamId: string; panelTabId: string; bots: Bot[]; onClose: () => void }) {
+export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: string; panelTabId: string; onClose: () => void }) {
   const { t } = useTranslation();
   const state = useTeamBrowser(teamId);
   const setViewport = useSetBrowserTabViewport(teamId);
   const page = state.data?.tabs.find((item) => item.id === panelTabId);
   const gone = state.isSuccess && state.data !== undefined && !page;
+  // A page without an address is nothing yet: no picture to paint (a blank
+  // page reads as black), no stream to follow — an empty state and the
+  // address bar wait for the first address.
+  const blank = !page || !page.url || page.url === 'about:blank';
 
   const canvas = useRef<HTMLCanvasElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
+  const addressInput = useRef<HTMLInputElement>(null);
+  const [boxRef, box] = useElementSize<HTMLDivElement>();
   const frameSize = useRef({ width: 1280, height: 900 });
-  const [box, setBox] = useState({ width: 0, height: 0 });
   const [error, setError] = useState<string | null>(null);
   const [address, setAddress] = useState('');
   const [editing, setEditing] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
-  // The size the status row shows. frameSize is read on every pointer
+  // The size the control row shows. frameSize is read on every pointer
   // event and stays a ref; this copy re-renders the row when a new
   // viewport arrives, which a ref alone never does.
   const [frame, setFrame] = useState({ width: 1280, height: 900 });
   const [scale, setScale] = useState<Scale>('fit');
   const [viewportError, setViewportError] = useState<string | null>(null);
+  // The sizes typed into the control row; they commit on enter or blur,
+  // and follow the page again once it reports a new size.
+  const [sizing, setSizing] = useState<{ width: string; height: string } | null>(null);
 
-  // The workspace box, for fitting the picture inside it.
+  // The first address of a blank page is typed, not found: the address bar
+  // takes the focus.
   useEffect(() => {
-    const target = boxRef.current;
-    if (!target) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setBox({ width, height });
-    });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, []);
+    if (blank) addressInput.current?.focus();
+  }, [blank]);
 
   // Inputs go out one at a time and in order; a mouse move waiting behind
   // others is dropped, since the next one supersedes it.
@@ -60,7 +63,7 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
   const pendingMoves = useRef(0);
   const send = useCallback(
     (input: BrowserInput) => {
-      if (!panelTabId) return;
+      if (!panelTabId || blank) return;
       const move = input.kind === 'mouse' && input.action === 'move';
       if (move) {
         if (pendingMoves.current > 0) return;
@@ -73,13 +76,14 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
           if (move) pendingMoves.current--;
         });
     },
-    [teamId, panelTabId, t],
+    [teamId, panelTabId, blank, t],
   );
 
   // The pictures of this page. Only the visible tab mounts this component,
-  // so a background tab never streams.
+  // so a background tab never streams; a page that has no address has no
+  // picture to stream either.
   useEffect(() => {
-    if (!panelTabId) return;
+    if (!panelTabId || blank) return;
     setHasFrame(false);
     const controller = new AbortController();
     let decoding = false;
@@ -134,12 +138,13 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
     };
     void follow();
     return () => controller.abort();
-  }, [teamId, panelTabId, t]);
+  }, [teamId, panelTabId, blank, t]);
 
-  // The address bar follows the page unless the user is typing in it.
+  // The address bar follows the page unless the user is typing in it; a
+  // blank page shows none.
   useEffect(() => {
-    if (!editing) setAddress(page?.url ?? '');
-  }, [page?.url, editing]);
+    if (!editing) setAddress(blank ? '' : (page?.url ?? ''));
+  }, [page?.url, editing, blank]);
 
   const point = (e: { clientX: number; clientY: number }) => {
     const rect = canvas.current!.getBoundingClientRect();
@@ -179,7 +184,7 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
   // Wheel needs a non-passive listener to keep the page from scrolling.
   useEffect(() => {
     const target = canvas.current;
-    if (!target) return;
+    if (!target || blank) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = target.getBoundingClientRect();
@@ -191,7 +196,7 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
     };
     target.addEventListener('wheel', onWheel, { passive: false });
     return () => target.removeEventListener('wheel', onWheel);
-  }, [send, panelTabId, hasFrame]);
+  }, [send, panelTabId, hasFrame, blank]);
 
   if (state.data && !state.data.available) {
     return <EmptyState icon={<Icons.openExternal size={20} aria-hidden />} title={t('browser.notInstalled')} description={t('browser.notInstalledHint')} />;
@@ -221,16 +226,10 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
   const shownHeight = Math.round(natural.height * shown);
   const percent = Math.round(shown * 100);
 
-  const memberName = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
-  const isUser = page?.owner === 'user';
-  // "In use" is a member working; the user's own page is never busy.
-  const busy = !isUser && (page?.busy ?? false);
-  const statusLabel = isUser
-    ? t('workspace.browser.userOwn')
-    : t('workspace.browser.memberTab', { name: memberName(page?.memberId ?? '') });
-  const statusHint = isUser ? t('workspace.browser.userHint') : t('workspace.browser.memberHint');
+  const busy = page?.owner !== 'user' && (page?.busy ?? false);
 
-  // The real window size the page has; the dropdown changes it for everyone.
+  // The real window size the page has; the control row changes it for
+  // everyone, either by naming a device or by typing a size.
   const viewportValue = (() => {
     if (scale === 'fit') return 'fit';
     if (scale === 'full') return 'full';
@@ -247,13 +246,26 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
       { onError: (err) => setViewportError(apiErrorMessage(t, err)) },
     );
   };
+  const commitSize = () => {
+    const value = sizing;
+    setSizing(null);
+    if (!value) return;
+    const width = Number(value.width);
+    const height = Number(value.height);
+    if (!width || !height || width < 1 || height < 1 || width > 3840 || height > 2160) return;
+    setViewportError(null);
+    setViewport.mutate(
+      { tab: panelTabId, body: { width, height } },
+      { onError: (err) => setViewportError(apiErrorMessage(t, err)) },
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1.5 px-2 pb-2 pt-1.5">
       <div className="flex items-center gap-1">
-        <IconButton label={t('browser.back')} icon={Icons.previous} size="sm" onClick={() => send({ kind: 'nav', to: 'back' })} />
-        <IconButton label={t('browser.forward')} icon={Icons.next} size="sm" onClick={() => send({ kind: 'nav', to: 'forward' })} />
-        <IconButton label={t('browser.reload')} icon={Icons.refresh} size="sm" onClick={() => send({ kind: 'nav', to: 'reload' })} />
+        <IconButton label={t('browser.back')} icon={Icons.previous} size="sm" onClick={() => send({ kind: 'nav', to: 'back' })} disabled={blank} />
+        <IconButton label={t('browser.forward')} icon={Icons.next} size="sm" onClick={() => send({ kind: 'nav', to: 'forward' })} disabled={blank} />
+        <IconButton label={t('browser.reload')} icon={Icons.refresh} size="sm" onClick={() => send({ kind: 'nav', to: 'reload' })} disabled={blank} />
         <form
           className="min-w-0 flex-1"
           onSubmit={(e) => {
@@ -263,25 +275,48 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
           }}
         >
           <TextInput
+            ref={addressInput}
             size="sm"
             mono
             aria-label={t('browser.address')}
+            placeholder={t('browser.addressPlaceholder')}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             onFocus={() => setEditing(true)}
             onBlur={() => setEditing(false)}
           />
         </form>
+        {/* The page lives where the user's own tabs do: hand it to the
+            system browser on their click, never on its own. */}
+        <IconButton label={t('browser.openExternal')} icon={Icons.openExternal} size="sm" disabled={blank} onClick={() => page?.url && openExternal(page.url)} />
       </div>
-      <div className="flex items-center gap-2 px-0.5">
-        <p className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-2xs text-neutral-500 dark:text-neutral-400">
-          {busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />}
-          <span className="truncate font-medium text-neutral-700 dark:text-neutral-300">{statusLabel}</span>
-          {busy && <span className="shrink-0 rounded bg-emerald-100 px-1 py-px text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{t('workspace.browser.memberBusy')}</span>}
-          <span className="truncate">· {statusHint}</span>
-        </p>
+      <div className="flex items-center gap-2 px-0.5" title={t('workspace.browser.viewportSizeTitle')}>
+        {busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-label={t('workspace.browser.memberBusy')} />}
+        <form
+          className="flex shrink-0 items-center gap-1 font-mono text-2xs tabular-nums text-neutral-500 dark:text-neutral-400"
+          onSubmit={(e) => {
+            e.preventDefault();
+            commitSize();
+          }}
+        >
+          <input
+            aria-label={t('workspace.browser.viewportWidth')}
+            value={sizing?.width ?? String(natural.width)}
+            onChange={(e) => setSizing((current) => ({ width: e.target.value, height: current?.height ?? String(natural.height) }))}
+            onBlur={commitSize}
+            className="w-14 rounded-md border border-transparent bg-neutral-900/[0.04] px-1.5 py-0.5 text-right outline-none transition-colors focus:border-signal-500 dark:bg-white/[0.06]"
+          />
+          <span aria-hidden>×</span>
+          <input
+            aria-label={t('workspace.browser.viewportHeight')}
+            value={sizing?.height ?? String(natural.height)}
+            onChange={(e) => setSizing((current) => ({ width: current?.width ?? String(natural.width), height: e.target.value }))}
+            onBlur={commitSize}
+            className="w-14 rounded-md border border-transparent bg-neutral-900/[0.04] px-1.5 py-0.5 text-right outline-none transition-colors focus:border-signal-500 dark:bg-white/[0.06]"
+          />
+        </form>
         <span className="shrink-0 font-mono text-2xs tabular-nums text-neutral-500 dark:text-neutral-400">
-          {natural.width} × {natural.height} · {percent}%
+          {percent}%
         </span>
         <Select
           size="sm"
@@ -300,33 +335,47 @@ export default function BrowserTab({ teamId, panelTabId, bots, onClose }: { team
       {(error || viewportError) && <Alert tone="warning">{[error, viewportError].filter(Boolean).join(' · ')}</Alert>}
       <div
         ref={boxRef}
-        className={`relative min-h-0 flex-1 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-inset ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-800 ${scale === 'full' ? 'overflow-auto' : ''}`}
+        className={`relative min-h-0 flex-1 rounded-lg bg-neutral-200/60 ring-1 ring-inset ring-neutral-300 dark:bg-neutral-950 dark:ring-neutral-800 ${scale === 'full' ? 'overflow-auto' : 'overflow-hidden'}`}
       >
-        <div className={scale === 'fit' ? 'flex h-full w-full items-center justify-center' : 'inline-block'}>
-          <canvas
-            ref={canvas}
-            tabIndex={0}
-            role="application"
-            aria-label={t('browser.view')}
-            style={{ width: shownWidth || undefined, height: shownHeight || undefined }}
-            className="block max-w-none cursor-default bg-white outline-none focus-visible:ring-2 focus-visible:ring-signal-500"
-            onPointerDown={onPointerDown}
-            onPointerUp={onPointerUp}
-            onPointerMove={onPointerMove}
-            onContextMenu={(e) => e.preventDefault()}
-            onKeyDown={(e) => onKey(e, 'down')}
-            onKeyUp={(e) => onKey(e, 'up')}
-            onPaste={(e) => {
-              e.preventDefault();
-              const text = e.clipboardData.getData('text');
-              if (text) send({ kind: 'text', text });
-            }}
-          />
-        </div>
-        {!hasFrame && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
-            {t('browser.loading')}
+        {blank ? (
+          <div className="flex h-full flex-col items-center justify-center gap-1.5">
+            <Icons.webSearch size={22} className="text-neutral-400 dark:text-neutral-600" aria-hidden />
+            <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">{t('browser.emptyTitle')}</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('browser.emptyHint')}</p>
           </div>
+        ) : (
+          <>
+            <div className={scale === 'fit' ? 'flex h-full w-full items-center justify-center p-3' : 'inline-block p-3'}>
+              {/* The page as a device: a framed picture sitting on the mat,
+                  scaled to the workspace or shown one to one. */}
+              <div className="overflow-hidden rounded-lg bg-white shadow-floating ring-1 ring-neutral-900/[0.08] dark:ring-white/[0.10]">
+                <canvas
+                  ref={canvas}
+                  tabIndex={0}
+                  role="application"
+                  aria-label={t('browser.view')}
+                  style={{ width: shownWidth || undefined, height: shownHeight || undefined }}
+                  className="block max-w-none cursor-default bg-white outline-none focus-visible:ring-2 focus-visible:ring-signal-500"
+                  onPointerDown={onPointerDown}
+                  onPointerUp={onPointerUp}
+                  onPointerMove={onPointerMove}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onKeyDown={(e) => onKey(e, 'down')}
+                  onKeyUp={(e) => onKey(e, 'up')}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData('text');
+                    if (text) send({ kind: 'text', text });
+                  }}
+                />
+              </div>
+            </div>
+            {!hasFrame && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+                {t('browser.loading')}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
