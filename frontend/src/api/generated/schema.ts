@@ -1444,6 +1444,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find chats and team members by conversation content */
+        get: operations["searchConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/collaboration": {
         parameters: {
             query?: never;
@@ -1576,6 +1593,27 @@ export interface components {
         ChatList: {
             items: components["schemas"]["Chat"][];
             nextCursor: string;
+        };
+        SearchResults: {
+            query: string;
+            chats: components["schemas"]["ChatSearchResult"][];
+            members: components["schemas"]["MemberSearchResult"][];
+        };
+        ChatSearchResult: {
+            chatId: string;
+            title: string;
+            /** @description Excerpt of the latest matching message; empty when only the title matched. */
+            snippet: string;
+            activityAt?: string;
+        };
+        MemberSearchResult: {
+            teamId: string;
+            teamName: string;
+            botId: string;
+            botName: string;
+            /** @description Excerpt of the member's latest matching message. */
+            snippet: string;
+            activityAt?: string;
         };
         ChatSendInput: {
             requestId: string;
@@ -5381,6 +5419,32 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    searchConversations: {
+        parameters: {
+            query: {
+                /** @description Plain text matched against chat titles */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest matches first, a few per group; archived and deleted conversations are never returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["SearchResults"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
         };
     };
     collaborationTool: {

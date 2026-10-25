@@ -6,6 +6,7 @@ import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client
 import { queryKeys, useEventStream, useSnapshot, useStatus, useTeams } from '../api/queries';
 import ChatLayout from '../features/chats/ChatLayout';
 import ChatRoute from '../features/chats/ChatPage';
+import SearchBox from '../features/search/SearchBox';
 import { savedMode, lastChatPath, writeLocal } from './mode';
 import ModeSwitch from './ModeSwitch';
 import Layout from './Layout';
@@ -46,12 +47,14 @@ export default function App() {
   // in CoBot's theme, above every screen.
   return (
     <ShellProvider titleBar>
-      <div className="flex h-full flex-col">
-        <TitleBar desktop={desktop} />
-        <div className="min-h-0 flex-1">
-          <Screens />
+      <SelectedBotProvider>
+        <div className="flex h-full flex-col">
+          <TitleBar desktop={desktop} />
+          <div className="min-h-0 flex-1">
+            <Screens />
+          </div>
         </div>
-      </div>
+      </SelectedBotProvider>
     </ShellProvider>
   );
 }
@@ -68,7 +71,7 @@ function TitleBar({ desktop }: { desktop: DesktopWindow | null }) {
       platform={desktop?.platform ?? 'windows'}
       fullscreen={desktop?.fullscreen}
       flushLeft
-      left={workspace ? <AppModeHeader listVisible={listVisible} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader> : undefined}
+      left={workspace ? <AppModeHeader listVisible={listVisible} leading={<SearchBox />} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader> : undefined}
       windowControls={desktop ? {
         minimizeLabel: t('window.minimize'),
         maximizeLabel: t('window.maximize'),
@@ -187,7 +190,6 @@ function Screens() {
 
   return (
     <ToastProvider closeLabel={t('common.close')}>
-    <SelectedBotProvider>
       <Routes>
         <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
         <Route path="/settings/:section" element={<SettingsPage />} />
@@ -201,7 +203,6 @@ function Screens() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
-    </SelectedBotProvider>
     </ToastProvider>
   );
 }

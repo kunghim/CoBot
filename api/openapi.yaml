@@ -3236,6 +3236,28 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/search:
+    get:
+      operationId: searchConversations
+      summary: Find chats and team members by conversation content
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, description: Plain text matched against chat titles, chat message text, and team member message text. }
+      responses:
+        "200":
+          description: Newest matches first, a few per group; archived and deleted conversations are never returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/SearchResults" }
+        default:
+          $ref: "#/components/responses/Error"
   /internal/v1/collaboration:
     post:
       operationId: collaborationTool
@@ -3527,6 +3549,35 @@ components:
             $ref: "#/components/schemas/Chat"
         nextCursor:
           type: "string"
+    SearchResults:
+      type: object
+      required: [query, chats, members]
+      properties:
+        query: { type: string }
+        chats:
+          type: array
+          items: { $ref: "#/components/schemas/ChatSearchResult" }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/MemberSearchResult" }
+    ChatSearchResult:
+      type: object
+      required: [chatId, title, snippet]
+      properties:
+        chatId: { type: string }
+        title: { type: string }
+        snippet: { type: string, description: Excerpt of the latest matching message; empty when only the title matched. }
+        activityAt: { type: string }
+    MemberSearchResult:
+      type: object
+      required: [teamId, teamName, botId, botName, snippet]
+      properties:
+        teamId: { type: string }
+        teamName: { type: string }
+        botId: { type: string }
+        botName: { type: string }
+        snippet: { type: string, description: Excerpt of the member's latest matching message. }
+        activityAt: { type: string }
     ChatSendInput:
       type: "object"
       required:

@@ -901,6 +901,16 @@ type ChatRun struct {
 	TurnId        string     `json:"turnId"`
 }
 
+// ChatSearchResult defines model for ChatSearchResult.
+type ChatSearchResult struct {
+	ActivityAt *string `json:"activityAt,omitempty"`
+	ChatId     string  `json:"chatId"`
+
+	// Snippet Excerpt of the latest matching message; empty when only the title matched.
+	Snippet string `json:"snippet"`
+	Title   string `json:"title"`
+}
+
 // ChatSection defines model for ChatSection.
 type ChatSection struct {
 	Id    string `json:"id"`
@@ -1081,6 +1091,18 @@ type MemberBudget struct {
 
 // MemberBudgetLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
 type MemberBudgetLimitedBy string
+
+// MemberSearchResult defines model for MemberSearchResult.
+type MemberSearchResult struct {
+	ActivityAt *string `json:"activityAt,omitempty"`
+	BotId      string  `json:"botId"`
+	BotName    string  `json:"botName"`
+
+	// Snippet Excerpt of the member's latest matching message.
+	Snippet  string `json:"snippet"`
+	TeamId   string `json:"teamId"`
+	TeamName string `json:"teamName"`
+}
 
 // Memory defines model for Memory.
 type Memory struct {
@@ -1438,6 +1460,13 @@ type RunWithSteps struct {
 
 // RunWithStepsStatus defines model for RunWithSteps.Status.
 type RunWithStepsStatus string
+
+// SearchResults defines model for SearchResults.
+type SearchResults struct {
+	Chats   []ChatSearchResult   `json:"chats"`
+	Members []MemberSearchResult `json:"members"`
+	Query   string               `json:"query"`
+}
 
 // SessionStats defines model for SessionStats.
 type SessionStats struct {
@@ -1989,6 +2018,12 @@ type InterruptRunJSONBody struct {
 // RetryRunJSONBody defines parameters for RetryRun.
 type RetryRunJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// SearchConversationsParams defines parameters for SearchConversations.
+type SearchConversationsParams struct {
+	// Q Plain text matched against chat titles
+	Q string `form:"q" json:"q"`
 }
 
 // ExchangeBootstrapJSONBody defines parameters for ExchangeBootstrap.

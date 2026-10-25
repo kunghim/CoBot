@@ -2,7 +2,7 @@ import { SidebarToggle } from '../app/SidebarToggle';
 import { ModeSelector, modeIcons } from '../app/ModeSelector';
 import { useState } from 'react';
 import '../i18n';
-import { AppModeHeader, AppTitleBar, BrandMark, RailItem, ChatComposer, Button, Card, EmptyState, Icons, Menu, IconButton } from '../components/ui';
+import { AppModeHeader, AppTitleBar, BrandMark, RailItem, ChatComposer, Button, Card, EmptyState, Icons, Menu, IconButton, TextInput } from '../components/ui';
 import ArchiveTypeControl from '../features/settings/ArchiveTypeControl';
 import Markdown from '../features/conversations/Markdown';
 import ChatProcess from '../features/chats/ChatProcess';
@@ -16,8 +16,8 @@ export default function ChatPatterns() {
   const [archiveType, setArchiveType] = useState<'chat' | 'team'>('chat');
   const [sorting, setSorting] = useState('recent');
   return <Chapter id="chat-patterns" title="无项目聊天" intro="聊天直接开始，团队支持多成员协作。聊天中的原生工具过程与审批仍然可见。">
-    <Doc id="chat-mode" name="聊天 / 团队" file="app/ModeSelector.tsx" use="复用 40px 标题栏，Logo 位于主导航的主页按钮上方，不显示 CoBot 字标；模式胶囊为 24px 高，固定在二级侧栏右上角，36px 高的菜单开关固定在会话区左上角；收起侧栏时同时隐藏模式，开关仍跟随会话区左边缘，开关图标为 16×20px 的浅灰细线轮廓，悬停时加深；开关移位时背景立即清除，仅图标颜色保留过渡。" avoid="不能把聊天模式实现为禁用工具的权限开关。" a11y="沿用 SegmentedControl 的单选语义与方向键。">
-      <Demo><div className="overflow-hidden rounded-xl bg-side"><AppTitleBar platform="windows" flushLeft left={<AppModeHeader listVisible={listOpen} toggle={<SidebarToggle open={listOpen} onToggle={() => setListOpen(!listOpen)} openLabel="展开二级菜单" closeLabel="收起二级菜单" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={mode} onChange={setMode} /></AppModeHeader>} /><div className="flex h-40"><div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3"><div className="flex h-10 items-center"><BrandMark size={26} label="CoBot" /></div><RailItem icon={Icons.home} label="主页" /></div>{listOpen && <div className="w-[min(16rem,40vw)] shrink-0 p-3 text-xs text-neutral-500">二级菜单</div>}<div className="mt-2 min-w-0 flex-1 rounded-t-2xl bg-canvas p-3 text-xs text-neutral-500">会话</div></div></div></Demo>
+    <Doc id="chat-mode" name="聊天 / 团队" file="app/ModeSelector.tsx" use="复用 40px 标题栏，Logo 位于主导航的主页按钮上方，不显示 CoBot 字标；会话搜索框占据二级侧栏栏目的左端，窄窗口先收缩搜索框；模式胶囊为 24px 高，固定在二级侧栏右上角，36px 高的菜单开关固定在会话区左上角；收起侧栏时同时隐藏搜索与模式，开关仍跟随会话区左边缘，开关图标为 16×20px 的浅灰细线轮廓，悬停时加深；开关移位时背景立即清除，仅图标颜色保留过渡；macOS 非全屏的系统按钮预留行在标题栏之上，搜索框不与红绿灯重叠。" avoid="不能把聊天模式实现为禁用工具的权限开关。" a11y="沿用 SegmentedControl 的单选语义与方向键。">
+      <Demo><div className="overflow-hidden rounded-xl bg-side"><AppTitleBar platform="windows" flushLeft left={<AppModeHeader listVisible={listOpen} leading={<div className="min-w-0 max-w-44 flex-1"><TextInput size="sm" placeholder="搜索会话" prefix={<Icons.search size={14} aria-hidden />} /></div>} toggle={<SidebarToggle open={listOpen} onToggle={() => setListOpen(!listOpen)} openLabel="展开二级菜单" closeLabel="收起二级菜单" />}><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={mode} onChange={setMode} /></AppModeHeader>} /><div className="flex h-40"><div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3"><div className="flex h-10 items-center"><BrandMark size={26} label="CoBot" /></div><RailItem icon={Icons.home} label="主页" /></div>{listOpen && <div className="w-[min(16rem,40vw)] shrink-0 p-3 text-xs text-neutral-500">二级菜单</div>}<div className="mt-2 min-w-0 flex-1 rounded-t-2xl bg-canvas p-3 text-xs text-neutral-500">会话</div></div></div></Demo>
     </Doc>
     <Doc id="mode-sidebar-actions" name="侧栏新建与列表标题" file="features/chats/ChatLayout.tsx · features/teams/TeamList.tsx" use="两种模式都先显示新建操作，再显示列表标题；操作图标与对应模式一致，使用现有 Button。">
       <Demo><div className="grid grid-cols-2 gap-4 bg-side">{(['chat', 'work'] as const).map((value) => <div key={value} className="px-3 pt-2 pb-2">

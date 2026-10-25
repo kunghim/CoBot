@@ -133,9 +133,8 @@ func LatestMessagePreviews(ctx context.Context, q Queryer, teamID string) (map[s
 	return out, rows.Err()
 }
 
-// previewText joins a message's text blocks into one line and cuts it to
-// previewRunes.
-func previewText(blocks string) string {
+// blockText joins a message's text blocks into one normalized line.
+func blockText(blocks string) string {
 	var parsed []domain.TextBlock
 	if err := json.Unmarshal([]byte(blocks), &parsed); err != nil {
 		return ""
@@ -146,7 +145,12 @@ func previewText(blocks string) string {
 			parts = append(parts, block.Text)
 		}
 	}
-	text := strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
+	return strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
+}
+
+// previewText cuts the joined text blocks to previewRunes.
+func previewText(blocks string) string {
+	text := blockText(blocks)
 	if runes := []rune(text); len(runes) > previewRunes {
 		text = string(runes[:previewRunes]) + "…"
 	}

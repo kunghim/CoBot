@@ -4,6 +4,25 @@ import { join } from 'node:path';
 
 test.beforeEach(async ({ context }) => { await authorize(context); });
 
+test('header search finds a chat by message content and jumps into it', async ({ page }) => {
+  await page.goto('/chat/new');
+  const first = page.waitForResponse((response) => response.url().endsWith('/api/v1/chats') && response.request().method() === 'POST');
+  await page.getByRole('textbox', { name: '发送消息' }).fill('搜索标记-蓝鲸巡检');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  const created = (await (await first).json()).data;
+  await expect(page.getByText(/收到：搜索标记-蓝鲸巡检/)).toBeVisible({ timeout: 20_000 });
+  await page.goto('/chat/new');
+  const search = page.getByRole('combobox', { name: '搜索会话' });
+  await search.fill('蓝鲸巡检');
+  const hit = page.getByRole('option', { name: /蓝鲸巡检/ });
+  await expect(hit).toBeVisible({ timeout: 10_000 });
+  await hit.click();
+  await expect(page).toHaveURL(new RegExp(`/chat/${created.chat.id}$`));
+  // A phrase no conversation carries closes with an explicit empty state.
+  await search.fill('蓝鲸巡检-不存在');
+  await expect(page.getByText('没有匹配的会话')).toBeVisible({ timeout: 10_000 });
+});
+
 test('projectless chat persists, switches modes, renames and deletes', async ({ page }) => {
   await page.goto('/chat/new');
   await expect(page.getByTestId('chat-welcome')).toBeVisible();

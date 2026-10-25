@@ -27,6 +27,14 @@
     "openTeamList": "展开团队列表",
     "closeTeamList": "收起团队列表"
   },
+  "searchBox": {
+    "placeholder": "搜索会话",
+    "chats": "聊天",
+    "members": "团队成员",
+    "searching": "正在搜索…",
+    "noResults": "没有匹配的会话",
+    "error": "搜索失败，请稍后再试"
+  },
   "home": {
     "noTeams": "还没有团队。创建团队后，项目经理与成员会在这里协作。",
     "emptyTitle": "把一件事交给一支团队",

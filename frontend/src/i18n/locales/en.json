@@ -27,6 +27,14 @@
     "openTeamList": "Expand team list",
     "closeTeamList": "Collapse team list"
   },
+  "searchBox": {
+    "placeholder": "Search conversations",
+    "chats": "Chats",
+    "members": "Team members",
+    "searching": "Searching…",
+    "noResults": "No matching conversations",
+    "error": "Search failed; try again shortly"
+  },
   "home": {
     "noTeams": "No teams yet. Create one and the project manager and members will collaborate here.",
     "emptyTitle": "Hand one job to a whole team",
