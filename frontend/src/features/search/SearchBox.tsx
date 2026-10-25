@@ -106,13 +106,14 @@ export default function SearchBox() {
   );
 
   return (
-    <div ref={root} className="relative min-w-0 max-w-44 flex-1">
+    <div ref={root} className="relative min-w-0 max-w-36 flex-1">
       <TextInput
-        size="sm"
+        size="xs"
+        pill
         aria-label={t('searchBox.placeholder')}
         autoComplete="off"
         placeholder={t('searchBox.placeholder')}
-        prefix={<Icons.search size={14} aria-hidden />}
+        prefix={<Icons.search size={13} aria-hidden />}
         value={value}
         onChange={(event) => { setValue(event.target.value); setOpen(true); }}
         onKeyDown={onKeyDown}

@@ -9,6 +9,8 @@ export function cx(...classes: Array<string | false | null | undefined>): string
 
 /** Control heights, shared by buttons, inputs and selects so rows align. */
 export const controlHeight = {
+  /** Toolbar scale: level with the mode capsule in the header row. */
+  xs: 'h-6 text-xs',
   sm: 'h-7 text-xs',
   md: 'h-9 text-sm',
   lg: 'h-11 text-base',
