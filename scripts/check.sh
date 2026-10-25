@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 echo "==> public file policy"
 node scripts/check-public-files.mjs
-node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs
+node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs scripts/check-upgrade.test.mjs scripts/live-test-plan.test.mjs
 
 echo "==> docs and locale keys"
 node scripts/check-docs.mjs
