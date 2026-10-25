@@ -441,3 +441,69 @@ func TestAChatMovedToAnotherVendorStartsANewThread(t *testing.T) {
 		t.Fatalf("the first turn of the new thread = %q", third.Text)
 	}
 }
+
+// A turn the engine reconnects for is not a failed one: the attempts show as one
+// reconnecting step, which closes when the turn goes on, and the turn that then
+// finishes is recorded as finished with its reply and no error notice.
+func TestAChatTurnThatReconnectsAndFinishesIsNotShownAsFailed(t *testing.T) {
+	h := newM2Harness(t)
+	made := attachChats(t, h, nil)
+	ctx := context.Background()
+	sent, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "retry-1", Text: "你好"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	var run domain.ChatRun
+	waitUntil(t, 5*time.Second, "a running turn", func() bool {
+		page, err := h.app.ChatPage(ctx, h.user, sent.Chat.ID, "")
+		if err != nil {
+			return false
+		}
+		for _, r := range page.Runs {
+			if r.Status == domain.RunRunning {
+				run = r
+				return true
+			}
+		}
+		return false
+	})
+	problem := func(attempt string) engine.Notification {
+		return engine.Notification{Method: "error", ThreadID: run.ThreadID, TurnID: run.TurnID,
+			Problem: &engine.Problem{Level: "error", Message: "Reconnecting... " + attempt + "/5", Code: "responseStreamDisconnected", WillRetry: true}}
+	}
+	f.Emit(problem("1"))
+	f.Emit(problem("2"))
+	stepsOf := func() map[string]domain.ChatStep {
+		page, err := h.app.ChatPage(ctx, h.user, sent.Chat.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]domain.ChatStep{}
+		for _, r := range page.Runs {
+			for _, s := range r.Steps {
+				out[s.ID] = s
+			}
+		}
+		return out
+	}
+	waitUntil(t, 5*time.Second, "the reconnecting step", func() bool {
+		s, ok := stepsOf()["cobot-retry"]
+		return ok && s.Kind == "retry" && s.Status == engine.StepInProgress && strings.Contains(string(s.Detail), `"attempt":2`)
+	})
+	f.EmitTurnCompleted(run.ThreadID, run.TurnID, "completed", "已记住")
+	page := chatWait(t, h, sent.Chat.ID, domain.RunCompleted)
+	for _, r := range page.Runs {
+		if r.ErrorKey != "" {
+			t.Fatalf("errorKey = %q", r.ErrorKey)
+		}
+		for _, s := range r.Steps {
+			if s.Kind == "notice" {
+				t.Fatalf("a reconnect was recorded as a notice: %+v", s)
+			}
+		}
+	}
+	if s := stepsOf()["cobot-retry"]; s.Status == engine.StepInProgress {
+		t.Fatalf("the reconnecting step stays open after the turn ended: %+v", s)
+	}
+}
