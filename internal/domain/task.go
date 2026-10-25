@@ -110,6 +110,11 @@ type Question struct {
 	Revision        int64     `json:"revision"`
 	CreatedAt       time.Time `json:"createdAt"`
 	AnsweredAt      time.Time `json:"answeredAt,omitempty"`
+	// CanSkipChecks is a confirm stage's projection: whether a revision can
+	// come straight back to it, which only offers a choice when the stages
+	// a straight return skips include one that checks the work. Not stored;
+	// filled where the question is served.
+	CanSkipChecks bool `json:"canSkipChecks"`
 }
 
 // Event types appended by the collaboration milestone; never renamed.

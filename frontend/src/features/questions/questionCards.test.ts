@@ -33,6 +33,7 @@ const confirm = {
   status: 'open',
   revision: 1,
   createdAt: '2026-10-24T00:00:00Z',
+  canSkipChecks: true,
 };
 const acceptance = {
   ...confirm,
@@ -111,6 +112,15 @@ describe('question cards', () => {
     render();
     act(() => byText('忽略')!.click());
     expect(state.cancelRequirement).toHaveBeenCalledWith('r1', expect.anything());
+  });
+
+  it('offers skipping the checks in between only when the route has them', () => {
+    state.items = [confirm];
+    render();
+    expect(host.textContent).toContain('中间的检查不再重来');
+    state.items = [{ ...confirm, canSkipChecks: false }];
+    render();
+    expect(host.textContent).not.toContain('中间的检查不再重来');
   });
 
   it('dismisses an acceptance card and brings it back from the composer', () => {

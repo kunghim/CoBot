@@ -675,7 +675,7 @@
       "accept": "Confirm and continue",
       "revise": "Request changes",
       "changesPlaceholder": "Write your changes here; leave empty to confirm",
-      "returnToMe": "Bring the changes straight back to me (skip the reviews again)"
+      "returnToMe": "Bring the changes straight back to me (the checks in between do not run again)"
     },
     "title": "Needs your answer",
     "loadFailed": "Failed to load questions",

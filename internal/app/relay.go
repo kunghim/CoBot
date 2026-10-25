@@ -304,6 +304,19 @@ func producingStage(req domain.Requirement, idx int) int {
 	return -1
 }
 
+// routeCanSkipChecks reports whether a revision raised at the confirm stage
+// idx can come straight back to it: a straight return skips the stages
+// between the one that produced the work (or the document) and this
+// confirmation, so it only offers a choice when one of them checks the work.
+func routeCanSkipChecks(req domain.Requirement, idx int) bool {
+	for j := producingStage(req, idx) + 1; j < idx; j++ {
+		if req.Stages[j].ChecksWork() {
+			return true
+		}
+	}
+	return false
+}
+
 // reworkLocked sends work back to a stage (or to the requirement document)
 // with the reason; returnTo is where the fixed work goes next, -1 for the
 // route's own order.

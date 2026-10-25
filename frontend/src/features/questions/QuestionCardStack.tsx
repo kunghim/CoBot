@@ -230,7 +230,7 @@ function DecisionCard({ question, frame, onDismiss }: { question: Question; fram
       >
         <TextInput size="sm" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t(`questions.${kind}.changesPlaceholder`)} aria-label={t(`questions.${kind}.changesPlaceholder`)} />
       </form>
-      {kind === 'confirm' && <Checkbox checked={returnToMe} onChange={setReturnToMe} label={t('questions.confirm.returnToMe')} />}
+      {kind === 'confirm' && question.canSkipChecks && <Checkbox checked={returnToMe} onChange={setReturnToMe} label={t('questions.confirm.returnToMe')} />}
       {errorText && <Alert tone="danger">{errorText}</Alert>}
     </WaitingCard>
   );

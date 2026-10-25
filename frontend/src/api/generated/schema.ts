@@ -1897,6 +1897,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             answeredAt?: string;
+            /** @description A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served. */
+            canSkipChecks?: boolean;
         };
         Message: {
             id: string;

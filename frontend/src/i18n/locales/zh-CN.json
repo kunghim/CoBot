@@ -668,7 +668,7 @@
   "questions": {
     "prev": "上一张卡片",
     "next": "下一张卡片",
-    "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "有修改意见写在这里；留空直接确认", "returnToMe": "改完直接回到我确认（不再重新评审）" },
+    "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "有修改意见写在这里；留空直接确认", "returnToMe": "改完直接回到我确认（中间的检查不再重来）" },
     "title": "待你回答",
     "loadFailed": "问题加载失败",
     "answerPlaceholder": "输入回答…",

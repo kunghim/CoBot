@@ -1360,8 +1360,11 @@ type Question struct {
 	AnswerMessageId *string    `json:"answerMessageId,omitempty"`
 	AnswerText      *string    `json:"answerText,omitempty"`
 	AnsweredAt      *time.Time `json:"answeredAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	Id              string     `json:"id"`
+
+	// CanSkipChecks A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served.
+	CanSkipChecks *bool     `json:"canSkipChecks,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Id            string    `json:"id"`
 
 	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
 	Kind           QuestionKind   `json:"kind"`

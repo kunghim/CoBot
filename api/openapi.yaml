@@ -3914,6 +3914,9 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         answeredAt: { type: string, format: date-time }
+        canSkipChecks:
+          type: boolean
+          description: "A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served."
     Message:
       type: object
       required: [id, teamId, botId, kind, blocks, createdAt]

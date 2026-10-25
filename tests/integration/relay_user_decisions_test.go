@@ -229,6 +229,49 @@ func TestCancelledRequirementNotifiesLeader(t *testing.T) {
 	}
 }
 
+// The straight-return offer on a confirm card follows the route: there has
+// to be a checking stage between the work and the confirmation for a straight
+// return to skip anything.
+func TestConfirmCardSkipChecksFollowsTheRoute(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer", "qa-engineer"})
+	pm, dev, qa := bots[0], bots[1], bots[2]
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Name: "测试", Kind: domain.StageTest, OwnerID: qa.ID},
+		{Kind: domain.StageConfirm},
+		{Kind: domain.StageAccept},
+	})
+	ctx := context.Background()
+	openConfirm := func() domain.Question {
+		page, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "questions", TeamID: team.ID, State: "open"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page["items"].([]any) {
+			if q := item.(domain.Question); q.RequirementID == req.ID {
+				return q
+			}
+		}
+		t.Fatal("no open confirm question")
+		return domain.Question{}
+	}
+	// Nothing sits between the document and the first confirmation.
+	if first := openConfirm(); first.CanSkipChecks {
+		t.Fatal("the first confirmation offers a straight return with nothing to skip")
+	}
+	d.confirm(req)
+	d.handoff(d.open(req), domain.HandoffDone, "")
+	d.handoff(d.open(req), domain.HandoffDone, "")
+	// The test stage sits between the implementation and the second
+	// confirmation: a straight return would skip it.
+	if second := openConfirm(); !second.CanSkipChecks {
+		t.Fatal("the second confirmation does not offer skipping the test stage")
+	}
+}
+
 // hasMessageText reports whether one message renders to text containing the
 // given line.
 func hasMessageText(messages []domain.Message, text string) bool {
