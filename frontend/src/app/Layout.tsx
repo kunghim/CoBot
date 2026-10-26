@@ -43,7 +43,7 @@ export default function Layout() {
   }, [teams.data, botId, setBotId, teams.hasNextPage, teams.isFetchingNextPage, teams.isFetching]);
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
-  useNativeTitle(context?.team.name);
+  useNativeTitle(context?.team.name ?? t('app.title'));
 
   const teamList = (
     <aside aria-label={t('nav.teamList')} className="flex min-h-0 w-full flex-1 flex-col bg-side">
