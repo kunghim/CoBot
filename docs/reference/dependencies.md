@@ -74,7 +74,7 @@ Vite、TypeScript、Tailwind、Vitest、Playwright 和接口生成工具等开�
 
 ## 外部运行条件
 
-Codex CLI 由用户安装，CoBot 不将其放入发行包。当前兼容性下限按平台区分，见[引擎适配规则](../rules/engine.md)。
+用户需安装 ChatGPT 桌面端；CoBot 只复用其中的 Codex 程序，不将引擎放入发行包，也不使用独立 CLI。发现方式与私有环境边界见[引擎适配规则](../rules/engine.md)。
 Windows 桌面依赖已有 WebView2 Runtime；macOS 原生构建依赖平台工具链。
 这些外部条件与内嵌依赖分开说明，不将“需要用户安装”写成“由 CoBot 分发”。
 

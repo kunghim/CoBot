@@ -17,6 +17,7 @@ import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
+import DocumentCard from './DocumentCard';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
@@ -61,6 +62,29 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   useEffect(() => setExchange(null), [bot.id]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlder = useRef(false);
+  // Waiting cards float over the composer; whatever sticks out above it
+  // covers messages, so the scroll area gets that much room at its end and
+  // the covered content can scroll clear of the card.
+  const cardsRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const [cardScrollExtra, setCardScrollExtra] = useState(0);
+  useLayoutEffect(() => {
+    const cards = cardsRef.current;
+    const composer = composerRef.current;
+    if (!cards || !composer) return;
+    const measure = () => {
+      if (cards.offsetHeight === 0) {
+        setCardScrollExtra(0);
+        return;
+      }
+      setCardScrollExtra(Math.max(0, cards.offsetHeight - composer.offsetHeight) + 12);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(cards);
+    observer.observe(composer);
+    return () => observer.disconnect();
+  }, []);
   const loadEarlier = async () => {
     const element = scrollRef.current;
     const before = element ? { height: element.scrollHeight, top: element.scrollTop } : null;
@@ -195,7 +219,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           label={t('workspace.infoPanel')}
           closeLabel={t('common.close')}
           onClose={closeCard}
-          className="absolute bottom-3 right-3 top-3 z-10"
+          // Opens under the header's info button and grows downward from
+          // there; it overlays the conversation instead of squeezing it,
+          // and stops above the conversation's bottom edge.
+          className="animate-pop-in absolute -top-2 right-3 z-10 max-h-[calc(100%+0.5rem)] origin-top-right"
         >
           <WorkPanel />
         </FloatingCard>
@@ -217,7 +244,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className={`min-h-0 flex-1 overflow-y-auto py-4 ${workspace.cardOpen ? 'pl-8 pr-[25rem]' : 'px-8'}`}
+        className="min-h-0 flex-1 overflow-y-auto px-8 py-4"
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
@@ -281,13 +308,16 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             </li>
           )}
         </ul>
+        <div aria-hidden style={{ height: cardScrollExtra }} />
         </fieldset>
       </div>
       </div>
 
       {/* The exchange between two members is read-only: while it is open the
           composer and approval cards step aside (kept mounted, so nothing
-          typed or pending is lost). */}
+          typed or pending is lost). Waiting cards float over the composer
+          instead of stacking above it: the visible height stays, the draft
+          survives, and the messages behind fade into the card. */}
       <div className={`mx-auto w-full max-w-3xl space-y-2.5 px-8 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
         {queuedCount > 0 && (
           <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
@@ -295,44 +325,49 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </p>
         )}
 
-        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
-          <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
-          <QuestionCardStack key={`q-${bot.id}`} teamId={team.id} viewBotId={bot.id} />
-
-          <Composer
-            value={draft}
-            onChange={(value) => setDraft(bot.id, value)}
-            onSend={sendNow}
-            placeholder={t('conversation.placeholder', { name: headerTitle })}
-            disabled={blockReasonKey !== null}
-            sending={send.isPending}
-            sendLabel={t('conversation.send')}
-            running={!!activeRun}
-            stopping={stopping || interrupt.isPending}
-            stopLabel={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-            onStop={() => {
-              if (!activeRun?.id) return;
-              setStopping(true);
-              interrupt.mutate(activeRun.id, {
-                onSuccess: (result) => {
-                  if (result.responseState === 'unknown') {
+        <fieldset disabled={readOnly} className="relative m-0 min-w-0 border-0 p-0">
+          <div ref={composerRef}>
+            <Composer
+              value={draft}
+              onChange={(value) => setDraft(bot.id, value)}
+              onSend={sendNow}
+              placeholder={t('conversation.placeholder', { name: headerTitle })}
+              disabled={blockReasonKey !== null}
+              sending={send.isPending}
+              sendLabel={t('conversation.send')}
+              running={!!activeRun}
+              stopping={stopping || interrupt.isPending}
+              stopLabel={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
+              onStop={() => {
+                if (!activeRun?.id) return;
+                setStopping(true);
+                interrupt.mutate(activeRun.id, {
+                  onSuccess: (result) => {
+                    if (result.responseState === 'unknown') {
+                      setStopping(false);
+                      setActionError(t('errors.error.engine.interrupt_unconfirmed'));
+                    }
+                  },
+                  onError: (error) => {
                     setStopping(false);
-                    setActionError(t('errors.error.engine.interrupt_unconfirmed'));
-                  }
-                },
-                onError: (error) => {
-                  setStopping(false);
-                  setActionError(apiErrorMessage(t, error));
-                },
-              });
-            }}
-            options={
-              <>
-                <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
-                <ReasoningEffortSelect team={team} bot={bot} disabled={readOnly || blockReasonKey !== null} />
-              </>
-            }
-          />
+                    setActionError(apiErrorMessage(t, error));
+                  },
+                });
+              }}
+              options={
+                <>
+                  <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+                  <ReasoningEffortSelect team={team} bot={bot} bots={item.bots} disabled={readOnly || blockReasonKey !== null} />
+                </>
+              }
+            />
+          </div>
+          {/* The mist the card rises out of; clicks pass through, and with
+              no card waiting there is no mist to veil the composer. */}
+          <div ref={cardsRef} className="empty:before:hidden absolute inset-x-0 bottom-0 z-20 space-y-2 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-10 before:bg-gradient-to-t before:from-card before:to-transparent before:content-['']">
+            <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
+            <QuestionCardStack key={`q-${bot.id}`} teamId={team.id} viewBotId={bot.id} />
+          </div>
         </fieldset>
 
         <SessionStatsBar botId={bot.id} />
@@ -485,6 +520,7 @@ function MessageRow({
   }
 
   if (message.kind === 'system') return <SystemNote>{text}</SystemNote>;
+  if (message.kind === 'document') return <DocumentCard text={text} teamId={teamId} />;
 
   const isUser = message.kind === 'user';
   // A tool call the model wrote as text is not shown (see toolCallText.ts); a reply that was only that has nothing to show.

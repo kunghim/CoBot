@@ -51,7 +51,21 @@ type Settings struct {
 	BudgetScope       string `json:"budgetScope"`
 	BudgetTokens      int64  `json:"budgetTokens"`
 	EnginePath        string `json:"enginePath"`
+	// ModelSwitchPrompt says when switching a member's model offers to
+	// carry the teammates on the old provider along: always, never, or
+	// only when a member on that provider last failed.
+	ModelSwitchPrompt string `json:"modelSwitchPrompt"`
 }
+
+// Model switch prompt modes.
+const (
+	ModelSwitchAlways = "always"
+	ModelSwitchNever  = "never"
+	ModelSwitchSmart  = "smart"
+)
+
+// ModelSwitchPromptModes lists the accepted values in their UI order.
+var ModelSwitchPromptModes = []string{ModelSwitchAlways, ModelSwitchSmart, ModelSwitchNever}
 
 // DefaultSettings returns first-run values; model/engine fields stay empty
 // until the engine is configured — the product never fabricates them.
@@ -65,6 +79,7 @@ func DefaultSettings() Settings {
 		ColorMode:         "system",
 		Theme:             "classic",
 		BudgetScope:       BudgetScopeNone,
+		ModelSwitchPrompt: ModelSwitchAlways,
 	}
 }
 
@@ -78,6 +93,13 @@ func (s Settings) Validate() error {
 	}
 	if !oneOf(Themes, s.Theme) {
 		return InvalidRequest("error.settings.unsupported_theme", map[string]any{"theme": s.Theme})
+	}
+	prompt := s.ModelSwitchPrompt
+	if prompt == "" {
+		prompt = ModelSwitchAlways
+	}
+	if !oneOf(ModelSwitchPromptModes, prompt) {
+		return InvalidRequest("error.settings.unsupported_model_switch_prompt", map[string]any{"modelSwitchPrompt": s.ModelSwitchPrompt})
 	}
 	if s.MemberLimit < 1 || s.MemberLimit > 20 {
 		return InvalidRequest("error.settings.member_limit_range", map[string]any{"min": 1, "max": 20})
@@ -131,6 +153,7 @@ type SettingsPatch struct {
 	BudgetScope       *string `json:"budgetScope"`
 	BudgetTokens      *int64  `json:"budgetTokens"`
 	EnginePath        *string `json:"enginePath"`
+	ModelSwitchPrompt *string `json:"modelSwitchPrompt"`
 }
 
 // Apply returns the settings value after the patch, without persisting.
@@ -168,6 +191,9 @@ func (s Settings) Apply(p SettingsPatch) Settings {
 	}
 	if p.EnginePath != nil {
 		out.EnginePath = strings.TrimSpace(*p.EnginePath)
+	}
+	if p.ModelSwitchPrompt != nil {
+		out.ModelSwitchPrompt = strings.TrimSpace(*p.ModelSwitchPrompt)
 	}
 	return out
 }

@@ -11,6 +11,9 @@ const (
 	MessageKindAssistant     = "assistant"
 	MessageKindCollaboration = "collaboration"
 	MessageKindSystem        = "system"
+	// MessageKindDocument is a document the relay posts to be read where the
+	// conversation is — the requirement to confirm, the acceptance report.
+	MessageKindDocument = "document"
 )
 
 // Delivery statuses. accepted only means the engine accepted the turn, not

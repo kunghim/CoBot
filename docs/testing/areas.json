@@ -49,7 +49,8 @@
         "internal/app/open_path.go",
         "internal/api/http/handlers_teams.go",
         "internal/api/http/handlers_pages.go",
-        "frontend/src/features/teams/**"
+        "frontend/src/features/teams/**",
+        "internal/app/search.go"
       ]
     },
     {
@@ -108,7 +109,9 @@
         "frontend/src/app/ModeSelector.tsx",
         "frontend/src/app/ModeSwitch.tsx",
         "frontend/src/app/SidebarToggle.tsx",
-        "frontend/src/app/mode.ts"
+        "frontend/src/app/mode.ts",
+        "internal/app/search.go",
+        "frontend/src/features/search/**"
       ]
     },
     {
@@ -225,7 +228,8 @@
         "frontend/src/main.tsx",
         "frontend/index.html",
         "frontend/vite.config.ts",
-        "frontend/tailwind.config.*"
+        "frontend/tailwind.config.*",
+        "frontend/src/app/WindowChrome.tsx"
       ]
     },
     {

@@ -163,7 +163,7 @@ export function releaseNotes({ version, msiVersion, sourceCommit, repository, ru
     '## Downloads and requirements', '',
     '- Windows x64: choose the MSI installer or extract the complete ZIP; keep both helpers beside cobot-desktop.exe. Windows 10/11 and an existing WebView2 Runtime are required.',
     '- macOS Apple Silicon: open the ARM64 DMG, copy CoBot.app to Applications, eject the image, then open the installed app. Intel Macs are not included.',
-    '- Install the official Codex CLI separately: Windows minimum 0.161.0, macOS minimum 0.146.0. CoBot uses a private Codex environment and requires its own sign-in.',
+    '- Install the ChatGPT desktop app separately. CoBot uses only its bundled Codex engine, with a private environment and separate sign-in; standalone CLI installations are not used.',
     '- Packages are unsigned; macOS uses an ad-hoc bundle signature without Developer ID signing or notarization. If you trust the package, follow Apple’s per-app first-launch instructions: https://support.apple.com/102445. Do not disable Gatekeeper globally.',
     '- Compare each download with its adjacent .sha256 file. GitHub Source code archives are not runnable packages.',
     '- Updates are manual. Close CoBot before upgrading; preserve the complete data root. No automatic updater is included.', '',
@@ -175,7 +175,7 @@ export function releaseNotes({ version, msiVersion, sourceCommit, repository, ru
     '## 中文安装说明', '',
     '- Windows x64：任选 MSI 安装包或完整 ZIP；ZIP 解压后保留主程序旁的两个助手。系统需已有 WebView2 Runtime。',
     '- macOS Apple Silicon：打开 ARM64 DMG，将 CoBot.app 复制到「应用程序」，弹出映像后启动。暂不提供 Intel 包。',
-    '- 另行安装官方 Codex CLI（Windows 最低 0.161.0，macOS 最低 0.146.0），在 CoBot 的私有环境中独立登录。',
+    '- 需另行安装 ChatGPT 桌面端；CoBot 只使用其内置 Codex，在私有环境中独立登录，不使用独立安装的 CLI。',
     '- 程序未进行发行签名；macOS 也未公证。信任软件来源后，可参照 [Apple 的单个应用首次打开步骤](https://support.apple.com/zh-cn/102445)；不要全局关闭 Gatekeeper。',
     draftOnly
       ? '- 本次手动运行仅创建草稿；流水线不执行真实账号、Agent 审批或交互安装验收，不能据此认为这些场景已通过。'

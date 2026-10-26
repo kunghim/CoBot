@@ -101,8 +101,23 @@ describe('workspace persistence', () => {
     window.localStorage.setItem(key, JSON.stringify({ open: true, tabs: [{ id: 1 }] }));
     expect(loadWorkspace(key)).toBeNull();
     // A saved view of a tab that no longer exists falls back to the last tab.
-    saveWorkspace(key, { open: true, width: DEFAULT_WIDTH, tabs: [browserTab('t1')], activeId: 'gone' });
+    saveWorkspace(key, { open: true, width: DEFAULT_WIDTH, tabs: [browserTab('t1')], activeId: 'gone', fullView: false });
     expect(loadWorkspace(key)?.activeId).toBe('browser:t1');
+  });
+});
+
+describe('full view', () => {
+  it('flips only while the workspace is open, and leaves with the workspace', () => {
+    let state = workspaceReducer(initialWorkspaceState(), { type: 'toggleFullView' });
+    expect(state.fullView).toBe(false);
+    state = workspaceReducer(workspaceReducer(state, { type: 'newTab' }), { type: 'toggleFullView' });
+    expect(state.fullView).toBe(true);
+    state = workspaceReducer(state, { type: 'collapse' });
+    expect(state.fullView).toBe(false);
+  });
+
+  it('gives the workspace the whole room, conversation and list waiting', () => {
+    expect(layoutColumns(1600, true, true, 640, true)).toEqual({ showList: false, showConversation: false, workspaceWidth: 1600 - 56 - 8 });
   });
 });
 

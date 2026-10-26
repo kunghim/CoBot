@@ -3236,6 +3236,28 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/search:
+    get:
+      operationId: searchConversations
+      summary: Find chats and team members by conversation content
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, description: Plain text matched against chat titles, chat message text, and team member message text. }
+      responses:
+        "200":
+          description: Newest matches first, a few per group; archived and deleted conversations are never returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/SearchResults" }
+        default:
+          $ref: "#/components/responses/Error"
   /internal/v1/collaboration:
     post:
       operationId: collaborationTool
@@ -3527,6 +3549,35 @@ components:
             $ref: "#/components/schemas/Chat"
         nextCursor:
           type: "string"
+    SearchResults:
+      type: object
+      required: [query, chats, members]
+      properties:
+        query: { type: string }
+        chats:
+          type: array
+          items: { $ref: "#/components/schemas/ChatSearchResult" }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/MemberSearchResult" }
+    ChatSearchResult:
+      type: object
+      required: [chatId, title, snippet]
+      properties:
+        chatId: { type: string }
+        title: { type: string }
+        snippet: { type: string, description: Excerpt of the latest matching message; empty when only the title matched. }
+        activityAt: { type: string }
+    MemberSearchResult:
+      type: object
+      required: [teamId, teamName, botId, botName, snippet]
+      properties:
+        teamId: { type: string }
+        teamName: { type: string }
+        botId: { type: string }
+        botName: { type: string }
+        snippet: { type: string, description: Excerpt of the member's latest matching message. }
+        activityAt: { type: string }
     ChatSendInput:
       type: "object"
       required:
@@ -3863,6 +3914,9 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         answeredAt: { type: string, format: date-time }
+        canSkipChecks:
+          type: boolean
+          description: "A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served."
     Message:
       type: object
       required: [id, teamId, botId, kind, blocks, createdAt]
@@ -3870,7 +3924,7 @@ components:
         id: { type: string }
         teamId: { type: string }
         botId: { type: string }
-        kind: { type: string, enum: [user, assistant, collaboration, system] }
+        kind: { type: string, enum: [user, assistant, collaboration, system, document], description: document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card. }
         blocks:
           type: array
           items: { $ref: "#/components/schemas/TextBlock" }
@@ -4178,6 +4232,10 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt:
+          type: string
+          enum: [always, smart, never]
+          description: When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
     SettingsPatch:
       type: object
       properties:
@@ -4192,6 +4250,7 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt: { type: string, enum: [always, smart, never] }
     Snapshot:
       type: object
       required: [seq, instanceId, settings, teams, engine]
@@ -4256,14 +4315,19 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         lastMessage: { $ref: "#/components/schemas/MessagePreview" }
+        lastRunStatus:
+          type: string
+          enum: [completed, failed, interrupted, ""]
+          description: How the member's latest finished run ended; only team listings fill it.
     MessagePreview:
       type: object
-      description: The start of the latest message between the user and a member, for the team list.
+      description: The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
       required: [kind, text, createdAt]
       properties:
-        kind: { type: string, enum: [user, assistant] }
+        kind: { type: string, enum: [user, assistant, system, collaboration] }
         text: { type: string }
         createdAt: { type: string, format: date-time }
+        senderBotId: { type: string, description: Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user. }
     TeamWithBots:
       type: object
       required: [team, bots]

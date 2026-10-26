@@ -48,6 +48,7 @@ type Server struct {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/chats", s.handleListChats)
+	mux.HandleFunc("GET /api/v1/search", s.handleSearchConversations)
 	mux.HandleFunc("GET /api/v1/chat-navigation", s.handleChatNavigation)
 	mux.HandleFunc("POST /api/v1/chat-navigation", s.handleChangeChatNavigation)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/actions/{action}", s.handleChatAction)

@@ -9,6 +9,8 @@ import { authorize, setEngineMode } from './helpers';
 // process before the turn starts.
 test('native tool approval appears, decides, engine resumes', async ({ page, context }) => {
   await authorize(context);
+  // These scenarios exercise teams; a fresh profile now opens in chat mode.
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 
   const teamDir = join(process.env.COBOT_E2E_ROOT!, 'approval-' + Date.now());
   mkdirSync(teamDir, { recursive: true });

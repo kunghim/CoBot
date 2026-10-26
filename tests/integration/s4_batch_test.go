@@ -246,8 +246,10 @@ func TestHandoffWakesTheNextStage(t *testing.T) {
 	if !strings.Contains(next.Text, "【接力卡片】验收汇报") || !strings.Contains(next.Text, "接口已实现，go test ./... 通过") || !strings.Contains(next.Text, "handoff") {
 		t.Fatalf("leader input:\n%s", next.Text)
 	}
+	// Card messages carry their card in run_id; the notes of the user's
+	// decisions do not, so they stay out of this count.
 	var leaderMessages int
-	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system'`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM messages WHERE bot_id = ? AND kind = 'system' AND run_id != ''`, leader.ID).Scan(&leaderMessages); err != nil || leaderMessages != 1 {
 		t.Fatalf("leader cards = %d (%v)", leaderMessages, err)
 	}
 	// The leader's conversation shows the card as coming from the member.
@@ -264,13 +266,21 @@ func TestHandoffWakesTheNextStage(t *testing.T) {
 	if !sawCard {
 		t.Fatal("leader page: the card does not name the member")
 	}
-	// The record between the two members carries the card.
+	// The record between the two members carries both cards: the first one
+	// the confirmed route dispatched in the project manager's name, and the
+	// acceptance card the member handed off in its own name.
 	record, err := h.app.ListPage(ctx, h.user, app.PageRequest{Kind: "collaboration", TeamID: team.ID, BotID: member.ID, PeerBotID: leader.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if items := record["items"].([]any); len(items) != 1 || items[0].(domain.Message).Kind != domain.MessageKindSystem {
+	items := record["items"].([]any)
+	if len(items) != 2 {
 		t.Fatalf("exchange record = %+v", items)
+	}
+	first, second := items[0].(domain.Message), items[1].(domain.Message)
+	if first.Kind != domain.MessageKindSystem || first.SourceBotID != leader.ID ||
+		second.Kind != domain.MessageKindSystem || second.SourceBotID != member.ID {
+		t.Fatalf("exchange record = %s then %s (%s, %s)", first.SourceBotID, second.SourceBotID, first.Kind, second.Kind)
 	}
 }
 

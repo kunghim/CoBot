@@ -153,6 +153,7 @@ function pageQuery(params: Record<string, string | number | undefined>): string 
 
 export const api = {
   listChats: (cursor = '', filter: { pinned?: string; archived?: boolean; sort?: string; search?: string; section?: string } = {}) => request<import('./types').ChatList>('GET', '/api/v1/chats' + pageQuery({ cursor, ...filter, archived: filter.archived ? 'true' : undefined })),
+  searchConversations: (q: string) => request<import('./types').SearchResults>('GET', '/api/v1/search' + pageQuery({ q })),
   chatNavigation: () => request<import('./types').ChatNavigation>('GET', '/api/v1/chat-navigation'),
   changeChatNavigation: (body: import('./types').ChatNavigationInput) => request<import('./types').ChatNavigation>('POST', '/api/v1/chat-navigation', body),
   organizeChat: (id: string, action: 'pin' | 'unpin' | 'move' | 'reorder' | 'archive' | 'restore', body: { expectedRevision: number; sectionId?: string; beforeId?: string }) => request<import('./types').Chat>('POST', `/api/v1/chats/${encodeURIComponent(id)}/actions/${action}`, body),

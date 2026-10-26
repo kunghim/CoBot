@@ -8,11 +8,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngine, useEngineModels, useProviders, useSetBotModel, useSetTeamReasoningEffort, useSettings } from '../../api/queries';
 import type { Bot, EngineModel, Provider, Team } from '../../api/types';
-import { ModelEffortPicker, useToast } from '../../components/ui';
+import { AlertDialog, ModelEffortPicker, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
 import { choiceKey, DEFAULT_EFFORTS, engineDefaultModel, isOfficial, memberChoice, selectableModels } from '../providers/providerModels';
 import { useProviderName } from '../providers/useProviderName';
 import { createSettledSave, type SettledSave } from './settledSave';
+import { useOpenModelPicker } from './modelPicker';
 
 /** The model members run with: the configured default model, else the
  * engine's own default. */
@@ -49,8 +50,8 @@ export function effortChoices(provider: Provider | undefined, model: string, eng
   return { levels: declared.map((effort) => ({ effort })), toggle: own.thinkingToggle ?? false, defaultEffort: own.defaultEffort ?? '' };
 }
 
-export default function ReasoningEffortSelect({ team, bot, disabled }: { team: Team; bot: Bot; disabled?: boolean }) {
-  const { t } = useTranslation();
+export default function ReasoningEffortSelect({ team, bot, bots, disabled }: { team: Team; bot: Bot; bots?: Bot[]; disabled?: boolean }) {
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const settings = useSettings(true);
   const providers = useProviders();
@@ -61,6 +62,15 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
   const providerName = useProviderName();
   const engineList = models.data?.models ?? [];
   const providerList = providers.data?.providers;
+  // A failed turn's switch-model entry opens this picker from where the
+  // failure shows.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  useOpenModelPicker(bot.id, () => setPickerOpen(true));
+  // A switch that leaves teammates on the member's old provider offers to
+  // carry them along, so one quota that ran out does not fail them one by
+  // one.
+  const [batch, setBatch] = useState<{ targets: Bot[]; providerId: string; model: string; label: string } | null>(null);
+  const [batchError, setBatchError] = useState('');
 
   const unavailable = t('settings.modelUnavailable');
   const offered = selectableModels(providerList, engineList, engine.data?.loggedIn ?? false, providerName);
@@ -128,9 +138,67 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
 
   const chosenLabel = offered.find((entry) => entry.key === selected)?.label ?? choice.model;
 
+  const onModel = (key: string) => {
+    const next = offered.find((entry) => entry.key === key);
+    if (!next || key === selected) return;
+    // Teammates resolved to the provider the member just left — by their own
+    // choice or through the default model — would hit what the member ran
+    // from. Switching them along stays a user decision.
+    const targets = (bots ?? []).filter(
+      (member) =>
+        member.id !== bot.id &&
+        memberChoice(member, team, settings.data, providerList, engineDefaultModel(engineList), engine.data?.loggedIn ?? false).providerId === choice.providerId,
+    );
+    // Whether the offer to carry teammates along shows at all follows the
+    // setting: always, never, or only when the switch answers a failure —
+    // a member on the old provider whose last session failed.
+    const mode = settings.data?.modelSwitchPrompt || 'always';
+    const answersFailure = bot.lastRunStatus === 'failed' || targets.some((member) => member.lastRunStatus === 'failed');
+    const offer = mode === 'always' || (mode === 'smart' && answersFailure);
+    setModel.mutate(
+      { botId: bot.id, providerId: next.providerId, model: next.model, expectedRevision: bot.revision },
+      {
+        onSuccess: () => {
+          toast.show({ tone: 'success', title: t('effort.modelSwitched', { name: bot.name, model: next.label, provider: next.group }) });
+          if (offer && targets.length > 0) setBatch({ targets, providerId: next.providerId, model: next.model, label: next.label });
+        },
+        onError: (error) => toast.show({ tone: 'danger', title: t('effort.saveFailed'), description: apiErrorMessage(t, error) }),
+      },
+    );
+  };
+
+  const switchAll = async () => {
+    if (!batch) return;
+    setBatchError('');
+    const failed: Bot[] = [];
+    await Promise.all(
+      batch.targets.map(async (member) => {
+        try {
+          await setModel.mutateAsync({ botId: member.id, providerId: batch.providerId, model: batch.model, expectedRevision: member.revision });
+        } catch {
+          failed.push(member);
+        }
+      }),
+    );
+    if (failed.length > 0) {
+      // A member that switched is done; a retry offers only the rest, so
+      // switched members are not re-sent against revisions they outgrew.
+      setBatch({ ...batch, targets: failed });
+      setBatchError(t('effort.modelSwitchedAllFailed', { names: new Intl.ListFormat(i18n.language, { type: 'unit' }).format(failed.map((member) => member.name)) }));
+      return;
+    }
+    const count = batch.targets.length;
+    const label = batch.label;
+    setBatch(null);
+    toast.show({ tone: 'success', title: t('effort.modelSwitchedAll', { count, model: label }) });
+  };
+
   return (
+    <>
     <ModelEffortPicker
       disabled={disabled}
+      open={pickerOpen}
+      onOpenChange={setPickerOpen}
       triggerLabel={
         levels.length > 0 || toggle
           ? `${t('effort.label')}：${off ? t('effort.off') : current ? label(current) : t('effort.default')} · ${chosenLabel}`
@@ -138,17 +206,7 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
       }
       models={options}
       model={selected}
-      onModel={(key) => {
-        const next = offered.find((entry) => entry.key === key);
-        if (!next || key === selected) return;
-        setModel.mutate(
-          { botId: bot.id, providerId: next.providerId, model: next.model, expectedRevision: bot.revision },
-          {
-            onSuccess: () => toast.show({ tone: 'success', title: t('effort.modelSwitched', { name: bot.name, model: next.label, provider: next.group }) }),
-            onError: (error) => toast.show({ tone: 'danger', title: t('effort.saveFailed'), description: apiErrorMessage(t, error) }),
-          },
-        );
-      }}
+      onModel={onModel}
       levels={levels.map((option) => ({ value: option.effort, label: label(option.effort) }))}
       effort={shown}
       onEffort={chooseEffort}
@@ -158,5 +216,18 @@ export default function ReasoningEffortSelect({ team, bot, disabled }: { team: T
       labels={{ effort: t('effort.label'), reset: t('effort.reset'), chooseModel: t('effort.chooseModel'), back: t('effort.back') }}
       note={levels.length > 0 || toggle ? `${t('effort.note')} ${t('effort.modelNote')}` : t('effort.modelNote')}
     />
+    <AlertDialog
+      open={batch !== null}
+      onCancel={() => setBatch(null)}
+      onConfirm={switchAll}
+      danger={false}
+      title={t('effort.switchOthersTitle', { count: batch?.targets.length ?? 0, model: batch?.label ?? '' })}
+      description={t('effort.switchOthersNote')}
+      confirmLabel={t('effort.switchAll')}
+      cancelLabel={t('effort.switchThisOnly')}
+      busy={setModel.isPending}
+      error={batchError}
+    />
+    </>
   );
 }

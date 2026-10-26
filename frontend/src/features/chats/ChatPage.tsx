@@ -8,6 +8,7 @@ import { forgetChatRun, useChatLiveRuns } from '../../api/live';
 import { useEngine, useEngineModels, useProviders, useSettings } from '../../api/queries';
 import { Button, ChatComposer, CopyButton, MessageBubble, ModelEffortPicker, TextInput, cx } from '../../components/ui';
 import { ShellToggle } from '../../app/shell';
+import { useNativeTitle } from '../../app/WindowChrome';
 import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
@@ -40,6 +41,7 @@ function ChatPage({ id }: { id?: string }) {
   const [bottom, setBottom] = useState(true);
   const page = query.data?.pages[0];
   const chat = page?.chat;
+  useNativeTitle(chat?.title ?? t('chat.new'));
   const messages = [...new Map(query.data?.pages.slice().reverse().flatMap((p) => p.messages).map((m) => [m.id, m]) ?? []).values()];
   const runs = new Map(query.data?.pages.slice().reverse().flatMap((p) => p.runs).map((r) => [r.id, r]));
   const active = page?.runs.find((run) => isChatBlocked(run.status));

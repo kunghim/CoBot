@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { controlHeight, cx, interactive, type ControlSize } from './foundation';
 import { useField } from './Field';
 
-import { controlFrame } from './controlFrame';
+import { controlFrame, controlFramePill } from './controlFrame';
 
 const invalidFrame = 'border-red-500 hover:border-red-500 focus-within:border-red-500 focus-within:ring-red-500/25 dark:border-red-500';
 const disabledFrame = 'opacity-60 cursor-not-allowed';
@@ -19,10 +19,12 @@ export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   invalid?: boolean;
   /** Machine values (paths, ids, keys) use the monospace face. */
   mono?: boolean;
+  /** Full-radius frame for toolbar-scale controls beside capsule controls. */
+  pill?: boolean;
 }
 
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { size = 'md', prefix, suffix, invalid, mono, className, id, disabled, autoComplete, ...rest },
+  { size = 'md', prefix, suffix, invalid, mono, pill, className, id, disabled, autoComplete, ...rest },
   ref,
 ) {
   const field = useField();
@@ -31,7 +33,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
   // endpoint address under a number field); only a password lets it help.
   const complete = autoComplete ?? (rest.type === 'password' ? undefined : 'off');
   return (
-    <div className={cx('flex items-center gap-2 px-3', controlFrame, controlHeight[size], isInvalid && invalidFrame, disabled && disabledFrame, className)}>
+    <div className={cx('flex items-center gap-2 px-3', pill ? controlFramePill : controlFrame, controlHeight[size], isInvalid && invalidFrame, disabled && disabledFrame, className)}>
       {prefix && <span className="flex shrink-0 items-center text-neutral-400">{prefix}</span>}
       <input
         ref={ref}

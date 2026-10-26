@@ -5,6 +5,8 @@ import { authorize, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  // These scenarios exercise teams; a fresh profile now opens in chat mode.
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The workspace beside the conversation: the new-tab button opens it on its
@@ -36,6 +38,20 @@ test('workspace opens with tabs, the info card closes on Escape', async ({ page 
   await expect(workspace.getByRole('tab', { name: '新建标签页' })).toHaveAttribute('aria-selected', 'true');
   await expect(create).toHaveCount(0);
 
+  // If the workspace squeezes the list out, the conversation head follows
+  // the actual conversation edge. Expanding the list gives it room again.
+  await page.setViewportSize({ width: 900, height: 900 });
+  const toggle = page.getByTestId('app-title-bar').getByRole('button', { name: '展开团队列表', exact: true });
+  await expect(toggle).toBeVisible();
+  // The squeeze-out follows a resize listener; the geometry settles async.
+  await expect.poll(async () => Math.abs((await toggle.boundingBox())!.x - (await page.getByRole('main').boundingBox())!.x)).toBeLessThan(1);
+  await toggle.click();
+  await expect(page.getByRole('complementary', { name: '团队列表', exact: true })).toBeVisible();
+  await expect(workspace).toHaveCount(0);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await create.click();
+  await expect(workspace).toBeVisible();
+
   // The info card floats over the conversation; Escape closes it and the
   // focus returns to the button that opened it.
   const info = page.getByRole('button', { name: '展开信息面板' });
@@ -48,11 +64,13 @@ test('workspace opens with tabs, the info card closes on Escape', async ({ page 
   await expect(info).toBeFocused();
 
   // A browser page of the user's own: the new-tab page opens one, the tab
-  // shows the page, the viewport row and the shared status line. The
-  // browser takes a moment to come up.
+  // opens on the empty state until it has an address, with the viewport row
+  // beside the address bar.
   await page.getByRole('button', { name: /打开一个网页标签/ }).click();
   await expect(workspace.getByRole('tab', { name: /空白页|about:blank/ })).toHaveAttribute('aria-selected', 'true', { timeout: 20000 });
-  await expect(page.getByText('成员需要时可以查看')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('粘贴或输入 URL 以打开网页')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('textbox', { name: /页面宽度/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '在系统浏览器打开' })).toBeDisabled();
   await expect(page.getByRole('combobox', { name: /视口大小/ })).toBeVisible();
 
   // Closing the last tab takes the workspace down; the button returns.

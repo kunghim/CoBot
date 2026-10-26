@@ -13,6 +13,9 @@ import { isChatRunning } from './state';
 function processOf(run: ChatRun): ProcessRun {
   return {
     id: run.id,
+    // A chat's model belongs to the chat, not to a member: its turn view
+    // has no switch-model entry, so the run stays anonymous here.
+    botId: '',
     status: run.status as ProcessRun['status'],
     startedAt: run.startedAt,
     endedAt: run.endedAt,

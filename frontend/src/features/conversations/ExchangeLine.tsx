@@ -49,9 +49,10 @@ export function taskCardOf(blocks: Array<{ type: string; text: string }>): TaskC
 }
 
 /** Whether a message passed between members (or from the user's own task
- * assignment), and so reads as an exchange line rather than a bubble. */
+ * assignment), and so reads as an exchange line rather than a bubble. A
+ * message a member addressed to itself is CoBot's record, not an exchange. */
 export function isExchange(message: Message): boolean {
-  if (message.kind === 'collaboration') return true;
+  if (message.kind === 'collaboration') return message.sourceBotId !== message.botId;
   if (message.kind !== 'system') return false;
   if (message.sourceBotId) return message.sourceBotId !== message.botId;
   return taskCardOf(message.blocks) !== null;
