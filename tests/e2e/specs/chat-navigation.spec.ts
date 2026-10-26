@@ -127,6 +127,9 @@ test('manual drag and keyboard order agree; nested choices stay inside a narrow 
   await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByRole('button', { name: '整理聊天列表' }).click();
   const display = page.getByRole('menuitem', { name: '显示方式', exact: true });
+  // The sort save above is still in flight at first and grays the items out;
+  // keyed expansion needs the item focusable and enabled again.
+  await expect(display).toBeEnabled();
   await display.focus();
   await display.press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '合并显示' }).click();
