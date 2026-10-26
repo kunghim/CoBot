@@ -130,6 +130,9 @@ test('manual drag and keyboard order agree; nested choices stay inside a narrow 
   await display.focus();
   await display.press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '合并显示' }).click();
+  // The drag hit-tests the rows, so the menu must be gone first (same race
+  // as the reopen guard above).
+  await expect(page.getByRole('menu')).toHaveCount(0);
   const order = () => page.locator('[data-chat-id]').evaluateAll((rows, targets) => rows.map((row) => row.getAttribute('data-chat-id')).filter((id) => targets.includes(id!)), ids);
   await expect.poll(order).toEqual(ids);
   await page.locator(`[data-chat-id="${ids[2]}"]`).dragTo(page.locator(`[data-chat-id="${ids[0]}"]`));
