@@ -9,7 +9,7 @@ import { WorkspaceProvider, useWorkspace } from '../features/workspace/Workspace
 import { MAX_WIDTH, MIN_WIDTH, layoutColumns } from '../features/workspace/state';
 import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacCorner } from './WindowChrome';
+import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed } from './WindowChrome';
 import { useShell, useShellListLayout } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
 
@@ -83,7 +83,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
   const viewport = useViewportWidth();
   const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width);
   useShellListLayout(layout.showList, collapse);
-  const macCorner = useMacCorner();
+  const macCorner = useMacWindowed();
   return (
       <div className="relative flex h-full bg-side text-neutral-900 dark:text-neutral-100">
         <WindowCorner />

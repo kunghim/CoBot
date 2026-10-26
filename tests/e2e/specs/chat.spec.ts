@@ -282,10 +282,11 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
         expect(bar.y).toBe(0);
       }
       if (platform === 'mac') {
-        // Fullscreen reveals the traffic lights under the menu bar on hover,
-        // so the rail logo stays below the corner in every window state.
+        // While windowed the corner is reserved (logo below it); fullscreen
+        // cancels the reservation and the top of the window stays in use.
         const logo = (await page.getByTestId('rail-logo').boundingBox())!;
-        expect(logo.y).toBeGreaterThanOrEqual(40);
+        if (!fullscreen) expect(logo.y).toBeGreaterThanOrEqual(40);
+        else expect(logo.y).toBeLessThan(40);
       }
       for (const width of [320, 390, 640, 1024, 1440]) {
         await page.setViewportSize({ width, height: 900 });
@@ -294,7 +295,7 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
           // While macOS is windowed and the list is folded, the conversation
           // slides under the corner reservation and the toggle clears it by
           // the same 32px the sidebar head uses.
-          const expectInset = platform === 'mac' && !open ? 32 : 0;
+          const expectInset = platform === 'mac' && !fullscreen && !open ? 32 : 0;
           await expect.poll(async () => {
             const control = (await toggle.boundingBox())!;
             const canvas = (await page.getByRole('main').boundingBox())!;
