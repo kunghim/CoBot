@@ -5,7 +5,8 @@ test.beforeEach(async ({ context }) => {
   await authorize(context);
 });
 
-// The default-model page must not tell a signed-in user to sign in.
+// The default-model picker (inside the providers section) must not tell
+// a signed-in user to sign in.
 //
 // The model list comes from the engine, which answers in seconds rather than
 // milliseconds: it starts a control server and asks Codex for its catalogue.
@@ -38,7 +39,7 @@ test('the default-model page waits for the engine instead of asking a signed-in 
     await route.continue();
   });
 
-  await page.goto('/settings/models');
+  await page.goto('/settings/providers');
 
   const emptyState = page.getByText(/还没有可选的模型|No model to choose yet/);
   const signInPrompt = page.getByText(/登录 ChatGPT 账号|sign in with ChatGPT/);

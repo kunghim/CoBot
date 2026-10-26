@@ -44,6 +44,7 @@ vi.mock('../../api/queries', () => ({
   useApplyEngineCatalog: () => ({ mutate: state.apply, isPending: false }),
   // The ChatGPT account's card drives its own sign-in.
   useEngine: () => ({ data: { status: 'ready', loggedIn: false }, refetch: vi.fn() }),
+  useEngineModels: () => ({ data: { models: [{ slug: 'fake-model', displayName: 'Fake Model', isDefault: true }] }, isPending: false }),
   useEngineLogin: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
@@ -153,7 +154,7 @@ describe('provider settings', () => {
     host.remove();
   });
 
-  const render = () => act(() => root.render(h(QueryClientProvider, { client }, h(ProviderSection, {}))));
+  const render = () => act(() => root.render(h(QueryClientProvider, { client }, h(ProviderSection, { settings: state.settings as never, save: state.update, errors: {} }))));
 
   const byText = (text: string) =>
     [...host.querySelectorAll('button')].find((button) => button.textContent?.includes(text));
@@ -171,7 +172,10 @@ describe('provider settings', () => {
     expect(switches).toHaveLength(2);
     expect(switches.every((entry) => entry.getAttribute('aria-checked') === 'true')).toBe(true);
     const text = host.textContent ?? '';
-    expect(text.indexOf('OpenAI')).toBeLessThan(text.indexOf('DeepSeek'));
+    // The default-model card now sits above the list and may name any
+    // provider, so the order is read from the provider cards themselves:
+    // the account's sign-in line, then the gateway's endpoint.
+    expect(text.indexOf('登录 ChatGPT 账号')).toBeLessThan(text.indexOf('https://api.deepseek.com/v1'));
     expect(text).toContain('https://api.deepseek.com/v1');
     // Nothing reads as a single provider "in use" any more.
     expect(text).not.toContain('使用中');

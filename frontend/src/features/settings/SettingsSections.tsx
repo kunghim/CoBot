@@ -34,7 +34,7 @@ import {
   type Tone,
 } from '../../components/ui';
 type Save = (field: string, patch: SettingsPatch, rollback?: (persisted: Settings) => void) => void;
-type SectionProps = { settings: Settings; save: Save; errors: Record<string, string>; budgetScale?: BudgetScale };
+export type SectionProps = { settings: Settings; save: Save; errors: Record<string, string>; budgetScale?: BudgetScale };
 
 /**
  * NumberField keeps a draft while the value changes and saves it once the
@@ -316,12 +316,15 @@ export function EngineSection() {
 }
 
 /**
- * ModelsSection names the default model: the one a member runs with until
+ * DefaultModelCard names the default model: the one a member runs with until
  * it chooses its own in the conversation. Any model of an enabled provider
  * can be the default; the choice is one write of the provider and the model
- * together, so the two never disagree.
+ * together, so the two never disagree. It lives inside the providers
+ * section, above the provider list, and shows the model the members
+ * actually follow when nothing is named (the runtime fallback), not an
+ * empty picker.
  */
-export function ModelsSection({ settings, save, errors }: SectionProps) {
+export function DefaultModelCard({ settings, save, errors }: SectionProps) {
   const { t } = useTranslation();
   const engine = useEngine();
   const providers = useProviders();
