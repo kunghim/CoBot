@@ -63,6 +63,14 @@ const (
 	AvatarRefKindUpload  AvatarRefKind = "upload"
 )
 
+// Defines values for BotLastRunStatus.
+const (
+	BotLastRunStatusCompleted   BotLastRunStatus = "completed"
+	BotLastRunStatusEmpty       BotLastRunStatus = ""
+	BotLastRunStatusFailed      BotLastRunStatus = "failed"
+	BotLastRunStatusInterrupted BotLastRunStatus = "interrupted"
+)
+
 // Defines values for BotStatus.
 const (
 	BotStatusIdle            BotStatus = "idle"
@@ -201,14 +209,17 @@ const (
 const (
 	MessageKindAssistant     MessageKind = "assistant"
 	MessageKindCollaboration MessageKind = "collaboration"
+	MessageKindDocument      MessageKind = "document"
 	MessageKindSystem        MessageKind = "system"
 	MessageKindUser          MessageKind = "user"
 )
 
 // Defines values for MessagePreviewKind.
 const (
-	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
-	MessagePreviewKindUser      MessagePreviewKind = "user"
+	MessagePreviewKindAssistant     MessagePreviewKind = "assistant"
+	MessagePreviewKindCollaboration MessagePreviewKind = "collaboration"
+	MessagePreviewKindSystem        MessagePreviewKind = "system"
+	MessagePreviewKindUser          MessagePreviewKind = "user"
 )
 
 // Defines values for ModelCatalogStatusSource.
@@ -378,6 +389,13 @@ const (
 	SettingsLanguageZhCN SettingsLanguage = "zh-CN"
 )
 
+// Defines values for SettingsModelSwitchPrompt.
+const (
+	SettingsModelSwitchPromptAlways SettingsModelSwitchPrompt = "always"
+	SettingsModelSwitchPromptNever  SettingsModelSwitchPrompt = "never"
+	SettingsModelSwitchPromptSmart  SettingsModelSwitchPrompt = "smart"
+)
+
 // Defines values for SettingsTheme.
 const (
 	SettingsThemeClassic  SettingsTheme = "classic"
@@ -404,6 +422,13 @@ const (
 const (
 	SettingsPatchLanguageEn   SettingsPatchLanguage = "en"
 	SettingsPatchLanguageZhCN SettingsPatchLanguage = "zh-CN"
+)
+
+// Defines values for SettingsPatchModelSwitchPrompt.
+const (
+	SettingsPatchModelSwitchPromptAlways SettingsPatchModelSwitchPrompt = "always"
+	SettingsPatchModelSwitchPromptNever  SettingsPatchModelSwitchPrompt = "never"
+	SettingsPatchModelSwitchPromptSmart  SettingsPatchModelSwitchPrompt = "smart"
 )
 
 // Defines values for SettingsPatchTheme.
@@ -549,9 +574,9 @@ const (
 
 // Defines values for ListQuestionsParamsStatus.
 const (
-	Answered  ListQuestionsParamsStatus = "answered"
-	Cancelled ListQuestionsParamsStatus = "cancelled"
-	Open      ListQuestionsParamsStatus = "open"
+	ListQuestionsParamsStatusAnswered  ListQuestionsParamsStatus = "answered"
+	ListQuestionsParamsStatusCancelled ListQuestionsParamsStatus = "cancelled"
+	ListQuestionsParamsStatusOpen      ListQuestionsParamsStatus = "open"
 )
 
 // Defines values for PatchTeamJSONBodyPermissionMode.
@@ -713,8 +738,11 @@ type Bot struct {
 	Id           string     `json:"id"`
 	IsLeader     bool       `json:"isLeader"`
 
-	// LastMessage The start of the latest message between the user and a member, for the team list.
+	// LastMessage The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+
+	// LastRunStatus How the member's latest finished run ended; only team listings fill it.
+	LastRunStatus *BotLastRunStatus `json:"lastRunStatus,omitempty"`
 
 	// Model The model this member chose, one its provider serves.
 	Model *string `json:"model,omitempty"`
@@ -728,6 +756,9 @@ type Bot struct {
 	Status      BotStatus `json:"status"`
 	TeamId      string    `json:"teamId"`
 }
+
+// BotLastRunStatus How the member's latest finished run ended; only team listings fill it.
+type BotLastRunStatus string
 
 // BotStatus defines model for Bot.Status.
 type BotStatus string
@@ -1122,24 +1153,29 @@ type Message struct {
 	CreatedAt      time.Time              `json:"createdAt"`
 	DeliveryStatus *MessageDeliveryStatus `json:"deliveryStatus,omitempty"`
 	Id             string                 `json:"id"`
-	Kind           MessageKind            `json:"kind"`
-	RequestId      *string                `json:"requestId,omitempty"`
-	RunId          *string                `json:"runId,omitempty"`
-	SourceBotId    *string                `json:"sourceBotId,omitempty"`
-	TeamId         string                 `json:"teamId"`
+
+	// Kind document is a relay-posted document (the requirement to confirm
+	Kind        MessageKind `json:"kind"`
+	RequestId   *string     `json:"requestId,omitempty"`
+	RunId       *string     `json:"runId,omitempty"`
+	SourceBotId *string     `json:"sourceBotId,omitempty"`
+	TeamId      string      `json:"teamId"`
 }
 
 // MessageDeliveryStatus defines model for Message.DeliveryStatus.
 type MessageDeliveryStatus string
 
-// MessageKind defines model for Message.Kind.
+// MessageKind document is a relay-posted document (the requirement to confirm
 type MessageKind string
 
-// MessagePreview The start of the latest message between the user and a member, for the team list.
+// MessagePreview The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 type MessagePreview struct {
 	CreatedAt time.Time          `json:"createdAt"`
 	Kind      MessagePreviewKind `json:"kind"`
-	Text      string             `json:"text"`
+
+	// SenderBotId Who sent it
+	SenderBotId *string `json:"senderBotId,omitempty"`
+	Text        string  `json:"text"`
 }
 
 // MessagePreviewKind defines model for MessagePreview.Kind.
@@ -1360,8 +1396,11 @@ type Question struct {
 	AnswerMessageId *string    `json:"answerMessageId,omitempty"`
 	AnswerText      *string    `json:"answerText,omitempty"`
 	AnsweredAt      *time.Time `json:"answeredAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	Id              string     `json:"id"`
+
+	// CanSkipChecks A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served.
+	CanSkipChecks *bool     `json:"canSkipChecks,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Id            string    `json:"id"`
 
 	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
 	Kind           QuestionKind   `json:"kind"`
@@ -1508,13 +1547,16 @@ type Settings struct {
 	DefaultModel string              `json:"defaultModel"`
 
 	// DefaultProvider The model provider the profile runs with; empty means the engine's own.
-	DefaultProvider   *string          `json:"defaultProvider,omitempty"`
-	EnginePath        string           `json:"enginePath"`
-	Language          SettingsLanguage `json:"language"`
-	MemberLimit       int              `json:"memberLimit"`
-	ReviewRejectLimit int              `json:"reviewRejectLimit"`
-	Revision          int64            `json:"revision"`
-	Theme             SettingsTheme    `json:"theme"`
+	DefaultProvider *string          `json:"defaultProvider,omitempty"`
+	EnginePath      string           `json:"enginePath"`
+	Language        SettingsLanguage `json:"language"`
+	MemberLimit     int              `json:"memberLimit"`
+
+	// ModelSwitchPrompt When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+	ModelSwitchPrompt *SettingsModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
+	ReviewRejectLimit int                        `json:"reviewRejectLimit"`
+	Revision          int64                      `json:"revision"`
+	Theme             SettingsTheme              `json:"theme"`
 }
 
 // SettingsBudgetScope defines model for Settings.BudgetScope.
@@ -1525,6 +1567,9 @@ type SettingsColorMode string
 
 // SettingsLanguage defines model for Settings.Language.
 type SettingsLanguage string
+
+// SettingsModelSwitchPrompt When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+type SettingsModelSwitchPrompt string
 
 // SettingsTheme defines model for Settings.Theme.
 type SettingsTheme string
@@ -1538,12 +1583,13 @@ type SettingsPatch struct {
 	DefaultModel *string                   `json:"defaultModel,omitempty"`
 
 	// DefaultProvider The model provider to run with; must name a configured provider.
-	DefaultProvider   *string                `json:"defaultProvider,omitempty"`
-	EnginePath        *string                `json:"enginePath,omitempty"`
-	Language          *SettingsPatchLanguage `json:"language,omitempty"`
-	MemberLimit       *int                   `json:"memberLimit,omitempty"`
-	ReviewRejectLimit *int                   `json:"reviewRejectLimit,omitempty"`
-	Theme             *SettingsPatchTheme    `json:"theme,omitempty"`
+	DefaultProvider   *string                         `json:"defaultProvider,omitempty"`
+	EnginePath        *string                         `json:"enginePath,omitempty"`
+	Language          *SettingsPatchLanguage          `json:"language,omitempty"`
+	MemberLimit       *int                            `json:"memberLimit,omitempty"`
+	ModelSwitchPrompt *SettingsPatchModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
+	ReviewRejectLimit *int                            `json:"reviewRejectLimit,omitempty"`
+	Theme             *SettingsPatchTheme             `json:"theme,omitempty"`
 }
 
 // SettingsPatchBudgetScope defines model for SettingsPatch.BudgetScope.
@@ -1554,6 +1600,9 @@ type SettingsPatchColorMode string
 
 // SettingsPatchLanguage defines model for SettingsPatch.Language.
 type SettingsPatchLanguage string
+
+// SettingsPatchModelSwitchPrompt defines model for SettingsPatch.ModelSwitchPrompt.
+type SettingsPatchModelSwitchPrompt string
 
 // SettingsPatchTheme defines model for SettingsPatch.Theme.
 type SettingsPatchTheme string

@@ -11,8 +11,10 @@ const BOT = 'github-actions[bot]';
 const MARKER = 'cobot-issue-commands:v1';
 const HELP = 'Use a comment containing only `/claim`, `/unclaim`, or `/help`. '
   + '`/claim` assigns you and marks work in progress; `/unclaim` releases only your assignment and restores the previous status. '
+  + 'Assigning yourself on the issue page claims the same way. '
   + 'Claiming does not approve a feature or merge a PR.\n\n'
-  + '请单独评论 `/claim`、`/unclaim` 或 `/help`。认领自动分配给自己并标记正在处理；取消只移除自己的认领并恢复之前状态。认领不代表需求获批，PR 仍由维护者决定。';
+  + '请单独评论 `/claim`、`/unclaim` 或 `/help`。认领自动分配给自己并标记正在处理；取消只移除自己的认领并恢复之前状态。'
+  + '在 Issue 页面直接指派自己，效果与认领相同。认领不代表需求获批，PR 仍由维护者决定。';
 
 const names = issue => issue.labels.map(label => typeof label === 'string' ? label : label.name);
 const identity = user => Number.isSafeInteger(user?.id) && user.id > 0
@@ -143,6 +145,36 @@ async function applyUnclaim(github, plan, previousClaim) {
   };
 }
 
+// An assignment from the issue page is a claim too: it drives the same status
+// transition and journal, so sidebar actions and commands stay interchangeable.
+async function syncAssignment(github, issue, event, issueNumber) {
+  if (issue.state !== 'open') return;
+  const record = findRecord(await github.listComments(), issueNumber);
+  const state = record?.state ?? initialState(issueNumber);
+  const assignees = issue.assignees.filter(identity);
+  const write = (message, next) => record
+    ? github.updateComment(record.comment.id, encodeReply(message, next))
+    : github.createComment(encodeReply(message, next));
+  if (!assignees.length) {
+    if (!names(issue).includes(IN_PROGRESS)) return;
+    const priorStatus = state.claim?.priorStatus ?? [STATUS[0]];
+    if (!names(issue).some(label => STATUS.includes(label))) await github.addLabels(priorStatus);
+    await github.removeLabel(IN_PROGRESS);
+    await write('The last assignee was removed; the previous status is restored. / 最后一位负责人已移除，恢复之前的认领状态。',
+      { ...state, claim: null });
+    return;
+  }
+  if (state.claim && assignees.some(user => user.id === state.claim.owner.id)) return;
+  const owner = identity(event?.assignee) && assignees.some(user => user.id === event.assignee.id)
+    ? event.assignee : assignees[0];
+  // A claim handed to another assignee keeps the original status snapshot.
+  const priorStatus = state.claim ? state.claim.priorStatus : names(issue).filter(label => STATUS.includes(label));
+  await github.addLabels([IN_PROGRESS]);
+  for (const label of STATUS) await github.removeLabel(label);
+  await write(`Assigned to @${owner.login}; the assignment counts as a claim and status is in progress. / 已指派 @${owner.login}，指派即认领，状态为正在处理。`,
+    { ...state, claim: { owner, priorStatus } });
+}
+
 export async function processCommands(github, issueNumber) {
   // Actions keeps only one pending run per concurrency group. Drain every
   // unprocessed comment, so replacing a queued run does not drop its command.
@@ -213,6 +245,9 @@ export async function runAutomation(github, event, eventName, issueNumber) {
   // current declaration rather than relying on delivery of every edit event.
   await syncDiscoverySource(github, issue, event, issueNumber);
   await processCommands(github, issueNumber);
+  // Assignment events can equally be replaced, so reconcile assignees from the
+  // current state after every command instead of trusting one event's payload.
+  await syncAssignment(github, await github.getIssue(), event, issueNumber);
 }
 
 export function githubClient({ repository, issueNumber, token, apiUrl = 'https://api.github.com' }) {

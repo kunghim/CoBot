@@ -23,6 +23,7 @@ interface WorkspaceContext {
   focusTab: (id: string) => void;
   closeTab: (id: string) => void;
   collapse: () => void;
+  toggleFullView: () => void;
   setWidth: (width: number) => void;
   /** The info card over the conversation, for the member in view. */
   cardOpen: boolean;
@@ -73,6 +74,7 @@ export function WorkspaceProvider({ teamId, botId, children }: { teamId: string 
       focusTab: (id) => dispatch({ type: 'focus', id }),
       closeTab: (id) => dispatch({ type: 'close', id }),
       collapse: () => dispatch({ type: 'collapse' }),
+      toggleFullView: () => dispatch({ type: 'toggleFullView' }),
       setWidth: (width) => dispatch({ type: 'setWidth', width }),
       cardOpen,
       setCardOpen,

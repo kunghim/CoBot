@@ -36,6 +36,7 @@ CoBot 是本地运行的多智能体协作壳：管团队、需求接力、消�
 | 开发中要在真实应用里验证自己的改动 | [workflows/verify.md](docs/workflows/verify.md#开发中在真实应用里验证改动) |
 | 梳理需求、确认某个能力现在有没有、读懂业务概念 | [docs/product/](docs/product/overview.md) |
 | 写笔记、方案、记录，整理或归档文档 | [workflows/docs.md](docs/workflows/docs.md) |
+| 用户报问题或提需求，分析定位后提 Issue（不写代码） | [workflows/issue.md](docs/workflows/issue.md) |
 | 依赖、升级回滚、发布、Issue 分诊、hook 排障 | [docs/README.md](docs/README.md#很少需要) |
 
 ## 本机补充

@@ -245,6 +245,13 @@ func (a *App) unseenNotes(ctx context.Context, bot domain.Bot, runID string) str
 		if err != nil {
 			continue
 		}
+		// A note the product addresses to its own sender (the user's
+		// cancel of a requirement, recorded for the project manager) is
+		// CoBot relaying a fact, not a colleague speaking.
+		if message.SourceBotID == bot.ID {
+			fmt.Fprintf(&b, "- 系统记录：%s\n", message.RenderText())
+			continue
+		}
 		name, ok := names[message.SourceBotID]
 		if !ok {
 			if sender, err := sqlite.GetBot(ctx, a.DB, message.SourceBotID); err == nil {

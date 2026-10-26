@@ -1897,13 +1897,18 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             answeredAt?: string;
+            /** @description A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served. */
+            canSkipChecks?: boolean;
         };
         Message: {
             id: string;
             teamId: string;
             botId: string;
-            /** @enum {string} */
-            kind: "user" | "assistant" | "collaboration" | "system";
+            /**
+             * @description document is a relay-posted document (the requirement to confirm
+             * @enum {string}
+             */
+            kind: "user" | "assistant" | "collaboration" | "system" | "document";
             blocks: components["schemas"]["TextBlock"][];
             requestId?: string;
             /** @enum {string} */
@@ -2185,6 +2190,11 @@ export interface components {
             /** Format: int64 */
             budgetTokens: number;
             enginePath: string;
+            /**
+             * @description When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+             * @enum {string}
+             */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         SettingsPatch: {
             /** @enum {string} */
@@ -2204,6 +2214,8 @@ export interface components {
             /** Format: int64 */
             budgetTokens?: number;
             enginePath?: string;
+            /** @enum {string} */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         Snapshot: {
             /** Format: int64 */
@@ -2260,14 +2272,21 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             lastMessage?: components["schemas"]["MessagePreview"];
+            /**
+             * @description How the member's latest finished run ended; only team listings fill it.
+             * @enum {string}
+             */
+            lastRunStatus?: "completed" | "failed" | "interrupted" | "";
         };
-        /** @description The start of the latest message between the user and a member, for the team list. */
+        /** @description The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list. */
         MessagePreview: {
             /** @enum {string} */
-            kind: "user" | "assistant";
+            kind: "user" | "assistant" | "system" | "collaboration";
             text: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Who sent it */
+            senderBotId?: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];

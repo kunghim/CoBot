@@ -292,6 +292,32 @@ func validateProjectURL(rawURL string) error {
 	return nil
 }
 
+// OpenExternalURL hands an http or https address the user is looking at —
+// a conversation's link, the browser tab's current page — to the default
+// browser, where their own tabs live. The WebView keeps the application;
+// only a user click reaches here, and only these two schemes pass.
+func (b *Bridge) OpenExternalURL(rawURL string) error {
+	if err := validateExternalURL(rawURL); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	ctx := b.wailsCtx
+	b.mu.Unlock()
+	if ctx == nil {
+		return fmt.Errorf("application context is not ready")
+	}
+	wailsruntime.BrowserOpenURL(ctx, rawURL)
+	return nil
+}
+
+func validateExternalURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return fmt.Errorf("invalid external URL")
+	}
+	return nil
+}
+
 // Quit asks the host to shut down; OnShutdown then stops the owned core with
 // the product's bounded exit rules.
 func (b *Bridge) Quit() error {

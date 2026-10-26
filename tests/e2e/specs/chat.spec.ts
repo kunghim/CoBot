@@ -128,8 +128,10 @@ test('chat has one greeting, controls aligned with the sidebar and conversation 
   expect(listLabel!.x).toBeLessThan(create!.x);
   expect(toggle!.height).toBe(36);
   expect(toggle!.width).toBe(28);
-  expect((await bar.getByRole('button', { name: '收起聊天记录', exact: true }).locator('svg').boundingBox())!.height).toBe(20);
-  expect((await bar.getByRole('button', { name: '收起聊天记录', exact: true }).locator('svg').boundingBox())!.width).toBe(16);
+  // The title bar carries the same panel pair as every other toggle; only
+  // its colors are quieter.
+  expect((await bar.getByRole('button', { name: '收起聊天记录', exact: true }).locator('svg').boundingBox())!.height).toBe(14);
+  expect((await bar.getByRole('button', { name: '收起聊天记录', exact: true }).locator('svg').boundingBox())!.width).toBe(14);
   const toggleX = toggle!.x;
   await bar.getByRole('button', { name: '收起聊天记录', exact: true }).click();
   expect((await bar.getByRole('button', { name: '展开聊天记录', exact: true }).boundingBox())!.x).toBeLessThan(toggleX);

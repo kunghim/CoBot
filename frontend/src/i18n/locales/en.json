@@ -122,6 +122,7 @@
     "collapse": "Collapse team",
     "leader": "Project manager",
     "previewYou": "You: ",
+    "previewFrom": "{{name}}: {{text}}",
     "loading": "Loading teams…",
     "loadFailed": "Failed to load teams",
     "badge": {
@@ -202,6 +203,16 @@
     "chooseModel": "Choose model",
     "back": "Back",
     "saveFailed": "Thinking effort was not changed",
+    "switchOthersTitle": "{{count}} other member(s) still on the old provider — also switch them to {{model}}?",
+    "switchOthersTitle_one": "{{count}} other member is still on the old provider — also switch them to {{model}}?",
+    "switchOthersTitle_other": "{{count}} other members are still on the old provider — also switch them to {{model}}?",
+    "switchOthersNote": "Models belong to each member; a member at work picks the new one up from its next turn.",
+    "switchAll": "Switch all",
+    "switchThisOnly": "Only this member",
+    "modelSwitchedAll": "Switched {{count}} member(s) to {{model}}",
+    "modelSwitchedAll_one": "Switched {{count}} member to {{model}}",
+    "modelSwitchedAll_other": "Switched {{count}} members to {{model}}",
+    "modelSwitchedAllFailed": "Failed to switch: {{names}}",
     "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high", "max": "Max", "ultra": "Ultra" },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
@@ -317,6 +328,7 @@
     "step": {
       "reasoning": "Thinking",
       "message": "Note",
+      "switchModel": "Switch model",
       "diff": "Changes this turn: {{count}} file(s)",
       "agent": {
         "badge": "Sub-agent",
@@ -385,6 +397,13 @@
       "accepted": "Sent",
       "cancelled": "Cancelled",
       "unknown": "Needs verification"
+    },
+    "webLink": {
+      "openFailed": "Failed to open the page"
+    },
+    "document": {
+      "label": "Document",
+      "untitled": "Document"
     }
   },
   "approvals": {
@@ -406,7 +425,6 @@
       "budget": "Daily budget"
     },
     "requester": "Requested by: {{name}}",
-    "requesterAsks": "asks for your approval",
     "reason": "Reason",
     "prev": "Previous approval card",
     "next": "Next approval card",
@@ -548,6 +566,7 @@
   "panel": {
     "noSelection": "Pick a member on the left first",
     "tablist": "Work panel pages",
+    "end": "That's everything",
     "tabs": {
       "tasks": "Tasks",
       "approvals": "Approvals",
@@ -568,8 +587,10 @@
     "reload": "Reload",
     "address": "Address",
     "view": "The team's browser; click and type to use it",
-    "userTab": "Your tab",
-    "sharedHint": "This browser is shared with the members: what you do acts on the page, and a member is told when you touched its tab. Sign in once and every member shares the login."
+    "emptyTitle": "Browser",
+    "emptyHint": "Paste or type a URL to open a page",
+    "addressPlaceholder": "Type a URL and press Enter",
+    "openExternal": "Open in system browser"
   },
   "workspace": {
     "tablist": "Workspace",
@@ -592,11 +613,7 @@
       "noMemberPages": "No member has opened a page yet"
     },
     "browser": {
-      "memberTab": "{{name}}'s tab",
       "memberBusy": "In use",
-      "memberHint": "Click and type as you like; it will not interrupt them",
-      "userOwn": "Yours",
-      "userHint": "a member can use it when needed",
       "closed": "The page was closed",
       "closeClosed": "Close this tab",
       "viewport": "Viewport size",
@@ -605,8 +622,13 @@
       "viewportDesktop": "Desktop 1280 × 744",
       "viewportTablet": "Tablet 768 × 1024",
       "viewportPhone": "Phone 390 × 844",
-      "notAvailable": "The browser is unavailable"
-    }
+      "notAvailable": "The browser is unavailable",
+      "viewportSizeTitle": "The page's real viewport: changed here, every member sees the same size",
+      "viewportWidth": "Page width (pixels)",
+      "viewportHeight": "Page height (pixels)"
+    },
+    "fullView": "Enter full view ⇧⌘F",
+    "exitFullView": "Exit full view ⇧⌘F"
   },
   "tasks": {
     "ownerUser": "You",
@@ -675,8 +697,8 @@
       "title": "Needs your confirmation",
       "accept": "Confirm and continue",
       "revise": "Request changes",
-      "changesPlaceholder": "What needs to change (required to request changes)",
-      "returnToMe": "Bring the changes straight back to me (skip the reviews again)"
+      "changesPlaceholder": "Write your changes here; leave empty to confirm",
+      "returnToMe": "Bring the changes straight back to me (the checks in between do not run again)"
     },
     "title": "Needs your answer",
     "loadFailed": "Failed to load questions",
@@ -686,10 +708,13 @@
       "title": "Delivery acceptance",
       "accept": "Accept",
       "revise": "Request changes",
-      "changesPlaceholder": "What needs to change (required to request changes)"
+      "changesPlaceholder": "Write your changes here; leave empty to accept"
     },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
-    "cancel": "No longer needed"
+    "dismissed": "{{count}} card(s) awaiting acceptance",
+    "dismissed_one": "{{count}} card awaiting acceptance",
+    "dismissed_other": "{{count}} cards awaiting acceptance",
+    "cancel": "Ignore"
   },
   "engine": {
     "hook": "Safety hook",
@@ -897,7 +922,10 @@
   },
   "about": {
     "tagline": "Agents do the work, CoBot runs the team.",
-    "stage": { "beta": "Beta", "alpha": "Alpha" },
+    "stage": {
+      "beta": "Beta",
+      "alpha": "Alpha"
+    },
     "developmentBuild": "Development build",
     "checkUpdate": "Check for updates",
     "viewRelease": "View this release",
@@ -1021,7 +1049,13 @@
     "saved": "Saved",
     "saveFailed": "Save failed",
     "engineAccountHint": "The engine is not tied to an account: each member's model is chosen in the conversation, and the ChatGPT account signs in under Model providers.",
-    "modelsNeedProvider": "No model to choose yet: sign in with ChatGPT under Model providers, or add a provider."
+    "modelsNeedProvider": "No model to choose yet: sign in with ChatGPT under Model providers, or add a provider.",
+    "modelSwitchTitle": "Switching models in bulk",
+    "modelSwitchHint": "When switching one member\\u2019s model, whether to offer carrying the teammates still on the old one along.",
+    "modelSwitchPrompt": "When to ask",
+    "modelSwitchAlways": "Ask every time",
+    "modelSwitchSmart": "Only when a member on the old model last failed",
+    "modelSwitchNever": "Never ask"
   },
   "auth": {
     "authorizing": "Authorizing…",

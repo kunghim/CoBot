@@ -65,3 +65,26 @@ func TestOpenLoginURLRequiresApplicationContext(t *testing.T) {
 		t.Fatal("expected missing application context error")
 	}
 }
+
+func TestValidateExternalURL(t *testing.T) {
+	for _, rawURL := range []string{
+		"http://127.0.0.1:4173",
+		"https://example.com/page?with=state",
+	} {
+		if err := validateExternalURL(rawURL); err != nil {
+			t.Fatalf("%s rejected: %v", rawURL, err)
+		}
+	}
+	for _, rawURL := range []string{
+		"file:///C:/Windows/System32/cmd.exe",
+		"javascript:alert('test-only')",
+		"https://user@example.com/",
+		"ftp://example.com/file",
+		"https:///no-host",
+		"%test-only",
+	} {
+		if err := validateExternalURL(rawURL); err == nil {
+			t.Errorf("non-external URL accepted: %s", rawURL)
+		}
+	}
+}

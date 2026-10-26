@@ -3,10 +3,8 @@
 
 ## Problem and related issue / 问题与关联 Issue
 
-<!-- Explain the problem and trigger. Link an existing issue with Refs #123; small fixes do not require a new issue. -->
-<!-- 说明问题与触发场景。已有 Issue 用 Refs #123 关联；小修复无需为此新建 Issue。 -->
-<!-- Ordinary PRs target dev. Closing keywords belong in the dev -> main promotion for issues actually resolved there. -->
-<!-- 普通 PR 向 dev 提交；实际解决的问题在 dev -> main 晋级 PR 中用关闭关键词处理。 -->
+<!-- Explain the problem and trigger. Before opening a PR that resolves an issue, reply on the issue with the plan and completion status, then link it with `Closes #123`; use `Refs #123` for a partial fix. Small fixes do not require a new issue. -->
+<!-- 说明问题与触发场景。提解决某个 Issue 的 PR 前，先在该 Issue 回复处理方案和完成状态，再用 `Closes #123` 关联；部分处理用 `Refs #123`。小修复无需为此新建 Issue。 -->
 
 ## Resulting behavior / 改动后的行为
 

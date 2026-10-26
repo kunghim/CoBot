@@ -122,6 +122,7 @@
     "collapse": "收起团队",
     "leader": "项目经理",
     "previewYou": "你：",
+    "previewFrom": "{{name}}：{{text}}",
     "loading": "加载团队中…",
     "loadFailed": "团队列表加载失败",
     "badge": {
@@ -202,6 +203,12 @@
     "chooseModel": "选择模型",
     "back": "返回",
     "saveFailed": "思考强度没有改成",
+    "switchOthersTitle": "也给其他 {{count}} 位成员换成 {{model}} 吗？",
+    "switchOthersNote": "模型属于每位成员；正在工作的成员从下一轮起生效。",
+    "switchAll": "全部换",
+    "switchThisOnly": "只换这一位",
+    "modelSwitchedAll": "已把 {{count}} 位成员换成 {{model}}",
+    "modelSwitchedAllFailed": "这些成员没有换成：{{names}}",
     "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高", "max": "最高", "ultra": "Ultra" },
     "modelSwitched": "{{name}} 改用 {{provider}} · {{model}}，下一轮起生效"
   },
@@ -317,6 +324,7 @@
     "step": {
       "reasoning": "思考",
       "message": "说明",
+      "switchModel": "换模型",
       "diff": "本轮改动 {{count}} 个文件",
       "agent": {
         "badge": "子智能体",
@@ -383,6 +391,13 @@
       "accepted": "已发送",
       "cancelled": "已取消",
       "unknown": "待核对"
+    },
+    "webLink": {
+      "openFailed": "网页没能打开"
+    },
+    "document": {
+      "label": "文档",
+      "untitled": "文档"
     }
   },
   "approvals": {
@@ -404,7 +419,6 @@
       "budget": "每日预算"
     },
     "requester": "发起者：{{name}}",
-    "requesterAsks": "请求你批准",
     "reason": "理由",
     "prev": "上一张审批卡",
     "next": "下一张审批卡",
@@ -546,6 +560,7 @@
   "panel": {
     "noSelection": "先在左侧选择一个成员",
     "tablist": "工作面板页面",
+    "end": "已经到底了",
     "tabs": {
       "tasks": "任务",
       "approvals": "审批",
@@ -566,8 +581,10 @@
     "reload": "刷新",
     "address": "地址",
     "view": "团队浏览器画面，可直接点击和输入",
-    "userTab": "你打开的",
-    "sharedHint": "这是和成员共用的浏览器：你的操作会直接作用在页面上，成员下次操作时会知道你动过。登录一次，团队里所有成员共用登录状态。"
+    "emptyTitle": "浏览器",
+    "emptyHint": "粘贴或输入 URL 以打开网页",
+    "addressPlaceholder": "输入网址后回车",
+    "openExternal": "在系统浏览器打开"
   },
   "workspace": {
     "tablist": "工作区",
@@ -590,11 +607,7 @@
       "noMemberPages": "成员还没有打开页面"
     },
     "browser": {
-      "memberTab": "{{name}} 的标签页",
       "memberBusy": "正在操作",
-      "memberHint": "你也可以直接点击、输入，不会打断他",
-      "userOwn": "你打开的",
-      "userHint": "成员需要时可以查看",
       "closed": "页面已关闭",
       "closeClosed": "关闭这个标签页",
       "viewport": "视口大小",
@@ -603,8 +616,13 @@
       "viewportDesktop": "桌面 1280 × 744",
       "viewportTablet": "平板 768 × 1024",
       "viewportPhone": "手机 390 × 844",
-      "notAvailable": "浏览器用不了"
-    }
+      "notAvailable": "浏览器用不了",
+      "viewportSizeTitle": "页面的真实视口：在这里改，所有成员看到同一尺寸",
+      "viewportWidth": "页面宽度（像素）",
+      "viewportHeight": "页面高度（像素）"
+    },
+    "fullView": "进入完整视图 ⇧⌘F",
+    "exitFullView": "退出完整视图 ⇧⌘F"
   },
   "tasks": {
     "ownerUser": "你",
@@ -669,7 +687,13 @@
   "questions": {
     "prev": "上一张卡片",
     "next": "下一张卡片",
-    "confirm": { "title": "需要你确认", "accept": "确认，继续", "revise": "提修改意见", "changesPlaceholder": "需要修改什么（选「提修改意见」时必填）", "returnToMe": "改完直接回到我确认（不再重新评审）" },
+    "confirm": {
+      "title": "需要你确认",
+      "accept": "确认，继续",
+      "revise": "提修改意见",
+      "changesPlaceholder": "有修改意见写在这里；留空直接确认",
+      "returnToMe": "改完直接回到我确认（中间的检查不再重来）"
+    },
     "title": "待你回答",
     "loadFailed": "问题加载失败",
     "answerPlaceholder": "输入回答…",
@@ -678,10 +702,11 @@
       "title": "交付验收",
       "accept": "验收通过",
       "revise": "继续修改",
-      "changesPlaceholder": "需要修改什么（选「继续修改」时必填）"
+      "changesPlaceholder": "有修改意见写在这里；留空即验收通过"
     },
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
-    "cancel": "不再需要"
+    "dismissed": "{{count}} 张待验收",
+    "cancel": "忽略"
   },
   "engine": {
     "hook": "安全钩子",
@@ -887,7 +912,10 @@
   },
   "about": {
     "tagline": "Agent 干活，CoBot 带队。",
-    "stage": { "beta": "测试版", "alpha": "早期测试版" },
+    "stage": {
+      "beta": "测试版",
+      "alpha": "早期测试版"
+    },
     "developmentBuild": "开发版",
     "checkUpdate": "检查更新",
     "viewRelease": "查看这个版本",
@@ -1011,7 +1039,13 @@
     "saved": "已保存",
     "saveFailed": "保存失败",
     "engineAccountHint": "引擎不绑定账号：每个成员用哪个供应商的模型，在会话里选择；ChatGPT 账号在「模型供应商」里登录。",
-    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。"
+    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。",
+    "modelSwitchTitle": "批量切换模型",
+    "modelSwitchHint": "给一位成员换模型时，是否顺手把还在用原模型的其他成员一起换掉。",
+    "modelSwitchPrompt": "提示时机",
+    "modelSwitchAlways": "每次都提示",
+    "modelSwitchSmart": "仅当原模型的成员上次会话失败时提示",
+    "modelSwitchNever": "不提示"
   },
   "auth": {
     "authorizing": "正在授权…",

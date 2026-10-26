@@ -82,7 +82,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
   const location = useLocation();
   const { state, collapse } = useWorkspace();
   const viewport = useViewportWidth();
-  const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width);
+  const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width, state.fullView);
   useShellListLayout(layout.showList, collapse);
   const macWindowed = useMacWindowed();
   const macCorner = useMacCorner();
@@ -109,7 +109,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
           <div className="relative mt-2 flex min-h-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet"><Outlet /></div>
         </main>
 
-        <WorkspaceColumn context={context} width={layout.workspaceWidth} fill={!layout.showConversation} />
+        <WorkspaceColumn context={context} width={layout.workspaceWidth} fill={!layout.showConversation || state.fullView} />
       </div>
   );
 }

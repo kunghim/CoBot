@@ -64,11 +64,13 @@ test('workspace opens with tabs, the info card closes on Escape', async ({ page 
   await expect(info).toBeFocused();
 
   // A browser page of the user's own: the new-tab page opens one, the tab
-  // shows the page, the viewport row and the shared status line. The
-  // browser takes a moment to come up.
+  // opens on the empty state until it has an address, with the viewport row
+  // beside the address bar.
   await page.getByRole('button', { name: /打开一个网页标签/ }).click();
   await expect(workspace.getByRole('tab', { name: /空白页|about:blank/ })).toHaveAttribute('aria-selected', 'true', { timeout: 20000 });
-  await expect(page.getByText('成员需要时可以查看')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('粘贴或输入 URL 以打开网页')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('textbox', { name: /页面宽度/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '在系统浏览器打开' })).toBeDisabled();
   await expect(page.getByRole('combobox', { name: /视口大小/ })).toBeVisible();
 
   // Closing the last tab takes the workspace down; the button returns.
