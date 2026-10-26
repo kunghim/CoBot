@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BrandMark, Icons, RailItem, cx } from '../../components/ui';
-import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacWindowed } from '../../app/WindowChrome';
+import { BrandMark, Icons, RailItem, SidebarHead, cx } from '../../components/ui';
+import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacCorner, useMacWindowed } from '../../app/WindowChrome';
 import { useShell, useShellListLayout } from '../../app/shell';
 import { writeLocal } from '../../app/mode';
 import { rememberWorkspacePath } from '../../app/workspacePath';
@@ -29,6 +29,7 @@ export default function ChatLayout() {
     </nav>
     <SidebarHeader />
     {listOpen && <aside aria-label={t('chat.history')} className="flex w-[min(16rem,40vw)] shrink-0 flex-col bg-side">
+      {useMacCorner() && <SidebarHead slim aria-hidden />}
       <MenuTools value="chat" />
       <ChatSidebar />
     </aside>}
