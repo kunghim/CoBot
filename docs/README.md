@@ -23,6 +23,7 @@
 | [验证流程](workflows/verify.md) | 跑测试、起服务、真实 Codex 验证、汇报结果 |
 | [交付与同步流程](workflows/deliver.md) | 做完汇报；提交、拉取、推送、开 PR（含私人笔记同步） |
 | [文档流程](workflows/docs.md) | 写方案和记录、整理或归档文档 |
+| [需求分析与提 Issue](workflows/issue.md) | 用户报问题或提需求，分析定位后提 Issue 交给编码智能体 |
 | [踩坑记录](pitfalls.md) | 每次都会碰到的环境与运行问题 |
 
 ## 发布前实测（`testing/`）
