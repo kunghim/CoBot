@@ -161,23 +161,34 @@ func (s *Scheduler) onProgress(ctx context.Context, teamID string, rt *teamRunti
 			step.ID, step.Detail = subAgentStep(ref.subAgent, step.ID, step.Detail)
 		}
 		s.saveStep(ctx, ref, step)
+		// A step notification may carry streamed text of its own (a message
+		// item the turn never announced is announced by its first delta).
+		s.publishDelta(n, &ref)
 	default:
 		if n.Delta == "" {
 			return true
 		}
 		s.settleRetry(ctx, rt, n, &ref)
-		itemID, kind := n.ItemID, n.DeltaKind
-		if ref.subAgent != "" {
-			// A sub-agent's answer is its result, shown with its steps, never
-			// streamed as the member's reply.
-			itemID, _ = subAgentStep(ref.subAgent, itemID, nil)
-			if kind == "message" {
-				kind = "commentary"
-			}
-		}
-		s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: itemID, Kind: kind, Text: n.Delta})
+		s.publishDelta(n, &ref)
 	}
 	return true
+}
+
+// publishDelta streams one piece of text into the conversation. A sub-agent's
+// answer is its result, shown with its steps, never streamed as the member's
+// reply.
+func (s *Scheduler) publishDelta(n engine.Notification, ref *liveRun) {
+	if n.Delta == "" {
+		return
+	}
+	itemID, kind := n.ItemID, n.DeltaKind
+	if ref.subAgent != "" {
+		itemID, _ = subAgentStep(ref.subAgent, itemID, nil)
+		if kind == "message" {
+			kind = "commentary"
+		}
+	}
+	s.app.Live.Publish(events.Live{Type: "delta", TeamID: ref.teamID, BotID: ref.botID, RunID: ref.runID, ItemID: itemID, Kind: kind, Text: n.Delta})
 }
 
 func (rt *teamRuntime) storeLiveRun(threadID, turnID string, ref liveRun) {

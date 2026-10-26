@@ -463,9 +463,16 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
 			// A message with no phase streams where it sits among the steps; its
-			// place as the reply is decided when the turn ends.
-			if phase := s.itemPhase(p.ItemID); phase == "commentary" || phase == noPhase {
+			// place as the reply is decided when the turn ends. An item the turn
+			// never announced (a gateway can stream deltas without an
+			// item/started) counts as one of those, and gets a step to stream
+			// into, so the words appear where they were said instead of piling
+			// up in the reply.
+			if phase := s.itemPhase(p.ItemID); phase == "" || phase == "commentary" || phase == noPhase {
 				n.DeltaKind, n.Phase = "commentary", "commentary"
+				if phase == "" {
+					n.Step = &engine.Step{ID: p.ItemID, Kind: engine.StepMessage, Status: engine.StepInProgress}
+				}
 			}
 		}
 	case "item/reasoning/summaryTextDelta", "item/commandExecution/outputDelta":

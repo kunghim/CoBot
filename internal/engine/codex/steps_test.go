@@ -86,8 +86,16 @@ func TestCommentaryIsAStepAndOnlyTheAnswerIsTheReply(t *testing.T) {
 	if got[3].Step != nil || got[3].Phase != "final_answer" {
 		t.Fatalf("answer start must not be a step: %+v", got[3])
 	}
-	if got[4].DeltaKind != "message" || got[5].DeltaKind != "message" {
-		t.Fatalf("answer and unknown-phase deltas = %+v / %+v", got[4], got[5])
+	if got[4].DeltaKind != "message" {
+		t.Fatalf("answer delta = %+v", got[4])
+	}
+	// An item the turn never announced streams where it sits, with a step to
+	// stream into; it is not part of the reply.
+	if got[5].DeltaKind != "commentary" {
+		t.Fatalf("unannounced-item delta = %+v", got[5])
+	}
+	if s := got[5].Step; s == nil || s.Kind != engine.StepMessage || s.ID != "x9" || s.Status != engine.StepInProgress {
+		t.Fatalf("unannounced item got no step: %+v", got[5])
 	}
 }
 
