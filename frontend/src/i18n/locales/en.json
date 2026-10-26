@@ -383,6 +383,10 @@
     "queuedBanner_one": "{{count}} message received, queued",
     "queuedBanner_other": "{{count}} messages received, queued",
     "cancelQueued": "Cancel queued message",
+    "message": {
+      "copy": "Copy source",
+      "copied": "Copied"
+    },
     "interrupt": "Stop",
     "interruptRequested": "Stop requested; waiting for the engine",
     "blocked": {

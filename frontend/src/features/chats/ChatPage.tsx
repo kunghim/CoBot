@@ -6,7 +6,7 @@ import { api, ApiError } from '../../api/client';
 import type { ChatRequest } from '../../api/types';
 import { forgetChatRun, useChatLiveRuns } from '../../api/live';
 import { useEngine, useEngineModels, useProviders, useSettings } from '../../api/queries';
-import { Button, ChatComposer, CopyButton, MessageBubble, ModelEffortPicker, TextInput, cx } from '../../components/ui';
+import { Button, ChatComposer, MessageActions, MessageBubble, ModelEffortPicker, TextInput, cx } from '../../components/ui';
 import { ShellToggle } from '../../app/shell';
 import { useNativeTitle } from '../../app/WindowChrome';
 import { readLocal, writeLocal } from '../../app/mode';
@@ -29,7 +29,7 @@ export default function ChatRoute() {
 }
 
 function ChatPage({ id }: { id?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const query = useChat(id);
@@ -147,7 +147,7 @@ function ChatPage({ id }: { id?: string }) {
         <div className="mx-auto w-full max-w-3xl space-y-6 py-4">
           {query.hasNextPage && <Button variant="ghost" size="sm" loading={query.isFetchingNextPage} onClick={() => { const el = scroll.current; const height = el?.scrollHeight ?? 0; void query.fetchNextPage().then(() => requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; })); }}>{t('chat.earlier')}</Button>}
           {messages.map((message) => {
-            const copy = <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"><CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} /></span>;
+            const copy = <MessageActions value={message.text} createdAt={message.createdAt} language={i18n.language} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} />;
             if (message.kind === 'user') return <div key={message.id} className="group"><MessageBubble from="user" meta={copy}>{message.text}</MessageBubble></div>;
             // The reply closes its turn: what was said and done on the way is above it, in order.
             const run = runs.get(message.runId);

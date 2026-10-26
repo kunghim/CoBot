@@ -23,7 +23,7 @@ import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess, { runHasContent } from './RunProcess';
 import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
-import { Alert, Composer, FloatingCard, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
+import { Alert, Composer, FloatingCard, IconButton, Icons, MessageActions, MessageBubble, Spinner, SystemNote } from '../../components/ui';
 import WorkPanel from '../../components/WorkPanel';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 import Avatar from '../avatars/Avatar';
@@ -460,6 +460,7 @@ function TurnRow({
   retrying: boolean;
 }) {
   const membersById = useContext(TeamMembersContext);
+  const { t, i18n } = useTranslation();
   const author = membersById.get(run.botId);
   const replyText = replies.map((reply) => stripToolCallText(messageText(reply))).filter((text) => text !== '').join('\n\n');
   if (replies.length > 0 && replyText === '' && !runHasContent(run, active, '')) return null;
@@ -468,12 +469,31 @@ function TurnRow({
   ) : null;
   if (!process && replyText === '') return null;
   return (
-    <MessageBubble from="member" avatar={author ? <Avatar bot={author} size="md" /> : undefined} author={nameOf(run.botId)}>
-      <div className="space-y-2">
-        {process}
-        {replyText !== '' && <Markdown text={replyText} teamId={teamId} />}
-      </div>
-    </MessageBubble>
+    <div className="group">
+      <MessageBubble
+        from="member"
+        avatar={author ? <Avatar bot={author} size="md" /> : undefined}
+        author={nameOf(run.botId)}
+        meta={
+          replyText !== '' && !active ? (
+            // The turn's words may be several messages; the copy takes them
+            // all, and the time is the last one's.
+            <MessageActions
+              value={replyText}
+              createdAt={replies[replies.length - 1]?.createdAt ?? ''}
+              language={i18n.language}
+              copyLabel={t('conversation.message.copy')}
+              copiedLabel={t('conversation.message.copied')}
+            />
+          ) : undefined
+        }
+      >
+        <div className="space-y-2">
+          {process}
+          {replyText !== '' && <Markdown text={replyText} teamId={teamId} />}
+        </div>
+      </MessageBubble>
+    </div>
   );
 }
 
@@ -500,7 +520,7 @@ function MessageRow({
   cancelPending: boolean;
   onCancelQueued: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const membersById = useContext(TeamMembersContext);
   const text = messageText(message);
 
@@ -527,22 +547,24 @@ function MessageRow({
   const shown = isUser ? text : stripToolCallText(text);
   if (!isUser && text !== '' && shown === '') return null;
   const delivery = isLastUser && message.deliveryStatus ? t(deliveryLabelKey(message.deliveryStatus)) : '';
-  const meta =
-    delivery || showCancel ? (
-      <>
-        {delivery && <span>{delivery}</span>}
-        {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
-      </>
-    ) : undefined;
+  const meta = (
+    <>
+      <MessageActions value={text} createdAt={message.createdAt} language={i18n.language} copyLabel={t('conversation.message.copy')} copiedLabel={t('conversation.message.copied')} />
+      {delivery && <span>{delivery}</span>}
+      {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
+    </>
+  );
   const author = membersById.get(message.botId);
   return (
-    <MessageBubble
-      from={isUser ? 'user' : 'member'}
-      avatar={author ? <Avatar bot={author} size="md" /> : undefined}
-      author={isUser ? undefined : nameOf(message.botId)}
-      meta={meta}
-    >
-      {isUser ? text : <Markdown text={shown} teamId={teamId} />}
-    </MessageBubble>
+    <div className="group">
+      <MessageBubble
+        from={isUser ? 'user' : 'member'}
+        avatar={author ? <Avatar bot={author} size="md" /> : undefined}
+        author={isUser ? undefined : nameOf(message.botId)}
+        meta={meta}
+      >
+        {isUser ? text : <Markdown text={shown} teamId={teamId} />}
+      </MessageBubble>
+    </div>
   );
 }

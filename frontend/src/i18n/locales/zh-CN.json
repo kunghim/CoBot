@@ -377,6 +377,10 @@
     "send": "发送",
     "queuedBanner": "已收下 {{count}} 条，排队中",
     "cancelQueued": "取消排队消息",
+    "message": {
+      "copy": "复制原文",
+      "copied": "已复制"
+    },
     "interrupt": "停止",
     "interruptRequested": "已请求停止，等待引擎响应",
     "blocked": {
