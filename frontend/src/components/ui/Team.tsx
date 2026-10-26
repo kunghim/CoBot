@@ -177,18 +177,24 @@ export function ProcessStep({ kind, status, title, detail, duration, badge }: { 
 
 /**
  * The frame of a card that waits for the user above the composer: a quiet
- * raised surface, an icon and title, paging when there are several, the
- * content, and the answers as pill buttons on the right, the main one last.
+ * raised surface, the asker on the left of one header line and the card type
+ * with paging on its right, the content, and the answers as pill buttons on
+ * the right, the main one last.
  */
-export function WaitingCard({ icon, title, position, onPrevious, onNext, previousLabel, nextLabel, onClose, closeLabel, children, actions }: { icon: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; children: ReactNode; actions: ReactNode }) {
+export function WaitingCard({ initiator, icon, title, position, onPrevious, onNext, previousLabel, nextLabel, onClose, closeLabel, children, actions }: { initiator?: ReactNode; icon: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; children: ReactNode; actions: ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={`${id}-title`} className="animate-pop-in rounded-2xl border border-neutral-900/[0.12] bg-card p-4 shadow-floating dark:border-white/[0.12]">
-      <header className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-        <span className="flex shrink-0 items-center" aria-hidden>{icon}</span>
-        <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate">{title}</h3>
+      <header className="flex min-w-0 items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+        {initiator && (
+          <span className="flex min-w-0 shrink items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-50">{initiator}</span>
+        )}
+        <h3 id={`${id}-title`} className={cx('flex min-w-0 items-center gap-1.5', initiator ? 'ml-auto shrink-0' : 'flex-1')}>
+          <span className="flex shrink-0 items-center" aria-hidden>{icon}</span>
+          <span className="min-w-0 truncate">{title}</span>
+        </h3>
         {position && position.total > 1 && (
-          <span className="flex items-center gap-0.5 text-xs tabular-nums">
+          <span className="flex shrink-0 items-center gap-0.5 text-xs tabular-nums">
             <IconButton icon={ChevronLeft} label={previousLabel} size="sm" shape="circle" disabled={position.index <= 1} onClick={onPrevious} />
             {position.index} / {position.total}
             <IconButton icon={ChevronRight} label={nextLabel} size="sm" shape="circle" disabled={position.index >= position.total} onClick={onNext} />
@@ -205,14 +211,8 @@ export function WaitingCard({ icon, title, position, onPrevious, onNext, previou
 /** A native tool request (run a command, change files) waiting for approval. */
 export function ApprovalCard({ requester, action, command, reason, ...frame }: { requester: PersonRef; action: ReactNode; command?: ReactNode; reason?: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; actions: ReactNode }) {
   return (
-    <WaitingCard icon={<ShieldCheck size={16} />} {...frame}>
-      <p className="flex flex-wrap items-center gap-1.5 font-semibold">
-        <span className="inline-flex items-center gap-1.5">
-          {requester.avatar}
-          {requester.name}
-        </span>
-        <span className="font-normal text-neutral-600 dark:text-neutral-300">{action}</span>
-      </p>
+    <WaitingCard icon={<ShieldCheck size={16} />} initiator={<>{requester.avatar}{requester.name}</>} {...frame}>
+      <p className="text-neutral-600 dark:text-neutral-300">{action}</p>
       {command && <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-neutral-900/[0.04] px-3 py-2 font-mono text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">{command}</pre>}
       {reason && <p className="text-neutral-600 dark:text-neutral-300">{reason}</p>}
     </WaitingCard>
@@ -222,11 +222,7 @@ export function ApprovalCard({ requester, action, command, reason, ...frame }: {
 /** A member's question to the user, answered in place. */
 export function QuestionCard({ asker, question, answer, onAnswer, placeholder, options, ...frame }: { asker: PersonRef; question: ReactNode; answer: string; onAnswer: (value: string) => void; placeholder: string; options?: ReactNode; title: ReactNode; position?: { index: number; total: number }; onPrevious?: () => void; onNext?: () => void; previousLabel: string; nextLabel: string; onClose?: () => void; closeLabel?: string; actions: ReactNode }) {
   return (
-    <WaitingCard icon={<CircleHelp size={16} />} {...frame}>
-      <p className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-        {asker.avatar}
-        {asker.name}
-      </p>
+    <WaitingCard icon={<CircleHelp size={16} />} initiator={<>{asker.avatar}{asker.name}</>} {...frame}>
       <p className="font-semibold leading-6">{question}</p>
       {options}
       <input

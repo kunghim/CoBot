@@ -218,7 +218,8 @@ func (a *App) ListCollaboration(ctx context.Context, principal auth.Principal, p
 	case auth.KindUser:
 		// Passing an empty peer asks the store for the member's whole record;
 		// a (member, member) pair would only ever match a self-addressed
-		// message, which the product never creates.
+		// message, which the product creates exactly once of: the project
+		// manager's own record of a cancelled requirement.
 		botID, peer = peerBotID, ""
 	case auth.KindBot:
 		botID, peer = principal.BotID, peerBotID

@@ -89,14 +89,20 @@ type Bot struct {
 	// LastMessage previews the latest message between the user and this
 	// member; only team listings fill it.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+	// LastRunStatus is how the member's latest finished run ended; only
+	// team listings fill it.
+	LastRunStatus string `json:"lastRunStatus,omitempty"`
 }
 
 // MessagePreview is the start of a conversation's latest message, for the
 // team list.
 type MessagePreview struct {
-	Kind      string    `json:"kind"` // user|assistant
-	Text      string    `json:"text"`
-	CreatedAt time.Time `json:"createdAt"`
+	Kind string `json:"kind"` // user|assistant|system|collaboration
+	// SenderBotID names the member that sent it, for cards and notes from
+	// other members; the member's exchange with the user has none.
+	SenderBotID string    `json:"senderBotId,omitempty"`
+	Text        string    `json:"text"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // ProviderSession maps a bot onto its engine thread.

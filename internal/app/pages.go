@@ -159,7 +159,20 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 		case "tasks":
 			value, err = sqlite.GetTask(ctx, q, id)
 		case "questions":
-			value, err = sqlite.GetQuestion(ctx, q, id)
+			question, e := sqlite.GetQuestion(ctx, q, id)
+			err = e
+			// The stages of a requirement never change, so this projection
+			// is computed where the question is served, not stored.
+			if err == nil && question.Kind == domain.QuestionKindConfirm && question.RequirementID != "" {
+				req, e := sqlite.GetRequirement(ctx, q, question.RequirementID)
+				if e != nil && !errors.Is(e, sqlite.ErrNotFound) {
+					return nil, e
+				}
+				if e == nil {
+					question.CanSkipChecks = routeCanSkipChecks(req, question.StageIndex)
+				}
+			}
+			value = question
 		case "messages", "collaboration":
 			value, err = sqlite.GetMessage(ctx, q, id)
 		case "memories":

@@ -4,7 +4,8 @@
 
 - CoBot 只管理自己的私有 Codex 环境（数据根下的 `CODEX_HOME`）。启动引擎时不继承用户已有的 `CODEX_HOME` 或供应商密钥，
   不读写用户日常的 Codex 状态。
-- 找不到 Codex CLI 时报告错误，不自动安装，也不修改用户的 shell 或 PATH。显式配置的引擎路径原样使用。
+- 只运行 ChatGPT 桌面端内置的 Codex，不从 PATH、standalone、npm、Cargo 或 Homebrew 回退。macOS 按应用包身份发现，Windows 按已安装 Store 包元数据发现；其他平台暂不自动发现。手动路径也必须属于桌面端应用包，符号链接解析后仍须在包内。找不到时提示安装或更新桌面端，不自动安装、不改用户的 shell 或 PATH。
+- Windows 桌面端仍使用 `OpenAI.Codex` 包身份，见[官方部署文档](https://learn.chatgpt.com/docs/enterprise/windows-deployment)；应用显示名称与安装包身份不能混用。
 - 协议有变化时先运行 `cobot trace protocol`，对照 `internal/engine/codex/protocol_baseline.json`（已处理的方法见 `handled.go`），
   确认差异后再改适配代码；更新基线用 `cobot trace protocol --write-baseline <文件>`。
 - 需要看真实流量时用 `cobot trace on|view|off --data-root <路径>`。录制未脱敏，留在数据根，不提交、不贴进 Issue/PR。

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import { authorize } from './helpers';
 
@@ -16,14 +17,19 @@ test('official login exposes the browser link and cancel uses its loginId', asyn
 
 test('Vite registers the dev authorization route against the real core', async ({browser}) => {
   const root=resolve(import.meta.dirname,'../../..');
-  const child=spawn(process.execPath,[resolve(root,'frontend/node_modules/vite/bin/vite.js'),'--port','5174'],{
+  const reservation=createServer();
+  await new Promise<void>((done)=>reservation.listen(0,'127.0.0.1',done));
+  const port=(reservation.address() as {port:number}).port;
+  await new Promise<void>((done,fail)=>reservation.close((error)=>error?fail(error):done()));
+  const baseURL=`http://127.0.0.1:${port}`;
+  const child=spawn(process.execPath,[resolve(root,'frontend/node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{
     cwd:resolve(root,'frontend'),windowsHide:true,stdio:'ignore',
     env:{...process.env,COBOT_API_ENDPOINT:process.env.COBOT_E2E_ENDPOINT!,COBOT_ADMIN_SECRET:process.env.COBOT_E2E_ADMIN_SECRET!},
   });
   const context=await browser.newContext();
   try{
-    await expect.poll(async()=>{try{return (await context.request.post('http://127.0.0.1:5174/__cobot/dev-link',{data:{}})).status()}catch{return 0}}).toBe(200);
-    const bad=await context.request.post('http://127.0.0.1:5174/__cobot/dev-link',{headers:{Origin:'https://untrusted.invalid'},data:{}});
+    await expect.poll(async()=>{try{return (await context.request.post(`${baseURL}/__cobot/dev-link`,{data:{}})).status()}catch{return 0}}).toBe(200);
+    const bad=await context.request.post(`${baseURL}/__cobot/dev-link`,{headers:{Origin:'https://untrusted.invalid'},data:{}});
     expect(bad.status()).toBe(403);
   } finally{await context.close();child.kill()}
 });

@@ -3,13 +3,13 @@
 // conversation target; the panel shows only data the API really returned.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useNavigate } from 'react-router-dom';
 import { useTeams } from '../../api/queries';
 import type { Bot, TeamWithBots } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
-import { modeIcons } from '../../app/ModeSelector';
-import { Alert, Badge, Button, cx, EmptyState, Icons, interactive, MemberRow, Skeleton } from '../../components/ui';
+import { Alert, Badge, cx, EmptyState, Icons, interactive, IconButton, MemberRow, Skeleton } from '../../components/ui';
 import CreateTeamDialog from './CreateTeamDialog';
 import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
@@ -56,11 +56,10 @@ export default function TeamList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-3 pt-2 pb-2">
-        <Button block variant="ghost" icon={modeIcons.work} onClick={() => setCreateOpen(true)} className="justify-start text-neutral-600 dark:text-neutral-300">
-          {t('team.new')}
-        </Button>
-        <p className="mt-4 px-3.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('nav.teamList')}</p>
+      {/* The list title keeps a compact +; creating a team opens the dialog. */}
+      <div className="flex items-center justify-between px-4 pb-1 pt-2">
+        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('nav.teamList')}</p>
+        <IconButton size="sm" icon={Icons.add} label={t('team.new')} onClick={() => setCreateOpen(true)} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -124,6 +123,7 @@ function TeamRow({
   // A team whose folder is gone stays visible, greyed and read-only.
   const missing = team.status === 'directory_missing';
   const Chevron = expanded ? Icons.expand : Icons.next;
+  const namesById = new Map(bots.map((member) => [member.id, member.name]));
 
   return (
     <li className={missing ? 'opacity-60' : undefined}>
@@ -153,7 +153,7 @@ function TeamRow({
         <ul className="mt-1 space-y-px">
           {orderBotsLeaderFirst(bots).map((bot) => (
             <li key={bot.id}>
-              <BotRow bot={bot} directory={bot.isLeader ? team.directory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
+              <BotRow bot={bot} namesById={namesById} directory={bot.isLeader ? team.directory : ''} selected={bot.id === selectedBotId} onSelect={onSelect} />
             </li>
           ))}
         </ul>
@@ -162,7 +162,7 @@ function TeamRow({
   );
 }
 
-function BotRow({ bot, directory, selected, onSelect }: { bot: Bot; directory: string; selected: boolean; onSelect: (botId: string) => void }) {
+function BotRow({ bot, namesById, directory, selected, onSelect }: { bot: Bot; namesById: ReadonlyMap<string, string>; directory: string; selected: boolean; onSelect: (botId: string) => void }) {
   const { t, i18n } = useTranslation();
   const statusLabel = t(`team.status.${bot.status}`, { defaultValue: t(`team.status.unknown`) });
   const busy = bot.status !== 'idle';
@@ -183,13 +183,21 @@ function BotRow({ bot, directory, selected, onSelect }: { bot: Bot; directory: s
         statusLabel={statusLabel}
         status={busy ? statusLabel : undefined}
         time={last ? <time dateTime={last.createdAt}>{shortTime(last.createdAt, i18n.language)}</time> : undefined}
-        preview={last ? (last.kind === 'user' ? `${t('team.previewYou')}${last.text}` : last.text) : undefined}
+        preview={last ? previewLine(last, namesById, t) : undefined}
         current={selected}
         attention={ATTENTION.has(bot.status)}
         onSelect={() => onSelect(bot.id)}
       />
     </span>
   );
+}
+
+/** One preview line: what the member last received or said, with who said
+ * it when it came from another member. */
+function previewLine(last: NonNullable<Bot['lastMessage']>, namesById: ReadonlyMap<string, string>, t: TFunction): string {
+  if (last.kind === 'user') return `${t('team.previewYou')}${last.text}`;
+  const sender = last.senderBotId ? namesById.get(last.senderBotId) : undefined;
+  return sender ? t('team.previewFrom', { name: sender, text: last.text }) : last.text;
 }
 
 /** Today's messages show the time; older ones the date. */

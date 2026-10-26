@@ -108,7 +108,8 @@ test('notes distinguish automation from real-account and installation acceptance
   assert.match(notes, /Intel Macs are not included/);
   assert.match(notes, /Publication is automated/);
   assert.match(notes, /does not perform them/);
-  assert.match(notes, /macOS 最低 0.146.0/);
+  assert.match(notes, /需另行安装 ChatGPT 桌面端/);
+  assert.match(notes, /standalone CLI installations are not used/);
   assert.match(notes, /\]\(https:\/\/support\.apple\.com\/zh-cn\/102445\)；/);
 });
 

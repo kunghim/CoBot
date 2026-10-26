@@ -104,38 +104,42 @@ func ListMessages(ctx context.Context, q Queryer, botID string, before string, l
 const previewRunes = 120
 
 // LatestMessagePreviews returns, per member of a team, the start of the
-// latest user or assistant message that has text. Members without one are
+// latest message the member took part in: its exchange with the user, a card
+// or note another member sent it, or a card the user dispatched. Plain
+// system notices (no sender, no card) never show. Members without one are
 // absent.
 func LatestMessagePreviews(ctx context.Context, q Queryer, teamID string) (map[string]domain.MessagePreview, error) {
-	rows, err := q.QueryContext(ctx, `SELECT bot_id, kind, blocks, created_at FROM (
-		SELECT bot_id, kind, blocks, created_at,
+	rows, err := q.QueryContext(ctx, `SELECT bot_id, kind, source_bot_id, blocks, created_at FROM (
+		SELECT bot_id, kind, source_bot_id, blocks, created_at,
 			ROW_NUMBER() OVER (PARTITION BY bot_id ORDER BY created_at DESC, id DESC) AS rn
 		FROM messages
-		WHERE team_id = ? AND kind IN (?, ?) AND blocks LIKE '%"text"%'
-	) WHERE rn = 1`, teamID, domain.MessageKindUser, domain.MessageKindAssistant)
+		WHERE team_id = ? AND blocks LIKE '%"text"%' AND (
+			kind IN (?, ?)
+			OR (kind IN (?, ?) AND (source_bot_id != '' OR blocks LIKE '%"type":"task"%'))
+		)
+	) WHERE rn = 1`, teamID, domain.MessageKindUser, domain.MessageKindAssistant, domain.MessageKindSystem, domain.MessageKindCollaboration)
 	if err != nil {
 		return nil, fmt.Errorf("latest message previews: %w", err)
 	}
 	defer rows.Close()
 	out := map[string]domain.MessagePreview{}
 	for rows.Next() {
-		var botID, kind, blocks, created string
-		if err := rows.Scan(&botID, &kind, &blocks, &created); err != nil {
+		var botID, kind, source, blocks, created string
+		if err := rows.Scan(&botID, &kind, &source, &blocks, &created); err != nil {
 			return nil, fmt.Errorf("scan message preview: %w", err)
 		}
-		text := previewText(blocks)
+		text := previewOf(kind, blocks)
 		if text == "" {
 			continue
 		}
 		at, _ := time.Parse(time.RFC3339Nano, created)
-		out[botID] = domain.MessagePreview{Kind: kind, Text: text, CreatedAt: at}
+		out[botID] = domain.MessagePreview{Kind: kind, SenderBotID: source, Text: text, CreatedAt: at}
 	}
 	return out, rows.Err()
 }
 
-// previewText joins a message's text blocks into one line and cuts it to
-// previewRunes.
-func previewText(blocks string) string {
+// blockText joins a message's text blocks into one normalized line.
+func blockText(blocks string) string {
 	var parsed []domain.TextBlock
 	if err := json.Unmarshal([]byte(blocks), &parsed); err != nil {
 		return ""
@@ -146,7 +150,38 @@ func previewText(blocks string) string {
 			parts = append(parts, block.Text)
 		}
 	}
-	text := strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
+	return strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
+}
+
+// previewOf reduces a message to its one preview line: a card message shows
+// the card's title rather than the whole card text.
+func previewOf(kind, blocks string) string {
+	if kind == domain.MessageKindSystem {
+		var parsed []domain.TextBlock
+		if err := json.Unmarshal([]byte(blocks), &parsed); err == nil {
+			for _, block := range parsed {
+				if block.Type != domain.BlockTypeTask {
+					continue
+				}
+				var card struct {
+					Title string `json:"title"`
+				}
+				if json.Unmarshal([]byte(block.Text), &card) == nil && card.Title != "" {
+					return cutPreview(card.Title)
+				}
+			}
+		}
+	}
+	return previewText(blocks)
+}
+
+// previewText cuts the joined text blocks to previewRunes.
+func previewText(blocks string) string {
+	return cutPreview(blockText(blocks))
+}
+
+// cutPreview trims one line to the preview length.
+func cutPreview(text string) string {
 	if runes := []rune(text); len(runes) > previewRunes {
 		text = string(runes[:previewRunes]) + "…"
 	}
