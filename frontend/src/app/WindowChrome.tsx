@@ -8,11 +8,13 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ConversationHead, SidebarHead, type WindowControls, cx } from '../components/ui';
+import { ConversationHead, type WindowControls, cx } from '../components/ui';
 import { useWindowFrame } from '../platform/desktopWindow';
 import ModeSwitch from './ModeSwitch';
 import SearchBox from '../features/search/SearchBox';
+import { SidebarToggle } from './SidebarToggle';
 import { ShellToggle, useShell } from './shell';
+import { useLocation } from 'react-router-dom';
 
 /** Names the window while fullscreen: macOS reveals the transparent titlebar
  * under the hover menu bar and draws this title beside the traffic lights
@@ -53,10 +55,36 @@ export function WindowCorner() {
   return <div data-testid="native-titlebar-inset" aria-hidden className="absolute left-0 top-0 z-10 h-7 w-[88px] bg-side" style={{ ['--wails-draggable' as string]: 'drag' }} />;
 }
 
-/** The sidebar's head: the window-top row above the secondary menu — empty
- * draggable surface on macOS (the lights' strip while windowed). */
+/** The sidebar's head: the window-top row above the secondary menu. The
+ * list toggle lives here at a fixed spot — beside the traffic lights while
+ * windowed, at the row's left edge in fullscreen — never moving with the
+ * menu or the window state. */
+/** True on the mac desktop: the fixed top-row toggle renders here — beside
+ * the lights while windowed, the row's left edge in fullscreen — surviving
+ * the menu's fold, which only unmounts the menu column below it. */
 export function SidebarHeader() {
-  return <SidebarHead inset={useMacWindowed()} slim={useMacCorner()} />;
+  const { t } = useTranslation();
+  const shell = useShell();
+  const chat = useLocation().pathname.startsWith('/chat');
+  const macWindowed = useMacWindowed();
+  if (!useMacCorner()) return null;
+  const labels = {
+    openLabel: t(chat ? 'chat.expandHistory' : 'nav.openTeamList'),
+    closeLabel: t(chat ? 'chat.collapseHistory' : 'nav.closeTeamList'),
+  };
+  // Absolutely positioned over the window's top-left: it never takes flex
+  // width, so narrow windows cannot overflow, and it survives the menu's
+  // fold because it is not a child of the menu column.
+  return (
+    <div
+      data-testid="top-row-toggle"
+      className={cx('absolute left-0 top-0 z-20 flex h-7 items-center', macWindowed && 'pl-[88px]')}
+      style={{ ['--wails-draggable' as string]: 'no-drag' }}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <SidebarToggle open={shell.listVisible} onToggle={shell.toggleList} {...labels} />
+    </div>
+  );
 }
 
 /** The secondary menu's tools row, inside the menu column above the list
@@ -93,5 +121,8 @@ export function ConversationHeader({ title, right, toggle = true, alwaysInset = 
     onClose: desktop.close,
   } : undefined;
   const inset = useMacWindowed() && (alwaysInset || !listVisible);
-  return <ConversationHead inset={inset} slim={useMacCorner()} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
+  // Web and Windows keep the toggle at the conversation's head; the mac
+  // desktop's fixed top-row spot renders in SidebarHeader instead.
+  const mac = desktop?.platform === 'mac';
+  return <ConversationHead inset={inset} slim={mac} left={toggle && !mac ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
 }

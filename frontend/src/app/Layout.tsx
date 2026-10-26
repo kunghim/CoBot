@@ -98,7 +98,8 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
           </div>
         </nav>
 
-        {layout.showList && <Column><SidebarHeader /><MenuTools value={location.pathname.startsWith('/chat') ? 'chat' : 'work'} />{teamList}</Column>}
+        {layout.showList && <Column><MenuTools value={location.pathname.startsWith('/chat') ? 'chat' : 'work'} />{teamList}</Column>}
+        <SidebarHeader />
 
         {/* Conversation area: the routed page. It stays mounted while the
             workspace takes its turn, so a draft and the scroll survive. */}

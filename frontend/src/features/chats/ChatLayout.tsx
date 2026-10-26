@@ -27,8 +27,8 @@ export default function ChatLayout() {
       <RailItem icon={Icons.home} label={t('chat.new')} current={location.pathname === '/chat/new'} onClick={() => navigate('/chat/new')} />
       <div className="mt-auto"><RailItem icon={Icons.settings} label={t('nav.settings')} onClick={() => navigate('/settings')} /></div>
     </nav>
+    <SidebarHeader />
     {listOpen && <aside aria-label={t('chat.history')} className="flex w-[min(16rem,40vw)] shrink-0 flex-col bg-side">
-      <SidebarHeader />
       <MenuTools value="chat" />
       <ChatSidebar />
     </aside>}
