@@ -32,6 +32,17 @@ test('chat sections, pinned state, nested menu keyboard and manual order persist
   await grouping.press('Escape');
   await expect(page.getByRole('button', { name: '整理聊天列表' })).toBeFocused();
 
+  // A render can race the menu's auto-focus and drop focus back on the
+  // trigger; the open menu must take it back instead of ignoring every key.
+  // page.keyboard goes to the real focus, so the steal is deterministic here.
+  await page.getByRole('button', { name: '整理聊天列表' }).click();
+  await page.getByRole('button', { name: '整理聊天列表' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitemradio', { name: '按分区显示' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '整理聊天列表' })).toBeFocused();
+
   await page.getByRole('button', { name: '整理聊天列表' }).click();
   await page.getByRole('menuitem', { name: '新建分区' }).click();
   await page.getByRole('textbox', { name: '分区名称' }).fill(title + '-分区');
@@ -116,9 +127,15 @@ test('manual drag and keyboard order agree; nested choices stay inside a narrow 
   await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByRole('button', { name: '整理聊天列表' }).click();
   const display = page.getByRole('menuitem', { name: '显示方式', exact: true });
+  // The sort save above is still in flight at first and grays the items out;
+  // keyed expansion needs the item focusable and enabled again.
+  await expect(display).toBeEnabled();
   await display.focus();
   await display.press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '合并显示' }).click();
+  // The drag hit-tests the rows, so the menu must be gone first (same race
+  // as the reopen guard above).
+  await expect(page.getByRole('menu')).toHaveCount(0);
   const order = () => page.locator('[data-chat-id]').evaluateAll((rows, targets) => rows.map((row) => row.getAttribute('data-chat-id')).filter((id) => targets.includes(id!)), ids);
   await expect.poll(order).toEqual(ids);
   await page.locator(`[data-chat-id="${ids[2]}"]`).dragTo(page.locator(`[data-chat-id="${ids[0]}"]`));

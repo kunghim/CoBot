@@ -36,19 +36,41 @@ export function Menu({ trigger, items, placement = 'bottom-end', label, note }: 
   const root = useRef<HTMLDivElement>(null);
   const anchor = useRef<HTMLElement | null>(null);
   const floating = useRef<HTMLDivElement>(null);
+  const closing = useRef(false);
   const id = useId();
-  const close = useCallback(() => { setOpen(false); anchor.current?.focus(); }, []);
+  const close = useCallback(() => { closing.current = true; setOpen(false); anchor.current?.focus(); }, []);
   useEffect(() => {
     if (!open) return;
-    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !floating.current?.contains(event.target as Node)) close(); };
+    closing.current = false;
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (root.current?.contains(target)) {
+        // A press on the trigger is about to toggle the menu closed.
+        if (target === anchor.current) closing.current = true;
+        return;
+      }
+      if (!floating.current?.contains(target)) close();
+    };
     const reposition = () => close();
+    // A render can race the auto-focus and leave the open menu without any
+    // focused item, so every key dies silently. Take focus back when it
+    // lands on the anchor or the body; anything else left the menu on purpose.
+    const escaped = (event: FocusEvent) => {
+      const target = event.target as Node;
+      if (closing.current || target !== document.body && target !== anchor.current) return;
+      floating.current?.querySelector<HTMLButtonElement>('[role^="menuitem"]:not([disabled])')?.focus();
+    };
     document.addEventListener('pointerdown', outside);
+    document.addEventListener('focusin', escaped, true);
     window.addEventListener('resize', reposition);
-    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', reposition); };
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('focusin', escaped, true); window.removeEventListener('resize', reposition); };
   }, [open, close]);
   return <div ref={root} className="relative inline-flex">
     {cloneElement(trigger, { ref: (node: HTMLElement | null) => { anchor.current = node; }, 'aria-haspopup': 'menu', 'aria-expanded': open, 'aria-controls': open ? id : undefined,
-      onClick: () => setOpen(!open), onKeyDown: (event: KeyboardEvent) => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } },
+      onClick: () => setOpen(!open), onKeyDown: (event: KeyboardEvent) => {
+        if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); }
+        else if (open && event.key === 'Escape') { event.preventDefault(); close(); }
+      },
     } as Record<string, unknown>)}
     {open && createPortal(<div ref={floating}><MenuPanel id={id} items={items} label={label} anchor={() => anchor.current} placement={placement} closeAll={close} note={note} /></div>, document.body)}
   </div>;
@@ -75,10 +97,17 @@ function MenuPanel({ id, items, label, anchor, placement = 'bottom-end', nested 
     if (!nested && top + b.height > window.innerHeight - 8 && a.top >= b.height + 8) top = a.top - b.height - 6;
     left = Math.max(8, Math.min(left, window.innerWidth - b.width - 8));
     top = Math.max(8, Math.min(top, window.innerHeight - b.height - 8));
-    setPosition({ left, top, ready: true }); focus(0);
+    setPosition({ left, top, ready: true });
     // Anchor identity changes during parent renders; measure only when this panel mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    // Focus once the panel is visible: focus() on the still-hidden first
+    // frame is silently dropped, leaving the menu keyboard-dead.
+    if (!position.ready) return;
+    focus(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position.ready]);
   const current = actions.find((item) => item.id === child);
   return <>
     <div ref={panel} id={id} role="menu" aria-label={label} style={{ left: position.left, top: position.top, visibility: position.ready ? 'visible' : 'hidden' }}
