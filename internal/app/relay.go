@@ -342,6 +342,11 @@ type HandoffInput struct {
 	Mode         string
 	Suggestions  string
 	Document     string
+	// Preview carries, on a done handoff whose result the user can run, the
+	// command that starts it in the team directory and the address to open
+	// once it answers. It is stored on the record, never run by the handoff.
+	PreviewCommand string
+	PreviewURL     string
 }
 
 // Handoff records how a member hands a card off and moves the work along the
@@ -401,6 +406,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	record := domain.Evidence{
 		ID: domain.NewID(), TaskID: card.ID, AuthorID: principal.BotID, Summary: summary,
 		ArtifactRefs: in.ArtifactRefs, Outcome: in.Outcome, Suggestions: strings.TrimSpace(in.Suggestions), Execution: execution,
+		PreviewCommand: strings.TrimSpace(in.PreviewCommand), PreviewURL: strings.TrimSpace(in.PreviewURL),
 	}
 	e := relayEntry{from: principal.BotID, chain: chainOfRunLocked(ctx, tx, principal.BotID), sourceRun: principal.RunID, returnTo: -1}
 	from := stageLabel(req, card)

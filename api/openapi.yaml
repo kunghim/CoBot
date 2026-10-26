@@ -1994,6 +1994,66 @@ paths:
           description: Warm-up started (or not needed)
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/start:
+    post:
+      operationId: startPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start a preview process the user opened from an acceptance card
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, command]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: The start command from the acceptance handoff's preview; run in the team directory. }
+      responses:
+        "200":
+          description: Started (or already running from an earlier press)
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/stop:
+    post:
+      operationId: stopPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Stop a preview process (or all of the team's)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: "The command that started it; omit to stop every preview of the team." }
+      responses:
+        "200":
+          description: Stopped
+        "400":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/browser:
     get:
       operationId: getTeamBrowser
@@ -4000,6 +4060,8 @@ components:
         outcome: { type: string, enum: [done, back, escalate, resume] }
         mode: { type: string, enum: [rerun, return_to_me] }
         suggestions: { type: string }
+        previewCommand: { type: string, description: With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it. }
+        previewUrl: { type: string, description: The address to open once the preview answers. }
         execution: { $ref: "#/components/schemas/Execution" }
         createdAt: { type: string, format: date-time }
     Execution:

@@ -873,6 +873,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/preview/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a preview process the user opened from an acceptance card */
+        post: operations["startPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/preview/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a preview process (or all of the team's) */
+        post: operations["stopPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/browser": {
         parameters: {
             query?: never;
@@ -1902,6 +1936,10 @@ export interface components {
             /** @enum {string} */
             mode?: "rerun" | "return_to_me";
             suggestions?: string;
+            /** @description With a runnable result */
+            previewCommand?: string;
+            /** @description The address to open once the preview answers. */
+            previewUrl?: string;
             execution?: components["schemas"]["Execution"];
             /** Format: date-time */
             createdAt: string;
@@ -4372,6 +4410,67 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["Error"];
+        };
+    };
+    startPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The start command from the acceptance handoff's preview; run in the team directory. */
+                    command: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Started (or already running from an earlier press) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    stopPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The command that started it; omit to stop every preview of the team. */
+                    command?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stopped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
         };
     };
     getTeamBrowser: {

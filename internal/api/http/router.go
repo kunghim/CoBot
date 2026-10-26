@@ -120,6 +120,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/directories/check", s.handleCheckDirectory)
 	mux.HandleFunc("POST /api/v1/teams/open", s.handleOpenTeam)
 	mux.HandleFunc("POST /api/v1/teams/adopt", s.handleAdoptTeam)
+	mux.HandleFunc("POST /api/v1/teams/{id}/preview/start", s.handleStartPreview)
+	mux.HandleFunc("POST /api/v1/teams/{id}/preview/stop", s.handleStopPreview)
 	mux.HandleFunc("GET /api/v1/authorizations", s.handleListAuthorizations)
 	mux.HandleFunc("POST /api/v1/authorizations/{id}/revoke", s.handleRevokeAuthorization)
 	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)

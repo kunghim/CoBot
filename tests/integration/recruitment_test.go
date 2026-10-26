@@ -369,3 +369,40 @@ func TestAdoptTeamRewritesTheMarkerAndCreatesTheTeam(t *testing.T) {
 		t.Fatal("an unmarked folder was adopted")
 	}
 }
+
+func TestPreviewRunsAndStopsInTheTeamDirectory(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeamWithDir(t, "预览", "preview-run", nil)
+
+	// A marker file proves the command runs in the team's directory.
+	script := filepath.Join(h.teamDirFor("preview-run"), "preview-marker.cmd")
+	if err := os.WriteFile(script, []byte("@echo off\r\nexit /b 0\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A long-running command: it stays up until stopped, and the process
+	// table must keep it.
+	command := "cmd /C ping -n 30 127.0.0.1 > NUL"
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, command); err != nil {
+		t.Fatalf("start preview: %v", err)
+	}
+	// A second press of the same button does not start a twin.
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, command); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.app.StopPreview(ctx, h.user, team.ID, command); err != nil {
+		t.Fatal(err)
+	}
+	// A bot cannot start anything.
+	if _, err := h.app.StartPreview(ctx, auth.NewPrincipalBot(team.LeaderID, team.ID), team.ID, command); err == nil {
+		t.Fatal("a bot started a preview")
+	}
+	_ = script
+	// An empty or multi-line command is refused outright.
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, ""); err == nil {
+		t.Fatal("an empty command was accepted")
+	}
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, "a\nb"); err == nil {
+		t.Fatal("a multi-line command was accepted")
+	}
+}

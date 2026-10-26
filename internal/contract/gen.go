@@ -1083,13 +1083,19 @@ type Evidence struct {
 	CreatedAt    time.Time `json:"createdAt"`
 
 	// Execution What the engine reported a member ran and changed while it held the card.
-	Execution   *Execution       `json:"execution,omitempty"`
-	Id          string           `json:"id"`
-	Mode        *EvidenceMode    `json:"mode,omitempty"`
-	Outcome     *EvidenceOutcome `json:"outcome,omitempty"`
-	Suggestions *string          `json:"suggestions,omitempty"`
-	Summary     string           `json:"summary"`
-	TaskId      string           `json:"taskId"`
+	Execution *Execution       `json:"execution,omitempty"`
+	Id        string           `json:"id"`
+	Mode      *EvidenceMode    `json:"mode,omitempty"`
+	Outcome   *EvidenceOutcome `json:"outcome,omitempty"`
+
+	// PreviewCommand With a runnable result
+	PreviewCommand *string `json:"previewCommand,omitempty"`
+
+	// PreviewUrl The address to open once the preview answers.
+	PreviewUrl  *string `json:"previewUrl,omitempty"`
+	Suggestions *string `json:"suggestions,omitempty"`
+	Summary     string  `json:"summary"`
+	TaskId      string  `json:"taskId"`
 }
 
 // EvidenceMode defines model for Evidence.Mode.
@@ -2263,6 +2269,20 @@ type OpenTeamPathJSONBody struct {
 	Reveal *bool `json:"reveal,omitempty"`
 }
 
+// StartPreviewJSONBody defines parameters for StartPreview.
+type StartPreviewJSONBody struct {
+	// Command The start command from the acceptance handoff's preview; run in the team directory.
+	Command   string             `json:"command"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// StopPreviewJSONBody defines parameters for StopPreview.
+type StopPreviewJSONBody struct {
+	// Command The command that started it; omit to stop every preview of the team.
+	Command   *string            `json:"command,omitempty"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
 type RestoreTeamJSONBody struct {
 	ExpectedRevision int64              `json:"expectedRevision"`
@@ -2466,6 +2486,12 @@ type ResetTeamBudgetJSONRequestBody ResetTeamBudgetJSONBody
 
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
+
+// StartPreviewJSONRequestBody defines body for StartPreview for application/json ContentType.
+type StartPreviewJSONRequestBody StartPreviewJSONBody
+
+// StopPreviewJSONRequestBody defines body for StopPreview for application/json ContentType.
+type StopPreviewJSONRequestBody StopPreviewJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody

@@ -63,6 +63,11 @@ type Evidence struct {
 	Outcome     string `json:"outcome,omitempty"`
 	Mode        string `json:"mode,omitempty"`
 	Suggestions string `json:"suggestions,omitempty"`
+	// Preview is a runnable result's start command (run in the team
+	// directory) and the address to open once it answers; the user starts it
+	// from the acceptance card, never the handoff itself.
+	PreviewCommand string `json:"previewCommand,omitempty"`
+	PreviewURL     string `json:"previewUrl,omitempty"`
 	// Execution is what the engine reported was run and changed, never the
 	// member's own account of it.
 	Execution *Execution `json:"execution,omitempty"`

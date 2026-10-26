@@ -376,6 +376,7 @@ func (a *App) releaseTeamRuntime(ctx context.Context, teamID string) {
 	if a.Scheduler == nil {
 		return
 	}
+	a.stopTeamPreviews(teamID)
 	if err := a.Scheduler.StopTeam(ctx, teamID); err != nil && a.Logger != nil {
 		a.Logger.Warn("stop team engine", "teamId", teamID, "error", err)
 	}

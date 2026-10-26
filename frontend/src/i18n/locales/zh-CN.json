@@ -740,7 +740,10 @@
       "title": "交付验收",
       "accept": "验收通过",
       "revise": "继续修改",
-      "changesPlaceholder": "有修改意见写在这里；留空即验收通过"
+      "changesPlaceholder": "有修改意见写在这里；留空即验收通过",
+      "startPreview": "启动并打开",
+      "openAgain": "打开",
+      "stopPreview": "停止"
     },
     "recruitment": {
       "title": "申请加入成员",

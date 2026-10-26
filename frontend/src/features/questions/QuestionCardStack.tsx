@@ -10,13 +10,14 @@
 // authorization, and the card says so.
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAnswerQuestion, useCancelQuestion, useCancelRequirement, useQuestions, useRoles } from '../../api/queries';
+import { useAnswerQuestion, useCancelQuestion, useCancelRequirement, useOpenBrowserTab, useQuestions, useRoles, useStartPreview, useStopPreview, useTaskDetail } from '../../api/queries';
 import type { Question } from '../../api/types';
-import { Alert, Button, Checkbox, Icons, TextInput, WaitingCard } from '../../components/ui';
+import { Alert, Button, Checkbox, Icons, Spinner, TextInput, WaitingCard } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
 import Avatar from '../avatars/Avatar';
 import { clampPagerIndex } from '../approvals/pager';
 import { TeamMembersContext } from '../conversations/ExchangeLine';
+import { useWorkspace } from '../workspace/WorkspaceProvider';
 import Markdown from '../conversations/Markdown';
 
 export default function QuestionCardStack({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
@@ -244,8 +245,68 @@ function DecisionCard({ question, frame, onDismiss }: { question: Question; fram
         <TextInput size="sm" value={changes} onChange={(event) => setChanges(event.target.value)} placeholder={t(`questions.${kind}.changesPlaceholder`)} aria-label={t(`questions.${kind}.changesPlaceholder`)} />
       </form>
       {kind === 'confirm' && question.canSkipChecks && <Checkbox checked={returnToMe} onChange={setReturnToMe} label={t('questions.confirm.returnToMe')} />}
+      {kind === 'acceptance' && question.taskId && <PreviewRow taskId={question.taskId} teamId={question.teamId} onError={(message) => setErrorText(message)} />}
       {errorText && <Alert tone="danger">{errorText}</Alert>}
     </WaitingCard>
+  );
+}
+
+/** The runnable result an acceptance handoff named: start it here, open it
+ * in the team's browser, stop it again. The command is the member's own and
+ * is shown in full before the user presses anything. */
+function PreviewRow({ taskId, teamId, onError }: { taskId: string; teamId: string; onError: (message: string) => void }) {
+  const { t } = useTranslation();
+  const detail = useTaskDetail(taskId);
+  const start = useStartPreview(teamId);
+  const stop = useStopPreview(teamId);
+  const openOwn = useOpenBrowserTab(teamId);
+  const workspace = useWorkspace();
+  const [running, setRunning] = useState(false);
+  const record = detail.data?.evidence?.find((entry) => entry.previewCommand);
+  if (!record) return null;
+  const command = record.previewCommand ?? '';
+  const url = record.previewUrl ?? '';
+  const launch = () => {
+    onError('');
+    start.mutate(command, {
+      onSuccess: () => {
+        setRunning(true);
+        if (!url) return;
+        openOwn.mutate(url, {
+          onSuccess: ({ tab }) => {
+            workspace.openTab({ id: `browser:${tab.id}`, kind: 'browser', title: tab.title || url, ref: tab.id }, true);
+          },
+        });
+      },
+      onError: (error) => onError(apiErrorMessage(t, error)),
+    });
+  };
+  const halt = () => {
+    onError('');
+    stop.mutate(command, { onSuccess: () => setRunning(false), onError: (error) => onError(apiErrorMessage(t, error)) });
+  };
+  return (
+    <div className="space-y-1.5 rounded-xl bg-sunk p-3" data-testid="acceptance-preview">
+      <p className="break-all font-mono text-2xs text-neutral-600 dark:text-neutral-300">{command}</p>
+      {url && <p className="break-all font-mono text-2xs text-neutral-500 dark:text-neutral-400">{url}</p>}
+      <div className="flex items-center gap-2">
+        {!running ? (
+          <Button size="sm" variant="primary" loading={start.isPending} onClick={launch}>
+            {t('questions.acceptance.startPreview')}
+          </Button>
+        ) : (
+          <>
+            <Button size="sm" loading={start.isPending} onClick={launch}>
+              {t('questions.acceptance.openAgain')}
+            </Button>
+            <Button size="sm" variant="secondary" loading={stop.isPending} onClick={halt}>
+              {t('questions.acceptance.stopPreview')}
+            </Button>
+            <Spinner size={12} aria-hidden />
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

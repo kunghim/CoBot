@@ -318,6 +318,18 @@ export function useCreateTeam() {
   });
 }
 
+export function useStartPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string) => api.startPreview(teamId, command),
+  });
+}
+
+export function useStopPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string | undefined) => api.stopPreview(teamId, command),
+  });
+}
+
 export function useAdoptTeam() {
   const qc = useQueryClient();
   return useMutation({

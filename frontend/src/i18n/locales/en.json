@@ -746,7 +746,10 @@
       "title": "Delivery acceptance",
       "accept": "Accept",
       "revise": "Request changes",
-      "changesPlaceholder": "Write your changes here; leave empty to accept"
+      "changesPlaceholder": "Write your changes here; leave empty to accept",
+      "startPreview": "Start and open",
+      "openAgain": "Open",
+      "stopPreview": "Stop"
     },
     "recruitment": {
       "title": "New members requested",

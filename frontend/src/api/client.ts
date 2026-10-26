@@ -375,6 +375,8 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}`),
   setBrowserTabViewport: (teamId: string, tab: string, body: BrowserViewportRequest) =>
     request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
+  startPreview: (teamId: string, command: string) => request<{ started: boolean; running: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/start`, { command }),
+  stopPreview: (teamId: string, command?: string) => request<{ stopped: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/stop`, command ? { command } : {}),
   openTeam: (path: string) => request<import('./types').OpenTeamResult>('POST', '/api/v1/teams/open', { path }),
   adoptTeam: (body: { path: string; name: string; initialRoleIds?: string[] }) =>
     request<{ team: import('./types').Team; bots: import('./types').Bot[] }>('POST', '/api/v1/teams/adopt', body),

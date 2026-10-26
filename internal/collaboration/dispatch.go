@@ -236,6 +236,10 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 			Outcome      string   `json:"outcome"`
 			Summary      string   `json:"summary"`
 			ArtifactRefs []string `json:"artifactRefs"`
+			Preview      *struct {
+				Command string `json:"command"`
+				URL     string `json:"url"`
+			} `json:"preview"`
 			Mode         string   `json:"mode"`
 			Suggestions  string   `json:"suggestions"`
 			Document     string   `json:"document"`
@@ -249,6 +253,7 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 		}
 		card, err := d.app.Handoff(ctx, principal, app.HandoffInput{
 			CardID: args.CardID, Outcome: args.Outcome, Summary: args.Summary, ArtifactRefs: args.ArtifactRefs,
+			PreviewCommand: previewCommand(args.Preview), PreviewURL: previewURL(args.Preview),
 			Mode: args.Mode, Suggestions: args.Suggestions, Document: args.Document,
 		})
 		if err != nil {
@@ -399,4 +404,26 @@ func perRecipient(p auth.Principal, target string) auth.Principal {
 	write.Key = recipientKey(write.Key, target)
 	p.Write = &write
 	return p
+}
+
+// previewCommand keeps the run instruction the member gave, or empty when
+// the handoff carried no preview at all.
+func previewCommand(p *struct {
+	Command string `json:"command"`
+	URL     string `json:"url"`
+}) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(p.Command)
+}
+
+func previewURL(p *struct {
+	Command string `json:"command"`
+	URL     string `json:"url"`
+}) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(p.URL)
 }
