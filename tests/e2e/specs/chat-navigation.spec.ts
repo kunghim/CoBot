@@ -32,6 +32,17 @@ test('chat sections, pinned state, nested menu keyboard and manual order persist
   await grouping.press('Escape');
   await expect(page.getByRole('button', { name: '整理聊天列表' })).toBeFocused();
 
+  // A render can race the menu's auto-focus and drop focus back on the
+  // trigger; the open menu must take it back instead of ignoring every key.
+  // page.keyboard goes to the real focus, so the steal is deterministic here.
+  await page.getByRole('button', { name: '整理聊天列表' }).click();
+  await page.getByRole('button', { name: '整理聊天列表' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitemradio', { name: '按分区显示' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '整理聊天列表' })).toBeFocused();
+
   await page.getByRole('button', { name: '整理聊天列表' }).click();
   await page.getByRole('menuitem', { name: '新建分区' }).click();
   await page.getByRole('textbox', { name: '分区名称' }).fill(title + '-分区');
