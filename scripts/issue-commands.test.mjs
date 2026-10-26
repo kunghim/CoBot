@@ -139,6 +139,61 @@ test('manual assignment can be released without removing another assignee', asyn
   assert.deepEqual(f.issue.labels, ['bug', STATUS[0]]);
 });
 
+test('a sidebar assignment claims like /claim and unassignment restores the prior status', async () => {
+  const f = fixture({ labels: ['bug', STATUS[2], 'area: ui'], assignees: [alice] });
+  await runAutomation(f.github, { action: 'assigned', assignee: alice }, 'issues', 42);
+  assert.deepEqual(f.issue.labels.sort(), ['bug', 'area: ui', IN_PROGRESS].sort());
+  assert.equal(f.replies().length, 1);
+  assert.match(f.replies()[0].body, /counts as a claim/);
+  f.issue.assignees = [];
+  await runAutomation(f.github, { action: 'unassigned', assignee: alice }, 'issues', 42);
+  assert.deepEqual(f.issue.labels.sort(), ['bug', STATUS[2], 'area: ui'].sort());
+  assert.equal(f.replies().length, 1);
+  const calls = { ...f.calls };
+  await runAutomation(f.github, { action: 'edited' }, 'issues', 42);
+  assert.deepEqual(f.calls, calls);
+});
+
+test('assignments reconcile even when their own event run was replaced', async () => {
+  const f = fixture({ labels: ['bug', STATUS[2]], assignees: [alice] });
+  await runAutomation(f.github, { action: 'opened' }, 'issues', 42);
+  assert.ok(f.issue.labels.includes(IN_PROGRESS));
+  assert.ok(!f.issue.labels.includes(STATUS[2]));
+  assert.match(f.replies()[0].body, /counts as a claim/);
+});
+
+test('an assignment claim works with the comment commands', async () => {
+  const f = fixture({ labels: ['bug', STATUS[2]], assignees: [alice] });
+  await runAutomation(f.github, { action: 'assigned', assignee: alice }, 'issues', 42);
+  f.addComment(alice, '/claim');
+  await f.run();
+  assert.match(f.replies().at(-1).body, /already assigned/);
+  f.addComment(alice, '/unclaim');
+  await f.run();
+  assert.deepEqual(f.issue.assignees, []);
+  assert.deepEqual(f.issue.labels, ['bug', STATUS[2]]);
+});
+
+test('handing an assignment to someone else keeps work in progress and restores on the last release', async () => {
+  const f = fixture({ labels: ['bug', STATUS[2]], assignees: [alice] });
+  await runAutomation(f.github, { action: 'assigned', assignee: alice }, 'issues', 42);
+  f.issue.assignees = [alice, bob];
+  await runAutomation(f.github, { action: 'assigned', assignee: bob }, 'issues', 42);
+  assert.equal(f.replies().length, 1);
+  f.issue.assignees = [bob];
+  await runAutomation(f.github, { action: 'unassigned', assignee: alice }, 'issues', 42);
+  assert.ok(f.issue.labels.includes(IN_PROGRESS));
+  f.issue.assignees = [];
+  await runAutomation(f.github, { action: 'unassigned', assignee: bob }, 'issues', 42);
+  assert.deepEqual(f.issue.labels, ['bug', STATUS[2]]);
+});
+
+test('a manually labeled in-progress issue returns to needs-triage when emptied', async () => {
+  const f = fixture({ labels: ['bug', IN_PROGRESS] });
+  await runAutomation(f.github, { action: 'unassigned', assignee: alice }, 'issues', 42);
+  assert.deepEqual(f.issue.labels, ['bug', STATUS[0]]);
+});
+
 test('a partial claim is resumed with its original status snapshot', async () => {
   const f = fixture();
   f.addComment(alice, '/claim');

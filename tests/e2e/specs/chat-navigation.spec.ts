@@ -57,8 +57,11 @@ test('chat sections, pinned state, nested menu keyboard and manual order persist
   await page.getByRole('menuitem', { name: '显示方式', exact: true }).press('ArrowRight');
   await page.getByRole('menuitemradio', { name: '合并显示' }).click();
   await expect(row()).toBeVisible();
+  // Reopen only once the menu has closed, or the second click toggles it shut.
+  // The submenu opens by pointer here; nested keyboard use is covered above.
+  await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByRole('button', { name: '整理聊天列表' }).click();
-  await page.getByRole('menuitem', { name: '显示方式', exact: true }).press('ArrowRight');
+  await page.getByRole('menuitem', { name: '显示方式', exact: true }).click();
   await page.getByRole('menuitemradio', { name: '按分区显示' }).click();
   await page.getByRole('button', { name: '分区操作：' + title + '-分区', exact: true }).click();
   await page.getByRole('menuitem', { name: '删除分区', exact: true }).click();
