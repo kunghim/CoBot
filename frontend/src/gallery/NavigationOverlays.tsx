@@ -35,7 +35,7 @@ export default function NavigationOverlays() {
     <Chapter id="navigation" title="导航与浮层" intro="导航把人带到别处；浮层临时盖在页面上。所有导航项都有静止、悬停、当前三种看得出的状态；所有浮层都能用 Esc 关闭，关闭后焦点回到打开它的按钮。">
       <Doc id="rail" name="RailItem 一级图标栏" file="components/ui/Navigation.tsx" use="最左侧的一级导航（首页、设置）。当前页是填充的方块。" a11y="每项都有 label，当前项标记 aria-current=page。">
         <Demo surface="sunken">
-          <div className="flex w-14 flex-col items-center gap-1 rounded-xl py-2">
+          <div className="flex w-11 flex-col items-center gap-1 rounded-xl py-2">
             <RailItem icon={Home} label="首页" current={rail === 'home'} onClick={() => setRail('home')} />
             <RailItem icon={Users} label="团队" current={rail === 'teams'} onClick={() => setRail('teams')} badge={<Count value={2} tone="danger" label="2 项等你处理" />} />
             <RailItem icon={Settings} label="设置" current={rail === 'settings'} onClick={() => setRail('settings')} />

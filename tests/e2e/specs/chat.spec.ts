@@ -307,7 +307,7 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
               // in it, past the lights while windowed, at the left edge in
               // fullscreen — never moving across the boundary.
               const yCentered = Math.abs(control.y + control.height / 2 - 14);
-              const xExpected = fullscreen ? 0 : 88;
+              const xExpected = fullscreen ? 48 : 88;
               return Math.abs(control.y + control.height / 2 - 14) + Math.abs(control.x - xExpected) < 2 ? 0 : 1;
             }
             const head = (await page.getByTestId('app-title-bar').boundingBox())!;
@@ -321,10 +321,10 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
             // below the window-top head row (28px on the mac desktop).
             expect(mode.y + mode.height).toBeLessThanOrEqual(side.y + 96);
             // The toggle's x never shifts across the fullscreen boundary:
-            // 88 past the lights windowed, the row's left edge fullscreen.
+            // 88 past the lights windowed, beside the slim rail fullscreen.
             if (platform === 'mac' && width === 1024) {
               const x = (await toggle.boundingBox())!.x;
-              expect(Math.abs(x - (fullscreen ? 0 : 88))).toBeLessThan(2);
+              expect(Math.abs(x - (fullscreen ? 48 : 88))).toBeLessThan(2);
             }
           } else {
             await expect(sidebar).toHaveCount(0);

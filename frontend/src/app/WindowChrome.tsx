@@ -78,8 +78,8 @@ export function SidebarHeader() {
   return (
     <div
       data-testid="top-row-toggle"
-      className={cx('absolute left-0 top-0 z-20 flex h-7 items-center', macWindowed && 'pl-[88px]')}
-      style={{ ['--wails-draggable' as string]: 'no-drag' }}
+      className="absolute left-0 top-0 z-20 flex h-7 items-center pl-1"
+      style={{ ['--wails-draggable' as string]: 'no-drag', paddingLeft: macWindowed ? 88 : 48 }}
       onDoubleClick={(event) => event.stopPropagation()}
     >
       <SidebarToggle open={shell.listVisible} onToggle={shell.toggleList} {...labels} />
