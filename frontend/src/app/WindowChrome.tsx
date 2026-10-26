@@ -27,6 +27,13 @@ export function useNativeTitle(title: string | undefined) {
   }, [desktop, fullscreen, title]);
 }
 
+/** True on the macOS desktop: the head rows use the titlebar's 28px metrics
+ * in every window state so the controls hold one position across the
+ * fullscreen boundary. */
+export function useMacCorner(): boolean {
+  return useWindowFrame()?.platform === 'mac';
+}
+
 /** True only on the macOS desktop while windowed: the traffic lights sit in
  * the page's top-left corner, so the layout reserves it. Fullscreen cancels
  * the reservation — the hover menu bar overlays the content like any macOS
@@ -36,20 +43,24 @@ export function useMacWindowed(): boolean {
   return window?.platform === 'mac' && !window.fullscreen;
 }
 
-/** The traffic-light reservation block: 88px of the sidebar surface at the
- * top-left corner while windowed. Nothing interactive lives under it. */
+/** The traffic-light reservation block: 88x28 of the sidebar surface at
+ * the top-left corner while windowed — the slim head rows' own extent, so
+ * the block fills exactly the strip the lights occupy. Nothing interactive
+ * lives under it. */
 export function WindowCorner() {
   const macWindowed = useMacWindowed();
   if (!macWindowed) return null;
-  return <div data-testid="native-titlebar-inset" aria-hidden className="absolute left-0 top-0 z-10 h-10 w-[88px] bg-side" style={{ ['--wails-draggable' as string]: 'drag' }} />;
+  return <div data-testid="native-titlebar-inset" aria-hidden className="absolute left-0 top-0 z-10 h-7 w-[88px] bg-side" style={{ ['--wails-draggable' as string]: 'drag' }} />;
 }
 
 /** The sidebar's head: conversation search at the left end, mode capsule at
- * the right end, clear of the traffic-light corner while windowed. */
+ * the right end. On the mac desktop the row is the titlebar-height 28px so
+ * its center is the traffic lights' center while windowed and the controls
+ * hold that position in fullscreen — no shift between states. */
 export function SidebarHeader() {
   const path = useLocation().pathname;
   return (
-    <SidebarHead inset={useMacWindowed()} alignTrafficLights={useMacWindowed()} leading={<SearchBox />}>
+    <SidebarHead inset={useMacWindowed()} slim={useMacCorner()} leading={<SearchBox />}>
       <ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} />
     </SidebarHead>
   );
@@ -74,5 +85,5 @@ export function ConversationHeader({ title, right, toggle = true, alwaysInset = 
     onClose: desktop.close,
   } : undefined;
   const inset = useMacWindowed() && (alwaysInset || !listVisible);
-  return <ConversationHead inset={inset} alignTrafficLights={useMacWindowed()} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
+  return <ConversationHead inset={inset} slim={useMacCorner()} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
 }

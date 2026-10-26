@@ -276,17 +276,20 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
         const inset = (await page.getByTestId('native-titlebar-inset').boundingBox())!;
         const bar = (await page.getByTestId('app-title-bar').boundingBox())!;
         expect(inset.y).toBe(0);
-        expect(inset.height).toBe(40);
+        expect(inset.height).toBe(28);
         expect(inset.width).toBe(88);
         expect(inset.x).toBe(0);
         expect(bar.y).toBe(0);
+        // The mac head rows are the titlebar's 28px metrics in both window
+        // states, so nothing shifts across the fullscreen boundary.
+        expect(bar.height).toBe(28);
       }
       if (platform === 'mac') {
         // While windowed the corner is reserved (logo below it); fullscreen
         // cancels the reservation and the top of the window stays in use.
         const logo = (await page.getByTestId('rail-logo').boundingBox())!;
-        if (!fullscreen) expect(logo.y).toBeGreaterThanOrEqual(40);
-        else expect(logo.y).toBeLessThan(40);
+        if (!fullscreen) expect(logo.y).toBeGreaterThanOrEqual(28);
+        else expect(logo.y).toBeLessThan(28);
       }
       for (const width of [320, 390, 640, 1024, 1440]) {
         await page.setViewportSize({ width, height: 900 });
@@ -305,7 +308,8 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
             const side = (await sidebar.boundingBox())!;
             const mode = (await modes.boundingBox())!;
             expect(mode.x + mode.width).toBeCloseTo(side.x + side.width - 8, 0);
-            // The capsule lives inside the sidebar's own 40px head row.
+            // The capsule lives inside the sidebar's head row (28px on the
+            // mac desktop, 40px elsewhere).
             expect(mode.y + mode.height).toBeLessThanOrEqual(side.y + 40);
             // Toggling the reservation never shifts controls sideways.
             if (platform === 'mac' && width === 1024) {

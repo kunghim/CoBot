@@ -90,7 +90,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
         <WindowCorner />
         {/* Primary icon rail: home on top, settings at the bottom; on macOS
             the traffic-light corner stays clear of its top in every state. */}
-        <nav aria-label={t('app.title')} className={cx('flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3', macCorner && 'pt-12')}>
+        <nav aria-label={t('app.title')} className={cx('flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3', macCorner && 'pt-10')}>
           <div data-testid="rail-logo" className="flex h-10 w-full shrink-0 items-center justify-center"><BrandMark size={26} label={t('app.title')} /></div>
           <RailItem icon={Icons.home} label={t('nav.home')} current={location.pathname === '/'} onClick={() => navigate('/')} />
           <div className="mt-auto">
