@@ -162,6 +162,8 @@ export const api = {
   renameChat: (id: string, title: string, expectedRevision: number) => request<import('./types').Chat>('PATCH', `/api/v1/chats/${encodeURIComponent(id)}`, { title, expectedRevision }),
   deleteChat: (id: string, expectedRevision: number) => request<import('./types').Chat>('DELETE', `/api/v1/chats/${encodeURIComponent(id)}`, { expectedRevision }),
   chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
+  editChatMessage: (id: string, messageId: string, text: string) => request<import('./types').ChatPage>('POST', `/api/v1/chats/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/edit`, { text }),
+  editMessage: (messageId: string, text: string) => request<import('./types').SendMessageResult>('POST', `/api/v1/messages/${encodeURIComponent(messageId)}/edit`, { text }),
   replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
   openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {

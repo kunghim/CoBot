@@ -28,6 +28,7 @@ type Server struct {
 	StartTurnErr      error
 	SteerErr          error
 	InterruptErr      error // set by tests: the engine refuses turn/interrupt
+	RevertErr         error // set by tests: the engine refuses thread/revert
 	ReplyErr          error
 	BeforeReplyReturn func()
 	ResumeErr         error
@@ -39,6 +40,7 @@ type Server struct {
 	parents           map[string]string
 	startedTurns      []StartedTurn
 	interrupted       []string
+	reverted          []string
 	steers            []Steer
 	replied           []Reply
 	ShutdownCalls     int
@@ -278,6 +280,27 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 		return s.InterruptErr
 	}
 	s.interrupted = append(s.interrupted, threadID)
+	return nil
+}
+
+// Reverted reports the turns thread/revert was asked to roll back.
+func (s *Server) Reverted() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.reverted...)
+}
+
+// RevertTurn records the request; the fake keeps no history to roll back.
+func (s *Server) RevertTurn(ctx context.Context, threadID, beforeTurnID string) error {
+	if threadID == "" || beforeTurnID == "" {
+		return fmt.Errorf("revert requires threadId and beforeTurnId")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.RevertErr != nil {
+		return s.RevertErr
+	}
+	s.reverted = append(s.reverted, beforeTurnID)
 	return nil
 }
 

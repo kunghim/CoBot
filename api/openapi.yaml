@@ -2377,6 +2377,72 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/messages/{messageId}/edit:
+    post:
+      operationId: editChatMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of the chat's last user message and send them again
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/messages/{messageId}/edit:
+    post:
+      operationId: editMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of a member's last user message and send them again
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: The turn was rolled back and the new words queued; delivery status arrives via events
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/messages/{id}/cancel:
     post:
       operationId: cancelMessage

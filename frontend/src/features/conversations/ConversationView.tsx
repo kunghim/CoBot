@@ -7,7 +7,7 @@
 import { ShellToggle } from '../../app/shell';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCancelMessage, useConversation, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
+import { useCancelMessage, useConversation, useEditMessage, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
 import { forgetLiveRuns, useLiveRuns, type LiveRun } from '../../api/live';
 import { api } from '../../api/client';
@@ -17,6 +17,7 @@ import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
+import MessageEditBox from './MessageEditBox';
 import DocumentCard from './DocumentCard';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
@@ -39,6 +40,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const conv = useConversation(bot.id);
   const send = useSendMessage(bot.id);
   const cancel = useCancelMessage(bot.id);
+  const editMessage = useEditMessage(bot.id);
   const interrupt = useInterruptRun(bot.id);
   const retryRun = useRetryRun(bot.id);
   const workspace = useWorkspace();
@@ -289,6 +291,11 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
                   isLastUser={lastUserMessage?.id === entry.message.id}
                   showCancel={lastQueuedMessage?.id === entry.message.id}
                   cancelPending={cancel.isPending}
+                  onEdit={
+                    lastUserMessage?.id === entry.message.id
+                      ? (text) => editMessage.mutateAsync({ messageId: entry.message.id, text })
+                      : undefined
+                  }
                   onCancelQueued={() => {
                     setActionError('');
                     cancel.mutate(entry.message.id, {
@@ -508,6 +515,7 @@ function MessageRow({
   showCancel,
   cancelPending,
   onCancelQueued,
+  onEdit,
 }: {
   message: Message;
   recipients?: string[];
@@ -519,8 +527,11 @@ function MessageRow({
   showCancel: boolean;
   cancelPending: boolean;
   onCancelQueued: () => void;
+  /** Given for the conversation's last user message: replace its words and send them again. */
+  onEdit?: (text: string) => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
+  const [editing, setEditing] = useState(false);
   const membersById = useContext(TeamMembersContext);
   const text = messageText(message);
 
@@ -549,12 +560,29 @@ function MessageRow({
   const delivery = isLastUser && message.deliveryStatus ? t(deliveryLabelKey(message.deliveryStatus)) : '';
   const meta = (
     <>
+      {isUser && isLastUser && onEdit && (
+        <IconButton icon={Icons.edit} label={t('conversation.message.edit')} size="sm" onClick={() => setEditing(true)} />
+      )}
       <MessageActions value={text} createdAt={message.createdAt} language={i18n.language} copyLabel={t('conversation.message.copy')} copiedLabel={t('conversation.message.copied')} />
       {delivery && <span>{delivery}</span>}
       {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
     </>
   );
   const author = membersById.get(message.botId);
+  if (editing) {
+    return (
+      <div className="rounded-xl bg-sunk p-3">
+        <MessageEditBox
+          initial={text}
+          onSave={async (next) => {
+            await onEdit?.(next);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
   return (
     <div className="group">
       <MessageBubble

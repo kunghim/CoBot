@@ -1030,6 +1030,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chats/{chatId}/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of the chat's last user message and send them again */
+        post: operations["editChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of a member's last user message and send them again */
+        post: operations["editMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/messages/{id}/cancel": {
         parameters: {
             query?: never;
@@ -4671,6 +4705,67 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    editChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    editMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The turn was rolled back and the new words queued; delivery status arrives via events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
             409: components["responses"]["Error"];
         };
     };

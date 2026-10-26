@@ -261,3 +261,25 @@ func GetChatPage(ctx context.Context, q Queryer, id, cursor string) (domain.Chat
 	out.Requests, err = ListChatRequests(ctx, q, id)
 	return out, err
 }
+
+// DeleteChatRun drops one chat turn: its steps, its messages (the user's and
+// the replies), its approval requests and the run itself, for a turn the
+// user edited away.
+func DeleteChatRun(ctx context.Context, q Queryer, runID string) error {
+	if _, err := q.ExecContext(ctx, `DELETE FROM chat_run_steps WHERE run_id = ?`, runID); err != nil {
+		return err
+	}
+	if _, err := q.ExecContext(ctx, `DELETE FROM chat_requests WHERE run_id = ?`, runID); err != nil {
+		return err
+	}
+	if _, err := q.ExecContext(ctx, `DELETE FROM chat_messages WHERE run_id = ?`, runID); err != nil {
+		return err
+	}
+	_, err := q.ExecContext(ctx, `DELETE FROM chat_runs WHERE id = ?`, runID)
+	return err
+}
+
+// GetChatMessage reads one chat message.
+func GetChatMessage(ctx context.Context, q Queryer, id string) (domain.ChatMessage, error) {
+	return readChatJSON[domain.ChatMessage](q.QueryRowContext(ctx, `SELECT data FROM chat_messages WHERE id=?`, id))
+}

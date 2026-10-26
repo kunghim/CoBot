@@ -428,6 +428,28 @@ export function useCancelMessage(botId: string) {
   });
 }
 
+export function useEditMessage(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editMessage(messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+export function useEditChatMessage(chatId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editChatMessage(chatId, messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chat', chatId] });
+      void qc.invalidateQueries({ queryKey: ['chats'] });
+    },
+  });
+}
+
 export function useRetryRun(botId: string) {
   const qc = useQueryClient();
   return useMutation({

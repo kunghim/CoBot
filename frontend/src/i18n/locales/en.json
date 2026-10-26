@@ -385,7 +385,10 @@
     "cancelQueued": "Cancel queued message",
     "message": {
       "copy": "Copy source",
-      "copied": "Copied"
+      "copied": "Copied",
+      "edit": "Edit and send again",
+      "save": "Save and send again",
+      "hint": "File changes are not undone; a turn still running is stopped first, and the old turn's record leaves the conversation."
     },
     "interrupt": "Stop",
     "interruptRequested": "Stop requested; waiting for the engine",
@@ -1266,6 +1269,14 @@
     "error.chat.restarted": "The app restarted. Verify the previous execution state.",
     "error.chat.unknown": "The execution state is unverified. This turn will not be automatically repeated.",
     "error.chat.archived": "This chat is archived or has an unconfirmed archive operation. Restore or verify it first.",
+    "error.chat.edit_not_user_message": "Only your own last message can be edited.",
+    "error.chat.edit_not_last": "Only the last message can be edited.",
+    "error.chat.revert_failed": "Rolling the turn back failed; the message is unchanged. Try again later.",
+    "error.message.edit_not_user_message": "Only your own last message to a member can be edited.",
+    "error.message.edit_not_last": "Only the last message you sent this member can be edited.",
+    "error.message.edit_running": "The turn is still running; stop it before editing.",
+    "error.message.edit_side_effects": "This message already set collaboration in motion (a requirement, a card or a note), so it cannot be edited and sent again.",
+    "error.message.revert_failed": "Rolling the turn back failed; the message is unchanged. Try again later.",
     "error.chat.archive_pending": "Verify the pending archive operation first.",
     "error.chat.archive_unknown": "The native thread archive state could not be confirmed. Verify it to continue.",
     "error.chat.archive_state": "The archive state changed. Refresh and try again.",

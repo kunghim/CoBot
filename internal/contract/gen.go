@@ -1931,6 +1931,12 @@ type GetChatParams struct {
 // OrganizeChatParamsAction defines parameters for OrganizeChat.
 type OrganizeChatParamsAction string
 
+// EditChatMessageJSONBody defines parameters for EditChatMessage.
+type EditChatMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
+}
+
 // OpenChatPathJSONBody defines parameters for OpenChatPath.
 type OpenChatPathJSONBody struct {
 	Path      string `json:"path"`
@@ -1972,6 +1978,12 @@ type StreamEventsParams struct {
 // CancelMessageJSONBody defines parameters for CancelMessage.
 type CancelMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// EditMessageJSONBody defines parameters for EditMessage.
+type EditMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
 }
 
 // ApplyEngineCatalogJSONBody defines parameters for ApplyEngineCatalog.
@@ -2318,6 +2330,9 @@ type OrganizeChatJSONRequestBody = ChatActionInput
 // SendChatMessageJSONRequestBody defines body for SendChatMessage for application/json ContentType.
 type SendChatMessageJSONRequestBody = ChatSendInput
 
+// EditChatMessageJSONRequestBody defines body for EditChatMessage for application/json ContentType.
+type EditChatMessageJSONRequestBody EditChatMessageJSONBody
+
 // OpenChatPathJSONRequestBody defines body for OpenChatPath for application/json ContentType.
 type OpenChatPathJSONRequestBody OpenChatPathJSONBody
 
@@ -2338,6 +2353,9 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// EditMessageJSONRequestBody defines body for EditMessage for application/json ContentType.
+type EditMessageJSONRequestBody EditMessageJSONBody
 
 // ApplyEngineCatalogJSONRequestBody defines body for ApplyEngineCatalog for application/json ContentType.
 type ApplyEngineCatalogJSONRequestBody ApplyEngineCatalogJSONBody

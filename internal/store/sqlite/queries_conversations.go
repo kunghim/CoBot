@@ -939,3 +939,52 @@ func SetRunDeliveriesStatus(ctx context.Context, tx *sql.Tx, runID, status strin
 	}
 	return messages, nil
 }
+
+// DeleteMessageDeliveries drops the delivery rows of one message, for a
+// message the user edited away.
+func DeleteMessageDeliveries(ctx context.Context, q Queryer, messageID string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM deliveries WHERE message_id = ?`, messageID)
+	return err
+}
+
+// DeleteRunMessages drops one member's turn from its conversation: the turn's
+// reply material (everything recorded under its run) and one message by id
+// (the user message being edited).
+func DeleteRunMessages(ctx context.Context, q Queryer, teamID, botID, runID, messageID string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM messages WHERE team_id = ? AND bot_id = ? AND (id = ? OR run_id = ?)`, teamID, botID, messageID, runID)
+	return err
+}
+
+// CountUserMessagesAfter reports how many user messages a member received
+// after one instant, to tell the conversation's last user message apart.
+func CountUserMessagesAfter(ctx context.Context, q Queryer, teamID, botID, createdAt string) (int, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages WHERE team_id = ? AND bot_id = ? AND kind = 'user' AND created_at > ?`, teamID, botID, createdAt).Scan(&n)
+	return n, err
+}
+
+// ListDeliveryRunsByMessage returns the run ids that claimed one message's
+// deliveries, oldest first; empty entries never claimed a run.
+func ListDeliveryRunsByMessage(ctx context.Context, q Queryer, messageID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT COALESCE(run_id, '') FROM deliveries WHERE message_id = ? ORDER BY created_at, id`, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var runID string
+		if err := rows.Scan(&runID); err != nil {
+			return nil, err
+		}
+		out = append(out, runID)
+	}
+	return out, rows.Err()
+}
+
+// UpdateMessageBlocks replaces one message's blocks, for a queued user
+// message the user edited before it was dispatched.
+func UpdateMessageBlocks(ctx context.Context, q Queryer, messageID string, blocks []byte) error {
+	_, err := q.ExecContext(ctx, `UPDATE messages SET blocks = ? WHERE id = ?`, blocks, messageID)
+	return err
+}

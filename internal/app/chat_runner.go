@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -53,6 +54,16 @@ type chatRuntime struct {
 	retryOpen  bool
 	lastActive time.Time
 	bindings   map[string][2]string
+	// pendingEdit carries a message edit waiting for the running turn to end:
+	// once it does, the thread rolls back and the new words are sent.
+	pendingEdit *chatEdit
+}
+
+// chatEdit is one requested edit of the last user message: its turn and the
+// text that replaces it.
+type chatEdit struct {
+	runID string
+	text  string
 }
 
 func NewChatRunner(a *App, factory ServerFactory) *ChatRunner {
@@ -649,7 +660,75 @@ func (r *ChatRunner) finish(rt *chatRuntime, status string) error {
 	}
 	rt.bindings = map[string][2]string{}
 	platform.RemoveChatLease(r.a.Paths.Root, rt.id)
+	// An edit of this turn's starting message was waiting for the turn to
+	// end; now the thread can roll back and the new words go out.
+	if rt.pendingEdit != nil && rt.pendingEdit.runID == run.ID {
+		edit := *rt.pendingEdit
+		rt.pendingEdit = nil
+		if err := r.applyEdit(ctx, rt, run, edit.text); err != nil {
+			// Nothing has changed: the turn stays as it ended and the user
+			// can ask for the edit again.
+			r.report(err)
+		}
+		r.a.chatChanged(context.Background(), rt.id, "chat.run.updated")
+	}
 	return nil
+}
+
+// applyEdit rolls the thread back to before one finished turn and sends new
+// words in its place. The turn's local record (its messages, steps and run)
+// is replaced by the new one.
+func (r *ChatRunner) applyEdit(ctx context.Context, rt *chatRuntime, run domain.ChatRun, text string) error {
+	if run.ThreadID != "" && run.TurnID != "" {
+		revertCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := rt.server.RevertTurn(revertCtx, run.ThreadID, run.TurnID); err != nil {
+			return fmt.Errorf("revert the turn for an edit: %w", err)
+		}
+	}
+	_, err := r.replaceChatTurn(context.Background(), rt.id, run.ID, text)
+	return err
+}
+
+// replaceChatTurn removes one finished turn's record and queues a new turn
+// with the given text, which the runner then dispatches like any message.
+func (r *ChatRunner) replaceChatTurn(ctx context.Context, chatID, oldRunID, text string) (domain.ChatPage, error) {
+	now := time.Now().UTC()
+	run := domain.ChatRun{ID: domain.NewID(), ChatID: chatID, Status: "queued", StartedAt: now, Steps: []domain.ChatStep{}}
+	msg := domain.ChatMessage{ID: domain.NewID(), ChatID: chatID, RunID: run.ID, Kind: domain.MessageKindUser, Text: text, CreatedAt: now}
+	run.MessageID = msg.ID
+	tx, err := r.a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	defer tx.Rollback()
+	if err = sqlite.DeleteChatRun(ctx, tx, oldRunID); err != nil {
+		return domain.ChatPage{}, err
+	}
+	if err = sqlite.SaveChatMessage(ctx, tx, msg); err != nil {
+		return domain.ChatPage{}, err
+	}
+	if err = sqlite.SaveChatRun(ctx, tx, run); err != nil {
+		return domain.ChatPage{}, err
+	}
+	chat, err := sqlite.GetChat(ctx, tx, chatID)
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	chat.UpdatedAt = now
+	chat.Revision++
+	if err = sqlite.SaveChat(ctx, tx, chat, true); err != nil {
+		return domain.ChatPage{}, err
+	}
+	page, err := sqlite.GetChatPage(ctx, tx, chatID, "")
+	if err != nil {
+		return page, err
+	}
+	if err = tx.Commit(); err != nil {
+		return page, err
+	}
+	r.wake(chatID, run.ID, text)
+	return page, nil
 }
 func (r *ChatRunner) markUnknown(ctx context.Context, run domain.ChatRun, key string) error {
 	run.Status = domain.RunUnknown
@@ -906,4 +985,137 @@ func (r *ChatRunner) interrupt(rt *chatRuntime, threadID, turnID string) {
 			}
 		}
 	})
+}
+
+// ChatEditText is one edit of the chat's last user message.
+type ChatEditText struct {
+	RequestID string `json:"requestId"`
+	Text      string `json:"text"`
+}
+
+// EditMessage replaces the words of the chat's last user message and sends
+// them again: a turn still running is stopped first, the engine's thread
+// history rolls back to before that turn, and a new turn starts with the new
+// text. The old turn's record goes away; file changes the turn made stay.
+func (r *ChatRunner) EditMessage(ctx context.Context, p auth.Principal, chatID, messageID string, in ChatEditText) (domain.ChatPage, error) {
+	p, err := WithWriteRequest(p, "chat.edit", in.RequestID, struct {
+		ChatID, MessageID string
+		Input             ChatEditText
+	}{chatID, messageID, in})
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	cached, unlock, err := beginWrite[domain.ChatPage](ctx, r.a, p)
+	defer unlock()
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	if cached != nil {
+		return *cached, nil
+	}
+	text := strings.TrimSpace(in.Text)
+	if text == "" || len(text) > 512*1024 {
+		return domain.ChatPage{}, domain.InvalidRequest("error.invalid_request", nil)
+	}
+	release := r.lock(chatID)
+	defer release()
+	chat, err := sqlite.GetChat(ctx, r.a.DB, chatID)
+	if err != nil {
+		return domain.ChatPage{}, sqlite.NormalizeError(err)
+	}
+	if chat.ArchivedAt != "" || chat.ArchiveOperation != "" {
+		return domain.ChatPage{}, domain.Conflict("error.chat.archived", nil)
+	}
+	message, err := sqlite.GetChatMessage(ctx, r.a.DB, messageID)
+	if err != nil {
+		return domain.ChatPage{}, sqlite.NormalizeError(err)
+	}
+	if message.ChatID != chatID || message.Kind != domain.MessageKindUser {
+		return domain.ChatPage{}, domain.InvalidRequest("error.chat.edit_not_user_message", nil)
+	}
+	runs, err := sqlite.ListChatRuns(ctx, r.a.DB, chatID)
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	var run *domain.ChatRun
+	for i := range runs {
+		if runs[i].MessageID == messageID {
+			run = &runs[i]
+			break
+		}
+	}
+	if run == nil {
+		return domain.ChatPage{}, domain.InvalidRequest("error.chat.edit_not_user_message", nil)
+	}
+	for _, other := range runs {
+		if other.ID != run.ID && other.StartedAt.After(run.StartedAt) {
+			return domain.ChatPage{}, domain.Conflict("error.chat.edit_not_last", nil)
+		}
+	}
+	// A turn that has not reached the engine yet only needs new words.
+	if run.Status == "queued" {
+		message.Text = text
+		tx, e := r.a.DB.BeginTx(ctx, nil)
+		if e != nil {
+			return domain.ChatPage{}, e
+		}
+		defer tx.Rollback()
+		if e = sqlite.SaveChatMessage(ctx, tx, message); e != nil {
+			return domain.ChatPage{}, e
+		}
+		var page domain.ChatPage
+		if page, e = sqlite.GetChatPage(ctx, tx, chatID, ""); e != nil {
+			return domain.ChatPage{}, e
+		}
+		if e = r.a.saveWriteResult(ctx, tx, p, page); e != nil {
+			return domain.ChatPage{}, e
+		}
+		if e = tx.Commit(); e != nil {
+			return domain.ChatPage{}, e
+		}
+		r.a.chatChanged(ctx, chatID, "chat.message.updated")
+		return page, nil
+	}
+	if domain.ChatRunActive(run.Status) && run.Status != "queued" {
+		rt := r.runtime(chatID)
+		if rt == nil || rt.run.ID != run.ID {
+			return domain.ChatPage{}, domain.Conflict("error.chat.busy", nil)
+		}
+		// Stop the turn; the rollback and the resend happen when it ends.
+		run.StopRequested = true
+		rt.run = *run
+		rt.pendingEdit = &chatEdit{runID: run.ID, text: text}
+		if err := sqlite.SaveChatRun(ctx, r.a.DB, *run); err != nil {
+			return domain.ChatPage{}, err
+		}
+		if run.TurnID != "" && rt.server.Epoch() == run.Epoch {
+			r.interrupt(rt, run.ThreadID, run.TurnID)
+		}
+		r.a.chatChanged(ctx, chatID, "chat.run.updated")
+		page, err := sqlite.GetChatPage(ctx, r.a.DB, chatID, "")
+		return page, err
+	}
+	// The turn has ended: roll the thread back and send the new words now.
+	rt := r.runtime(chatID)
+	if rt == nil {
+		if rt, err = r.ensure(chat); err != nil {
+			return domain.ChatPage{}, err
+		}
+		if _, _, err = r.thread(rt, chat, false); err != nil {
+			return domain.ChatPage{}, err
+		}
+	}
+	if run.ThreadID != "" && run.TurnID != "" {
+		revertCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := rt.server.RevertTurn(revertCtx, run.ThreadID, run.TurnID); err != nil {
+			return domain.ChatPage{}, domain.EngineUnavailable("error.chat.revert_failed", nil, err)
+		}
+	}
+	page, err := r.replaceChatTurn(ctx, chatID, run.ID, text)
+	if err != nil {
+		return domain.ChatPage{}, err
+	}
+	r.a.chatChanged(ctx, chatID, "chat.message.updated")
+	return page, nil
 }

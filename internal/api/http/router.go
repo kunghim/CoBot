@@ -58,6 +58,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/chats/{chatId}", s.handleDeleteChat)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/messages", s.handleSendChat)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/runs/{runId}/{action}", s.handleChatRunAction)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/messages/{messageId}/edit", s.handleChatMessageEdit)
+	mux.HandleFunc("POST /api/v1/messages/{messageId}/edit", s.handleMessageEdit)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/requests/{requestId}/reply", s.handleChatReply)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/open-path", s.handleOpenChatPath)
 

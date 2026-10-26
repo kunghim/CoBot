@@ -880,6 +880,19 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 	return nil
 }
 
+// RevertTurn replaces the thread's durable history with the part before one
+// turn, that turn included. The engine answers with the truncated thread;
+// the model never sees the reverted turns again.
+func (s *Server) RevertTurn(ctx context.Context, threadID, beforeTurnID string) error {
+	if threadID == "" || beforeTurnID == "" {
+		return errors.New("revert requires thread and turn identity")
+	}
+	if err := s.client.Call(ctx, "thread/revert", map[string]any{"threadId": threadID, "beforeTurnId": beforeTurnID}, nil); err != nil {
+		return fmt.Errorf("thread/revert: %w", err)
+	}
+	return nil
+}
+
 // ReplyApproval answers a pending native approval request.
 func (s *Server) ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error {
 	s.mu.Lock()

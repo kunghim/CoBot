@@ -379,7 +379,10 @@
     "cancelQueued": "取消排队消息",
     "message": {
       "copy": "复制原文",
-      "copied": "已复制"
+      "copied": "已复制",
+      "edit": "编辑并重发",
+      "save": "保存并重发",
+      "hint": "已改过的文件不会撤销；这一轮还在执行时会先停止，旧的对话记录会从会话里移除。"
     },
     "interrupt": "停止",
     "interruptRequested": "已请求停止，等待引擎响应",
@@ -1256,6 +1259,14 @@
     "error.chat.restarted": "应用重启，上一轮的执行结果需要核实。",
     "error.chat.unknown": "无法确认这一轮是否结束，不会自动重新执行。",
     "error.chat.archived": "这段聊天已归档或正在处理归档操作，请先恢复或核实。",
+    "error.chat.edit_not_user_message": "只能编辑自己发出的最后一条消息。",
+    "error.chat.edit_not_last": "只能编辑最后一条消息。",
+    "error.chat.revert_failed": "回退上一轮失败，消息没有改动；请稍后再试。",
+    "error.message.edit_not_user_message": "只能编辑你发给成员的最后一条消息。",
+    "error.message.edit_not_last": "只能编辑发给这位成员的最后一条消息。",
+    "error.message.edit_running": "这一轮还在执行，先停止再编辑。",
+    "error.message.edit_side_effects": "这条消息已经引起协作（需求、卡片或留言），不能编辑重发。",
+    "error.message.revert_failed": "回退上一轮失败，消息没有改动；请稍后再试。",
     "error.chat.archive_pending": "请先核实尚未完成的归档操作。",
     "error.chat.archive_unknown": "无法确认原生会话的归档状态，请核实后继续。",
     "error.chat.archive_state": "聊天归档状态已改变，请刷新后重试。",

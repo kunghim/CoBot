@@ -353,3 +353,15 @@ func (a *App) ChatRunAction(ctx context.Context, p auth.Principal, chatID, runID
 	}
 	return a.Chats.runAction(ctx, p, chatID, runID, action, in)
 }
+
+// EditChatMessage replaces the words of the chat's last user message and
+// sends them again; see ChatRunner.EditMessage.
+func (a *App) EditChatMessage(ctx context.Context, p auth.Principal, chatID, messageID string, in ChatEditText) (domain.ChatPage, error) {
+	if p.Kind != auth.KindUser {
+		return domain.ChatPage{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if a.Chats == nil {
+		return domain.ChatPage{}, domain.Conflict("error.chat.engine_unavailable", nil)
+	}
+	return a.Chats.EditMessage(ctx, p, chatID, messageID, in)
+}

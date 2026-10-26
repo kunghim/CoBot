@@ -189,3 +189,47 @@ func RunFailureCode(ctx context.Context, q Queryer, runID string) string {
 	}
 	return ""
 }
+
+// DeleteRunSteps drops every step of one run, for a turn the user edited
+// away.
+func DeleteRunSteps(ctx context.Context, q Queryer, runID string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM run_steps WHERE run_id = ?`, runID)
+	return err
+}
+
+// DeleteRun drops one run row. Its steps and the messages it produced are
+// the caller's to remove in the same transaction.
+func DeleteRun(ctx context.Context, q Queryer, runID string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM runs WHERE id = ?`, runID)
+	return err
+}
+
+// RunHasCollaborationSideEffects reports whether the turn recorded
+// collaboration: a CoBot tool call (a requirement, a hand-off, a note to a
+ // teammate) or an approval. A turn with either cannot be rolled back, so
+// its starting message cannot be edited and sent again.
+func RunHasCollaborationSideEffects(ctx context.Context, q Queryer, runID string) (bool, error) {
+	rows, err := q.QueryContext(ctx, `SELECT detail FROM run_steps WHERE run_id = ? AND kind = 'tool'`, runID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return false, err
+		}
+		var detail map[string]any
+		if json.Unmarshal([]byte(raw), &detail) == nil && detail["server"] == "cobot" {
+			return true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	var approvals int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM approvals WHERE run_id = ?`, runID).Scan(&approvals); err != nil {
+		return false, err
+	}
+	return approvals > 0, nil
+}
