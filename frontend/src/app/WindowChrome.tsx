@@ -49,7 +49,7 @@ export function WindowCorner() {
 export function SidebarHeader() {
   const path = useLocation().pathname;
   return (
-    <SidebarHead inset={useMacWindowed()} leading={<SearchBox />}>
+    <SidebarHead inset={useMacWindowed()} alignTrafficLights={useMacWindowed()} leading={<SearchBox />}>
       <ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} />
     </SidebarHead>
   );

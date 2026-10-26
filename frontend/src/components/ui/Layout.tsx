@@ -83,12 +83,16 @@ export interface WindowControls {
  * reservation so the row's controls never sit under the traffic lights.
  * The row drags the window.
  */
-export function SidebarHead({ leading, children, inset = false }: { leading?: ReactNode; children?: ReactNode; inset?: boolean }) {
+export function SidebarHead({ leading, children, inset = false, alignTrafficLights = false }: { leading?: ReactNode; children?: ReactNode; inset?: boolean; alignTrafficLights?: boolean }) {
   const drag = { ['--wails-draggable' as string]: 'drag' };
   const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
   return (
-    <div data-testid="app-mode-header" style={drag} className={cx('flex h-10 shrink-0 items-center bg-side', inset ? 'pl-8 pr-2' : 'px-2')}>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+    <div data-testid="app-mode-header" style={drag} className={cx('flex h-10 shrink-0 items-start bg-side', inset ? 'pl-8 pr-2' : 'px-2', alignTrafficLights && 'pt-1')}>
+      {/* macOS paints the traffic lights on the titlebar's own baseline, a
+          few pixels above the row's center; nudging the row's contents to
+          that baseline makes the pill row concentric with the lights. The
+          row keeps its 40px height either way. */}
+      <div className={cx('flex min-w-0 flex-1 items-center justify-end gap-2', !alignTrafficLights && 'h-full')} style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
         {leading}
         {children}
       </div>
