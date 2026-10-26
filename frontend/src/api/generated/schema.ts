@@ -1909,10 +1909,10 @@ export interface components {
         Question: {
             id: string;
             /**
-             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
              * @enum {string}
              */
-            kind: "" | "confirm" | "acceptance";
+            kind: "" | "confirm" | "acceptance" | "recruitment";
             requirementId?: string;
             stageIndex?: number;
             teamId: string;
@@ -1921,6 +1921,8 @@ export interface components {
             runId?: string;
             question: string;
             options: string[];
+            /** @description A recruitment question only: the role IDs the project manager asked to add. */
+            roleIds?: string[];
             /** @enum {string} */
             status: "open" | "answered" | "cancelled";
             answerText?: string;
@@ -2011,10 +2013,10 @@ export interface components {
             /** @description The answer; for a confirmation or acceptance */
             answerText: string;
             /**
-             * @description Required for a confirmation or acceptance question, refused for any other.
+             * @description Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
              * @enum {string}
              */
-            decision?: "accept" | "revise";
+            decision?: "accept" | "revise" | "approve" | "reject";
             /**
              * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
              * @enum {string}

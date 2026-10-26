@@ -66,6 +66,7 @@
         "internal/app/context.go",
         "internal/app/conversations.go",
         "internal/app/message_edit.go",
+        "internal/app/recruitment.go",
         "internal/app/steer.go",
         "internal/app/interrupt_request.go",
         "internal/app/run_retry.go",

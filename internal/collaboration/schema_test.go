@@ -33,7 +33,7 @@ func TestEveryToolAdvertisesItsArguments(t *testing.T) {
 }
 
 func TestEachRoleIsOfferedOnlyItsTools(t *testing.T) {
-	if got := ToolsForRole(RoleLeader); !slices.Equal(got, []string{"start_requirement", "handoff", "view_tasks", "send_message", "ask_user"}) {
+	if got := ToolsForRole(RoleLeader); !slices.Equal(got, []string{"start_requirement", "handoff", "view_tasks", "send_message", "ask_user", "request_member"}) {
 		t.Fatalf("leader tools = %v", got)
 	}
 	// A reviewer is a member like any other: its reviews come on cards.

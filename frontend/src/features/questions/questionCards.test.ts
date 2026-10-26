@@ -1,5 +1,6 @@
 // What waits for the user's decision (a member's question, a confirm stage, a
-// finished requirement) is a card above the composer, like an approval.
+// finished requirement, a member request) is a card above the composer, like
+// an approval.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,10 @@ const state = vi.hoisted(() => ({
   answer: vi.fn(),
   cancel: vi.fn(),
   cancelRequirement: vi.fn(),
+  roles: [
+    { id: 'fullstack-engineer', nameKey: 'role.fullstack-engineer.name', name: '全栈工程师' },
+    { id: 'qa-engineer', nameKey: 'role.qa-engineer.name', name: '测试工程师' },
+  ] as unknown[],
 }));
 
 vi.mock('../../api/queries', () => ({
@@ -19,6 +24,7 @@ vi.mock('../../api/queries', () => ({
   useAnswerQuestion: () => ({ mutate: state.answer, isPending: false }),
   useCancelQuestion: () => ({ mutate: state.cancel, isPending: false }),
   useCancelRequirement: () => ({ mutate: state.cancelRequirement, isPending: false }),
+  useRoles: () => ({ data: { items: state.roles } }),
 }));
 vi.mock('../conversations/Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
 
@@ -42,6 +48,15 @@ const acceptance = {
   question: '需求「回归」已完成，请按上面的汇报验收。',
 };
 const ask = { ...confirm, id: 'q2', kind: '', requirementId: '', question: '用哪个数据库？', options: ['SQLite', 'Postgres'] };
+const recruitment = {
+  ...confirm,
+  id: 'q4',
+  kind: 'recruitment',
+  requirementId: '',
+  question: '实现和测试都要人，申请招募。',
+  options: [],
+  roleIds: ['fullstack-engineer', 'qa-engineer', 'unknown-role'],
+};
 
 describe('question cards', () => {
   let root: Root;
@@ -66,7 +81,7 @@ describe('question cards', () => {
   const render = () => act(() => root.render(h(QuestionCardStack, { teamId: 't1', viewBotId: 'b1' })));
   const byText = (text: string) => [...host.querySelectorAll('button')].find((button) => button.textContent?.includes(text));
   const type = (text: string) => {
-    const input = host.querySelector('input[aria-label*="修改意见"], input[placeholder*="修改意见"]') as HTMLInputElement | null;
+    const input = host.querySelector('input[aria-label*="修改意见"], input[placeholder*="修改意见"], input[aria-label*="项目经理"], input[placeholder*="项目经理"]') as HTMLInputElement | null;
     if (!input) throw new Error('no changes input');
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     act(() => {
@@ -139,6 +154,38 @@ describe('question cards', () => {
     expect(host.textContent).toContain('用哪个数据库？');
     act(() => byText('Postgres')!.click());
     expect(state.answer).toHaveBeenCalledWith(expect.objectContaining({ questionId: 'q2', answerText: 'Postgres' }), expect.anything());
+  });
+
+  it('shows a recruitment request with role names and no ignore', () => {
+    state.items = [recruitment];
+    render();
+    expect(host.textContent).toContain('申请加入成员');
+    expect(host.textContent).toContain('全栈工程师');
+    expect(host.textContent).toContain('测试工程师');
+    expect(host.textContent).toContain('unknown-role');
+    expect(host.textContent).toContain('实现和测试都要人，申请招募。');
+    expect(byText('忽略')).toBeUndefined();
+  });
+
+  it('approves a recruitment request from its button', () => {
+    state.items = [recruitment];
+    render();
+    act(() => byText('同意加入')!.click());
+    expect(state.answer).toHaveBeenCalledWith(
+      expect.objectContaining({ questionId: 'q4', decision: 'approve', answerText: '' }),
+      expect.anything(),
+    );
+  });
+
+  it('rejects a recruitment request carrying the comment as the reason', () => {
+    state.items = [recruitment];
+    render();
+    type('这个需求一个人能做完');
+    act(() => byText('拒绝')!.click());
+    expect(state.answer).toHaveBeenCalledWith(
+      expect.objectContaining({ questionId: 'q4', decision: 'reject', answerText: '这个需求一个人能做完' }),
+      expect.anything(),
+    );
   });
 
   it('pages through several cards', () => {

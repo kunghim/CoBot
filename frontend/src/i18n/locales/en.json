@@ -725,6 +725,12 @@
       "revise": "Request changes",
       "changesPlaceholder": "Write your changes here; leave empty to accept"
     },
+    "recruitment": {
+      "title": "New members requested",
+      "approve": "Approve",
+      "reject": "Reject",
+      "commentPlaceholder": "A note for the project manager (optional); say why when rejecting"
+    },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
     "dismissed": "{{count}} card(s) awaiting acceptance",
     "dismissed_one": "{{count}} card awaiting acceptance",
@@ -1289,7 +1295,15 @@
     "error.chat.archive_unknown": "The native thread archive state could not be confirmed. Verify it to continue.",
     "error.chat.archive_state": "The archive state changed. Refresh and try again.",
     "error.chat.section_missing": "This section no longer exists. Refresh and try again.",
-    "error.chat.order_conflict": "The list order changed. Refresh and try again."
+    "error.chat.order_conflict": "The list order changed. Refresh and try again.",
+    "error.team.role_present": "The team already has a member of this role",
+    "error.recruitment.leader_only": "Only the project manager can request new members",
+    "error.recruitment.roles_required": "Name the roles to recruit",
+    "error.recruitment.reason_required": "A recruitment request needs a reason",
+    "error.recruitment.member_limit": "Recruiting {{requested}} more members would exceed the limit of {{limit}}",
+    "error.question.not_recruitment": "This card is not a recruitment request",
+    "error.question.recruitment_decision": "A recruitment request needs approve or reject",
+    "error.question.recruitment_decide": "A recruitment request cannot be ignored; approve or reject it"
   },
   "paging": {
     "more": "Load more",

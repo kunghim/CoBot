@@ -758,7 +758,15 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 // reviseAsNewInputLocked hands the user's changes to a finished requirement
 // to the project manager as the user's own message.
 func (a *App) reviseAsNewInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, comment string) (string, error) {
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: "验收未通过，需要修改：" + comment}})
+	return a.deliverDecisionInputLocked(ctx, tx, question, "验收未通过，需要修改："+comment)
+}
+
+// deliverDecisionInputLocked puts the outcome of a question card in front of
+// the member that asked it, as the user's own fresh input: the message joins
+// a new causal chain, the member reads it with a woken turn. The user's
+// decision is input, never an authorization.
+func (a *App) deliverDecisionInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, text string) (string, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 	if err != nil {
 		return "", err
 	}

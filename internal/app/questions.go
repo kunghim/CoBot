@@ -214,6 +214,12 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	if question.Status != domain.QuestionOpen {
 		return domain.Question{}, domain.Conflict("error.question.already_answered", map[string]any{"status": question.Status})
 	}
+	// A recruitment request has exactly two outcomes for the leader, approve
+	// and reject; withdrawing it silently would leave the project manager
+	// waiting on a decision that never comes.
+	if question.Kind == domain.QuestionKindRecruitment {
+		return domain.Question{}, domain.InvalidRequest("error.question.recruitment_decide", nil)
+	}
 	if expectedRevision > 0 && question.Revision != expectedRevision {
 		return domain.Question{}, domain.RevisionConflict("error.question.revision_conflict", map[string]any{"expected": expectedRevision, "actual": question.Revision})
 	}

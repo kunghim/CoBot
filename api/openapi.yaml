@@ -3965,8 +3965,8 @@ components:
         id: { type: string }
         kind:
           type: string
-          enum: ['', confirm, acceptance]
-          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+          enum: ['', confirm, acceptance, recruitment]
+          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
         requirementId: { type: string }
         stageIndex: { type: integer }
         teamId: { type: string }
@@ -3977,6 +3977,10 @@ components:
         options:
           type: array
           items: { type: string }
+        roleIds:
+          type: array
+          items: { type: string }
+          description: "A recruitment question only: the role IDs the project manager asked to add."
         status: { type: string, enum: [open, answered, cancelled] }
         answerText: { type: string }
         answerMessageId: { type: string }
@@ -4044,11 +4048,11 @@ components:
       required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise). }
+        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager. }
         decision:
           type: string
-          enum: [accept, revise]
-          description: Required for a confirmation or acceptance question, refused for any other.
+          enum: [accept, revise, approve, reject]
+          description: Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
         mode:
           type: string
           enum: [rerun, return_to_me]

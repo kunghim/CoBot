@@ -24,6 +24,7 @@ type App interface {
 	Handoff(ctx context.Context, principal auth.Principal, in app.HandoffInput) (domain.Task, error)
 	NotifyFromBot(ctx context.Context, principal auth.Principal, targetBotID, text, taskID, requestID string) (map[string]any, error)
 	AskUser(ctx context.Context, principal auth.Principal, in app.AskUserInput) (domain.Question, error)
+	RequestMember(ctx context.Context, principal auth.Principal, in app.RequestMemberInput) (domain.Question, error)
 	UseBrowser(ctx context.Context, principal auth.Principal, req browser.Request) (browser.Result, error)
 	// Write idempotency: a retried side-effect call replays its stored
 	// result; the same key with different arguments is a conflict.
@@ -310,6 +311,24 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 			return errorResult(err)
 		}
 		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID}}
+
+	case "request_member":
+		var args struct {
+			RoleIDs   []string `json:"roleIds"`
+			Reason    string   `json:"reason"`
+			RequestID string   `json:"idempotencyKey"`
+		}
+		if err := decodeArgs(call.Arguments, &args); err != nil {
+			return rejected("invalid_request", "error.invalid_json", nil)
+		}
+		if args.RequestID == "" {
+			return rejected("invalid_request", "error.idempotency.required", nil)
+		}
+		question, err := d.app.RequestMember(ctx, principal, app.RequestMemberInput{RoleIDs: args.RoleIDs, Reason: args.Reason})
+		if err != nil {
+			return errorResult(err)
+		}
+		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID, "roleIds": question.RoleIDs}}
 
 	case "browser":
 		var req browser.Request

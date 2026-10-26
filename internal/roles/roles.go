@@ -90,7 +90,7 @@ func Digest(instructions string) string {
 // profile copy still carrying one of them was never edited by the user, so it
 // is upgraded to the current default instead of pinning the old text forever.
 var retiredDigests = map[string][]string{
-	LeaderRoleID:      {"d4ff9b5d42b58330", "47096f47252a1cbe", "3b5aa00ad45e47af", "ae14e84830ebad5d", "38bc6f07efd942c9", "92a6bd4169037e83"},
+	LeaderRoleID:      {"d4ff9b5d42b58330", "47096f47252a1cbe", "3b5aa00ad45e47af", "ae14e84830ebad5d", "38bc6f07efd942c9", "92a6bd4169037e83", "b478e6d4"},
 	"code-reviewer":   {"356c52217a6c921b", "db1b0c37c4b47538", "032439ba35ed412c", "4289268f7df53b82"},
 	"product-manager": {"04df35093d7484bc", "d7b88a88385bccf8"},
 	"qa-engineer":     {"8d36dda792696699", "29b8207cd15a0e6e", "9670ddfd14423239"},

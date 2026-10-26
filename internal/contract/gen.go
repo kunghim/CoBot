@@ -18,8 +18,10 @@ const (
 
 // Defines values for AnswerQuestionRequestDecision.
 const (
-	AnswerQuestionRequestDecisionAccept AnswerQuestionRequestDecision = "accept"
-	AnswerQuestionRequestDecisionRevise AnswerQuestionRequestDecision = "revise"
+	AnswerQuestionRequestDecisionAccept  AnswerQuestionRequestDecision = "accept"
+	AnswerQuestionRequestDecisionApprove AnswerQuestionRequestDecision = "approve"
+	AnswerQuestionRequestDecisionReject  AnswerQuestionRequestDecision = "reject"
+	AnswerQuestionRequestDecisionRevise  AnswerQuestionRequestDecision = "revise"
 )
 
 // Defines values for AnswerQuestionRequestMode.
@@ -299,9 +301,10 @@ const (
 
 // Defines values for QuestionKind.
 const (
-	QuestionKindAcceptance QuestionKind = "acceptance"
-	QuestionKindConfirm    QuestionKind = "confirm"
-	QuestionKindEmpty      QuestionKind = ""
+	QuestionKindAcceptance  QuestionKind = "acceptance"
+	QuestionKindConfirm     QuestionKind = "confirm"
+	QuestionKindEmpty       QuestionKind = ""
+	QuestionKindRecruitment QuestionKind = "recruitment"
 )
 
 // Defines values for QuestionStatus.
@@ -614,7 +617,7 @@ type AnswerQuestionRequest struct {
 	// AnswerText The answer; for a confirmation or acceptance
 	AnswerText string `json:"answerText"`
 
-	// Decision Required for a confirmation or acceptance question, refused for any other.
+	// Decision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
 	ExpectedRevision int64                          `json:"expectedRevision"`
 
@@ -623,7 +626,7 @@ type AnswerQuestionRequest struct {
 	RequestId openapi_types.UUID         `json:"requestId"`
 }
 
-// AnswerQuestionRequestDecision Required for a confirmation or acceptance question, refused for any other.
+// AnswerQuestionRequestDecision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 type AnswerQuestionRequestDecision string
 
 // AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
@@ -1401,21 +1404,24 @@ type Question struct {
 	CreatedAt     time.Time `json:"createdAt"`
 	Id            string    `json:"id"`
 
-	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
-	Kind           QuestionKind   `json:"kind"`
-	Options        []string       `json:"options"`
-	Question       string         `json:"question"`
-	RequesterBotId string         `json:"requesterBotId"`
-	RequirementId  *string        `json:"requirementId,omitempty"`
-	Revision       int64          `json:"revision"`
-	RunId          *string        `json:"runId,omitempty"`
-	StageIndex     *int           `json:"stageIndex,omitempty"`
-	Status         QuestionStatus `json:"status"`
-	TaskId         *string        `json:"taskId,omitempty"`
-	TeamId         string         `json:"teamId"`
+	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
+	Kind           QuestionKind `json:"kind"`
+	Options        []string     `json:"options"`
+	Question       string       `json:"question"`
+	RequesterBotId string       `json:"requesterBotId"`
+	RequirementId  *string      `json:"requirementId,omitempty"`
+	Revision       int64        `json:"revision"`
+
+	// RoleIds A recruitment question only: the role IDs the project manager asked to add.
+	RoleIds    *[]string      `json:"roleIds,omitempty"`
+	RunId      *string        `json:"runId,omitempty"`
+	StageIndex *int           `json:"stageIndex,omitempty"`
+	Status     QuestionStatus `json:"status"`
+	TaskId     *string        `json:"taskId,omitempty"`
+	TeamId     string         `json:"teamId"`
 }
 
-// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question.
+// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question; recruitment asks the user to add members the project manager requested.
 type QuestionKind string
 
 // QuestionStatus defines model for Question.Status.

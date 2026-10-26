@@ -656,7 +656,7 @@ export function useAnswerQuestion() {
     }: {
       questionId: string;
       answerText: string;
-      decision?: 'accept' | 'revise';
+      decision?: 'accept' | 'revise' | 'approve' | 'reject';
       /** For revise on a confirmation: where the fixed work goes. */
       mode?: 'rerun' | 'return_to_me';
       expectedRevision: number;

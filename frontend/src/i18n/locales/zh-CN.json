@@ -719,6 +719,12 @@
       "revise": "继续修改",
       "changesPlaceholder": "有修改意见写在这里；留空即验收通过"
     },
+    "recruitment": {
+      "title": "申请加入成员",
+      "approve": "同意加入",
+      "reject": "拒绝",
+      "commentPlaceholder": "想转告项目经理的话（可选）；拒绝时写明原因"
+    },
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
     "dismissed": "{{count}} 张待验收",
     "cancel": "忽略"
@@ -1279,7 +1285,15 @@
     "error.chat.archive_unknown": "无法确认原生会话的归档状态，请核实后继续。",
     "error.chat.archive_state": "聊天归档状态已改变，请刷新后重试。",
     "error.chat.section_missing": "分区已不存在，请刷新后重试。",
-    "error.chat.order_conflict": "列表顺序已改变，请刷新后重试。"
+    "error.chat.order_conflict": "列表顺序已改变，请刷新后重试。",
+    "error.team.role_present": "团队里已有这个角色的成员，不能再招募同一个角色",
+    "error.recruitment.leader_only": "只有项目经理可以申请招募成员",
+    "error.recruitment.roles_required": "请写明要招募的角色",
+    "error.recruitment.reason_required": "招募申请要写明理由",
+    "error.recruitment.member_limit": "招募 {{requested}} 名新成员会超过上限 {{limit}}",
+    "error.question.not_recruitment": "这张卡不是招募申请",
+    "error.question.recruitment_decision": "招募申请需要选择「同意加入」或「拒绝」",
+    "error.question.recruitment_decide": "招募申请不能忽略，请选择同意或拒绝"
   },
   "paging": {
     "more": "继续加载",

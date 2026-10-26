@@ -70,6 +70,9 @@ func toolSchema(name string) json.RawMessage {
 	case "ask_user":
 		add("question", text("Specific input needed from the user. End this turn after asking."), true)
 		add("options", strings("Optional suggested answers, not security permissions."), false)
+	case "request_member":
+		add("roleIds", strings("Role IDs from the role library that the team does not have yet, e.g. [\"fullstack-engineer\"]."), true)
+		add("reason", text("Why the current work needs these members. End this turn after asking; the user decides on a card."), true)
 	case "browser":
 		str := func(description string) any { return map[string]any{"type": "string", "description": description} }
 		num := func(description string) any { return map[string]any{"type": "integer", "description": description} }

@@ -78,17 +78,25 @@ const (
 
 // Question kinds. A plain question is ask_user; a confirm question is a
 // confirm stage of a route; an acceptance question hands the finished
-// requirement to the user.
+// requirement to the user; a recruitment question asks the user to add
+// members the project manager requested.
 const (
-	QuestionKindAsk        = ""
-	QuestionKindConfirm    = "confirm"
-	QuestionKindAcceptance = "acceptance"
+	QuestionKindAsk         = ""
+	QuestionKindConfirm     = "confirm"
+	QuestionKindAcceptance  = "acceptance"
+	QuestionKindRecruitment = "recruitment"
 )
 
 // Decisions on a confirm or acceptance question.
 const (
 	AcceptanceAccept = "accept"
 	AcceptanceRevise = "revise"
+)
+
+// Decisions on a recruitment question.
+const (
+	RecruitmentApprove = "approve"
+	RecruitmentReject  = "reject"
 )
 
 // Question is an ask_user request, a confirmation or a requirement's
@@ -104,6 +112,7 @@ type Question struct {
 	RunID           string    `json:"runId,omitempty"`
 	Question        string    `json:"question"`
 	Options         []string  `json:"options"`
+	RoleIDs         []string  `json:"roleIds,omitempty"`
 	Status          string    `json:"status"`
 	AnswerText      string    `json:"answerText,omitempty"`
 	AnswerMessageID string    `json:"answerMessageId,omitempty"`
