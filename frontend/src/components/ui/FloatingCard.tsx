@@ -37,12 +37,16 @@ export function FloatingCard({ label, closeLabel, onClose, children, className }
       ref={ref}
       role="region"
       aria-label={label}
-      className={cx('relative flex min-h-0 w-96 max-w-[38vw] flex-col overflow-hidden rounded-2xl bg-side shadow-sheet ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]', className)}
+      className={cx('flex min-h-0 w-96 max-w-[38vw] flex-col overflow-hidden rounded-2xl bg-side shadow-sheet ring-1 ring-neutral-900/[0.06] dark:ring-white/[0.08]', className)}
     >
-      {/* The close sits on the content's own first line, so a header row of
-          its own cannot add an empty line above the card's tabs. */}
-      <IconButton size="sm" icon={Icons.close} label={closeLabel} onClick={onClose} className="absolute right-2 top-2 z-10" />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1 pb-2">{children}</div>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* The close sits on the content's own first line, so a header row of
+            its own cannot add an empty line above the card's tabs. The inner
+            wrapper owns the positioning context: the card itself takes
+            whatever placement its caller gives it. */}
+        <IconButton size="sm" icon={Icons.close} label={closeLabel} onClick={onClose} className="absolute right-2 top-2 z-10" />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1 pb-2">{children}</div>
+      </div>
     </div>
   );
 }

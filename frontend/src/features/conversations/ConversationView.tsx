@@ -222,7 +222,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           // Opens under the header's info button and grows downward from
           // there; it overlays the conversation instead of squeezing it,
           // and stops above the conversation's bottom edge.
-          className="absolute right-3 top-2 z-10 max-h-[calc(100%-1rem)] origin-top-right"
+          className="animate-pop-in absolute right-3 top-2 z-10 max-h-[calc(100%-1rem)] origin-top-right"
         >
           <WorkPanel />
         </FloatingCard>
