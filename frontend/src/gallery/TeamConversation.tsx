@@ -7,6 +7,7 @@ import dangoSeries from '../../../assets/avatars/dango/dist/dango.json';
 import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
+import DocumentCard from '../features/conversations/DocumentCard';
 import { ConversationHead, SidebarHead, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
@@ -107,7 +108,7 @@ export default function TeamConversation() {
           </div>
         </Demo>
       </Doc>
-      <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧凹下去的浅色气泡；成员的回复不用气泡：一行头像和名字，下面是正文，像读文档；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字。">
+      <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · DocumentCard 文档 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧凹下去的浅色气泡；成员的回复不用气泡：一行头像和名字，下面是正文，像读文档；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字；需求文档、验收汇报这类要读的文档是带标题行的卡片，可折叠。">
         <Demo>
           <div className="mx-auto max-w-2xl space-y-4">
             <MessageBubble from="user" meta="已送达">做一个本地待办页面，能添加和删除</MessageBubble>
@@ -116,6 +117,7 @@ export default function TeamConversation() {
             </MessageBubble>
             <ExchangeLine label="发给" people={[person('fullstack-engineer', '全栈工程师'), person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
             <ExchangeLine label="来自" people={[person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
+            <DocumentCard text="# 每日待办任务静态页面 · 用户确认需求\n\n### 链路\n\n1. 用户确认（用户）\n2. 实现（全栈工程师）\n3. 验收汇报（项目经理）" />
             <SystemNote>团队成员有变化：加入了评审员</SystemNote>
           </div>
         </Demo>

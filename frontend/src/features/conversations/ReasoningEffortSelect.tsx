@@ -149,12 +149,18 @@ export default function ReasoningEffortSelect({ team, bot, bots, disabled }: { t
         member.id !== bot.id &&
         memberChoice(member, team, settings.data, providerList, engineDefaultModel(engineList), engine.data?.loggedIn ?? false).providerId === choice.providerId,
     );
+    // Whether the offer to carry teammates along shows at all follows the
+    // setting: always, never, or only when the switch answers a failure —
+    // a member on the old provider whose last session failed.
+    const mode = settings.data?.modelSwitchPrompt || 'always';
+    const answersFailure = bot.lastRunStatus === 'failed' || targets.some((member) => member.lastRunStatus === 'failed');
+    const offer = mode === 'always' || (mode === 'smart' && answersFailure);
     setModel.mutate(
       { botId: bot.id, providerId: next.providerId, model: next.model, expectedRevision: bot.revision },
       {
         onSuccess: () => {
           toast.show({ tone: 'success', title: t('effort.modelSwitched', { name: bot.name, model: next.label, provider: next.group }) });
-          if (targets.length > 0) setBatch({ targets, providerId: next.providerId, model: next.model, label: next.label });
+          if (offer && targets.length > 0) setBatch({ targets, providerId: next.providerId, model: next.model, label: next.label });
         },
         onError: (error) => toast.show({ tone: 'danger', title: t('effort.saveFailed'), description: apiErrorMessage(t, error) }),
       },

@@ -121,3 +121,43 @@ func TestBotStatsRateLimitsFollowTheTeamProvider(t *testing.T) {
 		t.Fatal("a member running on the team's third-party provider still sees the account quota")
 	}
 }
+
+// A team listing reports how each member's latest finished run ended, for
+// surfaces that ask whether its last session failed.
+func TestTeamListingCarriesLastRunStatus(t *testing.T) {
+	ctx := context.Background()
+	binder := newFakeBinder()
+	a := providerTestApp(t, binder)
+	seedTeam(t, a, "t9", "lead", "dev")
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	insert := func(id, bot, status, started string) {
+		t.Helper()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO runs (id, team_id, bot_id, status, engine_epoch, started_at, ended_at) VALUES (?, 't9', ?, ?, 'e', ?, '2026-10-26T00:00:00Z')`,
+			id, bot, status, started); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert("r1", "dev", "completed", "2026-10-25T10:00:00Z")
+	insert("r2", "dev", "failed", "2026-10-25T11:00:00Z")
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	page, err := a.ListPage(ctx, auth.NewPrincipalUser(""), PageRequest{Kind: "teams", TeamID: "t9"})
+	_ = page
+	team, err := sqlite.GetTeamByID(ctx, a.DB, "t9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := teamWithBotsOn(ctx, a.DB, team)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bot := range view.Bots {
+		if bot.ID == "dev" && bot.LastRunStatus != "failed" {
+			t.Fatalf("dev lastRunStatus = %q, want failed", bot.LastRunStatus)
+		}
+	}
+}

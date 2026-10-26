@@ -17,6 +17,7 @@ import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
+import DocumentCard from './DocumentCard';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
@@ -218,9 +219,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           label={t('workspace.infoPanel')}
           closeLabel={t('common.close')}
           onClose={closeCard}
-          // Grown from the top by its content; the bottom margin keeps the
-          // card clear of the conversation's own bottom edge.
-          className="absolute right-3 top-3 max-h-[calc(100%-1.5rem)] z-10"
+          // Opens under the header's info button and grows downward from
+          // there; it overlays the conversation instead of squeezing it,
+          // and stops above the conversation's bottom edge.
+          className="absolute right-3 top-2 z-10 max-h-[calc(100%-1rem)] origin-top-right"
         >
           <WorkPanel />
         </FloatingCard>
@@ -242,7 +244,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className={`min-h-0 flex-1 overflow-y-auto py-4 ${workspace.cardOpen ? 'pl-8 pr-[25rem]' : 'px-8'}`}
+        className="min-h-0 flex-1 overflow-y-auto px-8 py-4"
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
@@ -518,6 +520,7 @@ function MessageRow({
   }
 
   if (message.kind === 'system') return <SystemNote>{text}</SystemNote>;
+  if (message.kind === 'document') return <DocumentCard text={text} teamId={teamId} />;
 
   const isUser = message.kind === 'user';
   // A tool call the model wrote as text is not shown (see toolCallText.ts); a reply that was only that has nothing to show.

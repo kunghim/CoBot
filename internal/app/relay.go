@@ -584,7 +584,7 @@ func postDocumentLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text str
 	}
 	message := domain.Message{
 		ID: domain.NewID(), TeamID: teamID, BotID: botID,
-		Kind: domain.MessageKindAssistant, Blocks: blocks, CreatedAt: time.Now().UTC(),
+		Kind: domain.MessageKindDocument, Blocks: blocks, CreatedAt: time.Now().UTC(),
 	}
 	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
 		return domain.Event{}, err
@@ -880,6 +880,14 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 	a.publishRelay(ctx, effect)
 	a.interruptCancelledWork(ctx, cancelled)
+	// The project manager's turn that submitted the requirement may still
+	// be running: without this, a user message arriving mid-turn is steered
+	// into a model that still believes the requirement is on its way, and
+	// it answers from that belief instead of submitting anew.
+	if a.Scheduler != nil {
+		a.Scheduler.steerNoteToRunningTurn(ctx, team.LeaderID,
+			"系统提示：用户刚取消了需求「"+summarizeLine(req.Title)+"」，它不会再推进。用户接下来是想先讨论；谈清楚后请用 start_requirement 重新提交。")
+	}
 	return req, nil
 }
 

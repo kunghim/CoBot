@@ -3924,7 +3924,7 @@ components:
         id: { type: string }
         teamId: { type: string }
         botId: { type: string }
-        kind: { type: string, enum: [user, assistant, collaboration, system] }
+        kind: { type: string, enum: [user, assistant, collaboration, system, document], description: document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card. }
         blocks:
           type: array
           items: { $ref: "#/components/schemas/TextBlock" }
@@ -4232,6 +4232,10 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt:
+          type: string
+          enum: [always, smart, never]
+          description: When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
     SettingsPatch:
       type: object
       properties:
@@ -4246,6 +4250,7 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt: { type: string, enum: [always, smart, never] }
     Snapshot:
       type: object
       required: [seq, instanceId, settings, teams, engine]
@@ -4310,6 +4315,10 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         lastMessage: { $ref: "#/components/schemas/MessagePreview" }
+        lastRunStatus:
+          type: string
+          enum: [completed, failed, interrupted, ""]
+          description: How the member's latest finished run ended; only team listings fill it.
     MessagePreview:
       type: object
       description: The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.

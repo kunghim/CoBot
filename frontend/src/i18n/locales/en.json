@@ -400,6 +400,10 @@
     },
     "webLink": {
       "openFailed": "Failed to open the page"
+    },
+    "document": {
+      "label": "Document",
+      "untitled": "Document"
     }
   },
   "approvals": {
@@ -1043,7 +1047,13 @@
     "saved": "Saved",
     "saveFailed": "Save failed",
     "engineAccountHint": "The engine is not tied to an account: each member's model is chosen in the conversation, and the ChatGPT account signs in under Model providers.",
-    "modelsNeedProvider": "No model to choose yet: sign in with ChatGPT under Model providers, or add a provider."
+    "modelsNeedProvider": "No model to choose yet: sign in with ChatGPT under Model providers, or add a provider.",
+    "modelSwitchTitle": "Switching models in bulk",
+    "modelSwitchHint": "When switching one member\\u2019s model, whether to offer carrying the teammates still on the old one along.",
+    "modelSwitchPrompt": "When to ask",
+    "modelSwitchAlways": "Ask every time",
+    "modelSwitchSmart": "Only when a member on the old model last failed",
+    "modelSwitchNever": "Never ask"
   },
   "auth": {
     "authorizing": "Authorizing…",

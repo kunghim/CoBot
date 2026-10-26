@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/auth"
@@ -351,6 +352,74 @@ func TestConfirmAfterRequirementsReviewOffersSkippingIt(t *testing.T) {
 		if !card.IsTerminal() && card.OwnerID == reviewer.ID {
 			t.Fatal("the review stage ran again although the revision skipped it")
 		}
+	}
+}
+
+// Cancelling a requirement while the project manager's submitting turn is
+// still running steers the cancellation into that turn: the user's next
+// message would otherwise join a model that still believes the requirement
+// is on its way.
+func TestCancelSteersNoteIntoRunningLeaderTurn(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm, dev := bots[0], bots[1]
+	fake := h.ensureFake(t, team.ID)
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: pm.ID, Text: "整理一个登录页的需求"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn running", func() bool {
+		run, err := sqlite.FindActiveRun(ctx, h.app.DB, pm.ID)
+		return err == nil && run.Status == domain.RunRunning
+	})
+	turn := fake.Turns()[0]
+
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	if _, err := h.app.CancelRequirement(ctx, h.user, req.ID); err != nil {
+		t.Fatal(err)
+	}
+	steers := fake.Steers()
+	if len(steers) == 0 || steers[len(steers)-1].TurnID != turn.TurnID {
+		t.Fatalf("steers = %+v, want the cancel note in the running turn", steers)
+	}
+	if text := steers[len(steers)-1].Text; !strings.Contains(text, "用户刚取消了需求") || !strings.Contains(text, "回归") {
+		t.Fatalf("steered note = %q", text)
+	}
+}
+
+// The document a confirm stage posts is its own kind: the conversation
+// renders it as a card, not as a member reply.
+func TestConfirmDocumentIsItsOwnKind(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm := bots[0]
+	d := relayDriver{t: t, h: h, team: team}
+	d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: bots[1].ID},
+		{Kind: domain.StageAccept},
+	})
+	rows, err := h.app.DB.QueryContext(context.Background(),
+		`SELECT kind FROM messages WHERE bot_id = ? AND blocks LIKE '%链路%'`, pm.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	kinds := map[string]bool{}
+	for rows.Next() {
+		var kind string
+		if rows.Scan(&kind) == nil {
+			kinds[kind] = true
+		}
+	}
+	if !kinds[domain.MessageKindDocument] {
+		t.Fatalf("document kinds = %v", kinds)
 	}
 }
 

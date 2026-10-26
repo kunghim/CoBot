@@ -46,6 +46,9 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
   // viewport arrives, which a ref alone never does.
   const [frame, setFrame] = useState({ width: 1280, height: 900 });
   const [scale, setScale] = useState<Scale>('fit');
+  // The device preset the page's viewport is set to, when it is: the
+  // dropdown shows it until a zoom mode or another size takes over.
+  const [preset, setPreset] = useState<string | null>(null);
   const [viewportError, setViewportError] = useState<string | null>(null);
   // The sizes typed into the control row; they commit on enter or blur,
   // and follow the page again once it reports a new size.
@@ -228,7 +231,8 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
 
   // Fit the picture into the box, or show it at 100% inside a scroller.
   const natural = frame;
-  const fitScale = box.width > 0 && box.height > 0 ? Math.min(box.width / natural.width, box.height / natural.height) : 1;
+  // Fitting shrinks a page bigger than the box; a smaller one keeps its real size instead of scaling up into blur.
+  const fitScale = box.width > 0 && box.height > 0 ? Math.min(box.width / natural.width, box.height / natural.height, 1) : 1;
   const shown = scale === 'fit' ? fitScale : 1;
   const shownWidth = Math.round(natural.width * shown);
   const shownHeight = Math.round(natural.height * shown);
@@ -236,18 +240,20 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
 
   const busy = page?.owner !== 'user' && (page?.busy ?? false);
 
-  // The real window size the page has; the control row changes it for
-  // everyone, either by naming a device or by typing a size.
-  const viewportValue = (() => {
-    if (scale === 'fit') return 'fit';
-    if (scale === 'full') return 'full';
-    return '';
-  })();
+  // One dropdown, one meaning at a time: the two zoom modes and the three
+  // device presets. A preset sets the page's real viewport (for everyone)
+  // and shows the whole device, so zoom goes back to fit; a zoom mode only
+  // changes how the picture is drawn. Every step acts the same whichever
+  // way the user walks through the list.
+  const viewportValue = preset ?? scale;
   const applyViewport = (value: string) => {
     if (value === 'fit' || value === 'full') {
+      setPreset(null);
       setScale(value);
       return;
     }
+    setPreset(value);
+    setScale('fit');
     setViewportError(null);
     setViewport.mutate(
       { tab: panelTabId, body: { preset: value as 'desktop' | 'tablet' | 'phone' } },
@@ -257,6 +263,7 @@ export default function BrowserTab({ teamId, panelTabId, onClose }: { teamId: st
   const commitSize = () => {
     const value = sizing;
     setSizing(null);
+    setPreset(null);
     if (!value) return;
     const width = Number(value.width);
     const height = Number(value.height);

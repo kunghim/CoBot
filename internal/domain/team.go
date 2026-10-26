@@ -89,6 +89,9 @@ type Bot struct {
 	// LastMessage previews the latest message between the user and this
 	// member; only team listings fill it.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+	// LastRunStatus is how the member's latest finished run ended; only
+	// team listings fill it.
+	LastRunStatus string `json:"lastRunStatus,omitempty"`
 }
 
 // MessagePreview is the start of a conversation's latest message, for the

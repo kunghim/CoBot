@@ -394,6 +394,10 @@
     },
     "webLink": {
       "openFailed": "网页没能打开"
+    },
+    "document": {
+      "label": "文档",
+      "untitled": "文档"
     }
   },
   "approvals": {
@@ -1033,7 +1037,13 @@
     "saved": "已保存",
     "saveFailed": "保存失败",
     "engineAccountHint": "引擎不绑定账号：每个成员用哪个供应商的模型，在会话里选择；ChatGPT 账号在「模型供应商」里登录。",
-    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。"
+    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。",
+    "modelSwitchTitle": "批量切换模型",
+    "modelSwitchHint": "给一位成员换模型时，是否顺手把还在用原模型的其他成员一起换掉。",
+    "modelSwitchPrompt": "提示时机",
+    "modelSwitchAlways": "每次都提示",
+    "modelSwitchSmart": "仅当原模型的成员上次会话失败时提示",
+    "modelSwitchNever": "不提示"
   },
   "auth": {
     "authorizing": "正在授权…",

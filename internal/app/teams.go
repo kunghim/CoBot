@@ -391,6 +391,21 @@ func teamWithBotsOn(ctx context.Context, q sqlite.Queryer, team domain.Team) (Te
 	if err != nil {
 		return TeamWithBots{}, err
 	}
+	// Each member's latest finished run, for the surfaces that ask whether
+	// its last session failed.
+	lastRuns := map[string]string{}
+	rows, err := q.QueryContext(ctx, `SELECT bot_id, status FROM runs r
+		WHERE ended_at != '' AND bot_id IN (SELECT id FROM bots WHERE team_id = ?)
+		  AND NOT EXISTS (SELECT 1 FROM runs n WHERE n.bot_id = r.bot_id AND n.ended_at != '' AND (n.started_at, n.id) > (r.started_at, r.id))`, team.ID)
+	if err == nil {
+		for rows.Next() {
+			var botID, status string
+			if rows.Scan(&botID, &status) == nil {
+				lastRuns[botID] = status
+			}
+		}
+		rows.Close()
+	}
 	previews, err := sqlite.LatestMessagePreviews(ctx, q, team.ID)
 	if err != nil {
 		return TeamWithBots{}, err
@@ -399,6 +414,7 @@ func teamWithBotsOn(ctx context.Context, q sqlite.Queryer, team domain.Team) (Te
 		if preview, ok := previews[bots[i].ID]; ok {
 			bots[i].LastMessage = &preview
 		}
+		bots[i].LastRunStatus = lastRuns[bots[i].ID]
 	}
 	return TeamWithBots{Team: team, Bots: bots}, nil
 }

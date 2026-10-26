@@ -1904,8 +1904,11 @@ export interface components {
             id: string;
             teamId: string;
             botId: string;
-            /** @enum {string} */
-            kind: "user" | "assistant" | "collaboration" | "system";
+            /**
+             * @description document is a relay-posted document (the requirement to confirm
+             * @enum {string}
+             */
+            kind: "user" | "assistant" | "collaboration" | "system" | "document";
             blocks: components["schemas"]["TextBlock"][];
             requestId?: string;
             /** @enum {string} */
@@ -2187,6 +2190,11 @@ export interface components {
             /** Format: int64 */
             budgetTokens: number;
             enginePath: string;
+            /**
+             * @description When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+             * @enum {string}
+             */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         SettingsPatch: {
             /** @enum {string} */
@@ -2206,6 +2214,8 @@ export interface components {
             /** Format: int64 */
             budgetTokens?: number;
             enginePath?: string;
+            /** @enum {string} */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         Snapshot: {
             /** Format: int64 */
@@ -2262,6 +2272,11 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             lastMessage?: components["schemas"]["MessagePreview"];
+            /**
+             * @description How the member's latest finished run ended; only team listings fill it.
+             * @enum {string}
+             */
+            lastRunStatus?: "completed" | "failed" | "interrupted" | "";
         };
         /** @description The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list. */
         MessagePreview: {
