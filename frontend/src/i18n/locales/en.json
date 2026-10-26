@@ -319,7 +319,7 @@
         "agent": "Used {{count}} sub-agent(s)",
         "other": "{{count}} step(s)"
       },
-      "done": "Worked for {{duration}} · {{count}} steps",      "failedAfter": "Failed · {{duration}}",
+      "done": "Worked for {{duration}}",      "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",

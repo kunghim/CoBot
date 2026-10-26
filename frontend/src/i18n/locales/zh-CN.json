@@ -315,7 +315,7 @@
         "agent": "调度了 {{count}} 个子智能体",
         "other": "{{count}} 个步骤"
       },
-      "done": "已处理 {{duration}} · {{count}} 个步骤",      "failedAfter": "执行失败 · {{duration}}",
+      "done": "用时 {{duration}}",      "failedAfter": "执行失败 · {{duration}}",
       "retry": "重试这一轮",
       "interruptedAfter": "已停止 · {{duration}}",
       "failed": "执行失败",

@@ -1,9 +1,12 @@
 // RunProcess shows one turn the way Codex does, in the order it happened:
 // what the member said stays in view between stretches of work, each stretch
-// folded to a line ("运行了 2 条命令") that opens into its steps. While it runs,
-// a live status line ("正在执行命令 · 12秒") heads it and the reply streams
-// in; once finished, a "已处理 1分23秒" line folds or opens all the work. A
-// team's turns and a chat's both use it (see Scope).
+// folded to a line ("运行了 2 条命令") that opens into its steps. While it
+// runs, the reply streams in and a live status line ("正在执行命令 · 12秒")
+// sits at the very bottom, under the newest content, so a long turn still
+// shows it is moving; once finished, the whole process folds to one "用时
+// 1分23秒" line above the reply and opens on click. A failed turn stays open
+// under its own line, an interrupted one is marked. A team's turns and a
+// chat's both use it (see Scope).
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Minus, X } from 'lucide-react';
@@ -78,9 +81,24 @@ export default function RunProcess({
   const steps = mergeSteps(run.steps, active ? live : undefined);
   const shown = visibleSteps(steps, active ? live : undefined, replyText);
   const blocks = turnBlocks(shown);
-  const workCount = shown.filter((step) => step.kind !== 'message').length;
   // The work of a running or failed turn stays open so what is going on, or what went wrong, is seen without a click.
   const expanded = open ?? (active || run.status === 'failed');
+
+  const endedAt = run.endedAt ? Date.parse(run.endedAt) : NaN;
+  const seconds = elapsedSeconds(run.startedAt, active || Number.isNaN(endedAt) ? now : endedAt);
+  const duration = say(durationPhrase(seconds));
+  // The steps live on screen while the turn runs, while something is wrong,
+  // and when the user opens a finished turn's record; a finished turn folds
+  // them behind its duration line.
+  const showProcess = active || run.status === 'failed' || run.status === 'interrupted' || expanded;
+  const phaseLine = active && (
+    <p role="status" className="-ml-1 flex items-center gap-1.5 px-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+      <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" />
+      <span>
+        {say(runPhase(run, steps, live, seconds))} · {duration}
+      </span>
+    </p>
+  );
 
   if (!active && shown.length === 0) {
     if (run.status === 'failed' || run.status === 'interrupted') {
@@ -94,39 +112,39 @@ export default function RunProcess({
     return null;
   }
 
-  const endedAt = run.endedAt ? Date.parse(run.endedAt) : NaN;
-  const seconds = elapsedSeconds(run.startedAt, active || Number.isNaN(endedAt) ? now : endedAt);
-  const duration = say(durationPhrase(seconds));
-  const header = active
-    ? `${say(runPhase(run, steps, live, seconds))} · ${duration}`
-    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: workCount });
+  const summary = t(
+    run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done',
+    { duration },
+  );
 
   return (
     <div className="min-w-0 space-y-2" data-testid="run-process">
-      {(active || workCount > 0 || run.status === 'failed' || run.status === 'interrupted') && (
+      {!active && (
         <button
           type="button"
           onClick={() => setOpen(!expanded)}
           aria-expanded={expanded}
           className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
         >
-          {active ? <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" /> : expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
-          <span role={active ? 'status' : undefined}>{header}</span>
+          {run.status !== 'failed' && run.status !== 'interrupted' && (expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />)}
+          <span>{summary}</span>
         </button>
       )}
-      {blocks.map((block) =>
-        block.kind === 'text' ? (
-          <StepRow key={block.step.id} step={block.step} botId={run.botId} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
-        ) : (
-          <WorkGroup key={block.id} steps={block.steps} botId={run.botId} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
-        ),
-      )}
+      {showProcess &&
+        blocks.map((block) =>
+          block.kind === 'text' ? (
+            <StepRow key={block.step.id} step={block.step} botId={run.botId} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
+          ) : (
+            <WorkGroup key={block.id} steps={block.steps} botId={run.botId} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
+          ),
+        )}
       {retry}
       {active && live?.reply && (
         <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
           <Markdown text={stripToolCallText(live.reply)} teamId={scope.teamId} chatId={scope.chatId} />
         </div>
       )}
+      {phaseLine}
     </div>
   );
 }
