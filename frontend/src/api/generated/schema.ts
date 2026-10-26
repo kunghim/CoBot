@@ -1407,6 +1407,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a project folder to the team action that fits it */
+        post: operations["openTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bind a folder another CoBot instance marked to a new team here */
+        post: operations["adoptTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations": {
         parameters: {
             query?: never;
@@ -5402,6 +5436,86 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+        };
+    };
+    openTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The action to take: open, restore, adopt or create */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            /**
+                             * @description open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                             * @enum {string}
+                             */
+                            action: "open" | "restore" | "adopt" | "create";
+                            teamId?: string;
+                            teamName?: string;
+                            archived?: boolean;
+                            /** @description For the create and adopt actions; the folder name or the foreign marker's team name. */
+                            suggestedName?: string;
+                            directory: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    adoptTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                    name: string;
+                    initialRoleIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The adopted team with its members; the folder's marker now names this instance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            team?: components["schemas"]["Team"];
+                            bots?: components["schemas"]["Bot"][];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     listAuthorizations: {

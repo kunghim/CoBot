@@ -105,6 +105,19 @@
     "directoryClaimed": "This folder is already used by team “{{teamName}}”; a new team cannot be created here",
     "directoryClaimedUnknown": "This folder is already used by a team in another CoBot environment; a new team cannot be created here",
     "new": "New team",
+    "open": "Open team",
+    "openTitle": "Open a team",
+    "openAction": {
+      "open": "This folder belongs to the team \"{{name}}\"; it opens directly.",
+      "restore": "This folder belongs to the archived team \"{{name}}\"; confirm to restore and open it.",
+      "adopt": "This folder belonged to the team \"{{name}}\", whose conversations are not in this environment.",
+      "create": "This folder has not been used; a team named \"{{name}}\" can be created in it."
+    },
+    "openRestoreButton": "Restore and open",
+    "openAdoptButton": "Adopt and create",
+    "openCreateButton": "Create team",
+    "adoptWarning": "Adopting creates a new team here bound to the folder and rewrites the marker inside it; the earlier conversations are not migrated.",
+    "adoptConfirm": "I understand; adopt this folder",
     "createTitle": "New team",
     "chooseDirectory": "Choose folder",
     "choosing": "Waiting for your choice…",
@@ -213,7 +226,16 @@
     "modelSwitchedAll_one": "Switched {{count}} member to {{model}}",
     "modelSwitchedAll_other": "Switched {{count}} members to {{model}}",
     "modelSwitchedAllFailed": "Failed to switch: {{names}}",
-    "level": { "none": "None", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra high", "max": "Max", "ultra": "Ultra" },
+    "level": {
+      "none": "None",
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high",
+      "max": "Max",
+      "ultra": "Ultra"
+    },
     "modelSwitched": "{{name}} now uses {{provider}} · {{model}} from its next turn"
   },
   "permission": {
@@ -260,8 +282,8 @@
       "empty": "No messages between them yet"
     },
     "engineError": {
-    "modelRerouted": "The engine switched the model: {{message}}",
-    "guardian": "The safety layer of the engine says: {{message}}",
+      "modelRerouted": "The engine switched the model: {{message}}",
+      "guardian": "The safety layer of the engine says: {{message}}",
       "serverOverloaded": "The model is at capacity, so this turn did not finish. Send again later or pick another model in Settings",
       "usageLimitExceeded": "The account reached its model usage limit, so this turn did not finish. Try again when it resets",
       "rateLimitExceeded": "The model service is rate limiting requests; send again in a moment",
@@ -321,7 +343,8 @@
         "agent": "Used {{count}} sub-agent(s)",
         "other": "{{count}} step(s)"
       },
-      "done": "Worked for {{duration}}",      "failedAfter": "Failed · {{duration}}",
+      "done": "Worked for {{duration}}",
+      "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
       "failed": "Failed",

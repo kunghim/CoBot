@@ -2125,6 +2125,20 @@ type CreateTeamJSONBody struct {
 	RequestId      openapi_types.UUID `json:"requestId"`
 }
 
+// AdoptTeamJSONBody defines parameters for AdoptTeam.
+type AdoptTeamJSONBody struct {
+	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
+	Name           string             `json:"name"`
+	Path           string             `json:"path"`
+	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// OpenTeamJSONBody defines parameters for OpenTeam.
+type OpenTeamJSONBody struct {
+	Path      string             `json:"path"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteTeamParams defines parameters for DeleteTeam.
 type DeleteTeamParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -2419,6 +2433,12 @@ type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
 
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
+
+// AdoptTeamJSONRequestBody defines body for AdoptTeam for application/json ContentType.
+type AdoptTeamJSONRequestBody AdoptTeamJSONBody
+
+// OpenTeamJSONRequestBody defines body for OpenTeam for application/json ContentType.
+type OpenTeamJSONRequestBody OpenTeamJSONBody
 
 // PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
 type PatchTeamJSONRequestBody PatchTeamJSONBody

@@ -278,6 +278,17 @@ export interface MemoryListResult {
 export type Memory = components['schemas']['Memory'];
 
 /** POST /directories/check */
+/** What POST /teams/open decided a folder is good for. */
+export interface OpenTeamResult {
+  action: 'open' | 'restore' | 'adopt' | 'create';
+  teamId?: string;
+  teamName?: string;
+  archived?: boolean;
+  /** For create and adopt: the folder name, or the foreign marker's name. */
+  suggestedName?: string;
+  directory: string;
+}
+
 export interface DirectoryCheckResult {
   canonical: string;
   ok: boolean;

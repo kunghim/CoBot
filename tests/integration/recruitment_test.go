@@ -2,7 +2,10 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -244,5 +247,125 @@ func TestRecruitmentCardSurvivesRestart(t *testing.T) {
 	}
 	if !hasMessageText(messages, "你同意了招募申请") {
 		t.Fatal("the project manager was not told the result after the restart")
+	}
+}
+
+// teamDirFor is a fresh, uniquely named folder under the harness root.
+func (h *m2Harness) teamDirFor(name string) string {
+	return filepath.Join(filepath.Dir(h.teamDir), name)
+}
+
+// openMarker writes a team marker like the core does, for folders whose rows
+// this instance does not hold.
+func openMarker(t *testing.T, dir, instanceID, teamID, teamName string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".cobot"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := map[string]any{"schemaVersion": 1, "instanceId": instanceID, "teamId": teamID, "teamName": teamName, "directory": dir}
+	data, err := json.Marshal(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".cobot", "team.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenTeamResolvesEachFolderState(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+
+	// A live team's folder opens directly; an archived one offers restore.
+	live, bots := h.createTeamWithDir(t, "打开-活跃", "open-live", nil)
+	open, err := h.app.OpenTeam(ctx, h.user, app.OpenTeamInput{Directory: h.teamDirFor("open-live")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open["action"] != "open" || open["teamId"] != live.ID {
+		t.Fatalf("live folder = %v", open)
+	}
+	archived, _ := h.createTeamWithDir(t, "打开-归档", "open-archived", nil)
+	if _, err := h.app.ArchiveTeam(ctx, h.user, archived.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.app.OpenTeam(ctx, h.user, app.OpenTeamInput{Directory: h.teamDirFor("open-archived")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res["action"] != "restore" || res["teamId"] != archived.ID {
+		t.Fatalf("archived folder = %v", res)
+	}
+	_ = bots
+
+	// A foreign marker offers adoption; nothing is written by resolving.
+	foreignDir := h.teamDirFor("open-foreign")
+	openMarker(t, foreignDir, "other-instance", "team-from-elsewhere", "异环境的团队")
+	adopt, err := h.app.OpenTeam(ctx, h.user, app.OpenTeamInput{Directory: foreignDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adopt["action"] != "adopt" || adopt["teamName"] != "异环境的团队" {
+		t.Fatalf("foreign folder = %v", adopt)
+	}
+	if _, err := os.Stat(filepath.Join(foreignDir, ".cobot", "team.json")); err != nil {
+		t.Fatal("resolution touched the marker")
+	}
+
+	// An unmarked folder offers creation with the folder's name.
+	freshDir := h.teamDirFor("open-fresh")
+	if err := os.MkdirAll(freshDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	create, err := h.app.OpenTeam(ctx, h.user, app.OpenTeamInput{Directory: freshDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if create["action"] != "create" || create["suggestedName"] != "open-fresh" {
+		t.Fatalf("fresh folder = %v", create)
+	}
+}
+
+func TestAdoptTeamRewritesTheMarkerAndCreatesTheTeam(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	foreignDir := h.teamDirFor("adopt-run")
+	openMarker(t, foreignDir, "other-instance", "team-from-elsewhere", "异环境的团队")
+
+	created, bots, err := h.app.AdoptTeam(ctx, h.user, app.AdoptTeamInput{
+		Directory: foreignDir, Name: "接管的团队", InitialRoleIDs: []string{"fullstack-engineer"}, RequestID: "adopt-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bots) != 2 {
+		t.Fatalf("adopted team members = %d, want leader plus one", len(bots))
+	}
+	// The marker now names this instance's team.
+	data, err := os.ReadFile(filepath.Join(foreignDir, ".cobot", "team.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var marker struct {
+		InstanceID string `json:"instanceId"`
+		TeamID     string `json:"teamId"`
+	}
+	if err := json.Unmarshal(data, &marker); err != nil {
+		t.Fatal(err)
+	}
+	if marker.InstanceID != h.app.InstanceID || marker.TeamID != created.ID {
+		t.Fatalf("marker = %+v, want this instance and %s", marker, created.ID)
+	}
+	// Creation still refuses the folder: adoption is the only way in.
+	if _, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "再建", Directory: foreignDir}); err == nil {
+		t.Fatal("a bound folder accepted a second team through creation")
+	}
+	// And an unmarked folder is not adoption's business.
+	fresh := h.teamDirFor("adopt-fresh")
+	if err := os.MkdirAll(fresh, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := h.app.AdoptTeam(ctx, h.user, app.AdoptTeamInput{Directory: fresh, Name: "x", RequestID: "adopt-2"}); err == nil {
+		t.Fatal("an unmarked folder was adopted")
 	}
 }

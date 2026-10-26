@@ -3164,6 +3164,91 @@ paths:
                             description: The folder belongs to an archived team; restoring that team is the way to use it again.
         "400":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/open:
+    post:
+      operationId: openTeam
+      security:
+        - SessionCookie: []
+      summary: Resolve a project folder to the team action that fits it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+      responses:
+        "200":
+          description: "The action to take: open, restore, adopt or create"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [action, directory]
+                        properties:
+                          action:
+                            type: string
+                            enum: [open, restore, adopt, create]
+                            description: open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                          teamId: { type: string }
+                          teamName: { type: string }
+                          archived: { type: boolean }
+                          suggestedName: { type: string, description: For the create and adopt actions; the folder name or the foreign marker's team name. }
+                          directory: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/adopt:
+    post:
+      operationId: adoptTeam
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Bind a folder another CoBot instance marked to a new team here
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path, name]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+                name: { type: string }
+                initialRoleIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: The adopted team with its members; the folder's marker now names this instance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          team: { $ref: "#/components/schemas/Team" }
+                          bots:
+                            type: array
+                            items: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/authorizations:
     get:
       operationId: listAuthorizations

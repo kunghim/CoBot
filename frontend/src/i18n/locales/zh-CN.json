@@ -105,6 +105,19 @@
     "directoryClaimed": "该目录已被团队「{{teamName}}」使用，不能再创建新团队",
     "directoryClaimedUnknown": "该目录已被另一个 CoBot 环境中的团队使用，不能再创建新团队",
     "new": "新建团队",
+    "open": "打开团队",
+    "openTitle": "打开团队",
+    "openAction": {
+      "open": "这个文件夹是团队「{{name}}」的，可以直接打开。",
+      "restore": "这个文件夹属于已归档的团队「{{name}}」，确认后恢复并打开。",
+      "adopt": "这个文件夹之前属于团队「{{name}}」，但那份对话记录不在当前环境。",
+      "create": "这个文件夹还没有用过，可以在里面新建团队「{{name}}」。"
+    },
+    "openRestoreButton": "恢复并打开",
+    "openAdoptButton": "接管并建队",
+    "openCreateButton": "新建团队",
+    "adoptWarning": "接管会在当前环境新建一个团队绑定这个文件夹，并改写文件夹里的标记；原来的对话记录不会迁移过来。",
+    "adoptConfirm": "我已了解，接管这个文件夹",
     "createTitle": "新建团队",
     "chooseDirectory": "选择目录",
     "choosing": "等待选择…",
@@ -209,7 +222,16 @@
     "switchThisOnly": "只换这一位",
     "modelSwitchedAll": "已把 {{count}} 位成员换成 {{model}}",
     "modelSwitchedAllFailed": "这些成员没有换成：{{names}}",
-    "level": { "none": "不思考", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高", "max": "最高", "ultra": "Ultra" },
+    "level": {
+      "none": "不思考",
+      "minimal": "最低",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "xhigh": "极高",
+      "max": "最高",
+      "ultra": "Ultra"
+    },
     "modelSwitched": "{{name}} 改用 {{provider}} · {{model}}，下一轮起生效"
   },
   "permission": {
@@ -256,8 +278,8 @@
       "empty": "还没有往来消息"
     },
     "engineError": {
-    "modelRerouted": "引擎把模型换成了：{{message}}",
-    "guardian": "引擎安全层提示：{{message}}",
+      "modelRerouted": "引擎把模型换成了：{{message}}",
+      "guardian": "引擎安全层提示：{{message}}",
       "serverOverloaded": "模型当前满载，这一轮没能完成。请稍后重发，或在设置里换一个模型",
       "usageLimitExceeded": "账号的模型用量已达上限，这一轮没能完成。请等额度恢复后再试",
       "rateLimitExceeded": "请求太频繁被模型服务限流，请稍后重发",
@@ -317,7 +339,8 @@
         "agent": "调度了 {{count}} 个子智能体",
         "other": "{{count}} 个步骤"
       },
-      "done": "用时 {{duration}}",      "failedAfter": "执行失败 · {{duration}}",
+      "done": "用时 {{duration}}",
+      "failedAfter": "执行失败 · {{duration}}",
       "retry": "重试这一轮",
       "interruptedAfter": "已停止 · {{duration}}",
       "failed": "执行失败",

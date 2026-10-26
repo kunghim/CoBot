@@ -96,7 +96,9 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	}
 
 	// One project belongs to one team for its whole life: a folder another
-	// team still claims is refused, never taken over.
+	// team still claims is refused, never taken over. Adoption of a foreign
+	// marker goes through OpenTeam + AdoptTeam, the only path that rewrites
+	// a marker, and it retires the foreign file before creation re-checks.
 	if err := a.refuseClaimedDirectory(ctx, canon.Display); err != nil {
 		return domain.Team{}, nil, err
 	}
@@ -556,4 +558,177 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 	}
 	a.Hub.Publish()
 	return updated
+}
+
+// OpenTeamInput names the folder the user wants to open.
+type OpenTeamInput struct {
+	Directory string
+	RequestID string
+}
+
+// OpenTeam resolves a project folder to the team that owns it and reports
+// what the user can do with it: jump to a live team, restore an archived
+// one, adopt a folder another CoBot environment marked, or create a team in
+// an unmarked folder. Nothing is written until the user confirms; adopting
+// is the one case that overrides the marker, and only here - creation still
+// refuses a claimed folder.
+func (a *App) OpenTeam(ctx context.Context, principal auth.Principal, in OpenTeamInput) (map[string]any, error) {
+	if principal.Kind != auth.KindUser {
+		return nil, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if strings.TrimSpace(in.Directory) == "" {
+		return nil, domain.InvalidRequest("error.team.directory_required", nil)
+	}
+	canon, err := platform.CanonicalDirFrom(in.Directory)
+	if err != nil {
+		return nil, domain.InvalidRequest("error.team.directory_invalid", map[string]any{"detail": err.Error()})
+	}
+	if info, err := os.Stat(canon.Display); err != nil || !info.IsDir() {
+		return nil, domain.InvalidRequest("error.team.directory_missing", map[string]any{"directory": canon.Display})
+	}
+	// The marker is read before the transaction: markerClaim touches the
+	// database itself, and the pool is one connection — a second query inside
+	// the open transaction would wait on itself.
+	claim, err := a.markerClaim(ctx, canon.Display)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := a.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	// A folder a live team of this instance holds belongs to it, whatever an
+	// older marker says.
+	existing, err := sqlite.FindActiveTeamByDirectoryKey(ctx, tx, canon.Key)
+	if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
+		return nil, err
+	}
+	if existing.ID != "" {
+		action := "open"
+		if existing.Status == domain.TeamStatusArchived {
+			action = "restore"
+		}
+		return map[string]any{
+			"action": action, "teamId": existing.ID, "teamName": existing.Name,
+			"archived": existing.Status == domain.TeamStatusArchived, "directory": canon.Display,
+		}, nil
+	}
+	if claim != nil && claim["external"] == true {
+		return map[string]any{
+			"action": "adopt", "teamName": claim["teamName"], "directory": canon.Display,
+		}, nil
+	}
+	// A marker this instance wrote but whose row is gone (another profile
+	// deleted it) reads as a fresh folder: the user creates a team again.
+	name := claim["teamName"]
+	if name == nil || name == "" {
+		name = folderDisplayName(canon.Display)
+	}
+	return map[string]any{
+		"action": "create", "suggestedName": name, "directory": canon.Display,
+	}, nil
+}
+
+// folderDisplayName is the last path segment, the name a new team starts
+// with when the user picks a folder.
+func folderDisplayName(path string) string {
+	cleaned := strings.TrimRight(path, `\/`)
+	if i := max(strings.LastIndexAny(cleaned, `/\`)+1, 0); i < len(cleaned) {
+		return cleaned[i:]
+	}
+	return path
+}
+
+// AdoptTeamInput is a confirmed adoption: a folder another CoBot environment
+// marked becomes this instance's team under a new identity.
+type AdoptTeamInput struct {
+	Directory       string
+	Name            string
+	InitialRoleIDs  []string
+	RequestID       string
+	ExpectedRevision int64
+}
+
+// AdoptTeam binds a folder that another CoBot instance marked to a new team
+// of this instance, rewriting the marker. The old conversations and threads
+// are not migrated; the user confirms this in the interface before calling.
+func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptTeamInput) (domain.Team, []domain.Bot, error) {
+	if principal.Write == nil && in.RequestID != "" {
+		var err error
+		principal, err = WithWriteRequest(principal, "team.adopt", in.RequestID, in)
+		if err != nil {
+			return domain.Team{}, nil, err
+		}
+	}
+	cached, unlock, writeErr := beginWrite[TeamWithBots](ctx, a, principal)
+	defer unlock()
+	if writeErr != nil {
+		return domain.Team{}, nil, writeErr
+	}
+	if cached != nil {
+		return cached.Team, cached.Bots, nil
+	}
+	if principal.Kind != auth.KindUser {
+		return domain.Team{}, nil, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	// The folder must still be marked by someone else: an unmarked folder
+	// goes through creation, and a folder this instance holds stays with
+	// that team.
+	if err := a.refuseForeignOnly(ctx, strings.TrimSpace(in.Directory)); err != nil {
+		return domain.Team{}, nil, err
+	}
+	// Creation carries the rest: name, roles, limits, the nested check, and
+	// the marker rewrite, which lands with the new team's own .cobot. The
+	// foreign marker is the one thing creation may not re-refuse: adoption
+	// just verified it is the very state this call exists for, so the marker
+	// is retired first (it is about to be rewritten anyway) and the rest of
+	// creation's guarantees - member limit, nesting, the transactional bind -
+	// stay in force. The write scope is dropped before delegating:
+	// CreateTeam re-derives the idempotency lock from the same request id and
+	// would wait on itself.
+	if err := a.retireForeignMarker(ctx, strings.TrimSpace(in.Directory)); err != nil {
+		return domain.Team{}, nil, err
+	}
+	inner := principal
+	inner.Write = nil
+	team, bots, err := a.CreateTeam(ctx, inner, CreateTeamInput{
+		Name: in.Name, Directory: in.Directory, InitialRoleIDs: in.InitialRoleIDs, RequestID: in.RequestID,
+	})
+	if err != nil {
+		return domain.Team{}, nil, err
+	}
+	return team, bots, nil
+}
+
+// retireForeignMarker removes a foreign instance's marker file, leaving the
+// folder unmarked until creation writes this instance's own. A failure here
+// refuses the adoption: half-retired markers would let creation proceed on a
+// folder whose state was never confirmed.
+func (a *App) retireForeignMarker(ctx context.Context, dir string) error {
+	if err := a.refuseForeignOnly(ctx, dir); err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(dir, ".cobot", "team.json")); err != nil {
+		return domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
+	}
+	return nil
+}
+
+// refuseForeignOnly refuses a folder unless a foreign instance marks it: the
+// only state adoption exists for.
+func (a *App) refuseForeignOnly(ctx context.Context, dir string) error {
+	claim, err := a.markerClaim(ctx, dir)
+	if err != nil {
+		return err
+	}
+	if claim == nil {
+		return domain.Conflict("error.team.directory_unmarked", map[string]any{"directory": dir})
+	}
+	if claim["external"] != true {
+		return domain.Conflict("error.team.directory_bound", map[string]any{
+			"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir,
+		})
+	}
+	return nil
 }

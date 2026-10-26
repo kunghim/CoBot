@@ -318,6 +318,18 @@ export function useCreateTeam() {
   });
 }
 
+export function useAdoptTeam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { path: string; name: string; initialRoleIds: string[] }) => api.adoptTeam(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      void qc.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+
 export function useRoles(enabled = true) {
   return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
 }
