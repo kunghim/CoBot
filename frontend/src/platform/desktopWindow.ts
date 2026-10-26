@@ -72,11 +72,44 @@ export function useDesktopWindow(): DesktopWindow | null {
         }
       })
       .catch(() => undefined);
+    // Entering or leaving fullscreen fires no event and resizes only at the
+    // end of the animation, so the traffic lights appear (or vanish) a beat
+    // before our reservation catches up. While the flag and the window
+    // disagree — transition — poll fast; otherwise resize alone suffices.
+    let lastFullscreen = false;
+    let watch: ReturnType<typeof setInterval> | null = null;
+    const watchTransition = () => {
+      if (watch) return;
+      watch = setInterval(() => {
+        void readFullscreen().then((isFullscreen) => {
+          if (cancelled) return;
+          if (watch && isFullscreen === lastFullscreen) {
+            clearInterval(watch);
+            watch = null;
+          } else {
+            lastFullscreen = isFullscreen;
+            setFullscreen(isFullscreen);
+          }
+        }).catch(() => undefined);
+      }, 120);
+    };
+    void readFullscreen().then((isFullscreen) => { lastFullscreen = isFullscreen; }).catch(() => undefined);
     refresh();
-    window.addEventListener('resize', refresh);
+    const onResize = () => {
+      void readFullscreen().then((isFullscreen) => {
+        if (isFullscreen !== lastFullscreen) {
+          lastFullscreen = isFullscreen;
+          if (!cancelled) setFullscreen(isFullscreen);
+          watchTransition();
+        }
+      }).catch(() => undefined);
+      refresh();
+    };
+    window.addEventListener('resize', onResize);
     return () => {
       cancelled = true;
-      window.removeEventListener('resize', refresh);
+      window.removeEventListener('resize', onResize);
+      if (watch) clearInterval(watch);
     };
   }, []);
   const rt = runtime();
