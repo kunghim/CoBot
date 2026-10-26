@@ -9,7 +9,7 @@ import { WorkspaceProvider, useWorkspace } from '../features/workspace/Workspace
 import { MAX_WIDTH, MIN_WIDTH, layoutColumns } from '../features/workspace/state';
 import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed } from './WindowChrome';
+import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed, useNativeTitle } from './WindowChrome';
 import { useShell, useShellListLayout } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
 
@@ -43,6 +43,7 @@ export default function Layout() {
   }, [teams.data, botId, setBotId, teams.hasNextPage, teams.isFetchingNextPage, teams.isFetching]);
 
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
+  useNativeTitle(context?.team.name);
 
   const teamList = (
     <aside aria-label={t('nav.teamList')} className="flex min-h-0 w-full flex-1 flex-col bg-side">

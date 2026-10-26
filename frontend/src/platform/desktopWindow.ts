@@ -11,6 +11,7 @@ interface WailsRuntime {
   WindowToggleMaximise(): void;
   WindowIsMaximised(): Promise<boolean>;
   WindowIsFullscreen(): Promise<boolean>;
+  WindowSetTitle?(title: string): void;
   Quit(): void;
 }
 
@@ -31,6 +32,9 @@ export interface DesktopWindow {
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
+  /** Names the window: macOS draws it beside the traffic lights when the
+   * fullscreen hover reveals the titlebar. Empty string clears it. */
+  setNativeTitle: (title: string) => void;
 }
 
 /** The app shell provides the window once, high above the layouts; column
@@ -84,5 +88,6 @@ export function useDesktopWindow(): DesktopWindow | null {
     minimize: () => rt.WindowMinimise(),
     toggleMaximize: () => rt.WindowToggleMaximise(),
     close: () => rt.Quit(),
+    setNativeTitle: (title: string) => rt.WindowSetTitle?.(title),
   };
 }

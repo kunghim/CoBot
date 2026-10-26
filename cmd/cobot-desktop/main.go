@@ -84,9 +84,18 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 250, A: 1},
 		// The page draws its own column headers in CoBot's theme: Windows
 		// drops the system frame, macOS keeps only the traffic lights over
-		// the page. Linux keeps its system bar.
+		// the page. Linux keeps its system bar. The mac title stays enabled
+		// (empty by default, set to the conversation name in fullscreen) so
+		// the hover-revealed titlebar shows the title beside the traffic
+		// lights instead of an empty strip.
 		Frameless: runtime.GOOS == "windows",
-		Mac:       &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
+		Mac: &mac.Options{TitleBar: &mac.TitleBar{
+			TitlebarAppearsTransparent: true,
+			HideTitleBar:               false,
+			FullSizeContent:            true,
+			UseToolbar:                 true,
+			HideToolbarSeparator:       true,
+		}},
 		// One window per profile: a second launch hands over to the first
 		// and exits. Without it the extra process adopts the running core
 		// as a guest, and closing the first window stops the core under it.
@@ -103,6 +112,10 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			windowCtx = ctx
 			bridge.SetContext(ctx)
+			// The window title is drawn next to the traffic lights whenever
+			// the titlebar shows (mac fullscreen hover); keep it empty except
+			// when the frontend names the conversation in fullscreen.
+			wailsruntime.WindowSetTitle(ctx, "")
 			if err := bridge.StartCore(ctx, *dataRoot); err != nil {
 				wailsruntime.MessageDialog(ctx, messageDialogError(err))
 				wailsruntime.Quit(ctx)

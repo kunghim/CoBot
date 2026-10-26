@@ -5,6 +5,7 @@
 // reservation is the one place the system traffic lights land — a single
 // side-colored patch over the rail and the sidebar, gone in fullscreen.
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { ConversationHead, SidebarHead, type WindowControls } from '../components/ui';
@@ -12,6 +13,19 @@ import { useWindowFrame } from '../platform/desktopWindow';
 import ModeSwitch from './ModeSwitch';
 import SearchBox from '../features/search/SearchBox';
 import { ShellToggle, useShell } from './shell';
+
+/** Names the window while fullscreen: macOS reveals the transparent titlebar
+ * under the hover menu bar and draws this title beside the traffic lights
+ * (Codex-style), so the strip reads as a title bar instead of dead space.
+ * Windowed keeps the title empty — the columns carry their own headers. */
+export function useNativeTitle(title: string | undefined) {
+  const desktop = useWindowFrame();
+  const fullscreen = desktop?.fullscreen ?? false;
+  useEffect(() => {
+    desktop?.setNativeTitle(fullscreen ? title ?? '' : '');
+    return () => desktop?.setNativeTitle('');
+  }, [desktop, fullscreen, title]);
+}
 
 /** True only on the macOS desktop while windowed: the traffic lights sit in
  * the page's top-left corner, so the layout reserves it. Fullscreen cancels
