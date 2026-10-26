@@ -103,7 +103,7 @@ test('chat has one greeting, controls aligned with the sidebar and conversation 
   const bar = page.getByTestId('app-title-bar');
   await expect(header.getByText('CoBot', { exact: true })).toHaveCount(0);
   await expect(header.locator('img')).toHaveCount(0);
-  const mode = await header.getByRole('radio', { name: '团队', exact: true }).boundingBox();
+  const mode = await page.getByRole('radio', { name: '团队', exact: true }).boundingBox();
   const logo = await page.getByTestId('rail-logo').boundingBox();
   const home = await page.getByRole('navigation', { name: 'CoBot', exact: true }).getByRole('button', { name: '新建聊天', exact: true }).boundingBox();
   expect(logo!.y + logo!.height).toBeLessThanOrEqual(home!.y);
@@ -113,10 +113,10 @@ test('chat has one greeting, controls aligned with the sidebar and conversation 
   // The columns reach the top of the window; the conversation head is the
   // first row of main.
   expect((await page.getByRole('main').boundingBox())!.y).toBe(0);
-  expect((await header.getByRole('radiogroup', { name: '使用模式' }).boundingBox())!.height).toBe(24);
+  expect((await page.getByRole('radiogroup', { name: '使用模式' }).boundingBox())!.height).toBe(24);
   expect(mode!.height).toBe(20);
   expect(mode!.width).toBe(24);
-  await expect(header.getByRole('radio', { name: '团队', exact: true }).getByTitle('团队')).toBeVisible();
+  await expect(page.getByRole('radio', { name: '团队', exact: true }).getByTitle('团队')).toBeVisible();
   const sidebar = page.getByRole('complementary', { name: '聊天记录' });
   const sidebarBounds = await sidebar.boundingBox();
   expect(toggle!.x).toBeCloseTo(sidebarBounds!.x + sidebarBounds!.width, 0);
@@ -133,11 +133,11 @@ test('chat has one greeting, controls aligned with the sidebar and conversation 
   const toggleX = toggle!.x;
   await bar.getByRole('button', { name: '收起聊天记录', exact: true }).click();
   expect((await bar.getByRole('button', { name: '展开聊天记录', exact: true }).boundingBox())!.x).toBeLessThan(toggleX);
-  await expect(header.getByRole('radiogroup', { name: '使用模式' })).toBeHidden();
+  await expect(page.getByRole('radiogroup', { name: '使用模式' })).toHaveCount(0);
   expect((await bar.getByRole('button', { name: '展开聊天记录', exact: true }).boundingBox())!.height).toBe(36);
   await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'chat-collapsed.png'), animations: 'disabled' });
   await bar.getByRole('button', { name: '展开聊天记录', exact: true }).click();
-  await expect(header.getByRole('radio', { name: '聊天', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radio', { name: '聊天', exact: true })).toHaveAttribute('aria-checked', 'true');
   const input = page.getByRole('textbox', { name: '发送消息', exact: true });
   await input.fill('输入法确认');
   await page.clock.setFixedTime(new Date(2026, 9, 24, 15));
@@ -262,7 +262,7 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
     const header = page.getByTestId('app-mode-header');
     const sidebar = page.getByRole('complementary', { name: '聊天记录', exact: true });
     const toggle = page.getByTestId('app-title-bar').getByRole('button', { name: /聊天记录/ });
-    const modes = header.getByRole('radiogroup', { name: '使用模式' });
+    const modes = page.getByRole('radiogroup', { name: '使用模式' });
     let windowedToggleX = 0;
     for (const fullscreen of platform === 'mac' ? [false, true] : [false]) {
       await page.evaluate((fullscreen) => {
@@ -308,9 +308,9 @@ for (const platform of ['web', 'windows', 'mac'] as const) {
             const side = (await sidebar.boundingBox())!;
             const mode = (await modes.boundingBox())!;
             expect(mode.x + mode.width).toBeCloseTo(side.x + side.width - 8, 0);
-            // The capsule lives inside the sidebar's head row (28px on the
-            // mac desktop, 40px elsewhere).
-            expect(mode.y + mode.height).toBeLessThanOrEqual(side.y + 40);
+            // The capsule lives in the menu tools row inside the sidebar,
+            // below the window-top head row (28px on the mac desktop).
+            expect(mode.y + mode.height).toBeLessThanOrEqual(side.y + 96);
             // Toggling the reservation never shifts controls sideways.
             if (platform === 'mac' && width === 1024) {
               const x = (await toggle.boundingBox())!.x;

@@ -9,7 +9,7 @@ import { WorkspaceProvider, useWorkspace } from '../features/workspace/Workspace
 import { MAX_WIDTH, MIN_WIDTH, layoutColumns } from '../features/workspace/state';
 import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed, useNativeTitle } from './WindowChrome';
+import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacWindowed, useNativeTitle } from './WindowChrome';
 import { useShell, useShellListLayout } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
 
@@ -98,7 +98,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
           </div>
         </nav>
 
-        {layout.showList && <Column><SidebarHeader />{teamList}</Column>}
+        {layout.showList && <Column><SidebarHeader /><MenuTools value={location.pathname.startsWith('/chat') ? 'chat' : 'work'} />{teamList}</Column>}
 
         {/* Conversation area: the routed page. It stays mounted while the
             workspace takes its turn, so a draft and the scroll survive. */}

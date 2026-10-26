@@ -1,14 +1,14 @@
 // The header rows that replaced the old full-width title bar. The columns
-// reach the top of the window: the sidebar's head carries the search field
-// and the mode capsule, the conversation's head carries the list toggle and
-// (on Windows) the window controls, and on macOS while windowed the corner
-// reservation is the one place the system traffic lights land — a single
-// side-colored patch over the rail and the sidebar, gone in fullscreen.
+// reach the top of the window: the sidebar's head is the lights' strip while
+// windowed (the list toggle lives at the conversation's head), the search
+// field and the mode capsule sit in their own row inside the secondary menu
+// below it, and on macOS while windowed the corner reservation is the one
+// place the system traffic lights land — a single side-colored patch over
+// the rail and the sidebar, gone in fullscreen.
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
-import { ConversationHead, SidebarHead, type WindowControls } from '../components/ui';
+import { ConversationHead, SidebarHead, type WindowControls, cx } from '../components/ui';
 import { useWindowFrame } from '../platform/desktopWindow';
 import ModeSwitch from './ModeSwitch';
 import SearchBox from '../features/search/SearchBox';
@@ -44,7 +44,7 @@ export function useMacWindowed(): boolean {
 }
 
 /** The traffic-light reservation block: 88x28 of the sidebar surface at
- * the top-left corner while windowed — the slim head rows' own extent, so
+ * the top-left corner while windowed — the slim head row's own extent, so
  * the block fills exactly the strip the lights occupy. Nothing interactive
  * lives under it. */
 export function WindowCorner() {
@@ -53,23 +53,31 @@ export function WindowCorner() {
   return <div data-testid="native-titlebar-inset" aria-hidden className="absolute left-0 top-0 z-10 h-7 w-[88px] bg-side" style={{ ['--wails-draggable' as string]: 'drag' }} />;
 }
 
-/** The sidebar's head: conversation search at the left end, mode capsule at
- * the right end. On the mac desktop the row is the titlebar-height 28px so
- * its center is the traffic lights' center while windowed and the controls
- * hold that position in fullscreen — no shift between states. */
+/** The sidebar's head: the window-top row above the secondary menu — empty
+ * draggable surface on macOS (the lights' strip while windowed). */
 export function SidebarHeader() {
-  const path = useLocation().pathname;
+  return <SidebarHead inset={useMacWindowed()} slim={useMacCorner()} />;
+}
+
+/** The secondary menu's tools row, inside the menu column above the list
+ * title: search at the left end, mode capsule at the right end. It follows
+ * the menu (hidden when the menu folds) and never shares a row with the
+ * system lights. */
+export function MenuTools({ value }: { value: 'chat' | 'work' }) {
   return (
-    <SidebarHead inset={useMacWindowed()} slim={useMacCorner()} leading={<SearchBox />}>
-      <ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} />
-    </SidebarHead>
+    <div className={cx('flex shrink-0 items-center bg-side', useMacCorner() ? 'h-10 px-2 pb-1' : 'px-2 py-2')}>
+      <div className="flex h-full min-w-0 flex-1 items-center justify-between gap-2">
+        <SearchBox />
+        <ModeSwitch value={value} />
+      </div>
+    </div>
   );
 }
 
 /** The conversation's head: the list toggle flush with the sheet below, an
  * optional title, and the window controls on Windows. While macOS is
  * windowed and the sidebar is folded (or absent), the conversation's left
- * edge slides under the traffic lights, so the head clears them. */
+ * edge slides under the traffic lights, so the head clears it. */
 export function ConversationHeader({ title, right, toggle = true, alwaysInset = false }: { title?: ReactNode; right?: ReactNode; toggle?: boolean; alwaysInset?: boolean }) {
   const { t } = useTranslation();
   const desktop = useWindowFrame();

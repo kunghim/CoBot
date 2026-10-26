@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BrandMark, Icons, RailItem, cx } from '../../components/ui';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed } from '../../app/WindowChrome';
+import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacWindowed } from '../../app/WindowChrome';
 import { useShell, useShellListLayout } from '../../app/shell';
 import { writeLocal } from '../../app/mode';
 import { rememberWorkspacePath } from '../../app/workspacePath';
@@ -29,6 +29,7 @@ export default function ChatLayout() {
     </nav>
     {listOpen && <aside aria-label={t('chat.history')} className="flex w-[min(16rem,40vw)] shrink-0 flex-col bg-side">
       <SidebarHeader />
+      <MenuTools value="chat" />
       <ChatSidebar />
     </aside>}
     <main className="flex min-w-0 flex-1 flex-col">
