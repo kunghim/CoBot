@@ -13,14 +13,22 @@ import ModeSwitch from './ModeSwitch';
 import SearchBox from '../features/search/SearchBox';
 import { ShellToggle, useShell } from './shell';
 
-/** True only on the macOS desktop while windowed: the corner reservation exists. */
+/** True on the macOS desktop: the traffic lights occupy the top-left corner
+ * whether windowed or fullscreen (fullscreen reveals them under the menu bar
+ * on hover), so content keeps clear of it in both states. */
+export function useMacCorner(): boolean {
+  return useWindowFrame()?.platform === 'mac';
+}
+
+/** True only on the macOS desktop while windowed: the corner reservation
+ * block is drawn (fullscreen keeps the clear space but not the block). */
 export function useMacWindowed(): boolean {
   const window = useWindowFrame();
   return window?.platform === 'mac' && !window.fullscreen;
 }
 
-/** The traffic-light reservation: 88px of the sidebar surface at the top-left
- * corner. Nothing interactive lives under it. */
+/** The traffic-light reservation block: 88px of the sidebar surface at the
+ * top-left corner while windowed. Nothing interactive lives under it. */
 export function WindowCorner() {
   const macWindowed = useMacWindowed();
   if (!macWindowed) return null;
@@ -28,20 +36,20 @@ export function WindowCorner() {
 }
 
 /** The sidebar's head: conversation search at the left end, mode capsule at
- * the right end, clear of the corner reservation while windowed. */
+ * the right end, clear of the traffic-light corner on macOS. */
 export function SidebarHeader() {
   const path = useLocation().pathname;
   return (
-    <SidebarHead inset={useMacWindowed()} leading={<SearchBox />}>
+    <SidebarHead inset={useMacCorner()} leading={<SearchBox />}>
       <ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} />
     </SidebarHead>
   );
 }
 
 /** The conversation's head: the list toggle flush with the sheet below, an
- * optional title, and the window controls on Windows. While macOS is
- * windowed and the sidebar is folded (or absent), the conversation's left
- * edge slides under the corner reservation, so the head clears it. */
+ * optional title, and the window controls on Windows. On macOS with the
+ * sidebar folded (or absent), the conversation's left edge slides under the
+ * traffic-light corner, so the head clears it. */
 export function ConversationHeader({ title, right, toggle = true, alwaysInset = false }: { title?: ReactNode; right?: ReactNode; toggle?: boolean; alwaysInset?: boolean }) {
   const { t } = useTranslation();
   const desktop = useWindowFrame();
@@ -56,6 +64,6 @@ export function ConversationHeader({ title, right, toggle = true, alwaysInset = 
     onToggleMaximize: desktop.toggleMaximize,
     onClose: desktop.close,
   } : undefined;
-  const inset = useMacWindowed() && (alwaysInset || !listVisible);
+  const inset = useMacCorner() && (alwaysInset || !listVisible);
   return <ConversationHead inset={inset} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
 }
