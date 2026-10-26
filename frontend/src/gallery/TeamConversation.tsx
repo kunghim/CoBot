@@ -292,7 +292,7 @@ export default function TeamConversation() {
         <Demo title="Windows">
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
             <div className="relative flex bg-side">
-              <div className="flex w-14 shrink-0 items-center justify-center text-2xs text-neutral-400">导航</div>
+              <div className="flex w-11 shrink-0 items-center justify-center text-2xs text-neutral-400">导航</div>
               {left && <div className="w-[min(16rem,40vw)] shrink-0"><SidebarHead><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></SidebarHead></div>}
               <ConversationHead
                 title="CoBot — 待办应用 · 项目经理"
@@ -302,7 +302,7 @@ export default function TeamConversation() {
               />
             </div>
             <div className="flex h-24 text-xs text-neutral-500">
-              <div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-2"><BrandMark size={26} /><Icons.home size={18} /></div>
+              <div className="flex w-11 shrink-0 flex-col items-center gap-1 bg-rail py-2"><BrandMark size={26} /><Icons.home size={18} /></div>
               {left && <div className="w-[min(16rem,40vw)] shrink-0 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>}
               <div className="flex-1 p-3">会话</div>
               {right && <div className="w-36 border-l border-neutral-200 p-3 dark:border-neutral-800">工作面板</div>}
@@ -313,12 +313,12 @@ export default function TeamConversation() {
           <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
             <div className="relative flex bg-side">
               <div className="absolute left-0 top-0 z-10 h-10 w-[88px] bg-side" aria-hidden />
-              <div className="flex w-14 shrink-0 items-center justify-center pt-10 text-2xs text-neutral-400">导航</div>
+              <div className="flex w-11 shrink-0 items-center justify-center pt-10 text-2xs text-neutral-400">导航</div>
               <div className="w-[min(16rem,40vw)] shrink-0"><SidebarHead inset><ModeSelector label="使用模式" chatLabel="聊天" workLabel="团队" value={appMode} onChange={setAppMode} /></SidebarHead></div>
               <ConversationHead title="CoBot — 待办应用 · 项目经理" left={<SidebarToggle open={left} onToggle={() => setLeft(!left)} openLabel="展开团队列表" closeLabel="收起团队列表" />} right={<PanelToggle side="right" open={right} onToggle={() => setRight(!right)} openLabel="展开工作面板" closeLabel="收起工作面板" />} />
             </div>
             <div className="flex h-24 text-xs text-neutral-500">
-              <div className="flex w-14 shrink-0 flex-col items-center gap-1 bg-rail pb-2 pt-12"><BrandMark size={26} /><Icons.home size={18} /></div>
+              <div className="flex w-11 shrink-0 flex-col items-center gap-1 bg-rail pb-2 pt-12"><BrandMark size={26} /><Icons.home size={18} /></div>
               <div className="w-[min(16rem,40vw)] shrink-0 border-r border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900">团队列表</div>
               <div className="flex-1 p-3">会话</div>
             </div>

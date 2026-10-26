@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BrandMark, Icons, RailItem, cx } from '../../components/ui';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed } from '../../app/WindowChrome';
+import { BrandMark, Icons, RailItem, SidebarHead, cx } from '../../components/ui';
+import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacCorner, useMacWindowed } from '../../app/WindowChrome';
 import { useShell, useShellListLayout } from '../../app/shell';
 import { writeLocal } from '../../app/mode';
 import { rememberWorkspacePath } from '../../app/workspacePath';
@@ -22,13 +22,15 @@ export default function ChatLayout() {
   useEffect(() => { writeLocal('cobot.mode', 'chat'); rememberWorkspacePath(location.pathname); if (chatId) writeLocal('cobot.chat.selected', chatId); }, [chatId, location.pathname]);
   return <div className="relative flex h-full bg-side text-neutral-900 dark:text-neutral-100">
     <WindowCorner />
-    <nav aria-label={t('app.title')} className={cx('flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3', useMacWindowed() && 'pt-10')}>
+    <nav aria-label={t('app.title')} className={cx('flex w-11 shrink-0 flex-col items-center gap-1 bg-rail py-3', useMacWindowed() && 'pt-10')}>
       <div data-testid="rail-logo" className="flex h-10 w-full shrink-0 items-center justify-center"><BrandMark size={26} label={t('app.title')} /></div>
       <RailItem icon={Icons.home} label={t('chat.new')} current={location.pathname === '/chat/new'} onClick={() => navigate('/chat/new')} />
       <div className="mt-auto"><RailItem icon={Icons.settings} label={t('nav.settings')} onClick={() => navigate('/settings')} /></div>
     </nav>
+    <SidebarHeader />
     {listOpen && <aside aria-label={t('chat.history')} className="flex w-[min(16rem,40vw)] shrink-0 flex-col bg-side">
-      <SidebarHeader />
+      {useMacCorner() && <SidebarHead slim aria-hidden />}
+      <MenuTools value="chat" />
       <ChatSidebar />
     </aside>}
     <main className="flex min-w-0 flex-1 flex-col">

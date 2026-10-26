@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTeams } from '../api/queries';
-import { BrandMark, Icons, RailItem, SplitHandle, cx } from '../components/ui';
+import { BrandMark, Icons, RailItem, SidebarHead, SplitHandle, cx } from '../components/ui';
 import TeamList from '../features/teams/TeamList';
 import Workspace from '../features/workspace/Workspace';
 import { WorkspaceProvider, useWorkspace } from '../features/workspace/WorkspaceProvider';
 import { MAX_WIDTH, MIN_WIDTH, layoutColumns } from '../features/workspace/state';
 import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
-import { ConversationHeader, SidebarHeader, WindowCorner, useMacWindowed, useNativeTitle } from './WindowChrome';
+import { ConversationHeader, MenuTools, SidebarHeader, WindowCorner, useMacCorner, useMacWindowed, useNativeTitle } from './WindowChrome';
 import { useShell, useShellListLayout } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
 
@@ -84,13 +84,14 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
   const viewport = useViewportWidth();
   const layout = layoutColumns(viewport, listOpen, state.open && !!context, state.width, state.fullView);
   useShellListLayout(layout.showList, collapse);
-  const macCorner = useMacWindowed();
+  const macWindowed = useMacWindowed();
+  const macCorner = useMacCorner();
   return (
       <div className="relative flex h-full bg-side text-neutral-900 dark:text-neutral-100">
         <WindowCorner />
         {/* Primary icon rail: home on top, settings at the bottom; on macOS
             the traffic-light corner stays clear of its top in every state. */}
-        <nav aria-label={t('app.title')} className={cx('flex w-14 shrink-0 flex-col items-center gap-1 bg-rail py-3', macCorner && 'pt-10')}>
+        <nav aria-label={t('app.title')} className={cx('flex w-11 shrink-0 flex-col items-center gap-1 bg-rail py-3', macWindowed && 'pt-10')}>
           <div data-testid="rail-logo" className="flex h-10 w-full shrink-0 items-center justify-center"><BrandMark size={26} label={t('app.title')} /></div>
           <RailItem icon={Icons.home} label={t('nav.home')} current={location.pathname === '/'} onClick={() => navigate('/')} />
           <div className="mt-auto">
@@ -98,7 +99,8 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
           </div>
         </nav>
 
-        {layout.showList && <Column><SidebarHeader />{teamList}</Column>}
+        {layout.showList && <Column>{macCorner && <SidebarHead slim aria-hidden />}<MenuTools value={location.pathname.startsWith('/chat') ? 'chat' : 'work'} />{teamList}</Column>}
+        <SidebarHeader />
 
         {/* Conversation area: the routed page. It stays mounted while the
             workspace takes its turn, so a draft and the scroll survive. */}
