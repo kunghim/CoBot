@@ -269,8 +269,7 @@ const (
 
 // Defines values for ProviderEndpointDialect.
 const (
-	AnthropicMessages ProviderEndpointDialect = "anthropic-messages"
-	OpenaiResponses   ProviderEndpointDialect = "openai-responses"
+	OpenaiResponses ProviderEndpointDialect = "openai-responses"
 )
 
 // Defines values for ProviderModelStatus.

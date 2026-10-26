@@ -3651,7 +3651,7 @@ components:
       description: One wire dialect the provider offers.
       required: [dialect, baseUrl]
       properties:
-        dialect: { type: string, enum: [openai-responses, anthropic-messages] }
+        dialect: { type: string, enum: [openai-responses] }
         baseUrl: { type: string }
     ProviderModel:
       type: object

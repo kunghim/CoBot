@@ -764,12 +764,10 @@
     "updated": "Saved {{name}} with {{count}} models",
     "readyToUse": "Its models can now be chosen in the conversation.",
     "usableWith": "Works with {{engines}}",
-    "noCodexEndpoint": "Without an OpenAI-format endpoint there is nothing for the current engine to check the models against. You can add it as it is and fill the endpoint in later.",
+    "unusableClaude": "This provider offered the Claude protocol only, which is no longer supported; remove it, or edit it to an OpenAI-format endpoint.",
     "listSeparator": ", ",
     "dialectResponses": "OpenAI compatible",
-    "dialectAnthropic": "Anthropic compatible",
     "badgeCodex": "Codex",
-    "badgeClaudeCode": "Claude Code",
     "dialog": {
       "addTitle": "Add a model provider",
       "editTitle": "Edit {{name}}",
@@ -785,9 +783,6 @@
       "displayNamePlaceholder": "For example: our gateway",
       "openaiEndpoint": "OpenAI format endpoint",
       "openaiEndpointHint": "Codex calls its /responses.",
-      "anthropicEndpoint": "Claude format endpoint",
-      "anthropicEndpointHint": "Claude Code calls its /v1/messages.",
-      "endpointHint": "With only the OpenAI endpoint, only Codex can use it; fill in both and Codex and Claude Code can.",
       "apiKey": "API key",
       "apiKeyPlaceholder": "sk-…",
       "keyHint": "Get your key at <url>{{url}}</url>",
@@ -886,9 +881,6 @@
     "openai": {
       "name": "OpenAI"
     },
-    "anthropic": {
-      "name": "Anthropic"
-    },
     "deepseek": {
       "name": "DeepSeek"
     },
@@ -984,7 +976,7 @@
       "roles": "Each role's default avatar. Members without an avatar of their own follow it; click a member's avatar in its conversation to change just that member.",
       "engine": "CoBot uses the Codex engine bundled with the ChatGPT desktop app and authorizes its safety hook at startup. Sign in separately in CoBot’s private environment.",
       "models": "Used by a member until it is given its own model in the conversation; applies to work that starts afterwards.",
-      "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
+      "providers": "Configure once and Codex can use it. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
       "archived": "View, restore, or delete archived chats and teams.",
       "about": "Version, updates and project information."

@@ -27,20 +27,16 @@ import ModelPick, { modelsToProbe, withSelection } from './ModelPick';
 
 /** The dialect Codex speaks. */
 export const CODEX_DIALECT = 'openai-responses';
-/** The dialect Claude Code speaks. */
-export const CLAUDE_DIALECT = 'anthropic-messages';
 
 /** The engine that can speak a dialect. */
 export function engineOf(dialect: string): string {
   if (dialect === CODEX_DIALECT) return 'Codex';
-  if (dialect === CLAUDE_DIALECT) return 'Claude Code';
   return dialect;
 }
 
 /** What a dialect is called in the interface. */
 export function dialectLabel(dialect: string, t: TFunction): string {
   if (dialect === CODEX_DIALECT) return t('providers.dialectResponses');
-  if (dialect === CLAUDE_DIALECT) return t('providers.dialectAnthropic');
   return dialect;
 }
 
@@ -101,7 +97,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [openaiBase, setOpenaiBase] = useState('');
-  const [anthropicBase, setAnthropicBase] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -156,7 +151,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       setPreset(presets.find((entry) => entry.id === editing.presetId) ?? null);
       setName(editing.name);
       setOpenaiBase(editing.endpoints.find((endpoint) => endpoint.dialect === CODEX_DIALECT)?.baseUrl ?? '');
-      setAnthropicBase(editing.endpoints.find((endpoint) => endpoint.dialect === CLAUDE_DIALECT)?.baseUrl ?? '');
       const ids = editing.models.map((model) => model.id);
       setModels(ids);
       setSelected(ids);
@@ -172,7 +166,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     } else {
       setName('');
       setOpenaiBase('');
-      setAnthropicBase('');
       setModels([]);
       setSelected([]);
       setEntries({});
@@ -200,9 +193,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     if (preset) return preset.endpoints.map((endpoint) => ({ dialect: endpoint.dialect, baseUrl: absoluteBase(endpoint.baseUrl) }));
     const out: ProviderEndpoint[] = [];
     if (openaiBase.trim()) out.push({ dialect: CODEX_DIALECT, baseUrl: openaiBase.trim() });
-    if (anthropicBase.trim()) out.push({ dialect: CLAUDE_DIALECT, baseUrl: anthropicBase.trim() });
     return out;
-  }, [preset, openaiBase, anthropicBase]);
+  }, [preset, openaiBase]);
 
   const codexEndpoint = endpoints.find((endpoint) => endpoint.dialect === CODEX_DIALECT) ?? null;
   const key = apiKey.trim();
@@ -458,7 +450,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
                 </span>
                 <span className="mt-1 flex flex-wrap items-center gap-1">
                   {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
-                  {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
                 </span>
               </span>
             </button>
@@ -483,11 +474,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const formView = (
     <div className="space-y-4">
-      {/* Said once the user has described a provider the engine cannot check, not before they have typed anything. */}
-      {probeImpossible && (preset ? true : anthropicBase.trim() !== '') && (
-        <Alert tone="warning">{t('providers.noCodexEndpoint')}</Alert>
-      )}
-
       {preset ? (
         <div>
           <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100">{t('providers.dialog.endpoints')}</p>
@@ -512,10 +498,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
                 forgetAnswers();
               }} placeholder="https://gateway.example/v1" />
           </Field>
-          <Field label={t('providers.dialog.anthropicEndpoint')} hint={t('providers.dialog.anthropicEndpointHint')}>
-            <TextInput mono value={anthropicBase} onChange={(event) => setAnthropicBase(event.target.value)} placeholder="https://gateway.example/anthropic" />
-          </Field>
-          <p className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">{t('providers.dialog.endpointHint')}</p>
         </div>
       )}
 

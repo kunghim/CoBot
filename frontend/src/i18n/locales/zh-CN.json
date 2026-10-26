@@ -756,12 +756,10 @@
     "updated": "已保存 {{name}}，纳入 {{count}} 个模型",
     "readyToUse": "现在可以在会话里选择它的模型了。",
     "usableWith": "可用于 {{engines}}",
-    "noCodexEndpoint": "没有填 OpenAI 格式端点，就没法用当前引擎探测模型。可以直接添加，之后再补端点。",
+    "unusableClaude": "该供应商只支持 Claude 协议，已不再支持；请移除，或编辑它改成 OpenAI 格式端点。",
     "listSeparator": "、",
     "dialectResponses": "OpenAI 兼容",
-    "dialectAnthropic": "Anthropic 兼容",
     "badgeCodex": "Codex",
-    "badgeClaudeCode": "Claude Code",
     "dialog": {
       "addTitle": "添加模型供应商",
       "editTitle": "编辑 {{name}}",
@@ -777,9 +775,6 @@
       "displayNamePlaceholder": "例如：公司的中转站",
       "openaiEndpoint": "OpenAI 格式端点",
       "openaiEndpointHint": "Codex 走它的 /responses。",
-      "anthropicEndpoint": "Claude 格式端点",
-      "anthropicEndpointHint": "Claude Code 走它的 /v1/messages。",
-      "endpointHint": "只填 OpenAI 端点则只有 Codex 能用；两个都填则 Codex 与 Claude Code 通用。",
       "apiKey": "API 密钥",
       "apiKeyPlaceholder": "sk-…",
       "keyHint": "在 <url>{{url}}</url> 获取你的密钥",
@@ -876,9 +871,6 @@
     "openai": {
       "name": "OpenAI 官方"
     },
-    "anthropic": {
-      "name": "Anthropic 官方"
-    },
     "deepseek": {
       "name": "DeepSeek"
     },
@@ -974,7 +966,7 @@
       "roles": "每个角色的默认头像。没有单独设置头像的成员会跟着角色变；在成员的会话里点头像，可以只改这一个成员。",
       "engine": "CoBot 使用 ChatGPT 桌面端内置的 Codex，启动时自动检测并授权安全钩子。账号在 CoBot 的私有环境中独立登录。",
       "models": "成员还没在会话里选过模型时用它，对之后开始的任务起作用。",
-      "providers": "配置一次，Codex 与 Claude Code 通用。启用的供应商的模型都可以在会话里选，在厂商自己的供应商里换模型，会接着原来的会话；换供应商或在网关里换模型，会开一个新会话，并把之前的完整记录交给新模型。",
+      "providers": "配置一次，Codex 即可使用。启用的供应商的模型都可以在会话里选，在厂商自己的供应商里换模型，会接着原来的会话；换供应商或在网关里换模型，会开一个新会话，并把之前的完整记录交给新模型。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
       "archived": "查看、恢复或删除已归档的聊天和团队。",
       "about": "版本、更新和项目信息。"

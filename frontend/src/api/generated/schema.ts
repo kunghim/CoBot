@@ -1669,7 +1669,7 @@ export interface components {
         /** @description One wire dialect the provider offers. */
         ProviderEndpoint: {
             /** @enum {string} */
-            dialect: "openai-responses" | "anthropic-messages";
+            dialect: "openai-responses";
             baseUrl: string;
         };
         ProviderModel: {

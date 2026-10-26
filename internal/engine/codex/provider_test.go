@@ -157,9 +157,7 @@ func TestBindProviderRefusesAProviderWithoutAResponsesEndpoint(t *testing.T) {
 	server := &Server{client: backend.start(t)}
 
 	p := testProvider()
-	p.Endpoints = []domain.ProviderEndpoint{
-		{Dialect: domain.DialectAnthropicMessages, BaseURL: "https://api.deepseek.com/anthropic"},
-	}
+	p.Endpoints = []domain.ProviderEndpoint{}
 	if err := server.BindProvider(ctx, p); err == nil {
 		t.Fatal("a provider the engine cannot speak was bound")
 	}

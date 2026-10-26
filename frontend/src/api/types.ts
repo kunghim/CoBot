@@ -70,7 +70,7 @@ export type ProviderPreset = components['schemas']['ProviderPreset'];
 export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
 
 /** The dialects an engine can speak. */
-export type ProviderDialect = 'openai-responses' | 'anthropic-messages';
+export type ProviderDialect = 'openai-responses';
 
 /** GET /providers */
 export interface ProviderListResult {

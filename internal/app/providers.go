@@ -283,6 +283,13 @@ func (a *App) RebindProviders(ctx context.Context) {
 		if p.AuthMode != domain.ProviderAuthAPIKey {
 			continue
 		}
+		// A provider without an endpoint has nothing to hand over. That
+		// state only exists for a provider whose only dialect was removed
+		// (the migration marks it disabled); rebinding it would fail on
+		// every start-up for as long as the user keeps it around.
+		if len(p.Endpoints) == 0 {
+			continue
+		}
 		if err := a.bindProvider(ctx, p); err != nil && a.Logger != nil {
 			a.Logger.Warn("provider not handed to the engine", "provider", p.ID, "error", err)
 		}

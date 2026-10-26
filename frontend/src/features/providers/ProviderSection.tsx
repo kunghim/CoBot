@@ -96,6 +96,10 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
   const endpoint = provider.endpoints.find((entry) => entry.dialect === CODEX_DIALECT)?.baseUrl ?? provider.endpoints[0]?.baseUrl ?? '';
   const engines = [...new Set(provider.endpoints.map((entry) => engineOf(entry.dialect)))];
   const usable = provider.models.filter((entry) => entry.status !== 'failed').length;
+  // A provider without any endpoint spoke a dialect CoBot no longer has (the
+  // migration that removed it left the row in place, switched off); it stays
+  // until the user removes it, and nothing else can be done with it here.
+  const legacyClaude = !official && provider.endpoints.length === 0;
   return (
     <div
       className={cx(
@@ -120,9 +124,11 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
           </>
         ) : (
           <>
-            <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{endpoint}</p>
+            {!legacyClaude && (
+              <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{endpoint}</p>
+            )}
             <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">
-              {t('providers.modelSummary', { count: provider.models.length, usable })}
+              {legacyClaude ? t('providers.unusableClaude') : t('providers.modelSummary', { count: provider.models.length, usable })}
               {engines.length ? ` · ${t('providers.usableWith', { engines: engines.join(t('providers.listSeparator')) })}` : ''}
             </p>
           </>
@@ -139,7 +145,7 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
             </Button>
           </>
         )}
-        <Switch checked={provider.enabled} disabled={switching} label={t('providers.enabledLabel')} hideLabel onChange={onToggle} />
+        <Switch checked={provider.enabled} disabled={switching || legacyClaude} label={t('providers.enabledLabel')} hideLabel onChange={onToggle} />
       </div>
     </div>
   );

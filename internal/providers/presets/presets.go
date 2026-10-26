@@ -5,10 +5,10 @@
 // network. Two facts shape the catalogue.
 //
 // The engine speaks only the OpenAI Responses protocol. A vendor that offers
-// nothing else is useless to it unless the engine also speaks Anthropic
-// Messages, so every preset lists the dialects the vendor really serves and
-// never one it does not. A preset that pointed at a missing surface would
-// cost the user a failed setup that looks like a wrong key.
+// nothing else is useless to it, so every preset lists the dialects the
+// vendor really serves and never one it does not. A preset that pointed at a
+// missing surface would cost the user a failed setup that looks like a wrong
+// key.
 //
 // The shipped model list is a fallback, not the source of truth. Every vendor
 // here exposes GET {base}/models, so the live catalogue is fetched at runtime
@@ -89,25 +89,6 @@ var catalogue = []Preset{
 		AuthMode:  domain.ProviderAuthChatGPT,
 	},
 	{
-		ID:     "anthropic",
-		Name:   "Anthropic",
-		Short:  "AN",
-		Color:  "#D97757",
-		KeyURL: "console.anthropic.com/settings/keys",
-		KeyPatterns: []string{
-			`^sk-ant-api03-[A-Za-z0-9_-]{80,}$`,
-		},
-		// Anthropic does not serve the OpenAI Responses protocol at all —
-		// that surface answers 404 — so this preset declares only the
-		// Anthropic Messages dialect. Inventing a responses endpoint here
-		// would send the engine to a path that does not exist.
-		Endpoints: []Endpoint{
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.anthropic.com"},
-		},
-		Models:   []domain.ProviderModel{fallbackModel("claude-opus-5")},
-		AuthMode: domain.ProviderAuthAPIKey,
-	},
-	{
 		ID:     "deepseek",
 		Name:   "DeepSeek",
 		Short:  "DS",
@@ -118,7 +99,6 @@ var catalogue = []Preset{
 		},
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.deepseek.com/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.deepseek.com/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("deepseek-v4-pro")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -134,7 +114,6 @@ var catalogue = []Preset{
 		// be a guess. The user picks the vendor instead.
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.moonshot.cn/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.moonshot.cn/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("kimi-k3")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -150,7 +129,6 @@ var catalogue = []Preset{
 		},
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "open.bigmodel.cn/api/paas/v4"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "open.bigmodel.cn/api/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("GLM-5.3")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -169,7 +147,6 @@ var catalogue = []Preset{
 		},
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.z.ai/api/paas/v4"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.z.ai/api/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("GLM-5.3")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -185,7 +162,6 @@ var catalogue = []Preset{
 		},
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.minimaxi.com/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.minimaxi.com/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("MiniMax-M3")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -200,7 +176,6 @@ var catalogue = []Preset{
 		// other vendors that are not in this catalogue.
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "dashscope.aliyuncs.com/compatible-mode/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "dashscope.aliyuncs.com/apps/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("qwen3.8-max")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -214,7 +189,6 @@ var catalogue = []Preset{
 		// No key pattern: MiMo issues a generic "sk-" key.
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.xiaomimimo.com/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "api.xiaomimimo.com/anthropic"},
 		},
 		Models:   []domain.ProviderModel{fallbackModel("mimo-v2.5-pro")},
 		AuthMode: domain.ProviderAuthAPIKey,
@@ -228,8 +202,8 @@ var catalogue = []Preset{
 		KeyPatterns: []string{
 			`^xai-[A-Za-z0-9]{60,}$`,
 		},
-		// xAI serves no Anthropic-compatible surface, so only the OpenAI
-		// dialect is declared.
+		// xAI serves only the OpenAI dialect, which is the one the engine
+		// speaks anyway.
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "api.x.ai/v1"},
 		},
@@ -247,7 +221,6 @@ var catalogue = []Preset{
 		},
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "openrouter.ai/api/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "openrouter.ai/api"},
 		},
 		// No fallback models: OpenRouter namespaces its catalogue per
 		// upstream vendor ("vendor/model"), so there is no single id worth
@@ -263,7 +236,6 @@ var catalogue = []Preset{
 		KeyURL: "opencode.ai/zen",
 		Endpoints: []Endpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "opencode.ai/zen/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "opencode.ai/zen/v1"},
 		},
 		// No fallback models: Zen fronts several upstream vendors under
 		// its own ids, and none of them was measured here.
@@ -277,7 +249,6 @@ var catalogue = []Preset{
 // catalogue so the outcome of a key never depends on map iteration or on
 // where a preset is added later.
 var detectionOrder = []string{
-	"anthropic",  // sk-ant-api03-…
 	"openai",     // sk-proj-…
 	"xai",        // xai-…
 	"openrouter", // sk-or-v1-…
