@@ -1,12 +1,13 @@
 // RunProcess shows one turn the way Codex does, in the order it happened:
-// what the member said stays in view between stretches of work, each stretch
-// folded to a line ("运行了 2 条命令") that opens into its steps. While it
-// runs, the reply streams in and a live status line ("正在执行命令 · 12秒")
-// sits at the very bottom, under the newest content, so a long turn still
-// shows it is moving; once finished, the whole process folds to one "用时
-// 1分23秒" line above the reply and opens on click. A failed turn stays open
-// under its own line, an interrupted one is marked. A team's turns and a
-// chat's both use it (see Scope).
+// what the member said stays in view between stretches of work, and each
+// stretch of consecutive same-kind steps folds to a line ("运行了 3 条命令")
+// that opens into its steps. While it runs, finished stretches fold away and
+// only the one in progress stays open, a live status line ("正在执行命令 ·
+// 12秒") sits at the very bottom under the newest content, and the reply
+// streams in; once finished, the whole process folds to one "用时 1分23秒"
+// line above the reply and opens on click. A failed turn stays open under
+// its own line, an interrupted one is marked. A team's turns and a chat's
+// both use it (see Scope).
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Minus, X } from 'lucide-react';
@@ -91,6 +92,11 @@ export default function RunProcess({
   // and when the user opens a finished turn's record; a finished turn folds
   // them behind its duration line.
   const showProcess = active || run.status === 'failed' || run.status === 'interrupted' || expanded;
+  // The stretch the member is working in now is the last one on the turn.
+  let lastWorkIndex = -1;
+  blocks.forEach((block, index) => {
+    if (block.kind === 'work') lastWorkIndex = index;
+  });
   const phaseLine = active && (
     <p role="status" className="-ml-1 flex items-center gap-1.5 px-1.5 text-xs text-neutral-500 dark:text-neutral-400">
       <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" />
@@ -131,11 +137,24 @@ export default function RunProcess({
         </button>
       )}
       {showProcess &&
-        blocks.map((block) =>
+        blocks.map((block, index) =>
           block.kind === 'text' ? (
             <StepRow key={block.step.id} step={block.step} botId={run.botId} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
           ) : (
-            <WorkGroup key={block.id} steps={block.steps} botId={run.botId} expanded={expanded || workNeedsAttention(block.steps)} active={active} live={active ? live : undefined} scope={scope} nameOf={nameOf} say={say} />
+            <WorkGroup
+              key={block.id}
+              steps={block.steps}
+              botId={run.botId}
+              // While the turn runs, the finished stretches fold away and only
+              // the one the member is working in now stays open; something
+              // that went wrong always opens, as does a failed turn's work.
+              expanded={expanded || (active && index === lastWorkIndex) || workNeedsAttention(block.steps)}
+              active={active}
+              live={active ? live : undefined}
+              scope={scope}
+              nameOf={nameOf}
+              say={say}
+            />
           ),
         )}
       {retry}
@@ -150,25 +169,24 @@ export default function RunProcess({
 }
 
 /** A stretch of work between two things the member said: a line saying what it
- * held, which opens into the steps. A running or failed turn shows them open. */
+ * held, which opens into the steps. While the turn runs only the current
+ * stretch is open by default; the user can open any of them. */
 function WorkGroup({ steps, botId, expanded, active, live, scope, nameOf, say }: { steps: RunStep[]; botId: string; expanded: boolean; active: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
   const [own, setOwn] = useState<boolean | null>(null);
   const open = own ?? expanded;
   const summary = workSummary(steps).map(say).join('、');
   return (
     <div>
-      {!active && (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOwn(!open)}
-          className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
-        >
-          {open ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
-          <span>{summary}</span>
-        </button>
-      )}
-      {(open || active) && (
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOwn(!open)}
+        className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
+      >
+        {open ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
+        <span>{summary}</span>
+      </button>
+      {open && (
         <ol className="ml-1.5 mt-1 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
           {steps.map((step) => (
             <li key={step.id}>
