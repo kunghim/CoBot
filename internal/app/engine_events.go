@@ -34,6 +34,78 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	}
 
 	switch n.Method {
+	case "turn/plan/updated":
+		// The model's plan for this turn, shown as one living plan step in
+		// the process; later updates overwrite it.
+		var p struct {
+			ThreadID    string `json:"threadId"`
+			TurnID      string `json:"turnId"`
+			Explanation string `json:"explanation"`
+			Plan        []struct {
+				Step   string `json:"step"`
+				Status string `json:"status"`
+			} `json:"plan"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil || len(p.Plan) == 0 {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		mark := map[string]string{"pending": "□", "inProgress": "◆", "completed": "■"}
+		lines := make([]string, 0, len(p.Plan))
+		for _, step := range p.Plan {
+			m := mark[step.Status]
+			if m == "" {
+				m = "□"
+			}
+			lines = append(lines, m+" "+step.Step)
+		}
+		if p.Explanation != "" {
+			lines = append([]string{p.Explanation}, lines...)
+		}
+		detail, _ := json.Marshal(map[string]any{"text": strings.Join(lines, "\n")})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "plan-" + p.TurnID, Kind: engine.StepPlan, Status: engine.StepInProgress, Detail: detail})
+	case "model/rerouted":
+		// The engine answers with another model than the one asked for; the
+		// member's turn should say so.
+		var p struct {
+			ThreadID  string `json:"threadId"`
+			TurnID    string `json:"turnId"`
+			FromModel string `json:"fromModel"`
+			ToModel   string `json:"toModel"`
+			Reason    string `json:"reason"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		message := p.FromModel + " → " + p.ToModel
+		if p.Reason != "" {
+			message += " (" + p.Reason + ")"
+		}
+		detail, _ := json.Marshal(map[string]any{"level": "warning", "code": "modelRerouted", "message": message})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "rerouted-" + p.TurnID, Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
+	case "guardianWarning":
+		// The engine's safety layer flags the turn; the member sees why.
+		var p struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+			Message  string `json:"message"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil || p.Message == "" {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		detail, _ := json.Marshal(map[string]any{"level": "warning", "code": "guardian", "message": p.Message})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "guardian-" + p.TurnID, Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
 	case "turn/started":
 		if run, ok := s.runForThread(ctx, source, n.ThreadID, n.TurnID); ok && s.app.Paths.Root != "" {
 			if run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval {
@@ -505,6 +577,28 @@ func runIDOrEmpty(run domain.Run) string {
 func approvalSummary(req engine.ApprovalRequest) string {
 	// The complete requested operation is needed for a meaningful decision.
 	// Keep only relevant public fields; never persist the transport envelope.
+	if req.Method == "mcpServer/elicitation/request" {
+		// What the MCP server asks, verbatim: its words, and the form or the
+		// address it wants acted on.
+		var payload struct {
+			ServerName      string          `json:"serverName"`
+			Message         string          `json:"message"`
+			Mode            string          `json:"mode"`
+			RequestedSchema json.RawMessage `json:"requestedSchema"`
+			URL             string          `json:"url"`
+		}
+		if json.Unmarshal(req.RawParams, &payload) == nil {
+			details := map[string]any{"server": payload.ServerName, "mode": payload.Mode, "message": payload.Message}
+			if len(payload.RequestedSchema) > 0 && string(payload.RequestedSchema) != "null" {
+				details["requestedSchema"] = payload.RequestedSchema
+			}
+			if payload.URL != "" {
+				details["url"] = payload.URL
+			}
+			value, _ := json.MarshalIndent(details, "", "  ")
+			return string(value)
+		}
+	}
 	details := map[string]any{}
 	if req.Command != "" {
 		details["command"] = req.Command
@@ -535,6 +629,12 @@ func approvalSummary(req engine.ApprovalRequest) string {
 // lasts for the member's engine session: Codex keeps the grant until its
 // thread is restarted, and nothing in CoBot can widen it further.
 func nativeToolOptions(method string) []domain.ApprovalOption {
+	if method == "mcpServer/elicitation/request" {
+		return []domain.ApprovalOption{
+			{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.elicit_submit"},
+			{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.elicit_decline"},
+		}
+	}
 	if method == "item/permissions/requestApproval" {
 		return []domain.ApprovalOption{
 			{ID: domain.DecisionGrantTurn, MessageKey: "approval.option.grant_turn"},

@@ -256,6 +256,8 @@
       "empty": "还没有往来消息"
     },
     "engineError": {
+    "modelRerouted": "引擎把模型换成了：{{message}}",
+    "guardian": "引擎安全层提示：{{message}}",
       "serverOverloaded": "模型当前满载，这一轮没能完成。请稍后重发，或在设置里换一个模型",
       "usageLimitExceeded": "账号的模型用量已达上限，这一轮没能完成。请等额度恢复后再试",
       "rateLimitExceeded": "请求太频繁被模型服务限流，请稍后重发",
@@ -419,6 +421,10 @@
       "permissionWrite": "写入：{{paths}}"
     },
     "title": "安全审批",
+    "elicitation": {
+      "server": "来自 {{server}}",
+      "open": "打开并授权"
+    },
     "type": {
       "native_tool": "安全审批",
       "recovery": "中断恢复",
@@ -479,6 +485,8 @@
       "recovery_rerun": "重跑",
       "recovery_abandon": "放弃",
       "chain_stop": "停止该链",
+      "elicit_submit": "提交",
+      "elicit_decline": "拒绝",
       "unknown": "未知选项"
     }
   },

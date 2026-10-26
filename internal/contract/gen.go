@@ -1797,10 +1797,13 @@ type ListApprovalsParamsState string
 
 // DecideApprovalJSONBody defines parameters for DecideApproval.
 type DecideApprovalJSONBody struct {
-	Comment          *string            `json:"comment,omitempty"`
-	ExpectedRevision int64              `json:"expectedRevision"`
-	OptionId         string             `json:"optionId"`
-	RequestId        openapi_types.UUID `json:"requestId"`
+	Comment *string `json:"comment,omitempty"`
+
+	// Content An MCP elicitation's accepted form values, keyed by field name.
+	Content          *map[string]interface{} `json:"content,omitempty"`
+	ExpectedRevision int64                   `json:"expectedRevision"`
+	OptionId         string                  `json:"optionId"`
+	RequestId        openapi_types.UUID      `json:"requestId"`
 }
 
 // EngineLoginJSONBody defines parameters for EngineLogin.

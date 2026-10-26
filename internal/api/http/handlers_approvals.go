@@ -9,10 +9,11 @@ func (s *Server) handleListApprovals(w http.ResponseWriter, r *http.Request) {
 }
 
 type decideApprovalRequest struct {
-	RequestID        string `json:"requestId"`
-	OptionID         string `json:"optionId"`
-	Comment          string `json:"comment"`
-	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
+	RequestID        string         `json:"requestId"`
+	OptionID         string         `json:"optionId"`
+	Comment          string         `json:"comment"`
+	ExpectedRevision *int64         `json:"expectedRevision,omitempty"`
+	Content          map[string]any `json:"content,omitempty"`
 }
 
 func (s *Server) handleDecideApproval(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +30,7 @@ func (s *Server) handleDecideApproval(w http.ResponseWriter, r *http.Request) {
 	if req.ExpectedRevision != nil {
 		expected = *req.ExpectedRevision
 	}
-	approval, err := s.App.DecideApproval(r.Context(), principal, r.PathValue("id"), req.OptionID, req.Comment, expected)
+	approval, err := s.App.DecideApproval(r.Context(), principal, r.PathValue("id"), req.OptionID, req.Comment, expected, req.Content)
 	if err != nil {
 		writeError(w, r, err)
 		return

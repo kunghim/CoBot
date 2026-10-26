@@ -265,7 +265,7 @@ func TestAStoppedChainSaysWhereTheRequirementStopped(t *testing.T) {
 		return err == nil && len(pending) == 1 && pending[0].Reason == "over_limit"
 	})
 	pending, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
-	if _, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, domain.ChainOptionStop, "", pending[0].Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, domain.ChainOptionStop, "", pending[0].Revision, nil); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	messages, err := sqlite.ListMessages(ctx, h.app.DB, pm.ID, "", 20)

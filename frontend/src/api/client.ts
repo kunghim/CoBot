@@ -164,7 +164,7 @@ export const api = {
   chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
   editChatMessage: (id: string, messageId: string, text: string) => request<import('./types').ChatPage>('POST', `/api/v1/chats/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/edit`, { text }),
   editMessage: (messageId: string, text: string) => request<import('./types').SendMessageResult>('POST', `/api/v1/messages/${encodeURIComponent(messageId)}/edit`, { text }),
-  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
+  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]>; content?: Record<string, unknown> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
   openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {
     const status = await request<import('./types').Status>('GET', '/api/v1/status');
@@ -289,7 +289,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').ApprovalListResult>('GET', `/api/v1/approvals?${query.toString()}`);
   },
-  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number }) =>
+  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number; content?: Record<string, unknown> }) =>
     request<import('./types').Approval>('POST', `/api/v1/approvals/${approvalId}/decisions`, body),
 
   // Engine account and models (M2).

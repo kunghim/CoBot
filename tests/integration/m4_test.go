@@ -76,7 +76,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	card := pending[0]
 
 	// Continue: the bound wake runs and the chain gets a fresh budget of 3.
-	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision, nil); err != nil {
 		t.Fatalf("continue: %v", err)
 	}
 	waitUntil(t, 5*time.Second, "captain turn (wake 4)", func() bool { return len(fake.Turns()) == 5 })
@@ -103,7 +103,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	overCard := pending[0]
 
 	// Stopping cancels the chain's undelivered work.
-	if _, err := h.app.DecideApproval(ctx, h.user, overCard.ID, domain.ChainOptionStop, "", overCard.Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, overCard.ID, domain.ChainOptionStop, "", overCard.Revision, nil); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	chain, err = sqlite.GetChain(ctx, h.app.DB, chain.ID)

@@ -166,7 +166,7 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 	waitUntil(t, 5*time.Second, "approval card", func() bool { cards, _ := h.app.PendingApprovals(ctx, h.user, team.ID, ""); return len(cards) == 1 })
 	cards, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
 	refused("a pending approval")
-	if _, err := h.app.DecideApproval(ctx, h.user, cards[0].ID, "decline", "", cards[0].Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, cards[0].ID, "decline", "", cards[0].Revision, nil); err != nil {
 		t.Fatalf("decline: %v", err)
 	}
 	fake.EmitTurnCompleted(asking.ThreadID, asking.TurnID, "completed", "declined")

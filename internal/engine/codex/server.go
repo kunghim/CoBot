@@ -218,10 +218,12 @@ func (s *Server) handleRequest(req InboundRequest) {
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
 		// Only verified native contracts become actionable product cards.
 	case "mcpServer/elicitation/request":
-		// MCP forms/URL authentication are not command approvals. This build
-		// cannot render them, so answer with the verified cancellation shape.
-		_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
-		return
+		// An MCP form or URL authentication becomes a card like the others;
+		// a build that cannot show it cancels instead of hanging the server.
+		if s.callbacks.OnApproval == nil {
+			_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
+			return
+		}
 	default:
 		_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
 		return
@@ -237,8 +239,13 @@ func (s *Server) handleRequest(req InboundRequest) {
 		Permissions json.RawMessage `json:"permissions"`
 		// command requests that need the network
 		NetworkApprovalContext json.RawMessage `json:"networkApprovalContext"`
+		// MCP elicitation: what the server asks, in its own words
+		Message string `json:"message"`
 	}
 	_ = json.Unmarshal(req.Params, &base)
+	if base.Reason == "" {
+		base.Reason = base.Message
+	}
 
 	var paths []string
 	var fileChange struct {

@@ -4906,6 +4906,8 @@ export interface operations {
                     comment?: string;
                     /** Format: int64 */
                     expectedRevision: number;
+                    /** @description An MCP elicitation's accepted form values, keyed by field name. */
+                    content?: Record<string, never>;
                 };
             };
         };

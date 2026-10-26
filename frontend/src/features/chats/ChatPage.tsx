@@ -13,6 +13,7 @@ import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
 import MessageEditBox from '../conversations/MessageEditBox';
+import ElicitationBody from '../approvals/ElicitationBody';
 import NativeApprovalBody from '../approvals/NativeApprovalBody';
 import { effortChoices } from '../conversations/ReasoningEffortSelect';
 import { PermissionModeMenu, permissionModeOf } from '../conversations/PermissionModeSelect';
@@ -205,19 +206,21 @@ function ChatPage({ id }: { id?: string }) {
 }
 
 type InputQuestion = { id: string; header: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] };
-function ChatRequestCard({ request, busy, onReply }: { request: ChatRequest; busy: boolean; onReply: (body: { optionId?: string; answers?: Record<string, string[]> }) => void }) {
+function ChatRequestCard({ request, busy, onReply }: { request: ChatRequest; busy: boolean; onReply: (body: { optionId?: string; answers?: Record<string, string[]>; content?: Record<string, unknown> }) => void }) {
   const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [content, setContent] = useState<Record<string, unknown>>({});
   const questions = (request.params?.questions ?? []) as InputQuestion[];
   const input = request.method === 'item/tool/requestUserInput';
+  const elicitation = request.method === 'mcpServer/elicitation/request';
   return <div className="mb-3 max-h-80 overflow-y-auto rounded-2xl border border-neutral-200 bg-card p-4 dark:border-neutral-700">
     <h2 className="mb-3 text-sm font-medium">{t(input ? 'chat.inputRequired' : 'chat.approvalRequired')}</h2>
     {input ? questions.map((q) => <fieldset key={q.id} className="mb-3 space-y-2"><legend className="text-sm">{q.question}</legend>
       {q.options?.map((option) => <Button key={option.label} size="sm" variant={answers[q.id] === option.label ? 'secondary' : 'ghost'} onClick={() => setAnswers({ ...answers, [q.id]: option.label })}>{option.label}</Button>)}
       <TextInput type={q.isSecret ? 'password' : 'text'} aria-label={q.question} value={answers[q.id] ?? ''} onChange={(event) => setAnswers({ ...answers, [q.id]: event.target.value })} />
-    </fieldset>) : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
+    </fieldset>) : elicitation ? <ElicitationBody summary={request.summary} value={content} onChange={setContent} /> : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
     <div className="mt-3 flex flex-wrap gap-2">{input ? <Button size="sm" loading={busy} disabled={!questions.length || questions.some((q) => !answers[q.id]?.trim())} onClick={() => onReply({ answers: Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, [value]])) })}>{t('chat.submitAnswers')}</Button>
-      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
+      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id, ...(elicitation && option.id === 'accept_engine' ? { content } : {}) })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
     </div>
   </div>;
 }

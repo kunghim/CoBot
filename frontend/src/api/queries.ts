@@ -480,8 +480,8 @@ export function useApprovals(teamId: string | null, state: 'pending' | 'history'
 export function useDecideApproval() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ approvalId, optionId, expectedRevision }: { approvalId: string; optionId: string; expectedRevision: number }) =>
-      api.decideApproval(approvalId, { optionId, expectedRevision }),
+    mutationFn: ({ approvalId, optionId, expectedRevision, content }: { approvalId: string; optionId: string; expectedRevision: number; content?: Record<string, unknown> }) =>
+      api.decideApproval(approvalId, { optionId, expectedRevision, content }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['approvals'] });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });

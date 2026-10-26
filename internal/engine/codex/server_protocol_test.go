@@ -184,27 +184,48 @@ func TestTracedEnvKeepsTheNameAndDropsTheValue(t *testing.T) {
 }
 
 func TestUnsupportedServerRequestsDoNotBecomeCommandApprovals(t *testing.T) {
-	for _, method := range []string{"mcpServer/elicitation/request", "unknown/request"} {
-		var output bytes.Buffer
-		client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{}), writeGate: make(chan struct{}, 1)}
-		approval := false
-		server := &Server{client: client, callbacks: engine.Callbacks{OnApproval: func(engine.ApprovalRequest) { approval = true }}}
-		server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: method, Params: json.RawMessage(`{}`)})
-		if approval {
-			t.Fatal("unsupported request became actionable command card")
-		}
-		var response map[string]any
-		if err := json.Unmarshal(output.Bytes(), &response); err != nil {
-			t.Fatal(err)
-		}
-		if method == "mcpServer/elicitation/request" {
-			result, _ := response["result"].(map[string]any)
-			if result["action"] != "cancel" || result["decision"] != nil {
-				t.Fatal("wrong elicitation response", response)
-			}
-		} else if response["error"] == nil {
-			t.Fatal("unknown request was silently accepted")
-		}
+	var output bytes.Buffer
+	client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{}), writeGate: make(chan struct{}, 1)}
+	approval := false
+	server := &Server{client: client, callbacks: engine.Callbacks{OnApproval: func(engine.ApprovalRequest) { approval = true }}}
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: "unknown/request", Params: json.RawMessage(`{}`)})
+	if approval {
+		t.Fatal("unsupported request became actionable command card")
+	}
+	var response map[string]any
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["error"] == nil {
+		t.Fatal("unknown request was silently accepted")
+	}
+}
+
+func TestElicitationBecomesACardOrIsCancelled(t *testing.T) {
+	params := json.RawMessage(`{"threadId":"th","serverName":"gatekeeper","message":"Allow access?","mode":"url","url":"https://example.com/login"}`)
+	// The product listens: the request becomes a card and the engine waits.
+	var output bytes.Buffer
+	client := &Client{stdin: nopCloser{&output}, closed: make(chan struct{}), writeGate: make(chan struct{}, 1)}
+	var got engine.ApprovalRequest
+	server := &Server{pending: map[string]pendingApproval{}, client: client, callbacks: engine.Callbacks{OnApproval: func(req engine.ApprovalRequest) { got = req }}}
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: "mcpServer/elicitation/request", Params: params})
+	if got.Method != "mcpServer/elicitation/request" || got.Reason != "Allow access?" {
+		t.Fatalf("elicitation did not become a card: %+v", got)
+	}
+	if output.Len() != 0 {
+		t.Fatalf("the engine was answered before the user decided: %s", output.String())
+	}
+	// Nothing can show the card: the server is cancelled outright.
+	output.Reset()
+	server = &Server{pending: map[string]pendingApproval{}, client: client}
+	server.handleRequest(InboundRequest{ID: json.RawMessage(`"request"`), Method: "mcpServer/elicitation/request", Params: params})
+	var response map[string]any
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	result, _ := response["result"].(map[string]any)
+	if result["action"] != "cancel" {
+		t.Fatalf("wrong elicitation response: %v", response)
 	}
 }
 

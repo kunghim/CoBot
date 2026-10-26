@@ -2600,6 +2600,9 @@ paths:
                 optionId: { type: string }
                 comment: { type: string }
                 expectedRevision: { type: integer, format: int64 }
+                content:
+                  type: object
+                  description: An MCP elicitation's accepted form values, keyed by field name.
       responses:
         "200":
           description: Decided approval (with responseState)

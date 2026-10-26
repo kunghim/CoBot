@@ -28,6 +28,8 @@ type ChatActionInput struct {
 	Title            string              `json:"title,omitempty"`
 	OptionID         string              `json:"optionId,omitempty"`
 	ExpectedRevision int64               `json:"expectedRevision,omitempty"`
+	// Content is an MCP elicitation's accepted form values.
+	Content map[string]any `json:"content,omitempty"`
 	Answers          map[string][]string `json:"answers,omitempty"`
 }
 

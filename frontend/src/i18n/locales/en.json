@@ -260,6 +260,8 @@
       "empty": "No messages between them yet"
     },
     "engineError": {
+    "modelRerouted": "The engine switched the model: {{message}}",
+    "guardian": "The safety layer of the engine says: {{message}}",
       "serverOverloaded": "The model is at capacity, so this turn did not finish. Send again later or pick another model in Settings",
       "usageLimitExceeded": "The account reached its model usage limit, so this turn did not finish. Try again when it resets",
       "rateLimitExceeded": "The model service is rate limiting requests; send again in a moment",
@@ -431,6 +433,10 @@
       "chain": "Chain confirmation",
       "budget": "Daily budget"
     },
+    "elicitation": {
+      "server": "From {{server}}",
+      "open": "Open and authorize"
+    },
     "requester": "Requested by: {{name}}",
     "reason": "Reason",
     "prev": "Previous approval card",
@@ -485,6 +491,8 @@
       "recovery_rerun": "Rerun",
       "recovery_abandon": "Abandon",
       "chain_stop": "Stop this chain",
+      "elicit_submit": "Submit",
+      "elicit_decline": "Decline",
       "unknown": "Unknown option"
     }
   },
