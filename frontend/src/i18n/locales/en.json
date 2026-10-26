@@ -626,7 +626,9 @@
       "viewportSizeTitle": "The page's real viewport: changed here, every member sees the same size",
       "viewportWidth": "Page width (pixels)",
       "viewportHeight": "Page height (pixels)"
-    }
+    },
+    "fullView": "Enter full view ⇧⌘F",
+    "exitFullView": "Exit full view ⇧⌘F"
   },
   "tasks": {
     "ownerUser": "You",

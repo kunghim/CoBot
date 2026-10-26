@@ -21,7 +21,7 @@ const KIND_ICONS: Record<WorkspaceTabKind, typeof Icons.add> = {
 
 export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[] }) {
   const { t } = useTranslation();
-  const { state, newTab, openTab, focusTab, closeTab, collapse } = useWorkspace();
+  const { state, newTab, openTab, focusTab, closeTab, collapse, toggleFullView } = useWorkspace();
   const browser = useTeamBrowser(teamId);
 
   // A page a member opens shows up as a tab (its title follows the page);
@@ -47,6 +47,23 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
 
   const active = state.tabs.find((tab) => tab.id === state.activeId) ?? null;
 
+  // Full view is a zcode-style flip between the two rooms: ⇧⌘F toggles it
+  // while the workspace is open, Escape hands the room back.
+  useEffect(() => {
+    if (!state.open) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'f' && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        toggleFullView();
+      } else if (event.key === 'Escape' && state.fullView) {
+        event.preventDefault();
+        toggleFullView();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state.open, state.fullView, toggleFullView]);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-side">
       <TabStrip
@@ -67,6 +84,10 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
         newTabLabel={t('workspace.newTab')}
         onCollapse={collapse}
         collapseLabel={t('workspace.collapse')}
+        fullView={state.fullView}
+        onToggleFullView={toggleFullView}
+        fullViewLabel={t('workspace.fullView')}
+        exitFullViewLabel={t('workspace.exitFullView')}
       />
       <div role="tabpanel" aria-label={t('workspace.tablist')} id={`tabpanel-${state.activeId ?? 'none'}`} className="min-h-0 flex-1 overflow-hidden rounded-tl-xl bg-canvas">
         {active?.kind === 'new' && <NewTabPage teamId={teamId} bots={bots} />}

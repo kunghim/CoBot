@@ -620,7 +620,9 @@
       "viewportSizeTitle": "页面的真实视口：在这里改，所有成员看到同一尺寸",
       "viewportWidth": "页面宽度（像素）",
       "viewportHeight": "页面高度（像素）"
-    }
+    },
+    "fullView": "进入完整视图 ⇧⌘F",
+    "exitFullView": "退出完整视图 ⇧⌘F"
   },
   "tasks": {
     "ownerUser": "你",

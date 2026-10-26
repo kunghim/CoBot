@@ -27,6 +27,12 @@ export interface TabStripProps {
   newTabLabel?: string;
   onCollapse?: () => void;
   collapseLabel?: string;
+  /** Full view: the workspace takes the whole room. The button only shows
+   * with the toggle given. */
+  fullView?: boolean;
+  onToggleFullView?: () => void;
+  fullViewLabel?: string;
+  exitFullViewLabel?: string;
 }
 
 export function TabStrip({
@@ -40,6 +46,10 @@ export function TabStrip({
   newTabLabel,
   onCollapse,
   collapseLabel,
+  fullView = false,
+  onToggleFullView,
+  fullViewLabel,
+  exitFullViewLabel,
 }: TabStripProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +126,17 @@ export function TabStrip({
       </div>
       {/* The strip only collapses; expanding happens at the workspace's
           other edge, so the toggle always shows the collapsed state's icon. */}
+      {/* Full view first: it is about the room, the collapse is about the
+          workspace itself. Both sit at the strip's right end. */}
+      {onToggleFullView && (fullView ? exitFullViewLabel : fullViewLabel) && (
+        <IconButton
+          size="sm"
+          icon={fullView ? Icons.minimize : Icons.maximize}
+          label={fullView ? exitFullViewLabel! : fullViewLabel!}
+          aria-pressed={fullView}
+          onClick={onToggleFullView}
+        />
+      )}
       {onCollapse && collapseLabel && <PanelToggle side="right" open onToggle={onCollapse} openLabel={collapseLabel} closeLabel={collapseLabel} />}
     </div>
   );
