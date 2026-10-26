@@ -279,6 +279,7 @@ export function EngineSection() {
             </span>
           </p>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('settings.engineAccountHint')}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('settings.engineAccountInfo')}</p>
           {details.length > 0 && <DescriptionList items={details} />}
           {info?.errorKey && <Alert tone="danger">{errorMessage(t, info.errorKey)}</Alert>}
           {info && info.status !== 'ready' && (
@@ -366,7 +367,7 @@ export function DefaultModelCard({ settings, save, errors }: SectionProps) {
   return (
     <Card>
       <div className="max-w-md">
-        <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} error={errors.defaultModel}>
+        <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} info={t('settings.defaultModelInfo')} error={errors.defaultModel}>
           <Select
             value={value}
             options={options}

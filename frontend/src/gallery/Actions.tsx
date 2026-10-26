@@ -118,11 +118,14 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="field" name="Field 字段" file="components/ui/Field.tsx" use="给每个输入控件配标签、提示和错误。里面的控件自动关联 id 和说明。" a11y="错误用 role=alert 读出，并通过 aria-describedby 关联到控件。" avoid="不要在字段旁边放“已保存”——保存成功用 Toast。">
+      <Doc id="field" name="Field 字段" file="components/ui/Field.tsx" use="给每个输入控件配标签、提示和错误。重要的提示直接显示在控件下方；次要的（单位、默认值）用 info 收进标签旁的图标，悬停或键盘聚焦显示。里面的控件自动关联 id 和说明。" a11y="错误用 role=alert 读出，并通过 aria-describedby 关联到控件。" avoid="不要在字段旁边放“已保存”——保存成功用 Toast。">
         <Demo surface="raised">
           <div className="grid max-w-xl gap-5">
             <Field label="团队名称" hint="成员会在团队列表里看到这个名字。" required>
               <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：待办应用" />
+            </Field>
+            <Field label="上下文长度" info="单位是 token；不填就用模型目录给的值，只能填更小的。">
+              <TextInput mono value="1048576" readOnly />
             </Field>
             <Field label="工作目录" error="这个目录已经被“设计预览”团队使用了，换一个目录，或先归档那个团队。">
               <TextInput mono value="E:\\work\\todo-app" readOnly />

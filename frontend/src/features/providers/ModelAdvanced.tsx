@@ -86,7 +86,8 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
                       {badge && <Badge tone="success">{badge}</Badge>}
                     </span>
                   }
-                  hint={spec.contextLimit > 0 ? t('providers.dialog.adv.contextLimitHint', { limit: spec.contextLimit }) : t('providers.dialog.adv.contextHint')}
+                  hint={t('providers.dialog.adv.contextInfo')}
+                  info={spec.contextLimit > 0 ? t('providers.dialog.adv.contextLimitInfo', { limit: spec.contextLimit }) : undefined}
                 >
                   <TextInput
                     size="sm"
@@ -97,7 +98,7 @@ export default function ModelAdvanced({ selected, entries, specs, onChange }: Mo
                     onChange={(event) => onChange(id, { contextWindow: limited(digits(event.target.value), spec.contextLimit) })}
                   />
                 </Field>
-                <Field label={t('providers.dialog.adv.maxOutput')} hint={spec.maxOutputLimit > 0 ? t('providers.dialog.adv.maxOutputLimitHint', { limit: spec.maxOutputLimit }) : t('providers.dialog.adv.maxOutputHint')}>
+                <Field label={t('providers.dialog.adv.maxOutput')} hint={t('providers.dialog.adv.maxOutputInfo')} info={spec.maxOutputLimit > 0 ? t('providers.dialog.adv.maxOutputLimitInfo', { limit: spec.maxOutputLimit }) : undefined}>
                   <TextInput
                     size="sm"
                     mono
