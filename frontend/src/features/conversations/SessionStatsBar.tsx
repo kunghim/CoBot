@@ -45,11 +45,11 @@ function Item({ label, title, children, testId }: { label: ReactNode; title: str
   );
 }
 
-function Row({ name, value }: { name: string; value: string }) {
+function Row({ name, value, strong = false }: { name: string; value: string; strong?: boolean }) {
   return (
     <span className="flex justify-between gap-3 py-0.5">
       <span className="text-neutral-500 dark:text-neutral-400">{name}</span>
-      <span className="font-medium tabular-nums">{value}</span>
+      <span className={strong ? 'font-semibold tabular-nums' : 'font-medium tabular-nums'}>{value}</span>
     </span>
   );
 }
@@ -85,40 +85,81 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
   const tps = stats.outputTokensPerSecond ? Math.round(stats.outputTokensPerSecond) : 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-1 px-1 font-mono text-2xs tracking-tight text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
-      <Item testId="stats-turns" title={t('stats.timeTitle')} label={<><Timer size={12} aria-hidden="true" />{t('stats.turns', { turns: stats.turns, steps: stats.steps })}{tps > 0 && ` · ${tps} tok/s`}</>}>
-        <span className="mb-1 block font-semibold">{t('stats.timeTitle')}</span>
+    <div className="flex flex-wrap items-center gap-1 px-1 text-2xs text-neutral-500 dark:text-neutral-400" data-testid="session-stats">
+      <Item testId="stats-turns" title={t('stats.timeTitle')} label={<><Timer size={12} aria-hidden="true" /><span className="font-mono tabular-nums">{t('stats.turns', { turns: stats.turns, steps: stats.steps })}</span>{tps > 0 && <span className="font-mono tabular-nums">{`· ${tps} tok/s`}</span>}</>}>
+        <PopoverHead title={t('stats.timeTitle')} value={t('stats.turns', { turns: stats.turns, steps: stats.steps })} />
         <Row name={t('stats.modelTime')} value={seconds(stats.modelMs)} />
         <Row name={t('stats.toolTime')} value={seconds(stats.toolMs)} />
         {stats.firstStepMs ? <Row name={t('stats.firstToken')} value={`${(stats.firstStepMs / 1000).toFixed(1)}s`} /> : null}
         {tps > 0 && <Row name={t('stats.speed')} value={`${tps} tok/s`} />}
-        <span className="mt-1 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.estimateNote')}</span>
+        <span className="mt-1.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.estimateNote')}</span>
       </Item>
-      <Item testId="stats-tokens" title={t('stats.tokensTitle')} label={<><Database size={12} aria-hidden="true" />{compactTokens(total)} tok · {t('stats.cacheHit', { percent: hit })}</>}>
-        <span className="mb-1 flex justify-between font-semibold"><span>{t('stats.tokensTitle')}</span><span className="tabular-nums">{total.toLocaleString()}</span></span>
-        <Row name={t('stats.cacheHitRate')} value={`${hit}%`} />
-        <Row name={t('stats.uncached')} value={(tokens.input - tokens.cachedRead).toLocaleString()} />
+      <Item testId="stats-tokens" title={t('stats.tokensTitle')} label={<><Database size={12} aria-hidden="true" /><span className="font-mono tabular-nums">{compactTokens(total)} tok</span><span className="rounded-full bg-neutral-900/[0.06] px-1.5 py-px font-mono tabular-nums dark:bg-white/[0.08]">{t('stats.cacheHit', { percent: hit })}</span></>}>
+        <PopoverHead title={t('stats.tokensTitle')} value={total.toLocaleString()} />
+        <Row name={t('stats.output')} value={tokens.output.toLocaleString()} strong />
+        {tokens.reasoning > 0 && <Row name={t('stats.reasoning')} value={tokens.reasoning.toLocaleString()} />}
+        <div className="my-1.5">
+          <MiniBar label={t('stats.cacheHitRate')} percent={hit} caption={`${hit}%`} />
+        </div>
         <Row name={t('stats.cacheRead')} value={tokens.cachedRead.toLocaleString()} />
         <Row name={t('stats.cacheWrite')} value={tokens.cacheWrite.toLocaleString()} />
-        <Row name={t('stats.output')} value={tokens.output.toLocaleString()} />
-        {tokens.reasoning > 0 && <Row name={t('stats.reasoning')} value={tokens.reasoning.toLocaleString()} />}
+        <Row name={t('stats.uncached')} value={(tokens.input - tokens.cachedRead).toLocaleString()} />
       </Item>
       {window > 0 && (
-        <Item testId="stats-context" title={t('stats.contextTitle', { percent: used })} label={<><ProgressRing value={used} label={t('stats.contextTitle', { percent: used })} size={14} showValue={false} tone={used >= 90 ? 'danger' : used >= 70 ? 'warning' : 'neutral'} />{used}%</>}>
-          <span className="mb-1 flex justify-between font-semibold"><span>{t('stats.contextTitle', { percent: used })}</span><span className="tabular-nums">{compactTokens(stats.context.used)} / {compactTokens(window)}</span></span>
-          <span className="block h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700"><span className="block h-full bg-signal-500" style={{ width: `${Math.min(used, 100)}%` }} /></span>
-          <span className="mt-1.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.contextNote')}</span>
+        <Item testId="stats-context" title={t('stats.contextTitle', { percent: used })} label={<><ProgressRing value={used} label={t('stats.contextTitle', { percent: used })} size={14} showValue={false} tone={used >= 90 ? 'danger' : used >= 70 ? 'warning' : 'neutral'} /><span className="font-mono tabular-nums">{used}%</span></>}>
+          <PopoverHead title={t('stats.contextTitle', { percent: used })} value={`${compactTokens(stats.context.used)} / ${compactTokens(window)}`} />
+          <div className="my-1.5">
+            <MiniBar label={t('stats.contextTitle', { percent: used })} percent={used} tone={used >= 90 ? 'danger' : used >= 70 ? 'warning' : 'neutral'} />
+          </div>
+          <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.contextNote')}</span>
         </Item>
       )}
       {(limits.primary || limits.secondary) && (
-        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<span className={cx('inline-flex items-center gap-1', limitTone(tightestLimit(limits)))}><Gauge size={12} aria-hidden="true" />{t('stats.limitShort', { percent: limitText(tightestLimit(limits)) })}</span>}>
-          <span className="mb-1 block font-semibold">{t('stats.limitsTitle')}</span>
-          {limits.primary && <Row name={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} value={limitText(limits.primary)} />}
-          {limits.primary?.resetsAt ? <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
-          {limits.secondary && <Row name={t('stats.limitWeek')} value={limitText(limits.secondary)} />}
-          {limits.secondary?.resetsAt ? <span className="block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.secondary) })}</span> : null}
+        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<span className={cx('inline-flex items-center gap-1', limitTone(tightestLimit(limits)))}><Gauge size={12} aria-hidden="true" /><span className="font-mono tabular-nums">{t('stats.limitShort', { percent: limitText(tightestLimit(limits)) })}</span></span>}>
+          <PopoverHead title={t('stats.limitsTitle')} value={limitText(tightestLimit(limits))} />
+          {limits.primary && (
+            <div className="my-1">
+              <MiniBar label={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} percent={limits.primary.usedPercent ?? 0} caption={limitText(limits.primary)} tone={limitTone(limits.primary) ? 'danger' : undefined} />
+              {limits.primary?.resetsAt ? <span className="mt-0.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
+            </div>
+          )}
+          {limits.secondary && (
+            <div className="my-1">
+              <MiniBar label={t('stats.limitWeek')} percent={limits.secondary.usedPercent ?? 0} caption={limitText(limits.secondary)} tone={limitTone(limits.secondary) ? 'danger' : undefined} />
+              {limits.secondary?.resetsAt ? <span className="mt-0.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.secondary) })}</span> : null}
+            </div>
+          )}
         </Item>
       )}
     </div>
+  );
+}
+
+/** The panel's header line: what the panel is about and its headline number. */
+function PopoverHead({ title, value }: { title: string; value: string }) {
+  return (
+    <span className="mb-1 flex items-baseline justify-between gap-3 border-b border-neutral-200 pb-1 font-semibold dark:border-neutral-700">
+      <span>{title}</span>
+      <span className="font-mono tabular-nums">{value}</span>
+    </span>
+  );
+}
+
+/** One proportion at a glance: a labelled bar with its share. Estimates stay
+ * quiet; the caption carries the number. */
+function MiniBar({ label, percent: value, caption, tone }: { label: string; percent: number; caption?: string; tone?: 'danger' | 'warning' | 'neutral' }) {
+  return (
+    <span className="block">
+      <span className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate">{label}</span>
+        {caption !== undefined && <span className="font-mono tabular-nums">{caption}</span>}
+      </span>
+      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+        <span
+          className={tone === 'danger' ? 'block h-full bg-red-500' : tone === 'warning' ? 'block h-full bg-amber-500' : 'block h-full bg-signal-500'}
+          style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }}
+        />
+      </span>
+    </span>
   );
 }
