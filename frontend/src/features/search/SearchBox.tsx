@@ -106,7 +106,7 @@ export default function SearchBox() {
   );
 
   return (
-    <div ref={root} className="relative min-w-0 max-w-36 flex-1">
+    <div ref={root} className="relative min-w-0 flex-1">
       <TextInput
         size="xs"
         pill
