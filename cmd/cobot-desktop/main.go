@@ -93,8 +93,12 @@ func main() {
 			TitlebarAppearsTransparent: true,
 			HideTitleBar:               false,
 			FullSizeContent:            true,
-			UseToolbar:                 true,
-			HideToolbarSeparator:       true,
+			// UseToolbar stays off: an attached toolbar turns the titlebar
+			// into toolbar height, and the fullscreen-hover strip that slides
+			// down under the menu bar reads as several times a normal
+			// toolbar. The standard-height titlebar keeps the strip slim.
+			UseToolbar:           false,
+			HideToolbarSeparator: true,
 		}},
 		// One window per profile: a second launch hands over to the first
 		// and exits. Without it the extra process adopts the running core
