@@ -74,5 +74,5 @@ export function ConversationHeader({ title, right, toggle = true, alwaysInset = 
     onClose: desktop.close,
   } : undefined;
   const inset = useMacWindowed() && (alwaysInset || !listVisible);
-  return <ConversationHead inset={inset} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
+  return <ConversationHead inset={inset} alignTrafficLights={useMacWindowed()} left={toggle ? <ShellToggle place="titlebar" /> : undefined} title={title} right={right} windowControls={desktop?.platform === 'windows' ? controls : undefined} />;
 }

@@ -106,33 +106,33 @@ export function SidebarHead({ leading, children, inset = false, alignTrafficLigh
  * right, and on Windows the window controls the bar used to carry. The row
  * drags the window; controls opt out.
  */
-export function ConversationHead({ title, left, right, windowControls, inset = false }: { title?: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls; inset?: boolean }) {
+export function ConversationHead({ title, left, right, windowControls, inset = false, alignTrafficLights = false }: { title?: ReactNode; left?: ReactNode; right?: ReactNode; windowControls?: WindowControls; inset?: boolean; alignTrafficLights?: boolean }) {
   const noDrag = { ['--wails-draggable' as string]: 'no-drag' };
   const drag = { ['--wails-draggable' as string]: 'drag' };
-  const control = 'flex h-full w-[clamp(1.75rem,8vw,2.75rem)] items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-900/[0.07] hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
+  const control = 'flex w-[clamp(1.75rem,8vw,2.75rem)] items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-900/[0.07] hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/[0.08] dark:hover:text-neutral-100';
   return (
     <div
       data-testid="app-title-bar"
       style={drag}
-      className={cx('flex h-10 shrink-0 select-none items-center bg-side', inset && 'pl-8')}
+      className={cx('flex h-10 shrink-0 select-none items-start bg-side', inset && 'pl-8', alignTrafficLights ? 'pt-1' : 'items-center')}
       onDoubleClick={windowControls?.onToggleMaximize}
     >
-      <div className="flex items-center gap-1" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+      <div className={cx('flex items-center gap-1', !alignTrafficLights && 'h-full')} style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
         {left}
       </div>
-      <div className="min-w-0 flex-1 truncate px-2 text-xs font-medium text-neutral-600 dark:text-neutral-300">{title}</div>
-      {right && <div className="flex items-center gap-1 px-2" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
+      <div className="min-w-0 flex-1 self-stretch truncate px-2 text-xs font-medium text-neutral-600 dark:text-neutral-300 flex items-center">{title}</div>
+      {right && <div className={cx('flex items-center gap-1 px-2', !alignTrafficLights && 'self-stretch')} style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
         {right}
       </div>}
       {windowControls && (
         <div className="flex h-full items-stretch" style={noDrag} onDoubleClick={(event) => event.stopPropagation()}>
-          <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={control}>
+          <button type="button" aria-label={windowControls.minimizeLabel} title={windowControls.minimizeLabel} onClick={windowControls.onMinimize} className={cx(control, 'h-full')}>
             <Minus size={15} aria-hidden />
           </button>
-          <button type="button" aria-label={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} title={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} onClick={windowControls.onToggleMaximize} className={control}>
+          <button type="button" aria-label={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} title={windowControls.maximized ? windowControls.restoreLabel : windowControls.maximizeLabel} onClick={windowControls.onToggleMaximize} className={cx(control, 'h-full')}>
             {windowControls.maximized ? <Copy size={13} aria-hidden /> : <Square size={12} aria-hidden />}
           </button>
-          <button type="button" aria-label={windowControls.closeLabel} title={windowControls.closeLabel} onClick={windowControls.onClose} className={cx(control, 'hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white')}>
+          <button type="button" aria-label={windowControls.closeLabel} title={windowControls.closeLabel} onClick={windowControls.onClose} className={cx(control, 'h-full', 'hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white')}>
             <X size={16} aria-hidden />
           </button>
         </div>
