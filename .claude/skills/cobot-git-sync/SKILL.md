@@ -18,5 +18,6 @@ description: CoBot 项目专用（kunghim/CoBot 仓库及其 worktree，其他�
    - 推送：先看 `git -C <主目录>/.local remote -v`。远端是 `kunghim/CoBot` 就停下告诉用户；
      还没设远端时按 docs.md 的规则设置（主仓库 origin 是用户 fork 就用同一地址，否则请用户给地址），
      并只在这一次提醒：fork 是公开的，想保密可另建私有仓库换过去；已有远端就不提醒；
-     第一次用 `push -u origin HEAD:notes`，之后直接 `push`。
+     第一次用 `push -u origin HEAD:<分支>`（单独的笔记仓库用 `main`，fork 用 `notes`），之后直接 `push`；
+     笔记仓库只有这一个分支，不另开分支或 worktree。
 4. 汇报：分开列出代码和笔记各自提交、拉取或推送了什么；跳过笔记时说明原因。
