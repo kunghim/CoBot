@@ -112,11 +112,11 @@ const (
 
 // Defines values for ChatNavigationInputAction.
 const (
-	Create      ChatNavigationInputAction = "create"
-	Delete      ChatNavigationInputAction = "delete"
-	Preferences ChatNavigationInputAction = "preferences"
-	Rename      ChatNavigationInputAction = "rename"
-	Reorder     ChatNavigationInputAction = "reorder"
+	ChatNavigationInputActionCreate      ChatNavigationInputAction = "create"
+	ChatNavigationInputActionDelete      ChatNavigationInputAction = "delete"
+	ChatNavigationInputActionPreferences ChatNavigationInputAction = "preferences"
+	ChatNavigationInputActionRename      ChatNavigationInputAction = "rename"
+	ChatNavigationInputActionReorder     ChatNavigationInputAction = "reorder"
 )
 
 // Defines values for ChatNavigationInputGrouping.
@@ -537,6 +537,39 @@ const (
 	UpdateCheckStateUpToDate    UpdateCheckState = "upToDate"
 )
 
+// Defines values for WorkspaceChangeFileKind.
+const (
+	WorkspaceChangeFileKindAdd    WorkspaceChangeFileKind = "add"
+	WorkspaceChangeFileKindDelete WorkspaceChangeFileKind = "delete"
+	WorkspaceChangeFileKindUpdate WorkspaceChangeFileKind = "update"
+)
+
+// Defines values for WorkspaceChangeRunSource.
+const (
+	WorkspaceChangeRunSourceFileChange WorkspaceChangeRunSource = "file_change"
+	WorkspaceChangeRunSourceTurnDiff   WorkspaceChangeRunSource = "turn_diff"
+)
+
+// Defines values for WorkspaceFileKind.
+const (
+	WorkspaceFileKindAudio        WorkspaceFileKind = "audio"
+	WorkspaceFileKindBinary       WorkspaceFileKind = "binary"
+	WorkspaceFileKindBlocked      WorkspaceFileKind = "blocked"
+	WorkspaceFileKindDirectory    WorkspaceFileKind = "directory"
+	WorkspaceFileKindDocument     WorkspaceFileKind = "document"
+	WorkspaceFileKindHtml         WorkspaceFileKind = "html"
+	WorkspaceFileKindImage        WorkspaceFileKind = "image"
+	WorkspaceFileKindLatex        WorkspaceFileKind = "latex"
+	WorkspaceFileKindMarkdown     WorkspaceFileKind = "markdown"
+	WorkspaceFileKindNotebook     WorkspaceFileKind = "notebook"
+	WorkspaceFileKindPdf          WorkspaceFileKind = "pdf"
+	WorkspaceFileKindPresentation WorkspaceFileKind = "presentation"
+	WorkspaceFileKindSpreadsheet  WorkspaceFileKind = "spreadsheet"
+	WorkspaceFileKindSvg          WorkspaceFileKind = "svg"
+	WorkspaceFileKindText         WorkspaceFileKind = "text"
+	WorkspaceFileKindVideo        WorkspaceFileKind = "video"
+)
+
 // Defines values for ListApprovalsParamsState.
 const (
 	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
@@ -597,11 +630,11 @@ const (
 
 // Defines values for SendTeamBrowserInputJSONBodyKind.
 const (
-	Key   SendTeamBrowserInputJSONBodyKind = "key"
-	Mouse SendTeamBrowserInputJSONBodyKind = "mouse"
-	Nav   SendTeamBrowserInputJSONBodyKind = "nav"
-	Text  SendTeamBrowserInputJSONBodyKind = "text"
-	Wheel SendTeamBrowserInputJSONBodyKind = "wheel"
+	SendTeamBrowserInputJSONBodyKindKey   SendTeamBrowserInputJSONBodyKind = "key"
+	SendTeamBrowserInputJSONBodyKindMouse SendTeamBrowserInputJSONBodyKind = "mouse"
+	SendTeamBrowserInputJSONBodyKindNav   SendTeamBrowserInputJSONBodyKind = "nav"
+	SendTeamBrowserInputJSONBodyKindText  SendTeamBrowserInputJSONBodyKind = "text"
+	SendTeamBrowserInputJSONBodyKindWheel SendTeamBrowserInputJSONBodyKind = "wheel"
 )
 
 // Defines values for SetTeamBrowserTabViewportJSONBodyPreset.
@@ -610,6 +643,60 @@ const (
 	Desktop SetTeamBrowserTabViewportJSONBodyPreset = "desktop"
 	Phone   SetTeamBrowserTabViewportJSONBodyPreset = "phone"
 	Tablet  SetTeamBrowserTabViewportJSONBodyPreset = "tablet"
+)
+
+// Defines values for ListWorkspaceChangeRunsParamsScope.
+const (
+	ListWorkspaceChangeRunsParamsScopeChat ListWorkspaceChangeRunsParamsScope = "chat"
+	ListWorkspaceChangeRunsParamsScopeTeam ListWorkspaceChangeRunsParamsScope = "team"
+)
+
+// Defines values for ListWorkspaceChangeFilesParamsScope.
+const (
+	ListWorkspaceChangeFilesParamsScopeChat ListWorkspaceChangeFilesParamsScope = "chat"
+	ListWorkspaceChangeFilesParamsScopeTeam ListWorkspaceChangeFilesParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceChangeDiffParamsScope.
+const (
+	GetWorkspaceChangeDiffParamsScopeChat GetWorkspaceChangeDiffParamsScope = "chat"
+	GetWorkspaceChangeDiffParamsScopeTeam GetWorkspaceChangeDiffParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceContentParamsScope.
+const (
+	GetWorkspaceContentParamsScopeChat GetWorkspaceContentParamsScope = "chat"
+	GetWorkspaceContentParamsScopeTeam GetWorkspaceContentParamsScope = "team"
+)
+
+// Defines values for ListWorkspaceEntriesParamsScope.
+const (
+	ListWorkspaceEntriesParamsScopeChat ListWorkspaceEntriesParamsScope = "chat"
+	ListWorkspaceEntriesParamsScopeTeam ListWorkspaceEntriesParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceFileParamsScope.
+const (
+	GetWorkspaceFileParamsScopeChat GetWorkspaceFileParamsScope = "chat"
+	GetWorkspaceFileParamsScopeTeam GetWorkspaceFileParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceLatexProjectParamsScope.
+const (
+	GetWorkspaceLatexProjectParamsScopeChat GetWorkspaceLatexProjectParamsScope = "chat"
+	GetWorkspaceLatexProjectParamsScopeTeam GetWorkspaceLatexProjectParamsScope = "team"
+)
+
+// Defines values for CompileWorkspaceLatexParamsScope.
+const (
+	CompileWorkspaceLatexParamsScopeChat CompileWorkspaceLatexParamsScope = "chat"
+	CompileWorkspaceLatexParamsScopeTeam CompileWorkspaceLatexParamsScope = "team"
+)
+
+// Defines values for WatchWorkspaceParamsScope.
+const (
+	WatchWorkspaceParamsScopeChat WatchWorkspaceParamsScope = "chat"
+	WatchWorkspaceParamsScopeTeam WatchWorkspaceParamsScope = "team"
 )
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
@@ -1473,7 +1560,11 @@ type RunStatus string
 type RunStep struct {
 	BotId string `json:"botId"`
 
-	// Detail Kind-specific payload.
+	// Detail Kind-specific payload. New file_change changes carry additions,
+	// deletions, statsComplete, binary and diffTruncated computed before
+	// storage clipping. New diff steps also carry changes (file metadata
+	// with byte start/end offsets), filesComplete and statsComplete.
+	// Missing completeness fields on older records mean unknown, not true.
 	Detail map[string]interface{} `json:"detail"`
 	Id     string                 `json:"id"`
 
@@ -1788,6 +1879,105 @@ type UpdateCheck struct {
 
 // UpdateCheckState upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
 type UpdateCheckState string
+
+// WorkspaceChangeDiff defines model for WorkspaceChangeDiff.
+type WorkspaceChangeDiff struct {
+	Diff          string              `json:"diff"`
+	DiffTruncated bool                `json:"diffTruncated"`
+	File          WorkspaceChangeFile `json:"file"`
+	Run           WorkspaceChangeRun  `json:"run"`
+}
+
+// WorkspaceChangeFile defines model for WorkspaceChangeFile.
+type WorkspaceChangeFile struct {
+	Additions     int                     `json:"additions"`
+	Binary        bool                    `json:"binary"`
+	Deletions     int                     `json:"deletions"`
+	DiffTruncated bool                    `json:"diffTruncated"`
+	Kind          WorkspaceChangeFileKind `json:"kind"`
+	MovePath      *string                 `json:"movePath,omitempty"`
+	Path          string                  `json:"path"`
+
+	// StatsComplete Missing historical counters are never inferred to be exact.
+	StatsComplete bool `json:"statsComplete"`
+}
+
+// WorkspaceChangeFileKind defines model for WorkspaceChangeFile.Kind.
+type WorkspaceChangeFileKind string
+
+// WorkspaceChangeFilesPage defines model for WorkspaceChangeFilesPage.
+type WorkspaceChangeFilesPage struct {
+	Files      []WorkspaceChangeFile `json:"files"`
+	NextCursor string                `json:"nextCursor"`
+	Run        WorkspaceChangeRun    `json:"run"`
+}
+
+// WorkspaceChangeRun defines model for WorkspaceChangeRun.
+type WorkspaceChangeRun struct {
+	Additions     int                      `json:"additions"`
+	BotId         string                   `json:"botId"`
+	Deletions     int                      `json:"deletions"`
+	EndedAt       time.Time                `json:"endedAt"`
+	FileCount     int                      `json:"fileCount"`
+	FilesComplete bool                     `json:"filesComplete"`
+	Id            string                   `json:"id"`
+	Source        WorkspaceChangeRunSource `json:"source"`
+	StartedAt     time.Time                `json:"startedAt"`
+	StatsComplete bool                     `json:"statsComplete"`
+	Status        string                   `json:"status"`
+}
+
+// WorkspaceChangeRunSource defines model for WorkspaceChangeRun.Source.
+type WorkspaceChangeRunSource string
+
+// WorkspaceChangeRunsPage defines model for WorkspaceChangeRunsPage.
+type WorkspaceChangeRunsPage struct {
+	NextCursor string               `json:"nextCursor"`
+	Runs       []WorkspaceChangeRun `json:"runs"`
+}
+
+// WorkspaceDirectory defines model for WorkspaceDirectory.
+type WorkspaceDirectory struct {
+	Entries    []WorkspaceFile `json:"entries"`
+	NextCursor *string         `json:"nextCursor,omitempty"`
+	Path       string          `json:"path"`
+}
+
+// WorkspaceFile defines model for WorkspaceFile.
+type WorkspaceFile struct {
+	Column     *int              `json:"column,omitempty"`
+	EndLine    *int              `json:"endLine,omitempty"`
+	Kind       WorkspaceFileKind `json:"kind"`
+	Line       *int              `json:"line,omitempty"`
+	ModifiedAt time.Time         `json:"modifiedAt"`
+	Name       string            `json:"name"`
+
+	// Path Canonical path relative to the workspace root.
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	Version string `json:"version"`
+}
+
+// WorkspaceFileKind defines model for WorkspaceFile.Kind.
+type WorkspaceFileKind string
+
+// WorkspaceLatexProject defines model for WorkspaceLatexProject.
+type WorkspaceLatexProject struct {
+	Available  bool            `json:"available"`
+	Candidates []WorkspaceFile `json:"candidates"`
+	Suggested  string          `json:"suggested"`
+	Truncated  bool            `json:"truncated"`
+}
+
+// WorkspaceLatexResult defines model for WorkspaceLatexResult.
+type WorkspaceLatexResult struct {
+	ErrorKey     *string `json:"errorKey,omitempty"`
+	Log          string  `json:"log"`
+	LogTruncated bool    `json:"logTruncated"`
+	Main         string  `json:"main"`
+	Pdf          *[]byte `json:"pdf,omitempty"`
+	Success      bool    `json:"success"`
+}
 
 // Error defines model for Error.
 type Error = ErrorEnvelope
@@ -2309,6 +2499,91 @@ type CheckForUpdateJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// ListWorkspaceChangeRunsParams defines parameters for ListWorkspaceChangeRuns.
+type ListWorkspaceChangeRunsParams struct {
+	// BotId For team scopes, the member whose recorded changes are listed.
+	BotId *string `form:"botId,omitempty" json:"botId,omitempty"`
+
+	// Cursor Last run id from the preceding page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceChangeRunsParamsScope defines parameters for ListWorkspaceChangeRuns.
+type ListWorkspaceChangeRunsParamsScope string
+
+// ListWorkspaceChangeFilesParams defines parameters for ListWorkspaceChangeFiles.
+type ListWorkspaceChangeFilesParams struct {
+	// Cursor Last file path from the preceding page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceChangeFilesParamsScope defines parameters for ListWorkspaceChangeFiles.
+type ListWorkspaceChangeFilesParamsScope string
+
+// GetWorkspaceChangeDiffParams defines parameters for GetWorkspaceChangeDiff.
+type GetWorkspaceChangeDiffParams struct {
+	// Path The recorded source path, without resolving the current disk.
+	Path string `form:"path" json:"path"`
+}
+
+// GetWorkspaceChangeDiffParamsScope defines parameters for GetWorkspaceChangeDiff.
+type GetWorkspaceChangeDiffParamsScope string
+
+// GetWorkspaceContentParams defines parameters for GetWorkspaceContent.
+type GetWorkspaceContentParams struct {
+	Path        *string `form:"path,omitempty" json:"path,omitempty"`
+	Range       *string `json:"Range,omitempty"`
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	IfMatch     *string `json:"If-Match,omitempty"`
+}
+
+// GetWorkspaceContentParamsScope defines parameters for GetWorkspaceContent.
+type GetWorkspaceContentParamsScope string
+
+// ListWorkspaceEntriesParams defines parameters for ListWorkspaceEntries.
+type ListWorkspaceEntriesParams struct {
+	Path          *string `form:"path,omitempty" json:"path,omitempty"`
+	IncludeHidden *bool   `form:"includeHidden,omitempty" json:"includeHidden,omitempty"`
+	Cursor        *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceEntriesParamsScope defines parameters for ListWorkspaceEntries.
+type ListWorkspaceEntriesParamsScope string
+
+// GetWorkspaceFileParams defines parameters for GetWorkspaceFile.
+type GetWorkspaceFileParams struct {
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// GetWorkspaceFileParamsScope defines parameters for GetWorkspaceFile.
+type GetWorkspaceFileParamsScope string
+
+// GetWorkspaceLatexProjectParams defines parameters for GetWorkspaceLatexProject.
+type GetWorkspaceLatexProjectParams struct {
+	Path string `form:"path" json:"path"`
+}
+
+// GetWorkspaceLatexProjectParamsScope defines parameters for GetWorkspaceLatexProject.
+type GetWorkspaceLatexProjectParamsScope string
+
+// CompileWorkspaceLatexJSONBody defines parameters for CompileWorkspaceLatex.
+type CompileWorkspaceLatexJSONBody struct {
+	Main      string `json:"main"`
+	RequestId string `json:"requestId"`
+}
+
+// CompileWorkspaceLatexParamsScope defines parameters for CompileWorkspaceLatex.
+type CompileWorkspaceLatexParamsScope string
+
+// WatchWorkspaceJSONBody defines parameters for WatchWorkspace.
+type WatchWorkspaceJSONBody struct {
+	Paths     []string `json:"paths"`
+	RequestId string   `json:"requestId"`
+}
+
+// WatchWorkspaceParamsScope defines parameters for WatchWorkspace.
+type WatchWorkspaceParamsScope string
+
 // InternalServiceStopJSONBody defines parameters for InternalServiceStop.
 type InternalServiceStopJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -2501,6 +2776,12 @@ type WarmTeamJSONRequestBody WarmTeamJSONBody
 
 // CheckForUpdateJSONRequestBody defines body for CheckForUpdate for application/json ContentType.
 type CheckForUpdateJSONRequestBody CheckForUpdateJSONBody
+
+// CompileWorkspaceLatexJSONRequestBody defines body for CompileWorkspaceLatex for application/json ContentType.
+type CompileWorkspaceLatexJSONRequestBody CompileWorkspaceLatexJSONBody
+
+// WatchWorkspaceJSONRequestBody defines body for WatchWorkspace for application/json ContentType.
+type WatchWorkspaceJSONRequestBody WatchWorkspaceJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest

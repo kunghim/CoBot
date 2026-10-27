@@ -2,6 +2,15 @@
 // Entity shapes come from OpenAPI; page composites add local view metadata.
 import type { components } from './generated/schema';
 
+export interface WorkspaceScope { kind: 'team' | 'chat'; id: string }
+export type WorkspaceFile = components['schemas']['WorkspaceFile'];
+export type WorkspaceDirectory = components['schemas']['WorkspaceDirectory'];
+export type WorkspaceChangeFile = components['schemas']['WorkspaceChangeFile'];
+export type WorkspaceChangeRun = components['schemas']['WorkspaceChangeRun'];
+export type WorkspaceChangeRunsPage = components['schemas']['WorkspaceChangeRunsPage'];
+export type WorkspaceChangeFilesPage = components['schemas']['WorkspaceChangeFilesPage'];
+export type WorkspaceChangeDiff = components['schemas']['WorkspaceChangeDiff'];
+
 export type Chat = components['schemas']['Chat'];
 export type ChatNavigation = components['schemas']['ChatNavigation'];
 export type ChatSection = components['schemas']['ChatSection'];
@@ -354,3 +363,6 @@ export interface QuestionListResult {
   nextCursor: string;
 }
 
+
+export type WorkspaceLatexProject = components['schemas']['WorkspaceLatexProject'];
+export type WorkspaceLatexResult = components['schemas']['WorkspaceLatexResult'];

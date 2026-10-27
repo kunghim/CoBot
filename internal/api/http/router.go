@@ -47,6 +47,15 @@ type Server struct {
 // Handler builds the full HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexProject)
+	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexCompile)
+	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/watch", s.handleWorkspaceWatch)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/entries", s.handleWorkspaceEntries)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes", s.handleWorkspaceChangeRuns)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes/{runId}", s.handleWorkspaceChangeFiles)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes/{runId}/file", s.handleWorkspaceChangeDiff)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/file", s.handleWorkspaceFile)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/content", s.handleWorkspaceContent)
 	mux.HandleFunc("GET /api/v1/chats", s.handleListChats)
 	mux.HandleFunc("GET /api/v1/search", s.handleSearchConversations)
 	mux.HandleFunc("GET /api/v1/chat-navigation", s.handleChatNavigation)
@@ -217,8 +226,10 @@ func contentTypeFor(path string) string {
 	switch {
 	case strings.HasSuffix(path, ".html"):
 		return "text/html; charset=utf-8"
-	case strings.HasSuffix(path, ".js"):
+	case strings.HasSuffix(path, ".js"), strings.HasSuffix(path, ".mjs"):
 		return "text/javascript; charset=utf-8"
+	case strings.HasSuffix(path, ".wasm"):
+		return "application/wasm"
 	case strings.HasSuffix(path, ".css"):
 		return "text/css; charset=utf-8"
 	case strings.HasSuffix(path, ".svg"):

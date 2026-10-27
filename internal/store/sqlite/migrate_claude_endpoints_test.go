@@ -20,7 +20,7 @@ func TestClaudeEndpointDropMigratesProviders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	old, err := migratorBefore(t, db, "00034")
+	old, err := migratorBefore(t, db, "00035")
 	if err != nil {
 		t.Fatal(err)
 	}

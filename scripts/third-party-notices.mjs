@@ -1,21 +1,19 @@
-// Collect installed dependency license texts; never read user engine profiles.
-// Run after npm ci, on the same platform used to build the desktop package.
+// Collect shipped dependency license texts; never read user engine profiles.
+// Run after the frontend build, on the platform used to package the desktop app.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { dependencyLicenseText } from './dependency-policy.mjs';
+import { frontendNoticeTexts } from './frontend-bundle.mjs';
 
 const destination = process.argv[2];
-if (!destination) throw new Error('Usage: node scripts/third-party-notices.mjs <output.txt>');
-const licenseName = /^(licen[cs]e|notice|copying|copyright)([._-].*)?$/i;
-const texts = ['CoBot third-party notices\nGenerated from the dependencies installed for this build.\n'];
-const missing = [];
-function append(name, directory) {
-  const files = readdirSync(directory, { withFileTypes: true })
-    .filter((file) => file.isFile() && licenseName.test(file.name))
-    .map((file) => file.name).sort();
-  if (!files.length) { missing.push(name); return; }
-  texts.push('\n' + '='.repeat(72) + '\n' + name + '\n');
-  for (const file of files) texts.push('\n--- ' + file + ' ---\n' + readFileSync(join(directory, file), 'utf8'));
+if (!destination) throw new Error('Usage: node scripts/third-party-notices.mjs <output.txt> [embedded-binary ...]');
+const texts = ['CoBot third-party notices\nGenerated from the Go dependency graph and recorded frontend build inputs.\n'];
+const frontend = frontendNoticeTexts(process.cwd(), process.argv.slice(3));
+const missing = [...frontend.missing];
+function append(name, directory, fallback) {
+  const text = dependencyLicenseText(name, directory, fallback);
+  if (text) texts.push(text); else missing.push(name);
 }
 const goroot = execFileSync('go', ['env', 'GOROOT'], { encoding: 'utf8' }).trim();
 const goVersion = execFileSync('go', ['env', 'GOVERSION'], { encoding: 'utf8' }).trim();
@@ -39,14 +37,7 @@ for (const line of [...new Set(modules)].sort()) {
   if (name === 'github.com/kunghim/CoBot') continue;
   append(name + ' ' + version, directory);
 }
-const lock = JSON.parse(readFileSync('frontend/package-lock.json', 'utf8'));
-for (const [relative, entry] of Object.entries(lock.packages).sort()) {
-  if (!relative || entry.dev) continue;
-  const directory = resolve('frontend', relative);
-  if (!existsSync(directory)) throw new Error('Missing installed production dependency: ' + relative);
-  const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
-  append(manifest.name + ' ' + manifest.version, directory);
-}
+texts.push(...frontend.texts);
 if (missing.length) throw new Error('License text needs review for:\n' + missing.join('\n'));
 writeFileSync(destination, texts.join('\n'), 'utf8');
 console.log('Dependency license texts written to ' + destination);

@@ -11,6 +11,268 @@ info:
 servers:
   - url: http://127.0.0.1:0
 paths:
+  /api/v1/workspaces/{scope}/{id}/latex:
+    get:
+      operationId: getWorkspaceLatexProject
+      description: Bounded read-only discovery of TeX main files for the selected file.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string, maxLength: 4096 } }
+      responses:
+        "200":
+          description: Canonical main-file candidates and compiler availability.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceLatexProject" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: compileWorkspaceLatex
+      description: >
+        Ephemeral isolated compilation, not a durable business command. Only one
+        compilation runs per core; disconnect cancels it. No automatic downloads.
+        TeX failures return success=false with bounded diagnostics and no PDF.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, main]
+              properties:
+                requestId: { type: string }
+                main: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Compilation result; PDF bytes are base64 and limited to 32 MiB decoded.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceLatexResult" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/watch:
+    post:
+      operationId: watchWorkspace
+      description: >
+        Subscribe to invalidation hints for up to 64 validated directories.
+        This creates only an ephemeral subscription, not a durable command.
+        SSE events ready and changed have an empty JSON object; unavailable
+        signals loss of native watching. Reconnect after EOF and re-read
+        workspace state after ready. The stream rotates within 90 seconds.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, paths]
+              properties:
+                requestId: { type: string }
+                paths:
+                  type: array
+                  minItems: 1
+                  maxItems: 64
+                  items: { type: string, maxLength: 4096 }
+      responses:
+        "200":
+          description: Native directory invalidation stream; no paths or file contents are exposed.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes:
+    get:
+      operationId: listWorkspaceChangeRuns
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - name: botId
+          in: query
+          required: false
+          description: For team scopes, the member whose recorded changes are listed.
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          description: Last run id from the preceding page.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeRunsPage" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes/{runId}:
+    get:
+      operationId: listWorkspaceChangeFiles
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: runId, in: path, required: true, schema: { type: string } }
+        - name: cursor
+          in: query
+          required: false
+          description: Last file path from the preceding page.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeFilesPage" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes/{runId}/file:
+    get:
+      operationId: getWorkspaceChangeDiff
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: runId, in: path, required: true, schema: { type: string } }
+        - name: path
+          in: query
+          required: true
+          description: The recorded source path, without resolving the current disk.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeDiff" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/entries:
+    get:
+      operationId: listWorkspaceEntries
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+        - { name: includeHidden, in: query, schema: { type: boolean, default: false } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceDirectory" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/file:
+    get:
+      operationId: getWorkspaceFile
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceFile" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/content:
+    get:
+      operationId: getWorkspaceContent
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+        - { name: Range, in: header, schema: { type: string } }
+        - { name: If-None-Match, in: header, schema: { type: string } }
+        - { name: If-Match, in: header, schema: { type: string } }
+      responses:
+        "200":
+          description: File bytes with Content-Type, ETag and Accept-Ranges; HTML is sandboxed.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "206":
+          description: A requested byte range.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "304":
+          description: The file has not changed.
+        "412":
+          description: The file changed since it was inspected.
+        "416":
+          description: The requested range is not satisfiable.
+        default:
+          $ref: "#/components/responses/Error"
   /api/v1/chat-navigation:
     get:
       operationId: getChatNavigation
@@ -4646,7 +4908,12 @@ components:
         detail:
           type: object
           additionalProperties: true
-          description: Kind-specific payload.
+          description: |
+            Kind-specific payload. New file_change changes carry additions,
+            deletions, statsComplete, binary and diffTruncated computed before
+            storage clipping. New diff steps also carry changes (file metadata
+            with byte start/end offsets), filesComplete and statsComplete.
+            Missing completeness fields on older records mean unknown, not true.
         startedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     RunWithSteps:
@@ -4704,3 +4971,97 @@ components:
             properties:
               effort: { type: string }
               description: { type: string }
+    WorkspaceChangeFile:
+      type: object
+      required: [path, kind, additions, deletions, statsComplete, binary, diffTruncated]
+      properties:
+        path: { type: string }
+        kind: { type: string, enum: [add, update, delete] }
+        movePath: { type: string }
+        additions: { type: integer }
+        deletions: { type: integer }
+        statsComplete: { type: boolean, description: Missing historical counters are never inferred to be exact. }
+        binary: { type: boolean }
+        diffTruncated: { type: boolean }
+    WorkspaceChangeRun:
+      type: object
+      required: [id, botId, status, startedAt, endedAt, source, fileCount, filesComplete, additions, deletions, statsComplete]
+      properties:
+        id: { type: string }
+        botId: { type: string }
+        status: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        source: { type: string, enum: [turn_diff, file_change] }
+        fileCount: { type: integer }
+        filesComplete: { type: boolean }
+        additions: { type: integer }
+        deletions: { type: integer }
+        statsComplete: { type: boolean }
+    WorkspaceChangeRunsPage:
+      type: object
+      required: [runs, nextCursor]
+      properties:
+        runs:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        nextCursor: { type: string }
+    WorkspaceChangeFilesPage:
+      type: object
+      required: [run, files, nextCursor]
+      properties:
+        run: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceChangeFile" }
+        nextCursor: { type: string }
+    WorkspaceChangeDiff:
+      type: object
+      required: [run, file, diff, diffTruncated]
+      properties:
+        run: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        file: { $ref: "#/components/schemas/WorkspaceChangeFile" }
+        diff: { type: string }
+        diffTruncated: { type: boolean }
+    WorkspaceLatexProject:
+      type: object
+      required: [candidates, suggested, truncated, available]
+      properties:
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceFile" }
+        suggested: { type: string }
+        truncated: { type: boolean }
+        available: { type: boolean }
+    WorkspaceLatexResult:
+      type: object
+      required: [success, log, logTruncated, main]
+      properties:
+        success: { type: boolean }
+        log: { type: string, maxLength: 131072 }
+        logTruncated: { type: boolean }
+        main: { type: string }
+        pdf: { type: string, format: byte }
+        errorKey: { type: string }
+    WorkspaceFile:
+      type: object
+      required: [path, name, kind, size, modifiedAt, version]
+      properties:
+        path: { type: string, description: Canonical path relative to the workspace root. }
+        name: { type: string }
+        kind: { type: string, enum: [directory, text, markdown, html, svg, image, pdf, audio, video, document, spreadsheet, presentation, notebook, latex, binary, blocked] }
+        size: { type: integer, format: int64 }
+        modifiedAt: { type: string, format: date-time }
+        version: { type: string }
+        line: { type: integer }
+        column: { type: integer }
+        endLine: { type: integer }
+    WorkspaceDirectory:
+      type: object
+      required: [path, entries]
+      properties:
+        path: { type: string }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceFile" }
+        nextCursor: { type: string }

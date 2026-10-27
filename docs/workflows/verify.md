@@ -9,7 +9,7 @@
 | Go 代码 | `go test ./internal/... ./tests/...` |
 | 前端代码 | `npm run typecheck --prefix frontend`、`npm test --prefix frontend` |
 | 跨前后端的界面流程 | 浏览器测试：`cd tests/e2e`，`npm ci`，`npx playwright test` |
-| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs` |
+| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/frontend-bundle.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs` |
 | 只改文档 | `node scripts/check-docs.mjs`（命名、索引、链接）和 `node scripts/check-public-files.mjs`；命令和说法自己核对 |
 
 改代码后、交付前运行完整检查 `./scripts/check.ps1` 或 `./scripts/check.sh`（Windows 加 `-Desktop` 会额外编译桌面壳）。
@@ -21,6 +21,7 @@
 其中 HTML 报告可用 `npx playwright show-report <报告目录>` 打开；Trace Viewer 可查看操作、网络与失败截图。
 上传前会移除临时 HTTP 凭据；脱敏失败时不上传。只上传合成测试报告，不上传 `.tmp/test-runs`、数据库或账号目录。
 这些用例使用假引擎，不消耗模型额度；浏览器外观回归覆盖保存、刷新与系统明暗变化，不代表原生桌面已验收。
+工作区预览截图单独上传为 `workspace-previews-...`，只收集合成 E2E 根目录下明确命名的 `filesystem-*.png`，用于 PR 界面审查；不上传整个测试数据根。
 
 ## 跨版本数据升级
 

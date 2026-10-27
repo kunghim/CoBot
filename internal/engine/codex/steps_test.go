@@ -179,3 +179,39 @@ func TestAMessageWithNoPhaseIsAStepAndStreamsAsOne(t *testing.T) {
 		t.Fatalf("done = %+v", got[2])
 	}
 }
+
+func TestDiffStatsAreSavedBeforeClipping(t *testing.T) {
+	body := strings.Repeat("+line\n", 60000)
+	diff := "diff --git a/big.txt b/big.txt\n--- a/big.txt\n+++ b/big.txt\n@@ -0,0 +1,60000 @@\n" + body
+	detail := turnDiffDetail(diff)
+	if detail["statsComplete"] != true || detail["diffTruncated"] != true || len(detail["diff"].(string)) > maxTurnDiff+len("\n…") {
+		t.Fatalf("unexpected completeness: stats=%v truncated=%v", detail["statsComplete"], detail["diffTruncated"])
+	}
+	encoded, _ := json.Marshal(detail)
+	var saved struct {
+		Changes []struct {
+			Additions     int  `json:"additions"`
+			DiffTruncated bool `json:"diffTruncated"`
+		} `json:"changes"`
+	}
+	if err := json.Unmarshal(encoded, &saved); err != nil || len(saved.Changes) != 1 || saved.Changes[0].Additions != 60000 || !saved.Changes[0].DiffTruncated {
+		t.Fatalf("saved metadata: %+v err=%v", saved, err)
+	}
+	raw, _ := json.Marshal(map[string]any{"id": "large", "type": "fileChange", "status": "completed", "changes": []any{map[string]any{"path": "big.txt", "kind": map[string]any{"type": "add"}, "diff": diff}}})
+	step := normalizeStep(raw)
+	var fileChange struct {
+		Changes []struct {
+			Additions     int    `json:"additions"`
+			StatsComplete bool   `json:"statsComplete"`
+			DiffTruncated bool   `json:"diffTruncated"`
+			Diff          string `json:"diff"`
+		} `json:"changes"`
+	}
+	if err := json.Unmarshal(step.Detail, &fileChange); err != nil || len(fileChange.Changes) != 1 {
+		t.Fatalf("file change detail: %s err=%v", step.Detail, err)
+	}
+	change := fileChange.Changes[0]
+	if change.Additions != 60000 || !change.StatsComplete || !change.DiffTruncated || len(change.Diff) > maxStepDiff+len("\n…") {
+		t.Fatalf("file change stats lost before clipping: additions=%d complete=%v truncated=%v", change.Additions, change.StatsComplete, change.DiffTruncated)
+	}
+}

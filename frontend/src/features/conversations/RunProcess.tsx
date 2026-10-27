@@ -15,7 +15,7 @@ import { Badge, Button, cx, Icons, interactive } from '../../components/ui';
 import type { RunStep, RunWithSteps } from '../../api/types';
 import type { LiveRun } from '../../api/live';
 import { mergeSteps } from '../../api/live';
-import { api } from '../../api/client';
+import { openWorkspaceFile } from '../workspace/fileNavigation';
 import { apiErrorMessage } from '../../i18n/errors';
 import DiffView from '../../components/DiffView';
 import Markdown from './Markdown';
@@ -356,7 +356,7 @@ function FileChangeRow({ change, scope }: { change: Record<string, unknown>; sco
             icon={Icons.openExternal}
             onClick={() => {
               setError('');
-              (scope.chatId ? api.openChatPath(scope.chatId, path) : api.openTeamPath(scope.teamId ?? '', path)).catch((err) => setError(apiErrorMessage(t, err)));
+              openWorkspaceFile(scope.chatId ? { kind: 'chat', id: scope.chatId } : { kind: 'team', id: scope.teamId ?? '' }, path).catch((err) => setError(apiErrorMessage(t, err)));
             }}
           >
             {t('conversation.file.open')}

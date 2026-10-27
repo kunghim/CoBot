@@ -193,8 +193,12 @@ const countedKinds = ['command', 'file_change', 'tool', 'web_search', 'agent'] a
 export function workSummary(steps: RunStep[]): Phrase[] {
   const out: Phrase[] = [];
   for (const kind of countedKinds) {
-    const count = steps.filter((step) => step.kind === kind).length;
-    if (count > 0) out.push({ key: `conversation.process.group.${kind}`, params: { count } });
+    const matching = steps.filter((step) => step.kind === kind);
+    const paths = kind === 'file_change' ? matching.flatMap((step) => Array.isArray(step.detail.changes) ? step.detail.changes.flatMap((change: unknown) => change && typeof change === 'object' && 'path' in change && typeof change.path === 'string' ? [change.path] : []) : []) : [];
+    const completePaths = matching.every((step) => Array.isArray(step.detail.changes) && step.detail.changes.length > 0 && step.detail.changes.every((change: unknown) => change && typeof change === 'object' && 'path' in change && typeof change.path === 'string'));
+    const count = kind === 'file_change' && completePaths ? new Set(paths).size : matching.length;
+    const label = kind === 'file_change' && !completePaths ? 'file_operation' : kind;
+    if (count > 0) out.push({ key: `conversation.process.group.${label}`, params: { count } });
   }
   if (out.length === 0) out.push({ key: 'conversation.process.group.other', params: { count: steps.length } });
   return out;

@@ -18,6 +18,7 @@ import { deliveryLabelKey, messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
 import MessageEditBox from './MessageEditBox';
+import ResourceStrip from './ResourceStrip';
 import DocumentCard from './DocumentCard';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
@@ -274,6 +275,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
                   active={entry.run.id === activeRun?.id}
                   live={liveRuns[entry.run.id]}
                   teamId={team.id}
+                  directory={team.directory}
                   nameOf={nameOf}
                   onRetry={!activeRun && entry.run.id === latestRunId ? () => retryRun.mutate(entry.run.id) : undefined}
                   retrying={retryRun.isPending}
@@ -453,6 +455,7 @@ function TurnRow({
   active,
   live,
   teamId,
+  directory,
   nameOf,
   onRetry,
   retrying,
@@ -462,6 +465,7 @@ function TurnRow({
   active: boolean;
   live: LiveRun | undefined;
   teamId: string;
+  directory: string;
   nameOf: (botId: string) => string;
   onRetry?: () => void;
   retrying: boolean;
@@ -498,6 +502,7 @@ function TurnRow({
         <div className="space-y-2">
           {process}
           {replyText !== '' && <Markdown text={replyText} teamId={teamId} />}
+          <ResourceStrip scope={{ kind: 'team', id: teamId }} run={run} text={replyText} directory={directory} />
         </div>
       </MessageBubble>
     </div>

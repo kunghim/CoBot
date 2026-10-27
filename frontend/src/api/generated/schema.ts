@@ -4,6 +4,137 @@
  */
 
 export interface paths {
+    "/api/v1/workspaces/{scope}/{id}/latex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bounded read-only discovery of TeX main files for the selected file. */
+        get: operations["getWorkspaceLatexProject"];
+        put?: never;
+        /** @description Ephemeral isolated compilation, not a durable business command. Only one compilation runs per core; disconnect cancels it. No automatic downloads. TeX failures return success=false with bounded diagnostics and no PDF. */
+        post: operations["compileWorkspaceLatex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Subscribe to invalidation hints for up to 64 validated directories. This creates only an ephemeral subscription, not a durable command. SSE events ready and changed have an empty JSON object; unavailable signals loss of native watching. Reconnect after EOF and re-read workspace state after ready. The stream rotates within 90 seconds. */
+        post: operations["watchWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceChangeRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceChangeFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes/{runId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceChangeDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat-navigation": {
         parameters: {
             query?: never;
@@ -2484,7 +2615,13 @@ export interface components {
             kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "compaction" | "notice" | "retry";
             /** @enum {string} */
             status: "in_progress" | "completed" | "failed" | "declined" | "interrupted";
-            /** @description Kind-specific payload. */
+            /**
+             * @description Kind-specific payload. New file_change changes carry additions,
+             *     deletions, statsComplete, binary and diffTruncated computed before
+             *     storage clipping. New diff steps also carry changes (file metadata
+             *     with byte start/end offsets), filesComplete and statsComplete.
+             *     Missing completeness fields on older records mean unknown, not true.
+             */
             detail: {
                 [key: string]: unknown;
             };
@@ -2525,6 +2662,84 @@ export interface components {
                 description: string;
             }[];
         };
+        WorkspaceChangeFile: {
+            path: string;
+            /** @enum {string} */
+            kind: "add" | "update" | "delete";
+            movePath?: string;
+            additions: number;
+            deletions: number;
+            /** @description Missing historical counters are never inferred to be exact. */
+            statsComplete: boolean;
+            binary: boolean;
+            diffTruncated: boolean;
+        };
+        WorkspaceChangeRun: {
+            id: string;
+            botId: string;
+            status: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string;
+            /** @enum {string} */
+            source: "turn_diff" | "file_change";
+            fileCount: number;
+            filesComplete: boolean;
+            additions: number;
+            deletions: number;
+            statsComplete: boolean;
+        };
+        WorkspaceChangeRunsPage: {
+            runs: components["schemas"]["WorkspaceChangeRun"][];
+            nextCursor: string;
+        };
+        WorkspaceChangeFilesPage: {
+            run: components["schemas"]["WorkspaceChangeRun"];
+            files: components["schemas"]["WorkspaceChangeFile"][];
+            nextCursor: string;
+        };
+        WorkspaceChangeDiff: {
+            run: components["schemas"]["WorkspaceChangeRun"];
+            file: components["schemas"]["WorkspaceChangeFile"];
+            diff: string;
+            diffTruncated: boolean;
+        };
+        WorkspaceLatexProject: {
+            candidates: components["schemas"]["WorkspaceFile"][];
+            suggested: string;
+            truncated: boolean;
+            available: boolean;
+        };
+        WorkspaceLatexResult: {
+            success: boolean;
+            log: string;
+            logTruncated: boolean;
+            main: string;
+            /** Format: byte */
+            pdf?: string;
+            errorKey?: string;
+        };
+        WorkspaceFile: {
+            /** @description Canonical path relative to the workspace root. */
+            path: string;
+            name: string;
+            /** @enum {string} */
+            kind: "directory" | "text" | "markdown" | "html" | "svg" | "image" | "pdf" | "audio" | "video" | "document" | "spreadsheet" | "presentation" | "notebook" | "latex" | "binary" | "blocked";
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            modifiedAt: string;
+            version: string;
+            line?: number;
+            column?: number;
+            endLine?: number;
+        };
+        WorkspaceDirectory: {
+            path: string;
+            entries: components["schemas"]["WorkspaceFile"][];
+            nextCursor?: string;
+        };
     };
     responses: {
         /** @description Structured error */
@@ -2544,6 +2759,307 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getWorkspaceLatexProject: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Canonical main-file candidates and compiler availability. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceLatexProject"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    compileWorkspaceLatex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    main: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Compilation result; PDF bytes are base64 and limited to 32 MiB decoded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceLatexResult"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    watchWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    paths: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Native directory invalidation stream; no paths or file contents are exposed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceChangeRuns: {
+        parameters: {
+            query?: {
+                /** @description For team scopes, the member whose recorded changes are listed. */
+                botId?: string;
+                /** @description Last run id from the preceding page. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeRunsPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceChangeFiles: {
+        parameters: {
+            query?: {
+                /** @description Last file path from the preceding page. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeFilesPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceChangeDiff: {
+        parameters: {
+            query: {
+                /** @description The recorded source path, without resolving the current disk. */
+                path: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeDiff"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceEntries: {
+        parameters: {
+            query?: {
+                path?: string;
+                includeHidden?: boolean;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceDirectory"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceFile"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceContent: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-None-Match"?: string;
+                "If-Match"?: string;
+            };
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes with Content-Type, ETag and Accept-Ranges; HTML is sandboxed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description A requested byte range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The file has not changed. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file changed since it was inspected. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getChatNavigation: {
         parameters: {
             query?: never;

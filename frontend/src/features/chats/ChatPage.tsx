@@ -14,6 +14,7 @@ import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
 import MessageEditBox from '../conversations/MessageEditBox';
 import ElicitationBody, { parseElicitation } from '../approvals/ElicitationBody';
+import ResourceStrip from '../conversations/ResourceStrip';
 import NativeApprovalBody from '../approvals/NativeApprovalBody';
 import { effortChoices } from '../conversations/ReasoningEffortSelect';
 import { PermissionModeMenu, permissionModeOf } from '../conversations/PermissionModeSelect';
@@ -24,6 +25,7 @@ import { isChatBlocked, isChatRunning } from './state';
 import ChatProcess from './ChatProcess';
 import ChatWelcome from './ChatWelcome';
 import ChatMenu from './ChatMenu';
+import { useWorkspace } from '../workspace/WorkspaceProvider';
 
 export default function ChatRoute() {
   const { chatId } = useParams();
@@ -31,6 +33,7 @@ export default function ChatRoute() {
 }
 
 function ChatPage({ id }: { id?: string }) {
+  const workspace = useWorkspace();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -144,6 +147,7 @@ function ChatPage({ id }: { id?: string }) {
     <header className="flex min-h-14 items-center gap-2 px-4">
       <ShellToggle place="header" />
       <div className="min-w-0 flex-1">{chat && <h1 className="truncate text-sm font-medium">{chat.title}</h1>}</div>
+      {chat && !workspace.state.open && <IconButton icon={Icons.add} size="sm" label={t('workspace.createTab')} onClick={workspace.newTab} />}
       {chat && <ChatMenu chat={chat} busy={!!active || pending.length > 0} />}
     </header>
     {id && query.isPending ? <p role="status" className="m-auto text-sm text-neutral-500">{t('common.loading')}</p> : <div className={cx('flex min-h-0 flex-1 flex-col', !id && 'overflow-y-auto')}>
@@ -181,7 +185,7 @@ function ChatPage({ id }: { id?: string }) {
               const run = runs.get(message.runId);
               return <div key={message.id} className="group space-y-2">
                 {run && <ChatProcess run={run} chatId={id!} live={live[run.id]} replyText={message.text} />}
-                <MessageBubble from="member" meta={copy}><Markdown text={message.text} chatId={id} /></MessageBubble>
+                <MessageBubble from="member" meta={copy}><Markdown text={message.text} chatId={id} /><ResourceStrip scope={{ kind: 'chat', id: id! }} run={run} text={message.text} directory={chat?.workspace} /></MessageBubble>
               </div>;
             });
           })()}

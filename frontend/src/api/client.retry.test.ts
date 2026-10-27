@@ -45,6 +45,25 @@ describe('ApiClient retry identity', () => {
     expect(messageId(1)).toBe(messageId(0));
   });
 
+  it('does not retry a cancelled workspace history read', async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      expect(init?.signal).toBe(controller.signal);
+      controller.abort();
+      throw new DOMException('Aborted', 'AbortError');
+    });
+    await expect(api.workspaceChangeRuns({ kind: 'chat', id: 'chat' }, '', '', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an ephemeral LaTeX compilation after a lost response', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('network lost'));
+    await expect(api.compileWorkspaceLatex({ kind: 'chat', id: 'chat' }, 'main.tex', new AbortController().signal)).rejects.toThrow('network lost');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(observed(0).method).toBe('POST');
+    expect(JSON.parse(String(observed(0).body))).toMatchObject({ main: 'main.tex', requestId: expect.any(String) });
+  });
+
   it('keeps the identity when resubmitting after both network attempts fail', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('first loss')).mockRejectedValueOnce(new TypeError('second loss'));
     await expect(api.sendMessage('bot-a', 'Review')).rejects.toThrow('second loss');

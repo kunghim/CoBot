@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { authorize, setEngineMode } from './helpers';
 import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 test.beforeEach(async ({ context }) => { await authorize(context); });
 
@@ -245,6 +246,39 @@ test('a remembered chat that is gone opens a new chat instead of an error', asyn
   await expect(page.getByText('资源不存在')).toHaveCount(0);
 });
 
+
+test('saved chat has an isolated file workspace and restores its file tab', async ({ page }) => {
+  await page.goto('/chat/new');
+  const first = page.waitForResponse((response) => response.url().endsWith('/api/v1/chats') && response.request().method() === 'POST');
+  await page.getByRole('textbox', { name: '发送消息' }).fill('文件工作区聊天');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  const created = (await (await first).json()).data;
+  await expect(page.getByText('收到：文件工作区聊天', { exact: true })).toBeVisible();
+  writeFileSync(join(created.chat.workspace, 'chat-file.md'), '# chat-file-fixture\n');
+  const savedURL = page.url();
+  await page.getByRole('button', { name: '创建标签页' }).click();
+  await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
+  await page.getByRole('treeitem', { name: 'chat-file.md', exact: true }).click();
+  const files = page.getByRole('tabpanel', { name: '工作区' });
+  await expect(files.getByRole('heading', { name: 'chat-file-fixture', exact: true })).toBeVisible();
+  await page.goto('/chat/new');
+  await expect(page.getByRole('tablist', { name: '工作区' })).toHaveCount(0);
+  await page.goto(savedURL);
+  await expect(files.getByRole('heading', { name: 'chat-file-fixture', exact: true })).toBeVisible();
+  setEngineMode('process', created.chat.workspace);
+  await page.getByRole('textbox', { name: '发送消息' }).fill('记录一次变更');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '已完成', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '新建标签页', exact: true }).click();
+  await page.getByRole('button', { name: /变更 按轮次查看已记录的文件变更/ }).click();
+  await expect(files.getByText('此会话的变更', { exact: true })).toBeVisible();
+  await expect(files.getByText('+# 笔记', { exact: true })).toBeVisible();
+  await files.getByRole('button', { name: '打开当前文件', exact: true }).click();
+  await expect(files.getByRole('heading', { name: '笔记', exact: true })).toBeVisible();
+  await page.goto('/chat/new');
+  await expect(page.getByRole('tablist', { name: '工作区' })).toHaveCount(0);
+
+});
 for (const platform of ['web', 'windows', 'mac'] as const) {
   test(`${platform} keeps navigation controls on their column edges at every width`, async ({ page }) => {
     if (platform !== 'web') {
