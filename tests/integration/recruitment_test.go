@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -375,6 +376,21 @@ func TestPreviewRunsAndStopsInTheTeamDirectory(t *testing.T) {
 	ctx := context.Background()
 	team, _ := h.createTeamWithDir(t, "预览", "preview-run", nil)
 
+	// A bot cannot start anything.
+	if _, err := h.app.StartPreview(ctx, auth.NewPrincipalBot(team.LeaderID, team.ID), team.ID, "echo"); err == nil {
+		t.Fatal("a bot started a preview")
+	}
+	// An empty or multi-line command is refused outright.
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, ""); err == nil {
+		t.Fatal("an empty command was accepted")
+	}
+	if _, err := h.app.StartPreview(ctx, h.user, team.ID, "a\nb"); err == nil {
+		t.Fatal("a multi-line command was accepted")
+	}
+	if runtime.GOOS != "windows" {
+		t.Skip("previews spawn cmd.exe, which only Windows has")
+	}
+
 	// A marker file proves the command runs in the team's directory.
 	script := filepath.Join(h.teamDirFor("preview-run"), "preview-marker.cmd")
 	if err := os.WriteFile(script, []byte("@echo off\r\nexit /b 0\r\n"), 0o644); err != nil {
@@ -392,17 +408,5 @@ func TestPreviewRunsAndStopsInTheTeamDirectory(t *testing.T) {
 	}
 	if err := h.app.StopPreview(ctx, h.user, team.ID, command); err != nil {
 		t.Fatal(err)
-	}
-	// A bot cannot start anything.
-	if _, err := h.app.StartPreview(ctx, auth.NewPrincipalBot(team.LeaderID, team.ID), team.ID, command); err == nil {
-		t.Fatal("a bot started a preview")
-	}
-	_ = script
-	// An empty or multi-line command is refused outright.
-	if _, err := h.app.StartPreview(ctx, h.user, team.ID, ""); err == nil {
-		t.Fatal("an empty command was accepted")
-	}
-	if _, err := h.app.StartPreview(ctx, h.user, team.ID, "a\nb"); err == nil {
-		t.Fatal("a multi-line command was accepted")
 	}
 }
