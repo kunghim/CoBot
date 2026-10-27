@@ -25,6 +25,44 @@ func fixture(t *testing.T, root, name, content string) string {
 	return p
 }
 
+func TestLiteralProbeUsesTheWorkspaceBoundary(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	boundary, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer boundary.Close()
+	inside := fixture(t, root, "literal.txt", "inside")
+	outsideRoot := t.TempDir()
+	outside := fixture(t, outsideRoot, "secret.txt", "outside")
+	for _, target := range []string{"literal.txt", inside} {
+		if !literalExists(boundary, root, target) {
+			t.Fatalf("missing literal: %q", target)
+		}
+	}
+	if literalExists(boundary, root, outside) {
+		t.Fatal("probe accepted an outside file")
+	}
+	t.Run("parent symlinks cannot escape but root aliases resolve inside", func(t *testing.T) {
+		if err := os.Symlink(outsideRoot, filepath.Join(root, "escape")); err != nil {
+			t.Skip("symlinks unavailable")
+		}
+		if literalExists(boundary, root, filepath.Join("escape", "secret.txt")) {
+			t.Fatal("probe followed a parent symlink outside the workspace")
+		}
+		alias := filepath.Join(t.TempDir(), "root-alias")
+		if err := os.Symlink(root, alias); err != nil {
+			t.Fatal(err)
+		}
+		if !literalExists(boundary, root, filepath.Join(alias, "literal.txt")) {
+			t.Fatal("absolute workspace alias was rejected")
+		}
+	})
+}
+
 func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 	root := t.TempDir()
 	fixture(t, root, "note.txt", "trimmed file")

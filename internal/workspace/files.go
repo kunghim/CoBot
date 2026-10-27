@@ -60,22 +60,41 @@ func (f *Opened) Close() error {
 	return errors.Join(a, b)
 }
 
-func relative(root, raw string) (string, error) {
+func literalExists(boundary *os.Root, rootPath, target string) bool {
+	if filepath.IsAbs(target) {
+		rel, err := filepath.Rel(rootPath, target)
+		if err != nil || !filepath.IsLocal(rel) {
+			// The owner may use an absolute alias of the workspace root.
+			resolved, err := filepath.EvalSymlinks(target)
+			if err != nil {
+				return false
+			}
+			rel, err = filepath.Rel(rootPath, resolved)
+			if err != nil {
+				return false
+			}
+		}
+		target = rel
+	}
+	if !filepath.IsLocal(target) {
+		return false
+	}
+	_, err := boundary.Lstat(target)
+	return err == nil
+}
+
+func relative(boundary *os.Root, root, raw string) (string, error) {
 	target := raw
 	if trimmed := strings.TrimSpace(raw); trimmed != raw {
 		// Pasted navigation may have surrounding whitespace, but a literal
 		// filename (including a position suffix) must win over that cleanup.
-		candidate := raw
-		if !filepath.IsAbs(candidate) {
-			candidate = filepath.Join(root, candidate)
-		}
-		_, err := os.Lstat(candidate)
-		if err != nil {
-			if suffix := position.FindString(candidate); suffix != "" {
-				_, err = os.Lstat(strings.TrimSuffix(candidate, suffix))
+		exists := literalExists(boundary, root, raw)
+		if !exists {
+			if suffix := position.FindString(raw); suffix != "" {
+				exists = literalExists(boundary, root, strings.TrimSuffix(raw, suffix))
 			}
 		}
-		if err != nil {
+		if !exists {
 			target = trimmed
 		}
 	}
@@ -89,11 +108,7 @@ func relative(root, raw string) (string, error) {
 			target += "#" + u.Fragment
 		}
 	} else {
-		candidate := target
-		if !filepath.IsAbs(candidate) {
-			candidate = filepath.Join(root, candidate)
-		}
-		if _, err := os.Lstat(candidate); err != nil {
+		if !literalExists(boundary, root, target) {
 			decoded, err := url.PathUnescape(target)
 			if err != nil {
 				return "", ErrOutside
@@ -145,7 +160,7 @@ func Open(directory, raw string) (*Opened, error) {
 	if err != nil {
 		return nil, err
 	}
-	rel, err := relative(rootPath, raw)
+	rel, err := relative(root, rootPath, raw)
 	if err != nil {
 		root.Close()
 		return nil, err

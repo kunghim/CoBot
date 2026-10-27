@@ -3,6 +3,12 @@ import { api } from '../../api/client';
 import { listenForChanges, openWorkspaceChanges } from './changeNavigation';
 const cleanups: Array<() => void> = [];
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.restoreAllMocks(); });
+it('rejects a malformed history subscription instead of invoking it', async () => {
+  vi.spyOn(api, 'workspaceChangeFiles').mockResolvedValue({ run: { id: 'run', botId: 'bot' } } as never);
+  const scope = { kind: 'chat' as const, id: 'invalid-listener' };
+  cleanups.push(listenForChanges(scope, {} as never));
+  await expect(openWorkspaceChanges(scope, 'run')).rejects.toMatchObject({ messageKey: 'error.workspace.unavailable' });
+});
 it('routes validated history to its owning workspace', async () => {
   vi.spyOn(api, 'workspaceChangeDiff').mockResolvedValue({ run: { id: 'run', botId: 'bot' } } as never);
   const team = vi.fn(); const chat = vi.fn();

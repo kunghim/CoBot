@@ -19,6 +19,6 @@ export async function openWorkspaceChanges(scope: WorkspaceScope, runId: string,
   const result = path ? await api.workspaceChangeDiff(scope, runId, path) : await api.workspaceChangeFiles(scope, runId);
   if (requests.get(key) !== sequence) return;
   const listener = listeners.get(key);
-  if (!listener) throw new ApiError(503, 'capability_missing', 'error.workspace.unavailable', {});
+  if (typeof listener !== 'function') throw new ApiError(503, 'capability_missing', 'error.workspace.unavailable', {});
   listener({ runId: result.run.id, botId: result.run.botId, path });
 }

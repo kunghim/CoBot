@@ -33,7 +33,7 @@ test('DOCX renders paged layout, tables and embedded images inside an isolated f
   const content: string[] = [];
   page.on('request', (request) => { const url = new URL(request.url()); if (url.pathname.endsWith('/content')) content.push(url.searchParams.get('path') ?? ''); });
 
-  const external: string[] = []; page.on('request', (request) => { if (request.url().startsWith('https://example.invalid')) external.push(request.url()); });
+  const external: string[] = []; page.on('request', (request) => { if (new URL(request.url()).origin === 'https://example.invalid') external.push(request.url()); });
   await page.getByRole('button', { name: '创建标签页', exact: true }).click();
   await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
   await selectWorkspaceFile(page, 'layout.docx');

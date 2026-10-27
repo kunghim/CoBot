@@ -19,6 +19,6 @@ export async function openWorkspaceFile(scope: WorkspaceScope, target: string): 
   const file = await api.workspaceFile(scope, target);
   if (requests.get(key) !== sequence) return;
   const listener = listeners.get(scopeKey(scope));
-  if (!listener) throw new ApiError(503, 'capability_missing', 'error.workspace.unavailable', {});
+  if (typeof listener !== 'function') throw new ApiError(503, 'capability_missing', 'error.workspace.unavailable', {});
   listener(file);
 }

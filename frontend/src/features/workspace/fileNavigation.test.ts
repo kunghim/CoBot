@@ -8,6 +8,12 @@ const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.restoreAllMocks(); });
 
 describe('file navigation', () => {
+  it('rejects a malformed navigation subscription instead of invoking it', async () => {
+    vi.spyOn(api, 'workspaceFile').mockResolvedValue(file);
+    const scope = { kind: 'chat' as const, id: 'invalid-listener' };
+    cleanups.push(listenForFiles(scope, {} as never));
+    await expect(openWorkspaceFile(scope, 'src/app.ts')).rejects.toMatchObject({ messageKey: 'error.workspace.unavailable' });
+  });
   it('uses server-normalized paths and keeps chat and team listeners separate', async () => {
     vi.spyOn(api, 'workspaceFile').mockResolvedValue(file);
     const team = vi.fn(); const chat = vi.fn();
