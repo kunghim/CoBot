@@ -68,6 +68,8 @@
         "internal/app/message_edit.go",
         "internal/app/recruitment.go",
         "internal/app/preview.go",
+        "internal/app/preview_unix.go",
+        "internal/app/preview_windows.go",
         "internal/app/steer.go",
         "internal/app/interrupt_request.go",
         "internal/app/run_retry.go",
