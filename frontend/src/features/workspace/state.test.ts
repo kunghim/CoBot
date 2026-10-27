@@ -75,6 +75,17 @@ describe('workspaceReducer', () => {
     expect(state.open).toBe(true);
   });
 
+  it('reopens a collapsed workspace for a new requested tab while background tabs stay collapsed', () => {
+    const opened = workspaceReducer(initialWorkspaceState(), { type: 'openTab', tab: fileTab('a.md'), focus: true });
+    const collapsed = workspaceReducer(opened, { type: 'collapse' });
+    const background = workspaceReducer(collapsed, { type: 'openTab', tab: browserTab('background', 'Background page') });
+    expect(background.open).toBe(false);
+    expect(background.activeId).toBe('file:a.md');
+    const selected = workspaceReducer(background, { type: 'openTab', tab: fileTab('b.md'), focus: true });
+    expect(selected.open).toBe(true);
+    expect(selected.activeId).toBe('file:b.md');
+  });
+
   it('clamps the width', () => {
     expect(clampWidth(10)).toBe(MIN_WIDTH);
     expect(clampWidth(99999)).toBe(MAX_WIDTH);

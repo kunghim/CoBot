@@ -105,6 +105,9 @@ test('team reply resources retain scope, reuse tabs and survive narrow and dark 
   await expect(page.getByRole('heading', { name: 'Resources ready', exact: true })).toBeVisible({ timeout: 15000 });
   const resources = page.getByRole('region', { name: '本轮资源' });
   await expect(resources.getByRole('listitem')).toHaveCount(3);
+  await page.getByRole('button', { name: '创建标签页', exact: true }).click();
+  await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
+  await page.getByRole('button', { name: '收起工作区', exact: true }).click();
   const opened = page.waitForResponse((response) => { const url = new URL(response.url()); return url.pathname === `/api/v1/workspaces/team/${created.team.id}/file` && url.searchParams.get('path') === 'artifact.md'; });
   await resources.getByRole('button', { name: '打开 artifact.md', exact: true }).click();
   expect((await (await opened).json()).data.path).toBe('artifact.md');

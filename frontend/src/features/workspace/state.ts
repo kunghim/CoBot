@@ -124,7 +124,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       }
       return {
         ...state,
-        open: first ? true : state.open,
+        open: focus ? true : state.open,
         tabs: [...state.tabs, tab],
         activeId: focus ? tab.id : state.activeId,
       };
