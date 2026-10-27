@@ -342,6 +342,11 @@ type HandoffInput struct {
 	Mode         string
 	Suggestions  string
 	Document     string
+	// Preview carries, on a done handoff whose result the user can run, the
+	// command that starts it in the team directory and the address to open
+	// once it answers. It is stored on the record, never run by the handoff.
+	PreviewCommand string
+	PreviewURL     string
 }
 
 // Handoff records how a member hands a card off and moves the work along the
@@ -401,6 +406,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	record := domain.Evidence{
 		ID: domain.NewID(), TaskID: card.ID, AuthorID: principal.BotID, Summary: summary,
 		ArtifactRefs: in.ArtifactRefs, Outcome: in.Outcome, Suggestions: strings.TrimSpace(in.Suggestions), Execution: execution,
+		PreviewCommand: strings.TrimSpace(in.PreviewCommand), PreviewURL: strings.TrimSpace(in.PreviewURL),
 	}
 	e := relayEntry{from: principal.BotID, chain: chainOfRunLocked(ctx, tx, principal.BotID), sourceRun: principal.RunID, returnTo: -1}
 	from := stageLabel(req, card)
@@ -758,7 +764,15 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 // reviseAsNewInputLocked hands the user's changes to a finished requirement
 // to the project manager as the user's own message.
 func (a *App) reviseAsNewInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, comment string) (string, error) {
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: "验收未通过，需要修改：" + comment}})
+	return a.deliverDecisionInputLocked(ctx, tx, question, "验收未通过，需要修改："+comment)
+}
+
+// deliverDecisionInputLocked puts the outcome of a question card in front of
+// the member that asked it, as the user's own fresh input: the message joins
+// a new causal chain, the member reads it with a woken turn. The user's
+// decision is input, never an authorization.
+func (a *App) deliverDecisionInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, text string) (string, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 	if err != nil {
 		return "", err
 	}

@@ -18,8 +18,10 @@ const (
 
 // Defines values for AnswerQuestionRequestDecision.
 const (
-	AnswerQuestionRequestDecisionAccept AnswerQuestionRequestDecision = "accept"
-	AnswerQuestionRequestDecisionRevise AnswerQuestionRequestDecision = "revise"
+	AnswerQuestionRequestDecisionAccept  AnswerQuestionRequestDecision = "accept"
+	AnswerQuestionRequestDecisionApprove AnswerQuestionRequestDecision = "approve"
+	AnswerQuestionRequestDecisionReject  AnswerQuestionRequestDecision = "reject"
+	AnswerQuestionRequestDecisionRevise  AnswerQuestionRequestDecision = "revise"
 )
 
 // Defines values for AnswerQuestionRequestMode.
@@ -269,8 +271,7 @@ const (
 
 // Defines values for ProviderEndpointDialect.
 const (
-	AnthropicMessages ProviderEndpointDialect = "anthropic-messages"
-	OpenaiResponses   ProviderEndpointDialect = "openai-responses"
+	OpenaiResponses ProviderEndpointDialect = "openai-responses"
 )
 
 // Defines values for ProviderModelStatus.
@@ -300,9 +301,10 @@ const (
 
 // Defines values for QuestionKind.
 const (
-	QuestionKindAcceptance QuestionKind = "acceptance"
-	QuestionKindConfirm    QuestionKind = "confirm"
-	QuestionKindEmpty      QuestionKind = ""
+	QuestionKindAcceptance  QuestionKind = "acceptance"
+	QuestionKindConfirm     QuestionKind = "confirm"
+	QuestionKindEmpty       QuestionKind = ""
+	QuestionKindRecruitment QuestionKind = "recruitment"
 )
 
 // Defines values for QuestionStatus.
@@ -702,7 +704,7 @@ type AnswerQuestionRequest struct {
 	// AnswerText The answer; for a confirmation or acceptance
 	AnswerText string `json:"answerText"`
 
-	// Decision Required for a confirmation or acceptance question, refused for any other.
+	// Decision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
 	ExpectedRevision int64                          `json:"expectedRevision"`
 
@@ -711,7 +713,7 @@ type AnswerQuestionRequest struct {
 	RequestId openapi_types.UUID         `json:"requestId"`
 }
 
-// AnswerQuestionRequestDecision Required for a confirmation or acceptance question, refused for any other.
+// AnswerQuestionRequestDecision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 type AnswerQuestionRequestDecision string
 
 // AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
@@ -1168,13 +1170,19 @@ type Evidence struct {
 	CreatedAt    time.Time `json:"createdAt"`
 
 	// Execution What the engine reported a member ran and changed while it held the card.
-	Execution   *Execution       `json:"execution,omitempty"`
-	Id          string           `json:"id"`
-	Mode        *EvidenceMode    `json:"mode,omitempty"`
-	Outcome     *EvidenceOutcome `json:"outcome,omitempty"`
-	Suggestions *string          `json:"suggestions,omitempty"`
-	Summary     string           `json:"summary"`
-	TaskId      string           `json:"taskId"`
+	Execution *Execution       `json:"execution,omitempty"`
+	Id        string           `json:"id"`
+	Mode      *EvidenceMode    `json:"mode,omitempty"`
+	Outcome   *EvidenceOutcome `json:"outcome,omitempty"`
+
+	// PreviewCommand With a runnable result
+	PreviewCommand *string `json:"previewCommand,omitempty"`
+
+	// PreviewUrl The address to open once the preview answers.
+	PreviewUrl  *string `json:"previewUrl,omitempty"`
+	Suggestions *string `json:"suggestions,omitempty"`
+	Summary     string  `json:"summary"`
+	TaskId      string  `json:"taskId"`
 }
 
 // EvidenceMode defines model for Evidence.Mode.
@@ -1489,21 +1497,24 @@ type Question struct {
 	CreatedAt     time.Time `json:"createdAt"`
 	Id            string    `json:"id"`
 
-	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
-	Kind           QuestionKind   `json:"kind"`
-	Options        []string       `json:"options"`
-	Question       string         `json:"question"`
-	RequesterBotId string         `json:"requesterBotId"`
-	RequirementId  *string        `json:"requirementId,omitempty"`
-	Revision       int64          `json:"revision"`
-	RunId          *string        `json:"runId,omitempty"`
-	StageIndex     *int           `json:"stageIndex,omitempty"`
-	Status         QuestionStatus `json:"status"`
-	TaskId         *string        `json:"taskId,omitempty"`
-	TeamId         string         `json:"teamId"`
+	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
+	Kind           QuestionKind `json:"kind"`
+	Options        []string     `json:"options"`
+	Question       string       `json:"question"`
+	RequesterBotId string       `json:"requesterBotId"`
+	RequirementId  *string      `json:"requirementId,omitempty"`
+	Revision       int64        `json:"revision"`
+
+	// RoleIds A recruitment question only: the role IDs the project manager asked to add.
+	RoleIds    *[]string      `json:"roleIds,omitempty"`
+	RunId      *string        `json:"runId,omitempty"`
+	StageIndex *int           `json:"stageIndex,omitempty"`
+	Status     QuestionStatus `json:"status"`
+	TaskId     *string        `json:"taskId,omitempty"`
+	TeamId     string         `json:"teamId"`
 }
 
-// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question.
+// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question; recruitment asks the user to add members the project manager requested.
 type QuestionKind string
 
 // QuestionStatus defines model for Question.Status.
@@ -1988,10 +1999,13 @@ type ListApprovalsParamsState string
 
 // DecideApprovalJSONBody defines parameters for DecideApproval.
 type DecideApprovalJSONBody struct {
-	Comment          *string            `json:"comment,omitempty"`
-	ExpectedRevision int64              `json:"expectedRevision"`
-	OptionId         string             `json:"optionId"`
-	RequestId        openapi_types.UUID `json:"requestId"`
+	Comment *string `json:"comment,omitempty"`
+
+	// Content An MCP elicitation's accepted form values, keyed by field name.
+	Content          *map[string]interface{} `json:"content,omitempty"`
+	ExpectedRevision int64                   `json:"expectedRevision"`
+	OptionId         string                  `json:"optionId"`
+	RequestId        openapi_types.UUID      `json:"requestId"`
 }
 
 // EngineLoginJSONBody defines parameters for EngineLogin.
@@ -2122,6 +2136,12 @@ type GetChatParams struct {
 // OrganizeChatParamsAction defines parameters for OrganizeChat.
 type OrganizeChatParamsAction string
 
+// EditChatMessageJSONBody defines parameters for EditChatMessage.
+type EditChatMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
+}
+
 // OpenChatPathJSONBody defines parameters for OpenChatPath.
 type OpenChatPathJSONBody struct {
 	Path      string `json:"path"`
@@ -2163,6 +2183,12 @@ type StreamEventsParams struct {
 // CancelMessageJSONBody defines parameters for CancelMessage.
 type CancelMessageJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// EditMessageJSONBody defines parameters for EditMessage.
+type EditMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
 }
 
 // ApplyEngineCatalogJSONBody defines parameters for ApplyEngineCatalog.
@@ -2295,6 +2321,20 @@ type CreateTeamJSONBody struct {
 	RequestId      openapi_types.UUID `json:"requestId"`
 }
 
+// AdoptTeamJSONBody defines parameters for AdoptTeam.
+type AdoptTeamJSONBody struct {
+	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
+	Name           string             `json:"name"`
+	Path           string             `json:"path"`
+	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// OpenTeamJSONBody defines parameters for OpenTeam.
+type OpenTeamJSONBody struct {
+	Path      string             `json:"path"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // DeleteTeamParams defines parameters for DeleteTeam.
 type DeleteTeamParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -2417,6 +2457,20 @@ type OpenTeamPathJSONBody struct {
 
 	// Reveal Show the file in the file manager instead of opening it.
 	Reveal *bool `json:"reveal,omitempty"`
+}
+
+// StartPreviewJSONBody defines parameters for StartPreview.
+type StartPreviewJSONBody struct {
+	// Command The start command from the acceptance handoff's preview; run in the team directory.
+	Command   string             `json:"command"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// StopPreviewJSONBody defines parameters for StopPreview.
+type StopPreviewJSONBody struct {
+	// Command The command that started it; omit to stop every preview of the team.
+	Command   *string            `json:"command,omitempty"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
@@ -2594,6 +2648,9 @@ type OrganizeChatJSONRequestBody = ChatActionInput
 // SendChatMessageJSONRequestBody defines body for SendChatMessage for application/json ContentType.
 type SendChatMessageJSONRequestBody = ChatSendInput
 
+// EditChatMessageJSONRequestBody defines body for EditChatMessage for application/json ContentType.
+type EditChatMessageJSONRequestBody EditChatMessageJSONBody
+
 // OpenChatPathJSONRequestBody defines body for OpenChatPath for application/json ContentType.
 type OpenChatPathJSONRequestBody OpenChatPathJSONBody
 
@@ -2614,6 +2671,9 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// EditMessageJSONRequestBody defines body for EditMessage for application/json ContentType.
+type EditMessageJSONRequestBody EditMessageJSONBody
 
 // ApplyEngineCatalogJSONRequestBody defines body for ApplyEngineCatalog for application/json ContentType.
 type ApplyEngineCatalogJSONRequestBody ApplyEngineCatalogJSONBody
@@ -2669,6 +2729,12 @@ type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
 
+// AdoptTeamJSONRequestBody defines body for AdoptTeam for application/json ContentType.
+type AdoptTeamJSONRequestBody AdoptTeamJSONBody
+
+// OpenTeamJSONRequestBody defines body for OpenTeam for application/json ContentType.
+type OpenTeamJSONRequestBody OpenTeamJSONBody
+
 // PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
 type PatchTeamJSONRequestBody PatchTeamJSONBody
 
@@ -2695,6 +2761,12 @@ type ResetTeamBudgetJSONRequestBody ResetTeamBudgetJSONBody
 
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
+
+// StartPreviewJSONRequestBody defines body for StartPreview for application/json ContentType.
+type StartPreviewJSONRequestBody StartPreviewJSONBody
+
+// StopPreviewJSONRequestBody defines body for StopPreview for application/json ContentType.
+type StopPreviewJSONRequestBody StopPreviewJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody

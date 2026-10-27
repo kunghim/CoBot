@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Settings, SettingsPatch } from '../../api/types';
 import '../../i18n';
-import { ModelsSection } from './SettingsSections';
+import { DefaultModelCard } from './SettingsSections';
 
 // The shape the settings page hands down: which field changed, the new
 // value for it, and a way back when the server refuses the change.
@@ -89,7 +89,7 @@ describe('the default model can come from any enabled provider', () => {
   const render = (over: Record<string, unknown> = {}) =>
     act(() =>
       root.render(
-        h(ModelsSection, {
+        h(DefaultModelCard, {
           settings: { defaultModel: 'engine-model', defaultProvider: '', ...over } as unknown as Settings,
           save,
           errors: {},

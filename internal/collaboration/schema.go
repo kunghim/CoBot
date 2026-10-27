@@ -62,6 +62,11 @@ func toolSchema(name string) json.RawMessage {
 		add("mode", map[string]any{"type": "string", "enum": []string{domain.ReworkRerun, domain.ReworkReturnToMe},
 			"description": "Required for back: rerun (after the fix the route runs on again) or return_to_me (after the fix the work comes straight back to you)."}, false)
 		add("suggestions", map[string]any{"type": "string", "description": "Optional, with done: improvements that do not block; kept as open items for the final report."}, false)
+		add("preview", map[string]any{"type": "object", "description": "Optional, with done and a result the user can run: how to start it and where to open it. command is the start command run in the team directory; url is the address to open once it answers.",
+			"properties": map[string]any{
+				"command": map[string]any{"type": "string"},
+				"url":     map[string]any{"type": "string"},
+			}, "required": []string{"command"}, "additionalProperties": false}, false)
 		add("document", map[string]any{"type": "string", "description": "Required on a requirement-document card: the full revised requirement document."}, false)
 	case "send_message":
 		add("targetBotIds", strings("Recipient member IDs (from the team roster in your instructions); one message reaches each."), false)
@@ -70,6 +75,9 @@ func toolSchema(name string) json.RawMessage {
 	case "ask_user":
 		add("question", text("Specific input needed from the user. End this turn after asking."), true)
 		add("options", strings("Optional suggested answers, not security permissions."), false)
+	case "request_member":
+		add("roleIds", strings("Role IDs from the role library that the team does not have yet, e.g. [\"fullstack-engineer\"]."), true)
+		add("reason", text("Why the current work needs these members. End this turn after asking; the user decides on a card."), true)
 	case "browser":
 		str := func(description string) any { return map[string]any{"type": "string", "description": description} }
 		num := func(description string) any { return map[string]any{"type": "integer", "description": description} }

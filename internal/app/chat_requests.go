@@ -63,7 +63,7 @@ func (a *App) DecideChatRequest(ctx context.Context, p auth.Principal, id, reque
 			release()
 			return req, domain.Conflict("error.approval.option_unavailable", nil)
 		}
-		response, err = engineResponseFor(card, in.OptionID)
+		response, err = engineResponseFor(card, in.OptionID, in.Content)
 	}
 	if err != nil {
 		release()

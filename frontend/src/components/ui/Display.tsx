@@ -214,6 +214,34 @@ export function CopyButton({ value, copyLabel, copiedLabel, size = 'sm' }: { val
   );
 }
 
+/** When a message was sent: today's messages show the time, older ones the
+ * date and the time. */
+export function messageTimeText(value: string, language: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  return date.toDateString() === today.toDateString()
+    ? date.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleString(language, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The quiet row under a message: a copy of its Markdown source and the time
+ * it was sent. It shows while the message is hovered or focused from a
+ * `group` parent. */
+export function MessageActions({ value, createdAt, language, copyLabel, copiedLabel }: { value: string; createdAt: string; language: string; copyLabel: string; copiedLabel: string }) {
+  const when = messageTimeText(createdAt, language);
+  return (
+    <span className="inline-flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      {value !== '' && <CopyButton value={value} copyLabel={copyLabel} copiedLabel={copiedLabel} />}
+      {when && (
+        <time dateTime={createdAt} className="px-1 text-2xs text-neutral-500 dark:text-neutral-400">
+          {when}
+        </time>
+      )}
+    </span>
+  );
+}
+
 /**
  * Sections that open and close one by one (details of a task, advanced
  * settings). Each header is a button; several may be open at once.

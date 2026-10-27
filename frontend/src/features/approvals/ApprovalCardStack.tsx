@@ -14,6 +14,7 @@ import { TeamMembersContext } from '../conversations/ExchangeLine';
 import Avatar from '../avatars/Avatar';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 import NativeApprovalBody from './NativeApprovalBody';
+import ElicitationBody, { parseElicitation } from './ElicitationBody';
 
 export default function ApprovalCardStack({
   teamId,
@@ -30,20 +31,31 @@ export default function ApprovalCardStack({
   const decide = useDecideApproval();
   const [index, setIndex] = useState(0);
   const [decideError, setDecideError] = useState('');
+  // An MCP elicitation's form answers, sent with the accept decision.
+  const [content, setContent] = useState<Record<string, unknown>>({});
 
   const items = approvals.data?.items ?? [];
   const selectedId = items[clampPagerIndex(index, items.length)]?.id;
-  useEffect(() => setDecideError(''), [selectedId]);
+  useEffect(() => {
+    setDecideError('');
+    setContent({});
+  }, [selectedId]);
   if (approvals.isError && !approvals.data) return <Alert tone="danger">{t('approvals.loadFailed')}</Alert>;
   if (items.length === 0) return null;
   const current = clampPagerIndex(index, items.length);
   const approval = items[current];
   const total = approvals.data?.total ?? items.length;
 
+  const elicitation = approval.method === 'mcpServer/elicitation/request';
   const decideOption = (option: ApprovalOption) => {
     setDecideError('');
     decide.mutate(
-      { approvalId: approval.id, optionId: option.id, expectedRevision: approval.revision },
+      {
+        approvalId: approval.id,
+        optionId: option.id,
+        expectedRevision: approval.revision,
+        ...(elicitation && option.id === 'accept' ? { content } : {}),
+      },
       { onError: (error) => setDecideError(apiErrorMessage(t, error)) },
     );
   };
@@ -87,7 +99,9 @@ export default function ApprovalCardStack({
         </Button>
       ))}
     >
-      {approval.type === 'native_tool' ? (
+      {approval.type === 'native_tool' && elicitation && parseElicitation(approval.summary) ? (
+        <ElicitationBody summary={approval.summary} value={content} onChange={setContent} teamId={teamId} />
+      ) : approval.type === 'native_tool' ? (
         <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />
       ) : (
         <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-all rounded-xl bg-neutral-900/[0.04] px-3 py-2 font-mono text-xs leading-5 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">

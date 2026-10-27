@@ -82,7 +82,7 @@ func TestATeamOverItsDailyBudgetAsksAndResetLetsTheHeldMessageRun(t *testing.T) 
 	}
 
 	card := lastBudgetCard(t, h)
-	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.BudgetOptionReset, "", 0); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.BudgetOptionReset, "", 0, nil); err != nil {
 		t.Fatalf("reset from the card: %v", err)
 	}
 	waitUntil(t, 5*time.Second, "the held message to run", func() bool { return len(fake.Turns()) == 2 })
@@ -121,7 +121,7 @@ func TestWaitingOnTheBudgetCardKeepsTheTeamHeldWithoutAskingAgain(t *testing.T) 
 		return n == 1
 	})
 
-	if _, err := h.app.DecideApproval(ctx, h.user, lastBudgetCard(t, h).ID, domain.BudgetOptionWait, "", 0); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, lastBudgetCard(t, h).ID, domain.BudgetOptionWait, "", 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第三条"}); err != nil {
@@ -168,7 +168,7 @@ func TestAHeldMessageIsNeverLeftQueuedWithoutAQuestionAfterAFailedTurn(t *testin
 			n, _ := pendingBudgetCards(t, h)
 			return n == 1
 		})
-		if _, err := h.app.DecideApproval(ctx, h.user, lastBudgetCard(t, h).ID, domain.BudgetOptionReset, "", 0); err != nil {
+		if _, err := h.app.DecideApproval(ctx, h.user, lastBudgetCard(t, h).ID, domain.BudgetOptionReset, "", 0, nil); err != nil {
 			t.Fatalf("reset from the card: %v", err)
 		}
 	}

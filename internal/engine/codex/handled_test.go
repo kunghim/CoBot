@@ -60,7 +60,9 @@ func literals(t *testing.T, file string, equals bool, funcs ...string) []string 
 }
 
 func TestHandledListsMatchTheCode(t *testing.T) {
-	isMessage := func(s string) bool { return strings.Contains(s, "/") || s == "error" || s == "warning" }
+	isMessage := func(s string) bool {
+		return strings.Contains(s, "/") || s == "error" || s == "warning" || s == "guardianWarning"
+	}
 	var messages []string
 	for _, s := range append(caseStrings(t, "server.go", "handleNotify", "handleRequest"),
 		caseStrings(t, "../../app/engine_events.go", "onNotification")...) {

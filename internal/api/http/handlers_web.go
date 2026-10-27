@@ -2,6 +2,8 @@ package http
 
 import (
 	"net/http"
+
+	"github.com/kunghim/CoBot/internal/app"
 )
 
 // The Web completeness surface (M5): activity feed, member memories,
@@ -149,4 +151,50 @@ func (s *Server) handleOpenTeamPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, http.StatusOK, result)
+}
+
+func (s *Server) handleOpenTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+		Path      string `json:"path"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.App.OpenTeam(r.Context(), principal, app.OpenTeamInput{Directory: req.Path, RequestID: req.RequestID})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, result)
+}
+
+func (s *Server) handleAdoptTeam(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID      string   `json:"requestId"`
+		Path           string   `json:"path"`
+		Name           string   `json:"name"`
+		InitialRoleIDs []string `json:"initialRoleIds"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	team, bots, err := s.App.AdoptTeam(r.Context(), principal, app.AdoptTeamInput{
+		Directory: req.Path, Name: req.Name, InitialRoleIDs: req.InitialRoleIDs, RequestID: req.RequestID,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"team": team, "bots": bots})
 }

@@ -8,7 +8,7 @@ import type { AvatarSeries } from '../api/types';
 import { AvatarImage } from '../features/avatars/Avatar';
 import { FALLBACK_AVATAR, drawAvatar, roleAvatar, type AvatarState } from '../features/avatars/render';
 import DocumentCard from '../features/conversations/DocumentCard';
-import { ConversationHead, SidebarHead, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
+import { ConversationHead, SidebarHead, BrandMark, Icons, ApprovalCard, AvatarStack, Badge, Button, Composer, ComposerOption, ExchangeLine, MemberRow, MessageActions, MessageBubble, ModelEffortPanel, ModelEffortPicker, PanelToggle, ProcessStep, QuestionCard, RoleChip, SystemNote } from '../components/ui';
 import { Chapter, Demo, Doc, Matrix } from './parts';
 
 const dango: AvatarSeries = { id: 'dango', name: dangoSeries.name, kind: 'composed', version: dangoSeries.version, data: dangoSeries as unknown as AvatarSeries['data'] };
@@ -108,13 +108,22 @@ export default function TeamConversation() {
           </div>
         </Demo>
       </Doc>
-      <Doc id="messages" name="MessageBubble 消息 · ExchangeLine 往来 · DocumentCard 文档 · SystemNote 系统说明" file="components/ui/Team.tsx" use="用户的话是右侧凹下去的浅色气泡；成员的回复不用气泡：一行头像和名字，下面是正文，像读文档；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字；需求文档、验收汇报这类要读的文档是带标题行的卡片，可折叠。">
+      <Doc id="messages" name="MessageBubble 消息 · MessageActions 悬停操作 · ExchangeLine 往来 · DocumentCard 文档 · SystemNote 系统说明" file="components/ui/Team.tsx · components/ui/Display.tsx" use="用户的话是右侧凹下去的浅色气泡；成员的回复不用气泡：一行头像和名字，下面是正文，像读文档；悬停在消息上出现操作行：复制 Markdown 原文和发送时间（当天只显示时分，更早的带日期）；成员之间的往来是居中的一行，带对方头像，点名字打开完整往来；CoBot 自己的说明是居中的小字；需求文档、验收汇报这类要读的文档是带标题行的卡片，可折叠。">
         <Demo>
           <div className="mx-auto max-w-2xl space-y-4">
-            <MessageBubble from="user" meta="已送达">做一个本地待办页面，能添加和删除</MessageBubble>
-            <MessageBubble from="member" avatar={<RoleAvatar roleId="leader" size={28} />} author="项目经理">
-              好的。我先确认两点：数据要不要在刷新后保留？要不要支持标记完成？
-            </MessageBubble>
+            <div className="group">
+              <MessageBubble from="user" meta={<MessageActions value="做一个本地待办页面，能添加和删除" createdAt={new Date().toISOString()} language="zh-CN" copyLabel="复制原文" copiedLabel="已复制" />}>做一个本地待办页面，能添加和删除</MessageBubble>
+            </div>
+            <div className="group">
+              <MessageBubble
+                from="member"
+                avatar={<RoleAvatar roleId="leader" size={28} />}
+                author="项目经理"
+                meta={<MessageActions value="好的。我先确认两点" createdAt={new Date(Date.now() - 86400000).toISOString()} language="zh-CN" copyLabel="复制原文" copiedLabel="已复制" />}
+              >
+                好的。我先确认两点：数据要不要在刷新后保留？要不要支持标记完成？
+              </MessageBubble>
+            </div>
             <ExchangeLine label="发给" people={[person('fullstack-engineer', '全栈工程师'), person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
             <ExchangeLine label="来自" people={[person('qa-engineer', '测试工程师')]} onOpen={() => undefined} />
             <DocumentCard text="# 每日待办任务静态页面 · 用户确认需求\n\n### 链路\n\n1. 用户确认（用户）\n2. 实现（全栈工程师）\n3. 验收汇报（项目经理）" />

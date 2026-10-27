@@ -97,6 +97,19 @@
     "directoryClaimed": "This folder is already used by team “{{teamName}}”; a new team cannot be created here",
     "directoryClaimedUnknown": "This folder is already used by a team in another CoBot environment; a new team cannot be created here",
     "new": "New team",
+    "open": "Open team",
+    "openTitle": "Open a team",
+    "openAction": {
+      "open": "This folder belongs to the team \"{{name}}\"; it opens directly.",
+      "restore": "This folder belongs to the archived team \"{{name}}\"; confirm to restore and open it.",
+      "adopt": "This folder belonged to the team \"{{name}}\", whose conversations are not in this environment.",
+      "create": "This folder has not been used; a team named \"{{name}}\" can be created in it."
+    },
+    "openRestoreButton": "Restore and open",
+    "openAdoptButton": "Adopt and create",
+    "openCreateButton": "Create team",
+    "adoptWarning": "Adopting creates a new team here bound to the folder and rewrites the marker inside it; the earlier conversations are not migrated.",
+    "adoptConfirm": "I understand; adopt this folder",
     "createTitle": "New team",
     "chooseDirectory": "Choose folder",
     "choosing": "Waiting for your choice…",
@@ -261,6 +274,8 @@
       "empty": "No messages between them yet"
     },
     "engineError": {
+      "modelRerouted": "The engine switched the model: {{message}}",
+      "guardian": "The safety layer of the engine says: {{message}}",
       "serverOverloaded": "The model is at capacity, so this turn did not finish. Send again later or pick another model in Settings",
       "usageLimitExceeded": "The account reached its model usage limit, so this turn did not finish. Try again when it resets",
       "rateLimitExceeded": "The model service is rate limiting requests; send again in a moment",
@@ -321,7 +336,7 @@
         "other": "{{count}} step(s)",
         "file_operation": "{{count}} file operation(s)"
       },
-      "done": "Worked for {{duration}} · {{count}} steps",
+      "done": "Worked for {{duration}}",
       "failedAfter": "Failed · {{duration}}",
       "retry": "Retry this turn",
       "interruptedAfter": "Stopped · {{duration}}",
@@ -386,6 +401,13 @@
     "queuedBanner_one": "{{count}} message received, queued",
     "queuedBanner_other": "{{count}} messages received, queued",
     "cancelQueued": "Cancel queued message",
+    "message": {
+      "copy": "Copy source",
+      "copied": "Copied",
+      "edit": "Edit and send again",
+      "save": "Save and send again",
+      "hint": "File changes are not undone; a turn still running is stopped first, and the old turn's record leaves the conversation."
+    },
     "interrupt": "Stop",
     "interruptRequested": "Stop requested; waiting for the engine",
     "blocked": {
@@ -426,6 +448,10 @@
       "recovery": "Recovery",
       "chain": "Chain confirmation",
       "budget": "Daily budget"
+    },
+    "elicitation": {
+      "server": "From {{server}}",
+      "open": "Open and authorize"
     },
     "requester": "Requested by: {{name}}",
     "reason": "Reason",
@@ -481,6 +507,8 @@
       "recovery_rerun": "Rerun",
       "recovery_abandon": "Abandon",
       "chain_stop": "Stop this chain",
+      "elicit_submit": "Submit",
+      "elicit_decline": "Decline",
       "unknown": "Unknown option"
     }
   },
@@ -839,7 +867,16 @@
       "title": "Delivery acceptance",
       "accept": "Accept",
       "revise": "Request changes",
-      "changesPlaceholder": "Write your changes here; leave empty to accept"
+      "changesPlaceholder": "Write your changes here; leave empty to accept",
+      "startPreview": "Start and open",
+      "openAgain": "Open",
+      "stopPreview": "Stop"
+    },
+    "recruitment": {
+      "title": "New members requested",
+      "approve": "Approve",
+      "reject": "Reject",
+      "commentPlaceholder": "A note for the project manager (optional); say why when rejecting"
     },
     "answerIsInput": "Your answer is delivered as an ordinary message to the asking member — it is not a security authorization",
     "dismissed": "{{count}} card(s) awaiting acceptance",
@@ -873,7 +910,7 @@
       "apply": "Restart idle engines",
       "applied": "Restarted {{count}} engine(s); they start with the new catalog on the next turn. {{busy}} more are in a turn and take it when they next start.",
       "title": "Model catalog",
-      "intro": "The catalog knows each model's context length, the input types it takes and its thinking levels. A model you add is matched by name, and what matches does not have to be filled in. The data comes from models.dev.",
+      "intro": "The catalog records each model’s context window, input kinds and thinking levels, and matches models by name when one is added. Data comes from models.dev and can be updated here.",
       "update": "Update model catalog",
       "updated": "Model catalog updated: {{count}} models",
       "unreachable": "Could not reach models.dev. Check the network and try again; the catalog in use is unchanged.",
@@ -895,12 +932,10 @@
     "updated": "Saved {{name}} with {{count}} models",
     "readyToUse": "Its models can now be chosen in the conversation.",
     "usableWith": "Works with {{engines}}",
-    "noCodexEndpoint": "Without an OpenAI-format endpoint there is nothing for the current engine to check the models against. You can add it as it is and fill the endpoint in later.",
+    "unusableClaude": "This provider offered the Claude protocol only, which is no longer supported; remove it, or edit it to an OpenAI-format endpoint.",
     "listSeparator": ", ",
     "dialectResponses": "OpenAI compatible",
-    "dialectAnthropic": "Anthropic compatible",
     "badgeCodex": "Codex",
-    "badgeClaudeCode": "Claude Code",
     "dialog": {
       "addTitle": "Add a model provider",
       "editTitle": "Edit {{name}}",
@@ -916,9 +951,6 @@
       "displayNamePlaceholder": "For example: our gateway",
       "openaiEndpoint": "OpenAI format endpoint",
       "openaiEndpointHint": "Codex calls its /responses.",
-      "anthropicEndpoint": "Claude format endpoint",
-      "anthropicEndpointHint": "Claude Code calls its /v1/messages.",
-      "endpointHint": "With only the OpenAI endpoint, only Codex can use it; fill in both and Codex and Claude Code can.",
       "apiKey": "API key",
       "apiKeyPlaceholder": "sk-…",
       "keyHint": "Get your key at <url>{{url}}</url>",
@@ -939,7 +971,7 @@
         "fromCatalog": "{{name}}: the catalog's numbers are limits you may lower but not exceed; thinking comes from the catalog and cannot be changed.",
         "custom": "The model catalog does not know this model, so everything below is yours to fill in.",
         "alias": "Alias",
-        "aliasHint": "Shown in place of the model name when set.",
+        "aliasHint": "Shown in place of the model id.",
         "context": "Context length",
         "contextHint": "In tokens. Once set, the context is compacted automatically as it nears the limit.",
         "maxOutput": "Max output length",
@@ -955,11 +987,15 @@
         },
         "abilities": "Abilities",
         "webSearch": "Web search",
-        "webSearchHint": "Turn on only if the provider supports web search; one that does not fails the whole turn.",
+        "webSearchHint": "Turning this on with a provider that cannot search fails the whole turn.",
         "thinking": "Thinking",
         "thinkingToggle": "Thinking can be switched off",
         "thinkingToggleHint": "When on, a conversation can turn thinking on and off.",
-        "thinkingHint": "Tick the thinking levels this model supports; with none ticked, low, medium and high apply."
+        "thinkingHint": "Tick the thinking levels this model supports; with none ticked, low, medium and high apply.",
+        "contextLimitInfo": "The catalog’s ceiling is {{limit}}: lower it freely, never above.",
+        "contextInfo": "Near the limit, the engine compacts the context by itself.",
+        "maxOutputLimitInfo": "The catalog’s ceiling is {{limit}}.",
+        "maxOutputInfo": "For reference; the engine does not cut output by it."
       },
       "selectAll": "Select all",
       "clearAll": "Clear",
@@ -1016,9 +1052,6 @@
   "preset": {
     "openai": {
       "name": "OpenAI"
-    },
-    "anthropic": {
-      "name": "Anthropic"
     },
     "deepseek": {
       "name": "DeepSeek"
@@ -1097,13 +1130,12 @@
     "back": "Back",
     "version": "Version",
     "limitsTitle": "Collaboration limits",
-    "defaultModelHint": "The model a member uses until it is given one in the conversation. Any enabled provider's model can be the default.",
+    "defaultModelHint": "What members run until they pick one in the conversation.",
     "sections": {
       "general": "General",
       "appearance": "Appearance",
       "roles": "Roles",
       "engine": "Codex engine",
-      "models": "Default model",
       "providers": "Model providers",
       "collaboration": "Collaboration & budget",
       "archived": "Archived",
@@ -1111,11 +1143,10 @@
     },
     "sectionHints": {
       "general": "Basic preferences such as the interface language.",
-      "appearance": "Light, dark or following the system, and the interface colors. Members keep their role colors in every theme.",
-      "roles": "Each role's default avatar. Members without an avatar of their own follow it; click a member's avatar in its conversation to change just that member.",
-      "engine": "CoBot uses the Codex engine bundled with the ChatGPT desktop app and authorizes its safety hook at startup. Sign in separately in CoBot’s private environment.",
-      "models": "Used by a member until it is given its own model in the conversation; applies to work that starts afterwards.",
-      "providers": "Configure once and use it from Codex and Claude Code. Every enabled provider's models can be chosen in the conversation, Another model from a vendor's own provider continues the conversation; another provider, or another model on a gateway, starts a new one that is handed the full record of the old.",
+      "appearance": "Light, dark, or system, and the accent colour.",
+      "roles": "Each role’s default avatar; members can override it in their own conversation.",
+      "engine": "CoBot uses the Codex bundled with the ChatGPT desktop app; accounts sign in inside CoBot.",
+      "providers": "Configure once and Codex can use it; members pick models from any enabled provider in the conversation.",
       "collaboration": "Team size, how often members may wake each other, and usage budget.",
       "archived": "View, restore, or delete archived chats and teams.",
       "about": "Version, updates and project information."
@@ -1166,7 +1197,7 @@
     "chainLimit": "Collaboration chain wake limit",
     "reviewRejectLimit": "Review send-back limit",
     "budget": "Daily budget",
-    "budgetHint": "Counted per day and reset the next day. This is the default: a team or a member can set its own under Team → Daily budget.",
+    "budgetHint": "Counted per day, reset the next day; this is the default for new teams.",
     "budgetScope": "Default applies to",
     "budgetNone": "Unlimited",
     "budgetBot": "Each member",
@@ -1179,14 +1210,17 @@
     "dataRoot": "Data root",
     "saved": "Saved",
     "saveFailed": "Save failed",
-    "engineAccountHint": "The engine is not tied to an account: each member's model is chosen in the conversation, and the ChatGPT account signs in under Model providers.",
+    "engineAccountHint": "Which model a member runs is chosen in the conversation.",
     "modelsNeedProvider": "No model to choose yet: sign in with ChatGPT under Model providers, or add a provider.",
     "modelSwitchTitle": "Switching models in bulk",
-    "modelSwitchHint": "When switching one member\\u2019s model, whether to offer carrying the teammates still on the old one along.",
+    "modelSwitchHint": "When switching one member’s model, whether to switch the others still on the old one.",
     "modelSwitchPrompt": "When to ask",
     "modelSwitchAlways": "Ask every time",
     "modelSwitchSmart": "Only when a member on the old model last failed",
-    "modelSwitchNever": "Never ask"
+    "modelSwitchNever": "Never ask",
+    "defaultModelInfo": "Any enabled provider’s models can be chosen; adding providers never moves this.",
+    "budgetInfo": "Teams and members adjust their own under “Team → daily budget”.",
+    "engineAccountInfo": "The ChatGPT account signs in under “Model providers”; the engine binds to no account."
   },
   "auth": {
     "authorizing": "Authorizing…",
@@ -1411,11 +1445,27 @@
     "error.chat.restarted": "The app restarted. Verify the previous execution state.",
     "error.chat.unknown": "The execution state is unverified. This turn will not be automatically repeated.",
     "error.chat.archived": "This chat is archived or has an unconfirmed archive operation. Restore or verify it first.",
+    "error.chat.edit_not_user_message": "Only your own last message can be edited.",
+    "error.chat.edit_not_last": "Only the last message can be edited.",
+    "error.chat.revert_failed": "Rolling the turn back failed; the message is unchanged. Try again later.",
+    "error.message.edit_not_user_message": "Only your own last message to a member can be edited.",
+    "error.message.edit_not_last": "Only the last message you sent this member can be edited.",
+    "error.message.edit_running": "The turn is still running; stop it before editing.",
+    "error.message.edit_side_effects": "This message already set collaboration in motion (a requirement, a card or a note), so it cannot be edited and sent again.",
+    "error.message.revert_failed": "Rolling the turn back failed; the message is unchanged. Try again later.",
     "error.chat.archive_pending": "Verify the pending archive operation first.",
     "error.chat.archive_unknown": "The native thread archive state could not be confirmed. Verify it to continue.",
     "error.chat.archive_state": "The archive state changed. Refresh and try again.",
     "error.chat.section_missing": "This section no longer exists. Refresh and try again.",
     "error.chat.order_conflict": "The list order changed. Refresh and try again.",
+    "error.team.role_present": "The team already has a member of this role",
+    "error.recruitment.leader_only": "Only the project manager can request new members",
+    "error.recruitment.roles_required": "Name the roles to recruit",
+    "error.recruitment.reason_required": "A recruitment request needs a reason",
+    "error.recruitment.member_limit": "Recruiting {{requested}} more members would exceed the limit of {{limit}}",
+    "error.question.not_recruitment": "This card is not a recruitment request",
+    "error.question.recruitment_decision": "A recruitment request needs approve or reject",
+    "error.question.recruitment_decide": "A recruitment request cannot be ignored; approve or reject it",
     "error.workspace.watch_unavailable": "Automatic file updates are unavailable. Refresh manually.",
     "error.workspace.latex_unavailable": "LaTeX preview requires an available isolated compiler and offline resources. You can still view the source.",
     "error.workspace.latex_busy": "Another document is compiling. Try again shortly.",

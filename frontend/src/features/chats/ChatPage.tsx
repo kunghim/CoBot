@@ -5,13 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../../api/client';
 import type { ChatRequest } from '../../api/types';
 import { forgetChatRun, useChatLiveRuns } from '../../api/live';
-import { useEngine, useEngineModels, useProviders, useSettings } from '../../api/queries';
-import { Button, ChatComposer, CopyButton, IconButton, Icons, MessageBubble, ModelEffortPicker, TextInput, cx } from '../../components/ui';
+import { useEditChatMessage, useEngine, useEngineModels, useProviders, useSettings } from '../../api/queries';
+import { Button, ChatComposer, IconButton, Icons, MessageActions, MessageBubble, ModelEffortPicker, TextInput, cx } from '../../components/ui';
 import { ShellToggle } from '../../app/shell';
 import { useNativeTitle } from '../../app/WindowChrome';
 import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
+import MessageEditBox from '../conversations/MessageEditBox';
+import ElicitationBody, { parseElicitation } from '../approvals/ElicitationBody';
 import ResourceStrip from '../conversations/ResourceStrip';
 import NativeApprovalBody from '../approvals/NativeApprovalBody';
 import { effortChoices } from '../conversations/ReasoningEffortSelect';
@@ -32,7 +34,7 @@ export default function ChatRoute() {
 
 function ChatPage({ id }: { id?: string }) {
   const workspace = useWorkspace();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const query = useChat(id);
@@ -80,6 +82,8 @@ function ChatPage({ id }: { id?: string }) {
   const mode = permissionModeOf(permission ?? chat?.permissionMode);
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['chat', id] }); void qc.invalidateQueries({ queryKey: ['chats'] }); };
   const action = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), onSuccess: refresh });
+  const editMessage = useEditChatMessage(id ?? '');
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const send = useMutation({
     mutationFn: (text: string) =>
       api.sendChat(id ?? null, {
@@ -128,7 +132,7 @@ function ChatPage({ id }: { id?: string }) {
   const shownLevel = levelNow || defaultEffort || levels[0]?.effort || '';
   const modelOptions = <>
     <PermissionModeMenu kind="chat" value={mode} onChange={setPermission} disabled={!!active} />
-    {!offered.length ? <Button size="sm" variant="ghost" disabled={modelLoading} onClick={() => navigate('/settings/models')}>{t(modelLoading ? 'common.loading' : 'chat.chooseModel')}</Button>
+    {!offered.length ? <Button size="sm" variant="ghost" disabled={modelLoading} onClick={() => navigate('/settings/providers')}>{t(modelLoading ? 'common.loading' : 'chat.chooseModel')}</Button>
       : <ModelEffortPicker triggerLabel={levels.length > 0 || toggle ? `${t('effort.label')}：${thinkingOff ? t('effort.off') : levelNow ? label(levelNow) : t('effort.default')} · ${choice?.label ?? chat?.model ?? t('chat.defaultModel')}` : (choice?.label ?? chat?.model ?? initial.model ?? t('chat.defaultModel'))}
         models={offered.map((m) => ({ id: m.key, label: m.label, group: m.group, disabled: m.unavailable, badge: m.contextBadge }))}
         model={picked ?? ownKey} onModel={(key) => { setPicked(key); setEffort(null); }}
@@ -150,16 +154,41 @@ function ChatPage({ id }: { id?: string }) {
       {id && <div ref={scroll} onScroll={() => { const el = scroll.current!; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setBottom(stick.current); }} className="min-h-0 flex-1 overflow-y-auto px-8">
         <div className="mx-auto w-full max-w-3xl space-y-6 py-4">
           {query.hasNextPage && <Button variant="ghost" size="sm" loading={query.isFetchingNextPage} onClick={() => { const el = scroll.current; const height = el?.scrollHeight ?? 0; void query.fetchNextPage().then(() => requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; })); }}>{t('chat.earlier')}</Button>}
-          {messages.map((message) => {
-            const copy = <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"><CopyButton value={message.text} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} /></span>;
-            if (message.kind === 'user') return <div key={message.id} className="group"><MessageBubble from="user" meta={copy}>{message.text}</MessageBubble></div>;
-            // The reply closes its turn: what was said and done on the way is above it, in order.
-            const run = runs.get(message.runId);
-            return <div key={message.id} className="group space-y-2">
-              {run && <ChatProcess run={run} chatId={id!} live={live[run.id]} replyText={message.text} />}
-              <MessageBubble from="member" meta={copy}><Markdown text={message.text} chatId={id} /><ResourceStrip scope={{ kind: 'chat', id: id! }} run={run} text={message.text} directory={chat?.workspace} /></MessageBubble>
-            </div>;
-          })}
+          {(() => {
+            const lastUserId = [...messages].reverse().find((m) => m.kind === 'user')?.id;
+            return messages.map((message) => {
+              const copy = <MessageActions value={message.text} createdAt={message.createdAt} language={i18n.language} copyLabel={t('chat.copy')} copiedLabel={t('chat.copied')} />;
+              if (message.kind === 'user') {
+                // Only the last message can be edited and sent again; the
+                // server says so too.
+                const editable = message.id === lastUserId;
+                const actions = (
+                  <>
+                    {editable && <IconButton icon={Icons.edit} label={t('conversation.message.edit')} size="sm" onClick={() => setEditing({ id: message.id, text: message.text })} />}
+                    {copy}
+                  </>
+                );
+                if (editing?.id === message.id) {
+                  return (
+                    <div key={message.id} className="rounded-xl bg-sunk p-3">
+                      <MessageEditBox initial={editing.text} onSave={(text) => editMessage.mutateAsync({ messageId: message.id, text }).then(() => setEditing(null))} onCancel={() => setEditing(null)} />
+                    </div>
+                  );
+                }
+                return (
+                  <div key={message.id} className="group">
+                    <MessageBubble from="user" meta={actions}>{message.text}</MessageBubble>
+                  </div>
+                );
+              }
+              // The reply closes its turn: what was said and done on the way is above it, in order.
+              const run = runs.get(message.runId);
+              return <div key={message.id} className="group space-y-2">
+                {run && <ChatProcess run={run} chatId={id!} live={live[run.id]} replyText={message.text} />}
+                <MessageBubble from="member" meta={copy}><Markdown text={message.text} chatId={id} /><ResourceStrip scope={{ kind: 'chat', id: id! }} run={run} text={message.text} directory={chat?.workspace} /></MessageBubble>
+              </div>;
+            });
+          })()}
           {[...runs.values()].filter((run) => !messages.some((m) => m.runId === run.id && m.kind === 'assistant')).map((run) => <ChatProcess key={run.id} run={run} chatId={id!} live={live[run.id]} />)}
           {active?.status === 'unknown' && <div className="rounded-xl bg-sunk p-4"><p className="text-sm">{t('chat.unknown')}</p><Button size="sm" className="mt-3" loading={action.isPending} onClick={() => action.mutate(() => api.chatRunAction(id!, active.id, 'verify'))}>{t('chat.verify')}</Button></div>}
         </div>
@@ -181,19 +210,21 @@ function ChatPage({ id }: { id?: string }) {
 }
 
 type InputQuestion = { id: string; header: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] };
-function ChatRequestCard({ request, busy, onReply }: { request: ChatRequest; busy: boolean; onReply: (body: { optionId?: string; answers?: Record<string, string[]> }) => void }) {
+function ChatRequestCard({ request, busy, onReply }: { request: ChatRequest; busy: boolean; onReply: (body: { optionId?: string; answers?: Record<string, string[]>; content?: Record<string, unknown> }) => void }) {
   const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [content, setContent] = useState<Record<string, unknown>>({});
   const questions = (request.params?.questions ?? []) as InputQuestion[];
   const input = request.method === 'item/tool/requestUserInput';
+  const elicitation = request.method === 'mcpServer/elicitation/request';
   return <div className="mb-3 max-h-80 overflow-y-auto rounded-2xl border border-neutral-200 bg-card p-4 dark:border-neutral-700">
     <h2 className="mb-3 text-sm font-medium">{t(input ? 'chat.inputRequired' : 'chat.approvalRequired')}</h2>
     {input ? questions.map((q) => <fieldset key={q.id} className="mb-3 space-y-2"><legend className="text-sm">{q.question}</legend>
       {q.options?.map((option) => <Button key={option.label} size="sm" variant={answers[q.id] === option.label ? 'secondary' : 'ghost'} onClick={() => setAnswers({ ...answers, [q.id]: option.label })}>{option.label}</Button>)}
       <TextInput type={q.isSecret ? 'password' : 'text'} aria-label={q.question} value={answers[q.id] ?? ''} onChange={(event) => setAnswers({ ...answers, [q.id]: event.target.value })} />
-    </fieldset>) : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
+    </fieldset>) : elicitation && parseElicitation(request.summary) ? <ElicitationBody summary={request.summary} value={content} onChange={setContent} /> : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
     <div className="mt-3 flex flex-wrap gap-2">{input ? <Button size="sm" loading={busy} disabled={!questions.length || questions.some((q) => !answers[q.id]?.trim())} onClick={() => onReply({ answers: Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, [value]])) })}>{t('chat.submitAnswers')}</Button>
-      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
+      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id, ...(elicitation && option.id === 'accept' ? { content } : {}) })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
     </div>
   </div>;
 }

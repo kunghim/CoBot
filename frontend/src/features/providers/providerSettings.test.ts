@@ -44,6 +44,7 @@ vi.mock('../../api/queries', () => ({
   useApplyEngineCatalog: () => ({ mutate: state.apply, isPending: false }),
   // The ChatGPT account's card drives its own sign-in.
   useEngine: () => ({ data: { status: 'ready', loggedIn: false }, refetch: vi.fn() }),
+  useEngineModels: () => ({ data: { models: [{ slug: 'fake-model', displayName: 'Fake Model', isDefault: true }] }, isPending: false }),
   useEngineLogin: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
   useEngineLogout: () => ({ mutate: vi.fn(), isPending: false }),
@@ -65,10 +66,7 @@ const preset = {
   keyUrl: 'platform.deepseek.com/api_keys',
   official: false,
   authMode: 'api_key',
-  endpoints: [
-    { dialect: 'openai-responses', baseUrl: 'api.deepseek.com/v1' },
-    { dialect: 'anthropic-messages', baseUrl: 'api.deepseek.com/anthropic' },
-  ],
+  endpoints: [{ dialect: 'openai-responses', baseUrl: 'api.deepseek.com/v1' }],
   models: [{ id: 'deepseek-v4-pro' }],
   keyPatterns: ['^sk-'],
 };
@@ -156,7 +154,7 @@ describe('provider settings', () => {
     host.remove();
   });
 
-  const render = () => act(() => root.render(h(QueryClientProvider, { client }, h(ProviderSection, {}))));
+  const render = () => act(() => root.render(h(QueryClientProvider, { client }, h(ProviderSection, { settings: state.settings as never, save: state.update, errors: {} }))));
 
   const byText = (text: string) =>
     [...host.querySelectorAll('button')].find((button) => button.textContent?.includes(text));
@@ -174,7 +172,10 @@ describe('provider settings', () => {
     expect(switches).toHaveLength(2);
     expect(switches.every((entry) => entry.getAttribute('aria-checked') === 'true')).toBe(true);
     const text = host.textContent ?? '';
-    expect(text.indexOf('OpenAI')).toBeLessThan(text.indexOf('DeepSeek'));
+    // The default-model card now sits above the list and may name any
+    // provider, so the order is read from the provider cards themselves:
+    // the account's sign-in line, then the gateway's endpoint.
+    expect(text.indexOf('登录 ChatGPT 账号')).toBeLessThan(text.indexOf('https://api.deepseek.com/v1'));
     expect(text).toContain('https://api.deepseek.com/v1');
     // Nothing reads as a single provider "in use" any more.
     expect(text).not.toContain('使用中');
@@ -324,16 +325,21 @@ describe('provider settings', () => {
     expect(pressed()).toBe(0);
   });
 
-  it('warns about a missing OpenAI endpoint only once a Claude one is given', () => {
+  it('offers to add a custom gateway without an endpoint, and refuses to save it', async () => {
     state.providers = [official];
     render();
     act(() => byText('添加供应商')!.click());
     act(() => byText('自建网关 / 中转站')!.click());
-    expect(host.textContent).not.toContain('没有填 OpenAI 格式端点');
-    const claude = [...host.querySelectorAll<HTMLInputElement>('input')].find((input) => input.placeholder.includes('anthropic'))!;
-    act(() => setValue(claude, 'https://gateway.example/anthropic'));
-    expect(host.textContent).toContain('没有填 OpenAI 格式端点');
-    expect(host.textContent).not.toContain('providers.');
+    expect(host.textContent).not.toContain('先填端点地址');
+    const name = [...host.querySelectorAll<HTMLInputElement>('input')].find((input) => input.placeholder.includes('公司的中转站'))!;
+    act(() => setValue(name, '我们的网关'));
+    // Without an endpoint there is nothing to check the models against, so
+    // the button adds directly — and the write refuses until one is filled.
+    await act(async () => {
+      byText('直接添加')!.click();
+    });
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '先填端点地址' }));
+    expect(state.save).not.toHaveBeenCalled();
   });
 
   // A new DeepSeek provider with both of its models ticked and a key typed.

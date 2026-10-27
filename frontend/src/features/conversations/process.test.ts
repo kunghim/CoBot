@@ -203,6 +203,28 @@ describe('a turn read in the order it happened', () => {
     const steps = [said('m1', '我先看看'), step({ id: 'c1' }), step({ id: 'c2' }), said('m2', '看完了'), step({ id: 'f1', kind: 'file_change' }), said('m3', '改好了')];
     expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : block.steps.map((s) => s.id).join('+')))).toEqual(['m1', 'c1+c2', 'm2', 'f1', 'm3']);
   });
+  it('splits a stretch when the kind changes, and lets uncounted steps follow along', () => {
+    const steps = [
+      step({ id: 'c1' }),
+      step({ id: 'c2' }),
+      step({ id: 'f1', kind: 'file_change' }),
+      step({ id: 'c3' }),
+      step({ id: 't1', kind: 'tool' }),
+      step({ id: 'r1', kind: 'reasoning', detail: { text: '想想' } }),
+      step({ id: 'n1', kind: 'notice', detail: { level: 'warning', message: '慢' } }),
+      step({ id: 't2', kind: 'tool' }),
+    ];
+    expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : `${block.of}:${block.steps.map((s) => s.id).join('+')}`))).toEqual([
+      'command:c1+c2',
+      'file_change:f1',
+      'command:c3',
+      'tool:t1+r1+n1+t2',
+    ]);
+  });
+  it('opens a fresh stretch after a saying, even of the same kind', () => {
+    const steps = [step({ id: 'c1' }), said('m1', '说一下'), step({ id: 'c2' })];
+    expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : block.steps.map((s) => s.id).join('+')))).toEqual(['c1', 'm1', 'c2']);
+  });
   it('says each stretch of work in a line', () => {
     expect(workSummary([step({ id: 'a' }), step({ id: 'b' }), step({ id: 'c', kind: 'file_change' })])).toEqual([
       { key: 'conversation.process.group.command', params: { count: 2 } },

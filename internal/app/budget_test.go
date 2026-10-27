@@ -403,7 +403,7 @@ func TestResettingFromTheCardCountsAgainAndWaitingKeepsTheTeamHeldForTheDay(t *t
 
 	// Waiting leaves it held, and the question is not asked again today.
 	card := openCard(t, a, "t1", "b1", pause)
-	decided, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionWait, "", 0)
+	decided, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionWait, "", 0, nil)
 	if err != nil || decided.RequestState != domain.ApprovalStateDecided {
 		t.Fatalf("wait = %+v %v", decided, err)
 	}
@@ -431,14 +431,14 @@ func TestChoosingResetOnTheCardStartsTheCountAgain(t *testing.T) {
 	pause, _ := a.budgetPaused(ctx, "t1", "b1", settings)
 	card := openCard(t, a, "t1", "b1", pause)
 
-	if _, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionReset, "", 0); err != nil {
+	if _, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionReset, "", 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	if again, _ := a.budgetPaused(ctx, "t1", "b1", settings); again != nil {
 		t.Fatalf("the team is still held after the reset: %v", again)
 	}
 	// An answer cannot be given twice.
-	if _, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionReset, "", 0); err == nil {
+	if _, err := a.DecideApproval(ctx, user, card.ID, domain.BudgetOptionReset, "", 0, nil); err == nil {
 		t.Fatal("a decided card was decided again")
 	}
 }

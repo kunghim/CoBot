@@ -123,6 +123,11 @@ type App struct {
 	Browser *browser.Manager
 	// browserGuideRead remembers the runs that have read the browser guide.
 	browserGuideRead sync.Map
+	// previewOnce builds the preview process table on first use; previews
+	// holds the "start and open" processes the user launched from acceptance
+	// cards, keyed by team and command.
+	previewOnce sync.Once
+	previews    *previewTable
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.

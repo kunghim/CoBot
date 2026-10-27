@@ -2256,6 +2256,66 @@ paths:
           description: Warm-up started (or not needed)
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/start:
+    post:
+      operationId: startPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start a preview process the user opened from an acceptance card
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, command]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: The start command from the acceptance handoff's preview; run in the team directory. }
+      responses:
+        "200":
+          description: Started (or already running from an earlier press)
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/stop:
+    post:
+      operationId: stopPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Stop a preview process (or all of the team's)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: "The command that started it; omit to stop every preview of the team." }
+      responses:
+        "200":
+          description: Stopped
+        "400":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/browser:
     get:
       operationId: getTeamBrowser
@@ -2639,6 +2699,72 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/messages/{messageId}/edit:
+    post:
+      operationId: editChatMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of the chat's last user message and send them again
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/messages/{messageId}/edit:
+    post:
+      operationId: editMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of a member's last user message and send them again
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: The turn was rolled back and the new words queued; delivery status arrives via events
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/messages/{id}/cancel:
     post:
       operationId: cancelMessage
@@ -2796,6 +2922,9 @@ paths:
                 optionId: { type: string }
                 comment: { type: string }
                 expectedRevision: { type: integer, format: int64 }
+                content:
+                  type: object
+                  description: An MCP elicitation's accepted form values, keyed by field name.
       responses:
         "200":
           description: Decided approval (with responseState)
@@ -3357,6 +3486,91 @@ paths:
                             description: The folder belongs to an archived team; restoring that team is the way to use it again.
         "400":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/open:
+    post:
+      operationId: openTeam
+      security:
+        - SessionCookie: []
+      summary: Resolve a project folder to the team action that fits it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+      responses:
+        "200":
+          description: "The action to take: open, restore, adopt or create"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [action, directory]
+                        properties:
+                          action:
+                            type: string
+                            enum: [open, restore, adopt, create]
+                            description: open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                          teamId: { type: string }
+                          teamName: { type: string }
+                          archived: { type: boolean }
+                          suggestedName: { type: string, description: For the create and adopt actions; the folder name or the foreign marker's team name. }
+                          directory: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/adopt:
+    post:
+      operationId: adoptTeam
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Bind a folder another CoBot instance marked to a new team here
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path, name]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+                name: { type: string }
+                initialRoleIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: The adopted team with its members; the folder's marker now names this instance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          team: { $ref: "#/components/schemas/Team" }
+                          bots:
+                            type: array
+                            items: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/authorizations:
     get:
       operationId: listAuthorizations
@@ -3913,7 +4127,7 @@ components:
       description: One wire dialect the provider offers.
       required: [dialect, baseUrl]
       properties:
-        dialect: { type: string, enum: [openai-responses, anthropic-messages] }
+        dialect: { type: string, enum: [openai-responses] }
         baseUrl: { type: string }
     ProviderModel:
       type: object
@@ -4108,6 +4322,8 @@ components:
         outcome: { type: string, enum: [done, back, escalate, resume] }
         mode: { type: string, enum: [rerun, return_to_me] }
         suggestions: { type: string }
+        previewCommand: { type: string, description: With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it. }
+        previewUrl: { type: string, description: The address to open once the preview answers. }
         execution: { $ref: "#/components/schemas/Execution" }
         createdAt: { type: string, format: date-time }
     Execution:
@@ -4158,8 +4374,8 @@ components:
         id: { type: string }
         kind:
           type: string
-          enum: ['', confirm, acceptance]
-          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+          enum: ['', confirm, acceptance, recruitment]
+          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
         requirementId: { type: string }
         stageIndex: { type: integer }
         teamId: { type: string }
@@ -4170,6 +4386,10 @@ components:
         options:
           type: array
           items: { type: string }
+        roleIds:
+          type: array
+          items: { type: string }
+          description: "A recruitment question only: the role IDs the project manager asked to add."
         status: { type: string, enum: [open, answered, cancelled] }
         answerText: { type: string }
         answerMessageId: { type: string }
@@ -4237,11 +4457,11 @@ components:
       required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise). }
+        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager. }
         decision:
           type: string
-          enum: [accept, revise]
-          description: Required for a confirmation or acceptance question, refused for any other.
+          enum: [accept, revise, approve, reject]
+          description: Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
         mode:
           type: string
           enum: [rerun, return_to_me]

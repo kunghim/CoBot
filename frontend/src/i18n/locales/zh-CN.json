@@ -97,6 +97,19 @@
     "directoryClaimed": "该目录已被团队「{{teamName}}」使用，不能再创建新团队",
     "directoryClaimedUnknown": "该目录已被另一个 CoBot 环境中的团队使用，不能再创建新团队",
     "new": "新建团队",
+    "open": "打开团队",
+    "openTitle": "打开团队",
+    "openAction": {
+      "open": "这个文件夹是团队「{{name}}」的，可以直接打开。",
+      "restore": "这个文件夹属于已归档的团队「{{name}}」，确认后恢复并打开。",
+      "adopt": "这个文件夹之前属于团队「{{name}}」，但那份对话记录不在当前环境。",
+      "create": "这个文件夹还没有用过，可以在里面新建团队「{{name}}」。"
+    },
+    "openRestoreButton": "恢复并打开",
+    "openAdoptButton": "接管并建队",
+    "openCreateButton": "新建团队",
+    "adoptWarning": "接管会在当前环境新建一个团队绑定这个文件夹，并改写文件夹里的标记；原来的对话记录不会迁移过来。",
+    "adoptConfirm": "我已了解，接管这个文件夹",
     "createTitle": "新建团队",
     "chooseDirectory": "选择目录",
     "choosing": "等待选择…",
@@ -257,6 +270,8 @@
       "empty": "还没有往来消息"
     },
     "engineError": {
+      "modelRerouted": "引擎把模型换成了：{{message}}",
+      "guardian": "引擎安全层提示：{{message}}",
       "serverOverloaded": "模型当前满载，这一轮没能完成。请稍后重发，或在设置里换一个模型",
       "usageLimitExceeded": "账号的模型用量已达上限，这一轮没能完成。请等额度恢复后再试",
       "rateLimitExceeded": "请求太频繁被模型服务限流，请稍后重发",
@@ -317,7 +332,7 @@
         "other": "{{count}} 个步骤",
         "file_operation": "进行了 {{count}} 次文件操作"
       },
-      "done": "已处理 {{duration}} · {{count}} 个步骤",
+      "done": "用时 {{duration}}",
       "failedAfter": "执行失败 · {{duration}}",
       "retry": "重试这一轮",
       "interruptedAfter": "已停止 · {{duration}}",
@@ -380,6 +395,13 @@
     "send": "发送",
     "queuedBanner": "已收下 {{count}} 条，排队中",
     "cancelQueued": "取消排队消息",
+    "message": {
+      "copy": "复制原文",
+      "copied": "已复制",
+      "edit": "编辑并重发",
+      "save": "保存并重发",
+      "hint": "已改过的文件不会撤销；这一轮还在执行时会先停止，旧的对话记录会从会话里移除。"
+    },
     "interrupt": "停止",
     "interruptRequested": "已请求停止，等待引擎响应",
     "blocked": {
@@ -415,6 +437,10 @@
       "permissionWrite": "写入：{{paths}}"
     },
     "title": "安全审批",
+    "elicitation": {
+      "server": "来自 {{server}}",
+      "open": "打开并授权"
+    },
     "type": {
       "native_tool": "安全审批",
       "recovery": "中断恢复",
@@ -475,6 +501,8 @@
       "recovery_rerun": "重跑",
       "recovery_abandon": "放弃",
       "chain_stop": "停止该链",
+      "elicit_submit": "提交",
+      "elicit_decline": "拒绝",
       "unknown": "未知选项"
     }
   },
@@ -833,7 +861,16 @@
       "title": "交付验收",
       "accept": "验收通过",
       "revise": "继续修改",
-      "changesPlaceholder": "有修改意见写在这里；留空即验收通过"
+      "changesPlaceholder": "有修改意见写在这里；留空即验收通过",
+      "startPreview": "启动并打开",
+      "openAgain": "打开",
+      "stopPreview": "停止"
+    },
+    "recruitment": {
+      "title": "申请加入成员",
+      "approve": "同意加入",
+      "reject": "拒绝",
+      "commentPlaceholder": "想转告项目经理的话（可选）；拒绝时写明原因"
     },
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
     "dismissed": "{{count}} 张待验收",
@@ -865,7 +902,7 @@
       "apply": "重启空闲的引擎",
       "applied": "已重启 {{count}} 个引擎，下一轮对话时用新目录启动；另有 {{busy}} 个正在对话，结束后会自动用新目录。",
       "title": "模型目录",
-      "intro": "目录记着各个模型的上下文长度、能接收的输入类型和思考档位，添加模型时按模型名自动匹配，匹配上的项不用你填。数据来自 models.dev。",
+      "intro": "模型目录记录各模型的上下文长度、输入类型和思考档位，添加模型时按名称自动匹配。数据来自 models.dev，可手动更新。",
       "update": "更新模型目录",
       "updated": "模型目录已更新，共 {{count}} 个模型",
       "unreachable": "连不上 models.dev，请检查网络后再试，现用的目录没有变化。",
@@ -887,12 +924,10 @@
     "updated": "已保存 {{name}}，纳入 {{count}} 个模型",
     "readyToUse": "现在可以在会话里选择它的模型了。",
     "usableWith": "可用于 {{engines}}",
-    "noCodexEndpoint": "没有填 OpenAI 格式端点，就没法用当前引擎探测模型。可以直接添加，之后再补端点。",
+    "unusableClaude": "该供应商只支持 Claude 协议，已不再支持；请移除，或编辑它改成 OpenAI 格式端点。",
     "listSeparator": "、",
     "dialectResponses": "OpenAI 兼容",
-    "dialectAnthropic": "Anthropic 兼容",
     "badgeCodex": "Codex",
-    "badgeClaudeCode": "Claude Code",
     "dialog": {
       "addTitle": "添加模型供应商",
       "editTitle": "编辑 {{name}}",
@@ -907,10 +942,7 @@
       "displayName": "显示名称",
       "displayNamePlaceholder": "例如：公司的中转站",
       "openaiEndpoint": "OpenAI 格式端点",
-      "openaiEndpointHint": "Codex 走它的 /responses。",
-      "anthropicEndpoint": "Claude 格式端点",
-      "anthropicEndpointHint": "Claude Code 走它的 /v1/messages。",
-      "endpointHint": "只填 OpenAI 端点则只有 Codex 能用；两个都填则 Codex 与 Claude Code 通用。",
+      "openaiEndpointHint": "Codex 调用它的 /responses。",
       "apiKey": "API 密钥",
       "apiKeyPlaceholder": "sk-…",
       "keyHint": "在 <url>{{url}}</url> 获取你的密钥",
@@ -931,7 +963,7 @@
         "fromCatalog": "{{name}}：目录里的数字是上限，可以改小，不能超过；思考方式来自目录，不能改。",
         "custom": "模型目录里没有这个模型，下面的项都由你填写。",
         "alias": "别名",
-        "aliasHint": "显示模型时优先用别名，不填就用模型名。",
+        "aliasHint": "显示时优先于模型 ID。",
         "context": "上下文长度",
         "contextHint": "单位是 token。填了以后，接近上限时会自动压缩上下文。",
         "maxOutput": "最大输出长度",
@@ -947,11 +979,15 @@
         },
         "abilities": "能力",
         "webSearch": "互联网搜索",
-        "webSearchHint": "服务商支持联网搜索时再打开，不支持的会让整轮对话报错。",
+        "webSearchHint": "供应商不支持时，打开会让整轮对话报错。",
         "thinking": "思考",
         "thinkingToggle": "可以关闭思考",
         "thinkingToggleHint": "打开后，对话里可以直接开关思考。",
-        "thinkingHint": "勾选这个模型支持的思考档位；都不选时用低、中、高。"
+        "thinkingHint": "勾选这个模型支持的思考档位；都不选时用低、中、高。",
+        "contextLimitInfo": "目录给的上限是 {{limit}}：可以改小，不能超过。",
+        "contextInfo": "接近上限时，引擎会自动压缩上下文。",
+        "maxOutputLimitInfo": "目录给的上限是 {{limit}}。",
+        "maxOutputInfo": "仅供参考，引擎不据此截断。"
       },
       "selectAll": "全选",
       "clearAll": "清空",
@@ -1006,9 +1042,6 @@
   "preset": {
     "openai": {
       "name": "OpenAI 官方"
-    },
-    "anthropic": {
-      "name": "Anthropic 官方"
     },
     "deepseek": {
       "name": "DeepSeek"
@@ -1087,13 +1120,12 @@
     "back": "返回",
     "version": "版本",
     "limitsTitle": "协作上限",
-    "defaultModelHint": "成员还没在会话里选过模型时，用这个模型。可以选任何已启用供应商的模型。",
+    "defaultModelHint": "成员还没在会话里选过模型时，用这个。",
     "sections": {
       "general": "通用",
       "appearance": "外观",
       "roles": "角色",
       "engine": "Codex 引擎",
-      "models": "默认模型",
       "providers": "模型供应商",
       "collaboration": "协作与预算",
       "archived": "已归档",
@@ -1101,11 +1133,10 @@
     },
     "sectionHints": {
       "general": "界面语言等基础偏好。",
-      "appearance": "浅色、深色或跟随系统，以及界面配色。成员的角色颜色在所有主题里不变。",
-      "roles": "每个角色的默认头像。没有单独设置头像的成员会跟着角色变；在成员的会话里点头像，可以只改这一个成员。",
-      "engine": "CoBot 使用 ChatGPT 桌面端内置的 Codex，启动时自动检测并授权安全钩子。账号在 CoBot 的私有环境中独立登录。",
-      "models": "成员还没在会话里选过模型时用它，对之后开始的任务起作用。",
-      "providers": "配置一次，Codex 与 Claude Code 通用。启用的供应商的模型都可以在会话里选，在厂商自己的供应商里换模型，会接着原来的会话；换供应商或在网关里换模型，会开一个新会话，并把之前的完整记录交给新模型。",
+      "appearance": "浅色、深色或跟随系统，以及界面配色。",
+      "roles": "每个角色的默认头像；成员可以在自己的会话里覆盖。",
+      "engine": "CoBot 使用 ChatGPT 桌面端内置的 Codex；账号在 CoBot 内独立登录。",
+      "providers": "配置一次，Codex 即可使用；成员在会话里从任何已启用的供应商选模型。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
       "archived": "查看、恢复或删除已归档的聊天和团队。",
       "about": "版本、更新和项目信息。"
@@ -1156,7 +1187,7 @@
     "chainLimit": "协作链唤醒上限",
     "reviewRejectLimit": "评审打回次数上限",
     "budget": "每日预算",
-    "budgetHint": "按天统计，隔天自动重置。这里是默认值：团队和成员可以在「团队 → 每日预算」里各自调整。",
+    "budgetHint": "按天统计，隔天自动重置；这里是新团队的默认值。",
     "budgetScope": "默认范围",
     "budgetNone": "不限制",
     "budgetBot": "按成员",
@@ -1169,14 +1200,17 @@
     "dataRoot": "数据目录",
     "saved": "已保存",
     "saveFailed": "保存失败",
-    "engineAccountHint": "引擎不绑定账号：每个成员用哪个供应商的模型，在会话里选择；ChatGPT 账号在「模型供应商」里登录。",
+    "engineAccountHint": "每个成员用哪个模型，在会话里选择。",
     "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。",
     "modelSwitchTitle": "批量切换模型",
-    "modelSwitchHint": "给一位成员换模型时，是否顺手把还在用原模型的其他成员一起换掉。",
+    "modelSwitchHint": "换一位成员的模型时，是否同时换掉其他还在用原模型的成员。",
     "modelSwitchPrompt": "提示时机",
     "modelSwitchAlways": "每次都提示",
     "modelSwitchSmart": "仅当原模型的成员上次会话失败时提示",
-    "modelSwitchNever": "不提示"
+    "modelSwitchNever": "不提示",
+    "defaultModelInfo": "可选任何已启用供应商的模型；之后新增供应商不会改变这里。",
+    "budgetInfo": "团队和成员可以在「团队 → 每日预算」里各自调整。",
+    "engineAccountInfo": "ChatGPT 账号在「模型供应商」分区登录；不绑定到引擎。"
   },
   "auth": {
     "authorizing": "正在授权…",
@@ -1401,11 +1435,27 @@
     "error.chat.restarted": "应用重启，上一轮的执行结果需要核实。",
     "error.chat.unknown": "无法确认这一轮是否结束，不会自动重新执行。",
     "error.chat.archived": "这段聊天已归档或正在处理归档操作，请先恢复或核实。",
+    "error.chat.edit_not_user_message": "只能编辑自己发出的最后一条消息。",
+    "error.chat.edit_not_last": "只能编辑最后一条消息。",
+    "error.chat.revert_failed": "回退上一轮失败，消息没有改动；请稍后再试。",
+    "error.message.edit_not_user_message": "只能编辑你发给成员的最后一条消息。",
+    "error.message.edit_not_last": "只能编辑发给这位成员的最后一条消息。",
+    "error.message.edit_running": "这一轮还在执行，先停止再编辑。",
+    "error.message.edit_side_effects": "这条消息已经引起协作（需求、卡片或留言），不能编辑重发。",
+    "error.message.revert_failed": "回退上一轮失败，消息没有改动；请稍后再试。",
     "error.chat.archive_pending": "请先核实尚未完成的归档操作。",
     "error.chat.archive_unknown": "无法确认原生会话的归档状态，请核实后继续。",
     "error.chat.archive_state": "聊天归档状态已改变，请刷新后重试。",
     "error.chat.section_missing": "分区已不存在，请刷新后重试。",
     "error.chat.order_conflict": "列表顺序已改变，请刷新后重试。",
+    "error.team.role_present": "团队里已有这个角色的成员，不能再招募同一个角色",
+    "error.recruitment.leader_only": "只有项目经理可以申请招募成员",
+    "error.recruitment.roles_required": "请写明要招募的角色",
+    "error.recruitment.reason_required": "招募申请要写明理由",
+    "error.recruitment.member_limit": "招募 {{requested}} 名新成员会超过上限 {{limit}}",
+    "error.question.not_recruitment": "这张卡不是招募申请",
+    "error.question.recruitment_decision": "招募申请需要选择「同意加入」或「拒绝」",
+    "error.question.recruitment_decide": "招募申请不能忽略，请选择同意或拒绝",
     "error.workspace.watch_unavailable": "自动文件更新暂不可用，请手动刷新。",
     "error.workspace.latex_unavailable": "LaTeX 预览需要可用的隔离编译器和离线资源；仍可查看源码。",
     "error.workspace.latex_busy": "其他文档正在编译，请稍后重试。",

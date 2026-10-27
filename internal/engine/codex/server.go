@@ -219,10 +219,12 @@ func (s *Server) handleRequest(req InboundRequest) {
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
 		// Only verified native contracts become actionable product cards.
 	case "mcpServer/elicitation/request":
-		// MCP forms/URL authentication are not command approvals. This build
-		// cannot render them, so answer with the verified cancellation shape.
-		_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
-		return
+		// An MCP form or URL authentication becomes a card like the others;
+		// a build that cannot show it cancels instead of hanging the server.
+		if s.callbacks.OnApproval == nil {
+			_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
+			return
+		}
 	default:
 		_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
 		return
@@ -238,8 +240,13 @@ func (s *Server) handleRequest(req InboundRequest) {
 		Permissions json.RawMessage `json:"permissions"`
 		// command requests that need the network
 		NetworkApprovalContext json.RawMessage `json:"networkApprovalContext"`
+		// MCP elicitation: what the server asks, in its own words
+		Message string `json:"message"`
 	}
 	_ = json.Unmarshal(req.Params, &base)
+	if base.Reason == "" {
+		base.Reason = base.Message
+	}
 
 	var paths []string
 	var fileChange struct {
@@ -467,9 +474,16 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
 			// A message with no phase streams where it sits among the steps; its
-			// place as the reply is decided when the turn ends.
-			if phase := s.itemPhase(p.ItemID); phase == "commentary" || phase == noPhase {
+			// place as the reply is decided when the turn ends. An item the turn
+			// never announced (a gateway can stream deltas without an
+			// item/started) counts as one of those, and gets a step to stream
+			// into, so the words appear where they were said instead of piling
+			// up in the reply.
+			if phase := s.itemPhase(p.ItemID); phase == "" || phase == "commentary" || phase == noPhase {
 				n.DeltaKind, n.Phase = "commentary", "commentary"
+				if phase == "" {
+					n.Step = &engine.Step{ID: p.ItemID, Kind: engine.StepMessage, Status: engine.StepInProgress}
+				}
 			}
 		}
 	case "item/reasoning/summaryTextDelta", "item/commandExecution/outputDelta":
@@ -873,6 +887,19 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 	}
 	if err := s.client.Call(ctx, "turn/interrupt", map[string]any{"threadId": threadID, "turnId": turnID}, nil); err != nil {
 		return fmt.Errorf("turn/interrupt: %w", err)
+	}
+	return nil
+}
+
+// RevertTurn replaces the thread's durable history with the part before one
+// turn, that turn included. The engine answers with the truncated thread;
+// the model never sees the reverted turns again.
+func (s *Server) RevertTurn(ctx context.Context, threadID, beforeTurnID string) error {
+	if threadID == "" || beforeTurnID == "" {
+		return errors.New("revert requires thread and turn identity")
+	}
+	if err := s.client.Call(ctx, "thread/revert", map[string]any{"threadId": threadID, "beforeTurnId": beforeTurnID}, nil); err != nil {
+		return fmt.Errorf("thread/revert: %w", err)
 	}
 	return nil
 }

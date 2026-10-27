@@ -27,9 +27,15 @@
 
 | 身份 | 工具 |
 | --- | --- |
-| 项目经理 | `start_requirement`、`handoff`、`view_tasks`、`send_message`、`ask_user` |
+| 项目经理 | `start_requirement`、`handoff`、`view_tasks`、`send_message`、`ask_user`、`request_member` |
 | 成员 | `handoff`、`view_tasks`、`send_message`、`ask_user`、`browser` |
-| 子智能体 | 不能调用 `handoff`、`start_requirement`、`ask_user` |
+| 子智能体 | 不能调用 `handoff`、`start_requirement`、`ask_user`、`request_member` |
+
+## 招募成员
+
+- 团队缺角色时，项目经理用 `request_member` 申请招募：一次一个或多个角色 ID，附理由；只能申请角色库里 `leader` 以外、团队还没有的角色，成员上限在申请和同意时都会校验。
+- 申请是一张等用户决定的卡片，只能同意或拒绝，不能忽略。同意后成员加入团队，项目经理收到结果和成员 ID，继续安排工作；拒绝时项目经理收到结果和用户的留言（如果有）。
+- 用户同意前，这个角色不能排进链路。
 
 ## 交接
 

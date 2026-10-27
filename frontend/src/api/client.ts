@@ -189,7 +189,9 @@ export const api = {
   renameChat: (id: string, title: string, expectedRevision: number) => request<import('./types').Chat>('PATCH', `/api/v1/chats/${encodeURIComponent(id)}`, { title, expectedRevision }),
   deleteChat: (id: string, expectedRevision: number) => request<import('./types').Chat>('DELETE', `/api/v1/chats/${encodeURIComponent(id)}`, { expectedRevision }),
   chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
-  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
+  editChatMessage: (id: string, messageId: string, text: string) => request<import('./types').ChatPage>('POST', `/api/v1/chats/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/edit`, { text }),
+  editMessage: (messageId: string, text: string) => request<import('./types').SendMessageResult>('POST', `/api/v1/messages/${encodeURIComponent(messageId)}/edit`, { text }),
+  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]>; content?: Record<string, unknown> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
   openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {
     const status = await request<import('./types').Status>('GET', '/api/v1/status');
@@ -314,7 +316,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').ApprovalListResult>('GET', `/api/v1/approvals?${query.toString()}`);
   },
-  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number }) =>
+  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number; content?: Record<string, unknown> }) =>
     request<import('./types').Approval>('POST', `/api/v1/approvals/${approvalId}/decisions`, body),
 
   // Engine account and models (M2).
@@ -365,7 +367,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
   },
-  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise'; mode?: 'rerun' | 'return_to_me'; expectedRevision: number }) =>
+  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise' | 'approve' | 'reject'; mode?: 'rerun' | 'return_to_me'; expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
@@ -400,6 +402,11 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}`),
   setBrowserTabViewport: (teamId: string, tab: string, body: BrowserViewportRequest) =>
     request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
+  startPreview: (teamId: string, command: string) => request<{ started: boolean; running: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/start`, { command }),
+  stopPreview: (teamId: string, command?: string) => request<{ stopped: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/stop`, command ? { command } : {}),
+  openTeam: (path: string) => request<import('./types').OpenTeamResult>('POST', '/api/v1/teams/open', { path }),
+  adoptTeam: (body: { path: string; name: string; initialRoleIds?: string[] }) =>
+    request<{ team: import('./types').Team; bots: import('./types').Bot[] }>('POST', '/api/v1/teams/adopt', body),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
 };

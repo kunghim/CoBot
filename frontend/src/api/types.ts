@@ -79,7 +79,7 @@ export type ProviderPreset = components['schemas']['ProviderPreset'];
 export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
 
 /** The dialects an engine can speak. */
-export type ProviderDialect = 'openai-responses' | 'anthropic-messages';
+export type ProviderDialect = 'openai-responses';
 
 /** GET /providers */
 export interface ProviderListResult {
@@ -287,6 +287,17 @@ export interface MemoryListResult {
 export type Memory = components['schemas']['Memory'];
 
 /** POST /directories/check */
+/** What POST /teams/open decided a folder is good for. */
+export interface OpenTeamResult {
+  action: 'open' | 'restore' | 'adopt' | 'create';
+  teamId?: string;
+  teamName?: string;
+  archived?: boolean;
+  /** For create and adopt: the folder name, or the foreign marker's name. */
+  suggestedName?: string;
+  directory: string;
+}
+
 export interface DirectoryCheckResult {
   canonical: string;
   ok: boolean;

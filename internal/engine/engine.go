@@ -68,6 +68,10 @@ type Server interface {
 	// SteerTurn adds input to the thread's running turn, which must still be
 	// turnID; it fails once that turn has ended.
 	SteerTurn(ctx context.Context, threadID, turnID, text string) error
+	// RevertTurn replaces the thread's durable history with the part before
+	// one turn, that turn included. It only changes conversation history:
+	// file changes the turn made stay.
+	RevertTurn(ctx context.Context, threadID, beforeTurnID string) error
 	// ReplyApproval answers a pending native approval request with the exact
 	// response shape the engine expects (decision / permissions).
 	ReplyApproval(ctx context.Context, requestID json.RawMessage, response map[string]any) error

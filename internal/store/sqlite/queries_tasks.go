@@ -268,9 +268,16 @@ func InsertQuestion(ctx context.Context, tx *sql.Tx, q domain.Question) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO questions (id, kind, requirement_id, stage_index, team_id, requester_bot_id, task_id, run_id, question, options, status, revision, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		q.ID, q.Kind, q.RequirementID, q.StageIndex, q.TeamID, q.RequesterBotID, q.TaskID, q.RunID, q.Question, string(options), q.Status, q.Revision,
+	roleIDs, err := json.Marshal(q.RoleIDs)
+	if err != nil {
+		return err
+	}
+	if q.RoleIDs == nil {
+		roleIDs = []byte("[]")
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO questions (id, kind, requirement_id, stage_index, team_id, requester_bot_id, task_id, run_id, question, options, role_ids, status, revision, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		q.ID, q.Kind, q.RequirementID, q.StageIndex, q.TeamID, q.RequesterBotID, q.TaskID, q.RunID, q.Question, string(options), string(roleIDs), q.Status, q.Revision,
 		time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("insert question: %w", err)
@@ -281,10 +288,10 @@ func InsertQuestion(ctx context.Context, tx *sql.Tx, q domain.Question) error {
 // GetQuestion reads one question with its options.
 func GetQuestion(ctx context.Context, q Queryer, id string) (domain.Question, error) {
 	var out domain.Question
-	var options, created, answered string
-	err := q.QueryRowContext(ctx, `SELECT id, kind, requirement_id, stage_index, team_id, requester_bot_id, task_id, run_id, question, options, status,
+	var options, roleIDs, created, answered string
+	err := q.QueryRowContext(ctx, `SELECT id, kind, requirement_id, stage_index, team_id, requester_bot_id, task_id, run_id, question, options, role_ids, status,
 		answer_text, answer_message_id, revision, created_at, answered_at FROM questions WHERE id = ?`, id).
-		Scan(&out.ID, &out.Kind, &out.RequirementID, &out.StageIndex, &out.TeamID, &out.RequesterBotID, &out.TaskID, &out.RunID, &out.Question, &options,
+		Scan(&out.ID, &out.Kind, &out.RequirementID, &out.StageIndex, &out.TeamID, &out.RequesterBotID, &out.TaskID, &out.RunID, &out.Question, &options, &roleIDs,
 			&out.Status, &out.AnswerText, &out.AnswerMessageID, &out.Revision, &created, &answered)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Question{}, ErrNotFound
@@ -293,6 +300,7 @@ func GetQuestion(ctx context.Context, q Queryer, id string) (domain.Question, er
 		return domain.Question{}, err
 	}
 	_ = json.Unmarshal([]byte(options), &out.Options)
+	_ = json.Unmarshal([]byte(roleIDs), &out.RoleIDs)
 	out.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	out.AnsweredAt, _ = time.Parse(time.RFC3339Nano, answered)
 	return out, nil

@@ -214,7 +214,7 @@ func TestRecoveryDecisionsContinueRerunAbandon(t *testing.T) {
 			if binding["runId"] != runID {
 				continue
 			}
-			if _, err := h.app.DecideApproval(ctx, h.user, card.ID, option, "", card.Revision); err != nil {
+			if _, err := h.app.DecideApproval(ctx, h.user, card.ID, option, "", card.Revision, nil); err != nil {
 				t.Fatalf("decide %s: %v", option, err)
 			}
 			return

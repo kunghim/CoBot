@@ -318,6 +318,30 @@ export function useCreateTeam() {
   });
 }
 
+export function useStartPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string) => api.startPreview(teamId, command),
+  });
+}
+
+export function useStopPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string | undefined) => api.stopPreview(teamId, command),
+  });
+}
+
+export function useAdoptTeam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { path: string; name: string; initialRoleIds: string[] }) => api.adoptTeam(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      void qc.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+
 export function useRoles(enabled = true) {
   return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
 }
@@ -428,6 +452,28 @@ export function useCancelMessage(botId: string) {
   });
 }
 
+export function useEditMessage(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editMessage(messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+export function useEditChatMessage(chatId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editChatMessage(chatId, messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chat', chatId] });
+      void qc.invalidateQueries({ queryKey: ['chats'] });
+    },
+  });
+}
+
 export function useRetryRun(botId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -458,8 +504,8 @@ export function useApprovals(teamId: string | null, state: 'pending' | 'history'
 export function useDecideApproval() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ approvalId, optionId, expectedRevision }: { approvalId: string; optionId: string; expectedRevision: number }) =>
-      api.decideApproval(approvalId, { optionId, expectedRevision }),
+    mutationFn: ({ approvalId, optionId, expectedRevision, content }: { approvalId: string; optionId: string; expectedRevision: number; content?: Record<string, unknown> }) =>
+      api.decideApproval(approvalId, { optionId, expectedRevision, content }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['approvals'] });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
@@ -634,7 +680,7 @@ export function useAnswerQuestion() {
     }: {
       questionId: string;
       answerText: string;
-      decision?: 'accept' | 'revise';
+      decision?: 'accept' | 'revise' | 'approve' | 'reject';
       /** For revise on a confirmation: where the fixed work goes. */
       mode?: 'rerun' | 'return_to_me';
       expectedRevision: number;

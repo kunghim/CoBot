@@ -1,3 +1,4 @@
+import { Database, Gauge, Timer } from 'lucide-react';
 import { ReplyFileRow } from '../features/conversations/ResourceStrip';
 import { TableContents } from '../features/workspace/TablePreview';
 import { WorkbookContents } from '../features/workspace/WorkbookPreview';
@@ -114,5 +115,26 @@ export default function ChatPatterns() {
     <Doc id="unified-archive" name="已归档 · 聊天与团队" file="features/settings/ArchiveTypeControl.tsx" use="同一个归档设置入口按类型切换；各自保留删除与恢复语义。" avoid="切换类型不能保留上一类的批量选择。">
       <Demo><div className="space-y-4"><ArchiveTypeControl value={archiveType} onChange={setArchiveType} /><Card><EmptyState icon={<Icons.archive size={20} aria-hidden />} title={archiveType === 'chat' ? '没有已归档的聊天' : '没有已归档的团队'} /></Card></div></Demo>
     </Doc>
+    <Doc id="session-stats" name="SessionStatsBar 会话统计条" file="features/conversations/SessionStatsBar.tsx" use="输入框下方的会话统计：轮次与速度、Token 与缓存命中、上下文占用、账号额度。每项悬停或聚焦打开自己的面板；面板里第一行是标题和总数，比例用条形表达，估算说明弱化。窄窗口时整条换行，不挤压。">
+      <Demo surface="raised">
+        <div className="space-y-4">
+          <SessionStatsBarDemo />
+          <p className="text-2xs text-neutral-500">上下文超过 70% 变黄，超过 90% 变红；额度窗口同理。</p>
+        </div>
+      </Demo>
+    </Doc>
   </Chapter>;
+}
+
+/** The stats bar with a fixed sample of numbers, in the gallery where the
+ * engine is absent. */
+function SessionStatsBarDemo() {
+  return (
+    <div className="flex flex-wrap items-center gap-1 px-1 text-2xs text-neutral-500 dark:text-neutral-400">
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"><Timer size={12} aria-hidden className="text-current" /><span className="font-mono tabular-nums">6 轮 · 48 步</span><span className="font-mono tabular-nums">{'· 42 tok/s'}</span></span>
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"><Database size={12} aria-hidden className="text-current" /><span className="font-mono tabular-nums">1.6M tok</span><span className="rounded-full bg-neutral-900/[0.06] px-1.5 py-px font-mono tabular-nums dark:bg-white/[0.08]">缓存 94%</span></span>
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"><span className="font-mono tabular-nums text-signal-600 dark:text-signal-400">38%</span></span>
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"><Gauge size={12} aria-hidden className="text-current" /><span className="font-mono tabular-nums">10%</span></span>
+    </div>
+  );
 }

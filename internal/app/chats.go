@@ -22,13 +22,15 @@ type ChatSendInput struct {
 	PermissionMode string `json:"permissionMode,omitempty"`
 }
 type ChatActionInput struct {
-	SectionID        string              `json:"sectionId,omitempty"`
-	BeforeID         string              `json:"beforeId,omitempty"`
-	RequestID        string              `json:"requestId"`
-	Title            string              `json:"title,omitempty"`
-	OptionID         string              `json:"optionId,omitempty"`
-	ExpectedRevision int64               `json:"expectedRevision,omitempty"`
-	Answers          map[string][]string `json:"answers,omitempty"`
+	SectionID        string `json:"sectionId,omitempty"`
+	BeforeID         string `json:"beforeId,omitempty"`
+	RequestID        string `json:"requestId"`
+	Title            string `json:"title,omitempty"`
+	OptionID         string `json:"optionId,omitempty"`
+	ExpectedRevision int64  `json:"expectedRevision,omitempty"`
+	// Content is an MCP elicitation's accepted form values.
+	Content map[string]any      `json:"content,omitempty"`
+	Answers map[string][]string `json:"answers,omitempty"`
 }
 
 func (a *App) ListChats(ctx context.Context, p auth.Principal, cursor string) (domain.ChatList, error) {
@@ -352,4 +354,16 @@ func (a *App) ChatRunAction(ctx context.Context, p auth.Principal, chatID, runID
 		return domain.ChatRun{}, domain.Conflict("error.chat.engine_unavailable", nil)
 	}
 	return a.Chats.runAction(ctx, p, chatID, runID, action, in)
+}
+
+// EditChatMessage replaces the words of the chat's last user message and
+// sends them again; see ChatRunner.EditMessage.
+func (a *App) EditChatMessage(ctx context.Context, p auth.Principal, chatID, messageID string, in ChatEditText) (domain.ChatPage, error) {
+	if p.Kind != auth.KindUser {
+		return domain.ChatPage{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if a.Chats == nil {
+		return domain.ChatPage{}, domain.Conflict("error.chat.engine_unavailable", nil)
+	}
+	return a.Chats.EditMessage(ctx, p, chatID, messageID, in)
 }

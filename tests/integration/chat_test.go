@@ -507,3 +507,204 @@ func TestAChatTurnThatReconnectsAndFinishesIsNotShownAsFailed(t *testing.T) {
 		t.Fatalf("the reconnecting step stays open after the turn ended: %+v", s)
 	}
 }
+
+func TestChatEditRollsTheTurnBackAndSendsAgain(t *testing.T) {
+	h := newM2Harness(t)
+	made := attachChats(t, h, nil)
+	ctx := context.Background()
+	first, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "create", Text: "最初的问题"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	page := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	oldRun := page.Runs[0]
+	f.EmitTurnCompleted(oldRun.ThreadID, oldRun.TurnID, "completed", "第一轮的回答")
+	page = chatWait(t, h, first.Chat.ID, domain.RunCompleted)
+
+	userMessage := ""
+	for _, m := range page.Messages {
+		if m.Kind == domain.MessageKindUser {
+			userMessage = m.ID
+		}
+	}
+	if userMessage == "" {
+		t.Fatal("no user message on the page")
+	}
+	// Editing the finished turn: the thread rolls back, the old record goes,
+	// and the new words start a new turn.
+	edited, err := h.app.EditChatMessage(ctx, h.user, first.Chat.ID, userMessage, app.ChatEditText{RequestID: "edit-1", Text: "改过的问题"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reverted := f.Reverted(); len(reverted) != 1 || reverted[0] != oldRun.TurnID {
+		t.Fatalf("the engine was not asked to revert: %v", reverted)
+	}
+	if _, err := sqlite.GetChatRun(ctx, h.app.DB, oldRun.ID); !errors.Is(err, sqlite.ErrNotFound) {
+		t.Fatal("the old turn survived the edit", err)
+	}
+	if _, err := sqlite.GetChatMessage(ctx, h.app.DB, userMessage); !errors.Is(err, sqlite.ErrNotFound) {
+		t.Fatal("the old message survived the edit", err)
+	}
+	if len(edited.Messages) == 0 || edited.Messages[len(edited.Messages)-1].Text != "改过的问题" {
+		t.Fatalf("the edited message is not on the page: %+v", edited.Messages)
+	}
+	newPage := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	if newPage.Runs[0].ID == oldRun.ID {
+		t.Fatal("the new turn reused the old run")
+	}
+	f.EmitTurnCompleted(newPage.Runs[0].ThreadID, newPage.Runs[0].TurnID, "completed", "新的回答")
+	chatWait(t, h, first.Chat.ID, domain.RunCompleted)
+}
+
+func TestChatEditOfARunningTurnStopsItBeforeItResends(t *testing.T) {
+	h := newM2Harness(t)
+	made := attachChats(t, h, nil)
+	ctx := context.Background()
+	first, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "create", Text: "最初的问题"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	page := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	oldRun := page.Runs[0]
+	userMessage := ""
+	for _, m := range page.Messages {
+		if m.Kind == domain.MessageKindUser {
+			userMessage = m.ID
+		}
+	}
+	if _, err := h.app.EditChatMessage(ctx, h.user, first.Chat.ID, userMessage, app.ChatEditText{RequestID: "edit-live", Text: "改过的问题"}); err != nil {
+		t.Fatal(err)
+	}
+	// The running turn is asked to stop; the edit waits for its end.
+	if len(f.Interrupts()) != 1 {
+		t.Fatalf("the running turn was not interrupted: %v", f.Interrupts())
+	}
+	f.EmitTurnCompleted(oldRun.ThreadID, oldRun.TurnID, "interrupted", "")
+	newPage := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	if newPage.Runs[0].ID == oldRun.ID {
+		t.Fatal("the replacement turn reused the old run")
+	}
+	if reverted := f.Reverted(); len(reverted) != 1 || reverted[0] != oldRun.TurnID {
+		t.Fatalf("the thread was not rolled back after the stop: %v", reverted)
+	}
+	if _, err := sqlite.GetChatRun(ctx, h.app.DB, oldRun.ID); !errors.Is(err, sqlite.ErrNotFound) {
+		t.Fatal("the stopped turn's record survived the edit", err)
+	}
+}
+
+func TestChatEditThatCannotRevertChangesNothing(t *testing.T) {
+	h := newM2Harness(t)
+	made := attachChats(t, h, func(f *chatFake) { f.RevertErr = errors.New("thread busy") })
+	ctx := context.Background()
+	first, err := h.app.SendChat(ctx, h.user, "", app.ChatSendInput{RequestID: "create", Text: "最初的问题"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := chatCreated(t, made)
+	page := chatWait(t, h, first.Chat.ID, domain.RunRunning)
+	oldRun := page.Runs[0]
+	f.EmitTurnCompleted(oldRun.ThreadID, oldRun.TurnID, "completed", "第一轮的回答")
+	page = chatWait(t, h, first.Chat.ID, domain.RunCompleted)
+	userMessage := ""
+	for _, m := range page.Messages {
+		if m.Kind == domain.MessageKindUser {
+			userMessage = m.ID
+		}
+	}
+	if _, err := h.app.EditChatMessage(ctx, h.user, first.Chat.ID, userMessage, app.ChatEditText{RequestID: "edit-broken", Text: "改过的问题"}); err == nil {
+		t.Fatal("a failed revert was reported as an edit")
+	}
+	if _, err := sqlite.GetChatRun(ctx, h.app.DB, oldRun.ID); err != nil {
+		t.Fatal("the old turn was dropped although the revert failed", err)
+	}
+	if _, err := sqlite.GetChatMessage(ctx, h.app.DB, userMessage); err != nil {
+		t.Fatal("the message was dropped although the revert failed", err)
+	}
+}
+
+func TestEditingAMembersLastMessageRollsItsTurnBack(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	captain := bots[0]
+	fake := h.ensureFake(t, team.ID)
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "最初的问题"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn 1", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "第一轮的回答")
+	waitUntil(t, 5*time.Second, "turn 1 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return err != nil
+	})
+	var runID, userID string
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT id FROM runs WHERE bot_id = ? ORDER BY started_at DESC LIMIT 1`, captain.ID).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT id FROM messages WHERE bot_id = ? AND kind = 'user' ORDER BY created_at DESC LIMIT 1`, captain.ID).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := h.app.EditMessage(ctx, h.user, userID, app.MessageEditText{RequestID: "edit-1", Text: "改过的问题"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "the thread rolled back", func() bool { return len(fake.Reverted()) == 1 })
+	waitUntil(t, 5*time.Second, "turn 2", func() bool { return len(fake.Turns()) == 2 })
+	second := fake.Turns()[1]
+	fake.EmitTurnCompleted(second.ThreadID, second.TurnID, "completed", "新的回答")
+	waitUntil(t, 5*time.Second, "turn 2 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return err != nil
+	})
+	if _, err := sqlite.GetRun(ctx, h.app.DB, runID); !errors.Is(err, sqlite.ErrNotFound) {
+		t.Fatal("the old run survived the edit", err)
+	}
+	var text string
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT json_extract(blocks,'$[0].text') FROM messages WHERE bot_id = ? AND kind = 'user' ORDER BY created_at DESC LIMIT 1`, captain.ID).Scan(&text); err != nil {
+		t.Fatal(err)
+	}
+	if text != "改过的问题" {
+		t.Fatalf("the edited message did not go out: %q", text)
+	}
+}
+
+func TestEditingAMembersMessageThatMovedCollaborationIsRefused(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, bots := h.createTeam(t, nil)
+	captain := bots[0]
+	fake := h.ensureFake(t, team.ID)
+
+	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "最初的问题"}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 5*time.Second, "turn 1", func() bool { return len(fake.Turns()) == 1 })
+	turn := fake.Turns()[0]
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, "completed", "第一轮的回答")
+	waitUntil(t, 5*time.Second, "turn 1 done", func() bool {
+		_, err := sqlite.FindActiveRun(ctx, h.app.DB, captain.ID)
+		return err != nil
+	})
+	var runID, userID string
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT id FROM runs WHERE bot_id = ? ORDER BY started_at DESC LIMIT 1`, captain.ID).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.app.DB.QueryRowContext(ctx, `SELECT id FROM messages WHERE bot_id = ? AND kind = 'user' ORDER BY created_at DESC LIMIT 1`, captain.ID).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	// The turn handed a requirement to the project manager: its starting
+	// message cannot be rolled back.
+	if _, err := sqlite.UpsertRunStep(ctx, h.app.DB, domain.RunStep{ID: "req-1", RunID: runID, TeamID: team.ID, BotID: captain.ID, Kind: "tool", Status: "completed", Detail: []byte(`{"server":"cobot","tool":"start_requirement"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.app.EditMessage(ctx, h.user, userID, app.MessageEditText{RequestID: "edit-1", Text: "改过的问题"}); err == nil {
+		t.Fatal("a turn with collaboration was edited anyway")
+	}
+	if len(fake.Reverted()) != 0 {
+		t.Fatal("the thread was rolled back although the turn had collaboration")
+	}
+}

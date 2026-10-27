@@ -160,3 +160,39 @@ func (s *Server) handleOpenChatPath(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, r, http.StatusOK, v)
 }
+
+func (s *Server) handleChatMessageEdit(w http.ResponseWriter, r *http.Request) {
+	p, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in app.ChatEditText
+	if e := decodeBody(w, r, &in); e != nil {
+		writeError(w, r, e)
+		return
+	}
+	v, e := s.App.EditChatMessage(r.Context(), p, r.PathValue("chatId"), r.PathValue("messageId"), in)
+	if e != nil {
+		writeError(w, r, e)
+		return
+	}
+	writeData(w, r, http.StatusOK, v)
+}
+
+func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
+	p, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in app.MessageEditText
+	if e := decodeBody(w, r, &in); e != nil {
+		writeError(w, r, e)
+		return
+	}
+	v, e := s.App.EditMessage(r.Context(), p, r.PathValue("messageId"), in)
+	if e != nil {
+		writeError(w, r, e)
+		return
+	}
+	writeData(w, r, http.StatusOK, v)
+}

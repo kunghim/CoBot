@@ -335,7 +335,9 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	if err != nil || len(queue) == 0 {
 		if err == nil {
 			var questions int
-			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&questions); e != nil {
+			// An open ask_user or recruitment question means the member is
+			// waiting on the user's decision, not idle.
+			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind IN ('', 'recruitment')`, botID).Scan(&questions); e != nil {
 				return e
 			}
 			queued, e := sqlite.CountQueuedDeliveries(ctx, s.app.DB, botID)

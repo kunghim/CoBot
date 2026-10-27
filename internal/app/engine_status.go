@@ -271,6 +271,8 @@ func (a *App) control(ctx context.Context) (*codex.Server, error) {
 
 // ShutdownControl stops the profile-wide control server during core exit.
 func (a *App) ShutdownControl(ctx context.Context) error {
+	// Preview processes are the core's children; they must not outlive it.
+	a.stopAllPreviews()
 	a.engineControlMu.Lock()
 	control := a.engineControl
 	a.engineControl = nil

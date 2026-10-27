@@ -78,18 +78,14 @@ func TestProviderOfficialNeedsNoCredentialAndNoEndpoint(t *testing.T) {
 
 func TestProviderEndpointLookup(t *testing.T) {
 	p := validProvider()
-	p.Endpoints = append(p.Endpoints, ProviderEndpoint{
-		Dialect: DialectAnthropicMessages,
-		BaseURL: "https://api.deepseek.com/anthropic",
-	})
-	if !p.SupportsDialect(DialectOpenAIResponses) || !p.SupportsDialect(DialectAnthropicMessages) {
-		t.Fatal("provider lost a dialect it declares")
+	if !p.SupportsDialect(DialectOpenAIResponses) {
+		t.Fatal("provider lost the dialect it declares")
 	}
 	if p.SupportsDialect("grpc") {
 		t.Fatal("provider claims a dialect it does not declare")
 	}
-	ep, ok := p.EndpointFor(DialectAnthropicMessages)
-	if !ok || ep.BaseURL != "https://api.deepseek.com/anthropic" {
+	ep, ok := p.EndpointFor(DialectOpenAIResponses)
+	if !ok || ep.Dialect != DialectOpenAIResponses || ep.BaseURL != "https://api.deepseek.com/v1" {
 		t.Fatalf("wrong endpoint: %+v", ep)
 	}
 	if _, ok := p.EndpointFor("grpc"); ok {

@@ -88,11 +88,21 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 			return SendMessageResult{}, err
 		}
 	}
+	return a.enqueueUserMessage(ctx, principal, team, bot, text, in.RequestID)
+}
 
+// enqueueUserMessage stores one user message with its chain and delivery and
+// hands it to the scheduler. The caller owns the idempotency write scope and
+// has checked the team's status; a duplicate request id here is refused.
+func (a *App) enqueueUserMessage(ctx context.Context, principal auth.Principal, team domain.Team, bot domain.Bot, text, requestID string) (SendMessageResult, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return SendMessageResult{}, err
+	}
 	message := domain.Message{
 		ID: domain.NewID(), TeamID: team.ID, BotID: bot.ID,
 		Kind: domain.MessageKindUser, Blocks: blocks,
-		RequestID: in.RequestID, DeliveryStatus: domain.DeliveryQueued,
+		RequestID: requestID, DeliveryStatus: domain.DeliveryQueued,
 		CreatedAt: time.Now().UTC(),
 	}
 	deliveryID := domain.NewID()
@@ -103,7 +113,7 @@ func (a *App) SendMessage(ctx context.Context, principal auth.Principal, in Send
 	defer tx.Rollback()
 	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
 		if isUniqueViolation(err) {
-			return SendMessageResult{}, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": in.RequestID})
+			return SendMessageResult{}, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": requestID})
 		}
 		return SendMessageResult{}, err
 	}

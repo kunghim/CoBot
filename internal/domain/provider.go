@@ -32,8 +32,7 @@ const (
 // Wire dialects. One provider may offer several; each engine picks the one it
 // can speak. The engine never gets a protocol it does not implement.
 const (
-	DialectOpenAIResponses   = "openai-responses"
-	DialectAnthropicMessages = "anthropic-messages"
+	DialectOpenAIResponses = "openai-responses"
 )
 
 // Result of the last connectivity check for one model.
@@ -188,7 +187,7 @@ func (p Provider) Validate() error {
 	}
 	for _, ep := range p.Endpoints {
 		switch ep.Dialect {
-		case DialectOpenAIResponses, DialectAnthropicMessages:
+		case DialectOpenAIResponses:
 		default:
 			return InvalidRequest("error.provider.invalid_dialect", map[string]any{"dialect": ep.Dialect})
 		}

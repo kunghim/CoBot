@@ -48,7 +48,7 @@ test('a turn shows its process live and keeps it afterwards', async ({ page }) =
   // Afterwards the reply is rendered Markdown and the process is one
   // collapsed line that expands into the same steps.
   await expect(page.getByRole('heading', { name: '已完成' })).toBeVisible({ timeout: 20000 });
-  const header = runBlock.getByRole('button', { name: /已处理/ });
+  const header = runBlock.getByRole('button', { name: /用时/ });
   await expect(header).toBeVisible({ timeout: 10000 });
   await expect(header).toHaveAttribute('aria-expanded', 'false');
   await header.click();
@@ -64,7 +64,7 @@ test('a turn shows its process live and keeps it afterwards', async ({ page }) =
   await page.reload();
   // The selected member and stored process are restored together.
   await expect(page.getByRole('heading', { name: '已完成' })).toBeVisible({ timeout: 15000 });
-  await page.getByTestId('run-process').last().getByRole('button', { name: /已处理/ }).click();
+  await page.getByTestId('run-process').last().getByRole('button', { name: /用时/ }).click();
   await expect(page.getByTestId('run-process').last().getByText('运行了命令')).toBeVisible();
 
   // A file link opens the internal file workspace and never launches a system program.

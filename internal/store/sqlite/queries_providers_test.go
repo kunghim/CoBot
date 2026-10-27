@@ -15,7 +15,6 @@ func seedProvider() domain.Provider {
 		AuthMode: domain.ProviderAuthAPIKey,
 		Endpoints: []domain.ProviderEndpoint{
 			{Dialect: domain.DialectOpenAIResponses, BaseURL: "https://api.deepseek.com/v1"},
-			{Dialect: domain.DialectAnthropicMessages, BaseURL: "https://api.deepseek.com/anthropic"},
 		},
 		Models: []domain.ProviderModel{
 			{ID: "deepseek-v4-pro", ContextWindow: 1000000, Status: domain.ModelStatusOK},
@@ -40,7 +39,7 @@ func TestProviderRoundTrip(t *testing.T) {
 	if saved.Revision != 1 {
 		t.Fatalf("new provider revision = %d, want 1", saved.Revision)
 	}
-	if len(saved.Endpoints) != 2 || saved.Endpoints[1].Dialect != domain.DialectAnthropicMessages {
+	if len(saved.Endpoints) != 1 || saved.Endpoints[0].Dialect != domain.DialectOpenAIResponses {
 		t.Fatalf("endpoints did not survive: %+v", saved.Endpoints)
 	}
 	if len(saved.Models) != 2 {

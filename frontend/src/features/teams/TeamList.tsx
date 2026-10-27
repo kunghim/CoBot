@@ -11,6 +11,7 @@ import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
 import { Alert, Badge, cx, EmptyState, Icons, interactive, IconButton, MemberRow, Skeleton } from '../../components/ui';
 import CreateTeamDialog from './CreateTeamDialog';
+import OpenTeamDialog from './OpenTeamDialog';
 import TeamMenu from './TeamMenu';
 import { findBotContext, orderBotsLeaderFirst, teamBadgeKey } from './teamUtils';
 import Avatar from '../avatars/Avatar';
@@ -25,6 +26,7 @@ export default function TeamList() {
   const teams = useTeams(true);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [openOpen, setOpenOpen] = useState(false);
 
   // Archived teams live in Settings; the sidebar lists teams in use.
   const items = (teams.data?.items ?? []).filter((item) => item.team.status !== 'archived');
@@ -59,7 +61,10 @@ export default function TeamList() {
       {/* The list title keeps a compact +; creating a team opens the dialog. */}
       <div className="flex items-center justify-between px-4 pb-1 pt-2">
         <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('nav.teamList')}</p>
-        <IconButton size="sm" icon={Icons.add} label={t('team.new')} onClick={() => setCreateOpen(true)} />
+        <span className="flex items-center gap-0.5">
+          <IconButton size="sm" icon={Icons.openFolder} label={t('team.open')} onClick={() => setOpenOpen(true)} />
+          <IconButton size="sm" icon={Icons.add} label={t('team.new')} onClick={() => setCreateOpen(true)} />
+        </span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -98,6 +103,15 @@ export default function TeamList() {
           setCreateOpen(false);
           expand(teamId);
           select(leaderBotId);
+        }}
+      />
+      <OpenTeamDialog
+        open={openOpen}
+        onClose={() => setOpenOpen(false)}
+        onOpened={(_leaderBotId, teamId) => {
+          setOpenOpen(false);
+          expand(teamId);
+          navigate('/');
         }}
       />
     </div>

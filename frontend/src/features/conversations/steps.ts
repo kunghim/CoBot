@@ -163,8 +163,11 @@ export function visibleSteps(steps: RunStep[], live: LiveRun | undefined, replyT
 }
 
 /** A turn read as the member lived it: what it said, and the stretches of
- * work between the sayings. */
-export type TurnBlock = { kind: 'text'; step: RunStep } | { kind: 'work'; id: string; steps: RunStep[] };
+ * work between the sayings. A stretch holds consecutive steps of one kind;
+ * a step of another counted kind starts the next stretch, and steps that are
+ * not counted on their own (a thought, a notice) follow along inside the
+ * stretch they land in. */
+export type TurnBlock = { kind: 'text'; step: RunStep } | { kind: 'work'; id: string; steps: RunStep[]; of?: string };
 
 export function turnBlocks(steps: RunStep[]): TurnBlock[] {
   const out: TurnBlock[] = [];
@@ -173,9 +176,13 @@ export function turnBlocks(steps: RunStep[]): TurnBlock[] {
       out.push({ kind: 'text', step });
       continue;
     }
+    const of = (countedKinds as readonly string[]).includes(step.kind) ? step.kind : undefined;
     const last = out[out.length - 1];
-    if (last?.kind === 'work') last.steps.push(step);
-    else out.push({ kind: 'work', id: step.id, steps: [step] });
+    if (last?.kind === 'work' && (of === undefined || last.of === of)) {
+      last.steps.push(step);
+      continue;
+    }
+    out.push({ kind: 'work', id: step.id, steps: [step], of });
   }
   return out;
 }

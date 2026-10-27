@@ -9,7 +9,10 @@ import (
 )
 
 // Desktop identity and bundle boundaries keep old standalone installations
-// from silently taking the place of the desktop app's engine.
+// from silently taking the place of the desktop app's engine. The exact
+// package identity OpenAI.Codex is store-assigned and sufficient on its own;
+// its publisher subject has been seen as a bare GUID, so a publisher match
+// is only required when the name alone is loose (a ChatGPT-branded package).
 func isDesktopEngine(path string) bool {
 	if !regularFile(path) {
 		return false
@@ -94,9 +97,19 @@ func desktopWindowsBundle(root string) bool {
 					publisher = strings.ToLower(attr.Value)
 				}
 			}
-			return (name == "openai.codex" || strings.Contains(name, "chatgpt")) && strings.Contains(publisher, "openai")
+			return name == "openai.codex" || (strings.Contains(name, "chatgpt") && strings.Contains(publisher, "openai"))
 		}
 	}
+}
+
+// resolveEnginePath follows symlinks when the OS allows it and falls back to
+// the path as given: the WindowsApps store directory denies the traversal
+// EvalSymlinks needs, while the registered package's own files stay readable.
+func resolveEnginePath(candidate string) (string, bool) {
+	if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
+		candidate = resolved
+	}
+	return candidate, isDesktopEngine(candidate)
 }
 
 func findDesktopEngine(roots []string) (string, error) {
@@ -106,14 +119,19 @@ func findDesktopEngine(roots []string) (string, error) {
 		}
 		if desktopMacBundle(root) {
 			for _, relative := range macEnginePaths() {
-				candidate := filepath.Join(root, relative)
-				if resolved, err := filepath.EvalSymlinks(candidate); err == nil && isDesktopEngine(resolved) {
+				if resolved, ok := resolveEnginePath(filepath.Join(root, relative)); ok {
 					return resolved, nil
 				}
 			}
 		}
 		if !desktopWindowsBundle(root) {
 			continue
+		}
+		// The engine lives at a fixed place in the package, beside a small
+		// launcher also named Codex.exe; the fixed path decides, and only a
+		// package without it falls back to the (possibly ambiguous) search.
+		if resolved, ok := resolveEnginePath(filepath.Join(root, "app", "resources", "codex.exe")); ok {
+			return resolved, nil
 		}
 		// Store metadata supplies the real root; never guess WindowsApps paths.
 		var found string
@@ -133,7 +151,7 @@ func findDesktopEngine(roots []string) (string, error) {
 			return "", err
 		}
 		if found != "" {
-			if resolved, err := filepath.EvalSymlinks(found); err == nil && isDesktopEngine(resolved) {
+			if resolved, ok := resolveEnginePath(found); ok {
 				return resolved, nil
 			}
 		}

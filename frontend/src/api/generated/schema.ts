@@ -1004,6 +1004,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/preview/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a preview process the user opened from an acceptance card */
+        post: operations["startPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/preview/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a preview process (or all of the team's) */
+        post: operations["stopPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/browser": {
         parameters: {
             query?: never;
@@ -1155,6 +1189,40 @@ export interface paths {
         put?: never;
         /** Send a user message (persisted and queued; answered with 202) */
         post: operations["sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of the chat's last user message and send them again */
+        post: operations["editChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of a member's last user message and send them again */
+        post: operations["editMessage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1504,6 +1572,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a project folder to the team action that fits it */
+        post: operations["openTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bind a folder another CoBot instance marked to a new team here */
+        post: operations["adoptTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations": {
         parameters: {
             query?: never;
@@ -1800,7 +1902,7 @@ export interface components {
         /** @description One wire dialect the provider offers. */
         ProviderEndpoint: {
             /** @enum {string} */
-            dialect: "openai-responses" | "anthropic-messages";
+            dialect: "openai-responses";
             baseUrl: string;
         };
         ProviderModel: {
@@ -1965,6 +2067,10 @@ export interface components {
             /** @enum {string} */
             mode?: "rerun" | "return_to_me";
             suggestions?: string;
+            /** @description With a runnable result */
+            previewCommand?: string;
+            /** @description The address to open once the preview answers. */
+            previewUrl?: string;
             execution?: components["schemas"]["Execution"];
             /** Format: date-time */
             createdAt: string;
@@ -2006,10 +2112,10 @@ export interface components {
         Question: {
             id: string;
             /**
-             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
              * @enum {string}
              */
-            kind: "" | "confirm" | "acceptance";
+            kind: "" | "confirm" | "acceptance" | "recruitment";
             requirementId?: string;
             stageIndex?: number;
             teamId: string;
@@ -2018,6 +2124,8 @@ export interface components {
             runId?: string;
             question: string;
             options: string[];
+            /** @description A recruitment question only: the role IDs the project manager asked to add. */
+            roleIds?: string[];
             /** @enum {string} */
             status: "open" | "answered" | "cancelled";
             answerText?: string;
@@ -2108,10 +2216,10 @@ export interface components {
             /** @description The answer; for a confirmation or acceptance */
             answerText: string;
             /**
-             * @description Required for a confirmation or acceptance question, refused for any other.
+             * @description Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
              * @enum {string}
              */
-            decision?: "accept" | "revise";
+            decision?: "accept" | "revise" | "approve" | "reject";
             /**
              * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
              * @enum {string}
@@ -4820,6 +4928,67 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
+    startPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The start command from the acceptance handoff's preview; run in the team directory. */
+                    command: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Started (or already running from an earlier press) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    stopPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The command that started it; omit to stop every preview of the team. */
+                    command?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stopped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+        };
+    };
     getTeamBrowser: {
         parameters: {
             query?: never;
@@ -5190,6 +5359,67 @@ export interface operations {
             409: components["responses"]["Error"];
         };
     };
+    editChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    editMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The turn was rolled back and the new words queued; delivery status arrives via events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     cancelMessage: {
         parameters: {
             query?: never;
@@ -5327,6 +5557,8 @@ export interface operations {
                     comment?: string;
                     /** Format: int64 */
                     expectedRevision: number;
+                    /** @description An MCP elicitation's accepted form values, keyed by field name. */
+                    content?: Record<string, never>;
                 };
             };
         };
@@ -5819,6 +6051,86 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
+        };
+    };
+    openTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The action to take: open, restore, adopt or create */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            /**
+                             * @description open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                             * @enum {string}
+                             */
+                            action: "open" | "restore" | "adopt" | "create";
+                            teamId?: string;
+                            teamName?: string;
+                            archived?: boolean;
+                            /** @description For the create and adopt actions; the folder name or the foreign marker's team name. */
+                            suggestedName?: string;
+                            directory: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    adoptTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                    name: string;
+                    initialRoleIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The adopted team with its members; the folder's marker now names this instance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            team?: components["schemas"]["Team"];
+                            bots?: components["schemas"]["Bot"][];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     listAuthorizations: {

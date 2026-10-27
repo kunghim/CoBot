@@ -54,7 +54,7 @@ export default function Layout() {
 
   return (
     <WorkspaceProvider teamId={context?.team.id ?? null} botId={botId}>
-      <Columns context={context} teamList={teamList} listOpen={shell.listOpen} />
+      <Columns context={context} teamList={teamList} listOpen={shell.listOpen} watchedBotId={botId ?? undefined} />
     </WorkspaceProvider>
   );
 }
@@ -66,7 +66,7 @@ export default function Layout() {
  * the conversation take turns. What the user set — the list open, the
  * workspace's width — is kept for when the window grows again.
  */
-function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof findBotContext> | null; teamList: ReactNode; listOpen: boolean }) {
+function Columns({ context, teamList, listOpen, watchedBotId }: { context: ReturnType<typeof findBotContext> | null; teamList: ReactNode; listOpen: boolean; watchedBotId?: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -99,7 +99,7 @@ function Columns({ context, teamList, listOpen }: { context: ReturnType<typeof f
           <div className="relative mt-2 flex min-h-0 flex-1 flex-col rounded-t-2xl bg-canvas shadow-sheet"><Outlet /></div>
         </main>
 
-        <WorkspaceColumn context={context} width={layout.workspaceWidth} fill={!layout.showConversation || state.fullView} />
+        <WorkspaceColumn context={context} width={layout.workspaceWidth} fill={!layout.showConversation || state.fullView} watchedBotId={watchedBotId} />
       </div>
   );
 }
@@ -114,7 +114,7 @@ function Column({ children }: { children: ReactNode }) {
  * The workspace column: the drag line and the area itself, present only
  * while the workspace is open on a team the user is looking at.
  */
-function WorkspaceColumn({ context, width, fill }: { context: ReturnType<typeof findBotContext> | null; width: number; fill: boolean }) {
+function WorkspaceColumn({ context, width, fill, watchedBotId }: { context: ReturnType<typeof findBotContext> | null; width: number; fill: boolean; watchedBotId?: string }) {
   const { t } = useTranslation();
   const { state, setWidth } = useWorkspace();
   if (!state.open || !context || width <= 0) return null;
@@ -122,7 +122,7 @@ function WorkspaceColumn({ context, width, fill }: { context: ReturnType<typeof 
     <>
       <SplitHandle value={state.width} min={MIN_WIDTH} max={MAX_WIDTH} label={t('workspace.resize')} onChange={setWidth} />
       <div style={fill ? undefined : { width }} className={cx('min-h-0', fill ? 'min-w-0 flex-1' : 'shrink-0')}>
-        <Workspace teamId={context.team.id} bots={context.item.bots} />
+        <Workspace teamId={context.team.id} bots={context.item.bots} watchedBotId={watchedBotId} />
       </div>
     </>
   );
