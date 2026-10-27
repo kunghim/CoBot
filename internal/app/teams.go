@@ -672,10 +672,19 @@ func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptT
 	if principal.Kind != auth.KindUser {
 		return domain.Team{}, nil, domain.Forbidden("error.forbidden.user_only", nil)
 	}
+	// The folder is canonicalized before any path use, exactly as creation
+	// does: everything below works on the canonical display path only.
+	canon, err := platform.CanonicalDirFrom(strings.TrimSpace(in.Directory))
+	if err != nil {
+		return domain.Team{}, nil, domain.InvalidRequest("error.team.directory_invalid", map[string]any{"detail": err.Error()})
+	}
+	if info, err := os.Stat(canon.Display); err != nil || !info.IsDir() {
+		return domain.Team{}, nil, domain.InvalidRequest("error.team.directory_missing", map[string]any{"directory": canon.Display})
+	}
 	// The folder must still be marked by someone else: an unmarked folder
 	// goes through creation, and a folder this instance holds stays with
 	// that team.
-	if err := a.refuseForeignOnly(ctx, strings.TrimSpace(in.Directory)); err != nil {
+	if err := a.refuseForeignOnly(ctx, canon.Display); err != nil {
 		return domain.Team{}, nil, err
 	}
 	// Creation carries the rest: name, roles, limits, the nested check, and
@@ -687,7 +696,7 @@ func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptT
 	// stay in force. The write scope is dropped before delegating:
 	// CreateTeam re-derives the idempotency lock from the same request id and
 	// would wait on itself.
-	if err := a.retireForeignMarker(ctx, strings.TrimSpace(in.Directory)); err != nil {
+	if err := a.retireForeignMarker(ctx, canon); err != nil {
 		return domain.Team{}, nil, err
 	}
 	inner := principal
@@ -705,11 +714,21 @@ func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptT
 // folder unmarked until creation writes this instance's own. A failure here
 // refuses the adoption: half-retired markers would let creation proceed on a
 // folder whose state was never confirmed.
-func (a *App) retireForeignMarker(ctx context.Context, dir string) error {
-	if err := a.refuseForeignOnly(ctx, dir); err != nil {
+func (a *App) retireForeignMarker(ctx context.Context, canon platform.CanonicalDir) error {
+	if err := a.refuseForeignOnly(ctx, canon.Display); err != nil {
 		return err
 	}
-	if err := os.Remove(filepath.Join(dir, ".cobot", "team.json")); err != nil {
+	marker := filepath.Join(canon.Display, ".cobot", "team.json")
+	if root, err := os.OpenRoot(canon.Display); err == nil {
+		defer root.Close()
+		if err := root.Remove(filepath.Join(".cobot", "team.json")); err == nil {
+			return nil
+		}
+	}
+	// Older kernels without os.Root support keep the plain removal; the path
+	// is the canonical display path, and refuseForeignOnly has just verified
+	// it is a foreign CoBot marker.
+	if err := os.Remove(marker); err != nil {
 		return domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
 	}
 	return nil
