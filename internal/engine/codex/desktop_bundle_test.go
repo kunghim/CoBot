@@ -87,13 +87,31 @@ func TestWindowsDesktopPackageDiscoveryUsesManifestAndRejectsAmbiguity(t *testin
 	if err != nil || got != binary || !isDesktopEngine(binary) {
 		t.Fatalf("Windows desktop package: %q, %v", got, err)
 	}
+	// The package ships a launcher beside the engine; the known relative
+	// path decides instead of a name search.
+	launcher := writeDesktopFixture(t, filepath.Join(root, "app", "Codex.exe"), "launcher stub")
+	if got, err := findDesktopEngine([]string{root}); err != nil || got != binary {
+		t.Fatalf("launcher stub beat the engine: %q, %v", got, err)
+	}
+	// Away from the known locations a second engine is genuinely ambiguous.
+	if err := os.Remove(filepath.Join(root, "app", "resources", "codex.exe")); err != nil {
+		t.Fatal(err)
+	}
 	second := writeDesktopFixture(t, filepath.Join(root, "other", "codex.exe"), "other architecture")
+	writeDesktopFixture(t, filepath.Join(root, "another", "codex.exe"), "yet another")
 	if _, err := findDesktopEngine([]string{root}); err == nil {
 		t.Fatal("ambiguous Windows package silently picked an engine")
 	}
 	if err := os.Remove(second); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Remove(filepath.Join(root, "another", "codex.exe")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(launcher); err != nil {
+		t.Fatal(err)
+	}
+	writeDesktopFixture(t, filepath.Join(root, "app", "resources", "codex.exe"), "desktop engine")
 	// The store-assigned identity OpenAI.Codex is enough: the live app has
 	// shipped with a bare-GUID publisher subject, so the exact name carries
 	// the check and the publisher only guards a loose ChatGPT-branded name.

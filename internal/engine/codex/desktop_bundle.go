@@ -102,6 +102,16 @@ func desktopWindowsBundle(root string) bool {
 	}
 }
 
+// resolveEnginePath follows symlinks when the OS allows it and falls back to
+// the path as given: the WindowsApps store directory denies the traversal
+// EvalSymlinks needs, while the registered package's own files stay readable.
+func resolveEnginePath(candidate string) (string, bool) {
+	if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
+		candidate = resolved
+	}
+	return candidate, isDesktopEngine(candidate)
+}
+
 func findDesktopEngine(roots []string) (string, error) {
 	for _, root := range roots {
 		if root == "" {
@@ -109,14 +119,19 @@ func findDesktopEngine(roots []string) (string, error) {
 		}
 		if desktopMacBundle(root) {
 			for _, relative := range macEnginePaths() {
-				candidate := filepath.Join(root, relative)
-				if resolved, err := filepath.EvalSymlinks(candidate); err == nil && isDesktopEngine(resolved) {
+				if resolved, ok := resolveEnginePath(filepath.Join(root, relative)); ok {
 					return resolved, nil
 				}
 			}
 		}
 		if !desktopWindowsBundle(root) {
 			continue
+		}
+		// The engine lives at a fixed place in the package, beside a small
+		// launcher also named Codex.exe; the fixed path decides, and only a
+		// package without it falls back to the (possibly ambiguous) search.
+		if resolved, ok := resolveEnginePath(filepath.Join(root, "app", "resources", "codex.exe")); ok {
+			return resolved, nil
 		}
 		// Store metadata supplies the real root; never guess WindowsApps paths.
 		var found string
@@ -136,7 +151,7 @@ func findDesktopEngine(roots []string) (string, error) {
 			return "", err
 		}
 		if found != "" {
-			if resolved, err := filepath.EvalSymlinks(found); err == nil && isDesktopEngine(resolved) {
+			if resolved, ok := resolveEnginePath(found); ok {
 				return resolved, nil
 			}
 		}
