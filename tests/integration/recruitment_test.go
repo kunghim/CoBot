@@ -387,18 +387,12 @@ func TestPreviewRunsAndStopsInTheTeamDirectory(t *testing.T) {
 	if _, err := h.app.StartPreview(ctx, h.user, team.ID, "a\nb"); err == nil {
 		t.Fatal("a multi-line command was accepted")
 	}
-	if runtime.GOOS != "windows" {
-		t.Skip("previews spawn cmd.exe, which only Windows has")
-	}
-
-	// A marker file proves the command runs in the team's directory.
-	script := filepath.Join(h.teamDirFor("preview-run"), "preview-marker.cmd")
-	if err := os.WriteFile(script, []byte("@echo off\r\nexit /b 0\r\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	// A long-running command: it stays up until stopped, and the process
 	// table must keep it.
-	command := "cmd /C ping -n 30 127.0.0.1 > NUL"
+	command := "ping -n 30 127.0.0.1"
+	if runtime.GOOS != "windows" {
+		command = "sleep 30"
+	}
 	if _, err := h.app.StartPreview(ctx, h.user, team.ID, command); err != nil {
 		t.Fatalf("start preview: %v", err)
 	}

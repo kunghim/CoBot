@@ -110,7 +110,7 @@ func (a *App) stopTeamPreviews(teamID string) {
 }
 
 func (a *App) spawnPreview(teamID, dir, command string) (*previewRun, error) {
-	cmd := exec.Command("cmd", "/C", command)
+	cmd := previewCommandProcess(command)
 	cmd.Dir = dir
 	if err := cmd.Start(); err != nil {
 		return nil, domain.Conflict("error.preview.start_failed", map[string]any{"detail": err.Error()})
@@ -129,42 +129,16 @@ func (a *App) stopPreview(run *previewRun) {
 		return
 	default:
 	}
-	killTree(run.cmd.Process.Pid)
+	killProcessTree(run.cmd)
 	select {
 	case <-run.done:
 	case <-time.After(5 * time.Second):
 	}
 }
 
-// killTree ends the process and its children: a start command usually spawns
-// a tool that owns the port, so killing only the shell would leave the
-// service running.
-func killTree(pid int) {
-	kill := exec.Command("taskkill", "/T", "/F", "/PID", itoa(pid))
-	_ = kill.Run()
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
-}
+// killProcessTree ends the process and its children: a start command usually
+// spawns a tool that owns the port, so killing only the shell would leave
+// the service running.
 
 // stopAllPreviews stops every preview process; the core's shutdown calls it
 // so nothing is left serving after the app exits.
