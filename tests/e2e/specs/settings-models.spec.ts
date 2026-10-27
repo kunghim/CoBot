@@ -41,8 +41,11 @@ test('the default-model page waits for the engine instead of asking a signed-in 
 
   await page.goto('/settings/providers');
 
-  const emptyState = page.getByText(/还没有可选的模型|No model to choose yet/);
-  const signInPrompt = page.getByText(/登录 ChatGPT 账号|sign in with ChatGPT/);
+  // Both wrong states live in the default-model card; the providers section
+  // legitimately keeps a sign-in button on the ChatGPT account card beside it.
+  const card = page.getByTestId('default-model-card');
+  const emptyState = card.getByText(/还没有可选的模型|No model to choose yet/);
+  const signInPrompt = card.getByText(/登录 ChatGPT 账号|sign in with ChatGPT/);
 
   // Watch the whole window the catalogue is in flight. The page may show a
   // placeholder; what it must never do is claim there is nothing to pick

@@ -366,7 +366,7 @@ export function DefaultModelCard({ settings, save, errors }: SectionProps) {
 
   return (
     <Card>
-      <div className="max-w-md">
+      <div className="max-w-md" data-testid="default-model-card">
         <Field label={t('settings.defaultModel')} hint={t('settings.defaultModelHint')} info={t('settings.defaultModelInfo')} error={errors.defaultModel}>
           <Select
             value={value}
