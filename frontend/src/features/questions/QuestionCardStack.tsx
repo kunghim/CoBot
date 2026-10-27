@@ -261,6 +261,8 @@ function PreviewRow({ taskId, teamId, onError }: { taskId: string; teamId: strin
   const stop = useStopPreview(teamId);
   const openOwn = useOpenBrowserTab(teamId);
   const workspace = useWorkspace();
+  // Local echo of the last press; the core's answer is the truth (a press on
+  // an already-running preview reports running: true without a new process).
   const [running, setRunning] = useState(false);
   const record = detail.data?.evidence?.find((entry) => entry.previewCommand);
   if (!record) return null;
@@ -269,13 +271,14 @@ function PreviewRow({ taskId, teamId, onError }: { taskId: string; teamId: strin
   const launch = () => {
     onError('');
     start.mutate(command, {
-      onSuccess: () => {
-        setRunning(true);
+      onSuccess: (result) => {
+        setRunning(Boolean(result.running));
         if (!url) return;
         openOwn.mutate(url, {
           onSuccess: ({ tab }) => {
             workspace.openTab({ id: `browser:${tab.id}`, kind: 'browser', title: tab.title || url, ref: tab.id }, true);
           },
+          onError: (error) => onError(apiErrorMessage(t, error)),
         });
       },
       onError: (error) => onError(apiErrorMessage(t, error)),

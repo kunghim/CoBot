@@ -13,7 +13,7 @@ import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import Markdown from '../conversations/Markdown';
 import MessageEditBox from '../conversations/MessageEditBox';
-import ElicitationBody from '../approvals/ElicitationBody';
+import ElicitationBody, { parseElicitation } from '../approvals/ElicitationBody';
 import NativeApprovalBody from '../approvals/NativeApprovalBody';
 import { effortChoices } from '../conversations/ReasoningEffortSelect';
 import { PermissionModeMenu, permissionModeOf } from '../conversations/PermissionModeSelect';
@@ -167,7 +167,7 @@ function ChatPage({ id }: { id?: string }) {
                 if (editing?.id === message.id) {
                   return (
                     <div key={message.id} className="rounded-xl bg-sunk p-3">
-                      <MessageEditBox initial={editing.text} onSave={(text) => editMessage.mutateAsync({ messageId: message.id, text })} onCancel={() => setEditing(null)} />
+                      <MessageEditBox initial={editing.text} onSave={(text) => editMessage.mutateAsync({ messageId: message.id, text }).then(() => setEditing(null))} onCancel={() => setEditing(null)} />
                     </div>
                   );
                 }
@@ -218,9 +218,9 @@ function ChatRequestCard({ request, busy, onReply }: { request: ChatRequest; bus
     {input ? questions.map((q) => <fieldset key={q.id} className="mb-3 space-y-2"><legend className="text-sm">{q.question}</legend>
       {q.options?.map((option) => <Button key={option.label} size="sm" variant={answers[q.id] === option.label ? 'secondary' : 'ghost'} onClick={() => setAnswers({ ...answers, [q.id]: option.label })}>{option.label}</Button>)}
       <TextInput type={q.isSecret ? 'password' : 'text'} aria-label={q.question} value={answers[q.id] ?? ''} onChange={(event) => setAnswers({ ...answers, [q.id]: event.target.value })} />
-    </fieldset>) : elicitation ? <ElicitationBody summary={request.summary} value={content} onChange={setContent} /> : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
+    </fieldset>) : elicitation && parseElicitation(request.summary) ? <ElicitationBody summary={request.summary} value={content} onChange={setContent} /> : <NativeApprovalBody summary={request.summary} fallback={request.reason || request.summary} />}
     <div className="mt-3 flex flex-wrap gap-2">{input ? <Button size="sm" loading={busy} disabled={!questions.length || questions.some((q) => !answers[q.id]?.trim())} onClick={() => onReply({ answers: Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, [value]])) })}>{t('chat.submitAnswers')}</Button>
-      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id, ...(elicitation && option.id === 'accept_engine' ? { content } : {}) })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
+      : request.options.map((option) => <Button key={option.id} size="sm" disabled={option.disabled || busy} title={option.disabledReasonKey ? t(option.disabledReasonKey) : undefined} onClick={() => onReply({ optionId: option.id, ...(elicitation && option.id === 'accept' ? { content } : {}) })}>{option.messageKey ? t(option.messageKey) : option.text ?? option.id}</Button>)}
     </div>
   </div>;
 }

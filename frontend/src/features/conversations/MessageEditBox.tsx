@@ -25,6 +25,7 @@ export default function MessageEditBox({ initial, onSave, onCancel }: { initial:
     <div className="space-y-2">
       <textarea
         autoFocus
+        aria-label={t('conversation.message.edit')}
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {

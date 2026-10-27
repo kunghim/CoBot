@@ -14,7 +14,7 @@ import { TeamMembersContext } from '../conversations/ExchangeLine';
 import Avatar from '../avatars/Avatar';
 import { approvalSummaryText, clampPagerIndex, optionFallbackText, optionLabelKeys } from './pager';
 import NativeApprovalBody from './NativeApprovalBody';
-import ElicitationBody from './ElicitationBody';
+import ElicitationBody, { parseElicitation } from './ElicitationBody';
 
 export default function ApprovalCardStack({
   teamId,
@@ -54,7 +54,7 @@ export default function ApprovalCardStack({
         approvalId: approval.id,
         optionId: option.id,
         expectedRevision: approval.revision,
-        ...(elicitation && option.id === 'accept_engine' ? { content } : {}),
+        ...(elicitation && option.id === 'accept' ? { content } : {}),
       },
       { onError: (error) => setDecideError(apiErrorMessage(t, error)) },
     );
@@ -99,7 +99,7 @@ export default function ApprovalCardStack({
         </Button>
       ))}
     >
-      {approval.type === 'native_tool' && elicitation ? (
+      {approval.type === 'native_tool' && elicitation && parseElicitation(approval.summary) ? (
         <ElicitationBody summary={approval.summary} value={content} onChange={setContent} teamId={teamId} />
       ) : approval.type === 'native_tool' ? (
         <NativeApprovalBody summary={approval.summary} fallback={approvalSummaryText(t, approval.summary)} />

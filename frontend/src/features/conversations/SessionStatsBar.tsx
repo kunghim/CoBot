@@ -80,8 +80,11 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
   const resets = (limit?: Limit) => (limit?.resetsAt ? new Date(limit.resetsAt * 1000).toLocaleString() : '');
   // Nearly used up reads as a warning, and a window the next turn will
   // likely not fit in reads as an error.
-  const limitTone = (limit?: Limit) =>
+  type Tone = 'danger' | 'warning' | 'neutral';
+  const limitClass = (limit?: Limit) =>
     (limit?.usedPercent ?? 0) >= 95 ? 'text-red-600 dark:text-red-400' : (limit?.usedPercent ?? 0) >= 80 ? 'text-amber-600 dark:text-amber-400' : undefined;
+  const limitTone = (limit?: Limit): Tone =>
+    (limit?.usedPercent ?? 0) >= 95 ? 'danger' : (limit?.usedPercent ?? 0) >= 80 ? 'warning' : 'neutral';
   const tps = stats.outputTokensPerSecond ? Math.round(stats.outputTokensPerSecond) : 0;
 
   return (
@@ -115,17 +118,17 @@ export default function SessionStatsBar({ botId }: { botId: string }) {
         </Item>
       )}
       {(limits.primary || limits.secondary) && (
-        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<span className={cx('inline-flex items-center gap-1', limitTone(tightestLimit(limits)))}><Gauge size={12} aria-hidden="true" /><span className="font-mono tabular-nums">{t('stats.limitShort', { percent: limitText(tightestLimit(limits)) })}</span></span>}>
+        <Item testId="stats-limits" title={t('stats.limitsTitle')} label={<span className={cx('inline-flex items-center gap-1', limitClass(tightestLimit(limits)))}><Gauge size={12} aria-hidden="true" /><span className="font-mono tabular-nums">{t('stats.limitShort', { percent: limitText(tightestLimit(limits)) })}</span></span>}>
           <PopoverHead title={t('stats.limitsTitle')} value={limitText(tightestLimit(limits))} />
           {limits.primary && (
             <div className="my-1">
-              <MiniBar label={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} percent={limits.primary.usedPercent ?? 0} caption={limitText(limits.primary)} tone={limitTone(limits.primary) ? 'danger' : undefined} />
+              <MiniBar label={t('stats.limitWindow', { hours: Math.round((limits.primary.windowDurationMins ?? 0) / 60) })} percent={limits.primary.usedPercent ?? 0} caption={limitText(limits.primary)} tone={limitTone(limits.primary) ?? 'neutral'} />
               {limits.primary?.resetsAt ? <span className="mt-0.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.primary) })}</span> : null}
             </div>
           )}
           {limits.secondary && (
             <div className="my-1">
-              <MiniBar label={t('stats.limitWeek')} percent={limits.secondary.usedPercent ?? 0} caption={limitText(limits.secondary)} tone={limitTone(limits.secondary) ? 'danger' : undefined} />
+              <MiniBar label={t('stats.limitWeek')} percent={limits.secondary.usedPercent ?? 0} caption={limitText(limits.secondary)} tone={limitTone(limits.secondary) ?? 'neutral'} />
               {limits.secondary?.resetsAt ? <span className="mt-0.5 block text-2xs text-neutral-500 dark:text-neutral-400">{t('stats.resets', { time: resets(limits.secondary) })}</span> : null}
             </div>
           )}

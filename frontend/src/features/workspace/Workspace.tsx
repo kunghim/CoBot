@@ -39,6 +39,7 @@ export default function Workspace({ teamId, bots, watchedBotId }: { teamId: stri
       lastUserAction.current = Date.now();
     };
     strip.addEventListener('pointerdown', mark);
+    strip.addEventListener('focusin', mark);
     return () => strip.removeEventListener('pointerdown', mark);
   }, []);
 
@@ -61,8 +62,8 @@ export default function Workspace({ teamId, bots, watchedBotId }: { teamId: stri
       if (page.owner === 'member') {
         const title = `${memberName(page.memberId ?? '')} · ${page.title || page.url || t('browser.blank')}`;
         // Follow once per (member, page): the watched member's busy page the
-        // user is not yet reading opens the view, once; a page already open,
-        // a later step in the same page, and a workspace the user touched in
+        // user is not yet reading opens the view once per page; a page already
+        // open, a page followed before, and a workspace the user touched in
         // the last few seconds never steal the view back.
         const mark = followMarkRef.current;
         const follow = Boolean(
@@ -75,7 +76,7 @@ export default function Workspace({ teamId, bots, watchedBotId }: { teamId: stri
         openTab({ id, kind: 'browser', title: page.title || page.url, ref: page.id });
       }
     }
-  }, [browser.data, bots, openTab, openIds, t, watchedBotId, state.open, focusTab]);
+  }, [browser.data, bots, openTab, openIds, t, watchedBotId, state.open]);
 
   const active = state.tabs.find((tab) => tab.id === state.activeId) ?? null;
 

@@ -37,6 +37,7 @@ export default function OpenTeamDialog({
   const [errorText, setErrorText] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<ReadonlySet<string>>(() => new Set());
   const checkedPath = useRef('');
+  const resolveSeq = useRef(0);
 
   const library = roles.data?.items ?? [];
   const leader = library.find((role) => role.id === 'leader');
@@ -58,15 +59,24 @@ export default function OpenTeamDialog({
     const trimmed = raw.trim();
     if (!trimmed || trimmed === checkedPath.current) return;
     checkedPath.current = trimmed;
+    const mine = ++resolveSeq.current;
     setResolving(true);
     setResolved(null);
     setConfirming(false);
     setErrorText('');
     api
       .openTeam(trimmed)
-      .then((result) => setResolved(result))
-      .catch((error) => setErrorText(apiErrorMessage(t, error)))
-      .finally(() => setResolving(false));
+      .then((result) => {
+        if (resolveSeq.current !== mine) return; // a newer lookup superseded this one
+        setResolved(result);
+      })
+      .catch((error) => {
+        if (resolveSeq.current !== mine) return;
+        setErrorText(apiErrorMessage(t, error));
+      })
+      .finally(() => {
+        if (resolveSeq.current === mine) setResolving(false);
+      });
   };
 
   const choose = () => {

@@ -563,7 +563,7 @@ function MessageRow({
       {isUser && isLastUser && onEdit && (
         <IconButton icon={Icons.edit} label={t('conversation.message.edit')} size="sm" onClick={() => setEditing(true)} />
       )}
-      <MessageActions value={text} createdAt={message.createdAt} language={i18n.language} copyLabel={t('conversation.message.copy')} copiedLabel={t('conversation.message.copied')} />
+      <MessageActions value={shown} createdAt={message.createdAt} language={i18n.language} copyLabel={t('conversation.message.copy')} copiedLabel={t('conversation.message.copied')} />
       {delivery && <span>{delivery}</span>}
       {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
     </>
