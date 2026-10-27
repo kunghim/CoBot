@@ -153,7 +153,6 @@ func (s *Server) handleOpenTeamPath(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, http.StatusOK, result)
 }
 
-
 func (s *Server) handleOpenTeam(w http.ResponseWriter, r *http.Request) {
 	principal, ok := requireUser(w, r)
 	if !ok {

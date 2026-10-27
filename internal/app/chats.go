@@ -22,15 +22,15 @@ type ChatSendInput struct {
 	PermissionMode string `json:"permissionMode,omitempty"`
 }
 type ChatActionInput struct {
-	SectionID        string              `json:"sectionId,omitempty"`
-	BeforeID         string              `json:"beforeId,omitempty"`
-	RequestID        string              `json:"requestId"`
-	Title            string              `json:"title,omitempty"`
-	OptionID         string              `json:"optionId,omitempty"`
-	ExpectedRevision int64               `json:"expectedRevision,omitempty"`
+	SectionID        string `json:"sectionId,omitempty"`
+	BeforeID         string `json:"beforeId,omitempty"`
+	RequestID        string `json:"requestId"`
+	Title            string `json:"title,omitempty"`
+	OptionID         string `json:"optionId,omitempty"`
+	ExpectedRevision int64  `json:"expectedRevision,omitempty"`
 	// Content is an MCP elicitation's accepted form values.
-	Content map[string]any `json:"content,omitempty"`
-	Answers          map[string][]string `json:"answers,omitempty"`
+	Content map[string]any      `json:"content,omitempty"`
+	Answers map[string][]string `json:"answers,omitempty"`
 }
 
 func (a *App) ListChats(ctx context.Context, p auth.Principal, cursor string) (domain.ChatList, error) {

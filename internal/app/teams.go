@@ -643,10 +643,10 @@ func folderDisplayName(path string) string {
 // AdoptTeamInput is a confirmed adoption: a folder another CoBot environment
 // marked becomes this instance's team under a new identity.
 type AdoptTeamInput struct {
-	Directory       string
-	Name            string
-	InitialRoleIDs  []string
-	RequestID       string
+	Directory        string
+	Name             string
+	InitialRoleIDs   []string
+	RequestID        string
 	ExpectedRevision int64
 }
 

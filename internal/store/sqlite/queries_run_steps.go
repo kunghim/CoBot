@@ -206,7 +206,7 @@ func DeleteRun(ctx context.Context, q Queryer, runID string) error {
 
 // RunHasCollaborationSideEffects reports whether the turn recorded
 // collaboration: a CoBot tool call (a requirement, a hand-off, a note to a
- // teammate) or an approval. A turn with either cannot be rolled back, so
+// teammate) or an approval. A turn with either cannot be rolled back, so
 // its starting message cannot be edited and sent again.
 func RunHasCollaborationSideEffects(ctx context.Context, q Queryer, runID string) (bool, error) {
 	rows, err := q.QueryContext(ctx, `SELECT detail FROM run_steps WHERE run_id = ? AND kind = 'tool'`, runID)

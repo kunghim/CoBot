@@ -240,10 +240,10 @@ func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal,
 				Command string `json:"command"`
 				URL     string `json:"url"`
 			} `json:"preview"`
-			Mode         string   `json:"mode"`
-			Suggestions  string   `json:"suggestions"`
-			Document     string   `json:"document"`
-			RequestID    string   `json:"idempotencyKey"`
+			Mode        string `json:"mode"`
+			Suggestions string `json:"suggestions"`
+			Document    string `json:"document"`
+			RequestID   string `json:"idempotencyKey"`
 		}
 		if err := decodeArgs(call.Arguments, &args); err != nil {
 			return rejected("invalid_request", "error.invalid_json", nil)
