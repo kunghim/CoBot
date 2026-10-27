@@ -152,6 +152,27 @@ jobs:
         id: browser-tests
         run: npx playwright test
         working-directory: tests/e2e
+      - name: Collect synthetic workspace preview screenshots
+        if: ${{ always() && steps.browser-tests.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile
+          output = Path('tests/e2e/test-results/workspace-previews')
+          for source in Path('.tmp/test-runs').glob('e2e-*/filesystem-*.png'):
+              if source.is_symlink() or not source.is_file():
+                  continue
+              output.mkdir(parents=True, exist_ok=True)
+              copyfile(source, output / (source.parent.name + '-' + source.name))
+          PY
+      - name: Upload synthetic workspace preview screenshots
+        if: ${{ always() && steps.browser-tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: workspace-previews-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/e2e/test-results/workspace-previews/*.png
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Remove temporary credentials from browser evidence
         id: sanitize-evidence
         if: ${{ failure() && steps.browser-tests.outcome == 'failure' }}
