@@ -202,9 +202,12 @@ describe('a turn read in the order it happened', () => {
   it('says each stretch of work in a line', () => {
     expect(workSummary([step({ id: 'a' }), step({ id: 'b' }), step({ id: 'c', kind: 'file_change' })])).toEqual([
       { key: 'conversation.process.group.command', params: { count: 2 } },
-      { key: 'conversation.process.group.file_change', params: { count: 1 } },
+      { key: 'conversation.process.group.file_operation', params: { count: 1 } },
     ]);
     expect(workSummary([step({ kind: 'diff' })])).toEqual([{ key: 'conversation.process.group.other', params: { count: 1 } }]);
+  });
+  it('counts unique file paths across file change events', () => {
+    expect(workSummary([step({ kind: 'file_change', detail: { changes: [{ path: 'a' }, { path: 'b' }] } }), step({ kind: 'file_change', detail: { changes: [{ path: 'a' }] } })])).toEqual([{ key: 'conversation.process.group.file_change', params: { count: 2 } }]);
   });
   it('leaves open the work that went wrong', () => {
     expect(workNeedsAttention([step({ status: 'completed' })])).toBe(false);

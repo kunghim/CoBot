@@ -17,6 +17,8 @@ export default function NavigationOverlays() {
   const [pill, setPill] = useState<'all' | 'open' | 'done'>('open');
   const [page, setPage] = useState(3);
   const [node, setNode] = useState('lead');
+  const [fileExpanded, setFileExpanded] = useState<string[]>(['src']);
+  const [fileSelected, setFileSelected] = useState('src/main.ts');
   const [dialog, setDialog] = useState(false);
   const [alert, setAlert] = useState(false);
   const [sheet, setSheet] = useState<'left' | 'right' | null>(null);
@@ -86,6 +88,15 @@ export default function NavigationOverlays() {
       </Doc>
 
       <Doc id="tree" name="Tree 树" file="components/ui/Tree.tsx" use="可以展开的层级（团队和成员）。" a11y="上下键移动；右键展开或进入；左键收起或回到上一级；回车选择。">
+        <Demo title="受控文件树：空目录、加载中、循环别名和不可访问项" surface="sunken">
+          <Tree label="项目文件" selected={fileSelected} onSelect={setFileSelected} expanded={fileExpanded} onExpandedChange={setFileExpanded} nodes={[
+            { id: 'src', label: 'src', directory: true, children: [{ id: 'src/main.ts', label: 'main.ts' }, { id: 'src/empty', label: 'empty', directory: true }] },
+            { id: 'linked-root', label: 'linked-root', directory: true, children: [{ id: '\0cycle:linked-root', label: '此目录指向已显示的上级目录。', disabled: true }] },
+            { id: 'loading', label: 'assets', directory: true, trailing: <span role="status" className="text-xs text-neutral-500">加载中</span> },
+            { id: 'blocked', label: 'external-link', disabled: true, trailing: <span className="text-xs text-neutral-500">无法访问</span> },
+          ]} />
+          <p role="status" className="border-t border-neutral-200 px-3 py-1 text-xs text-neutral-500 dark:border-neutral-800">自动文件更新暂不可用，请手动刷新。</p>
+        </Demo>
         <Demo surface="sunken">
           <div className="w-64">
             <Tree
@@ -210,6 +221,13 @@ export default function NavigationOverlays() {
       </Doc>
 
       <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，打开时内容为它让位。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+        <Demo title="文件树宽度：拖动或用左右方向键调整左栏">
+          <div className="flex h-24 overflow-hidden rounded-xl bg-sunk">
+            <div style={{ width: Math.min(wsWidth, 300) }} className="shrink-0 p-3 text-sm">文件树</div>
+            <SplitHandle side="left" value={Math.min(wsWidth, 300)} min={140} max={300} label="文件树宽度" onChange={setWsWidth} />
+            <div className="min-w-0 flex-1 bg-canvas p-3 text-sm">文件预览</div>
+          </div>
+        </Demo>
         <Demo surface="sunken">
           <div className="flex h-64 w-full">
             <div className="min-w-0 flex-1">

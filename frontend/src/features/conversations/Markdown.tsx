@@ -12,10 +12,21 @@ import { FolderOpen } from 'lucide-react';
 import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import { linkTarget } from './links';
+import { openWorkspaceFile } from '../workspace/fileNavigation';
+import { relativeFile } from '../workspace/relativeFile';
+import LocalImage from '../workspace/LocalImage';
 
-function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; chatId?: string }) {
+function Markdown({ text, teamId, chatId, basePath = '', imageSources }: { text: string; teamId?: string; chatId?: string; basePath?: string; imageSources?: Record<string, string> }) {
   const components: Components = {
-    a: ({ href, children }) => <MarkdownLink href={href ?? ''} teamId={teamId} chatId={chatId}>{children}</MarkdownLink>,
+    img: ({ src, alt }) => {
+      const attachment = src?.startsWith('attachment:') ? imageSources?.[src.slice('attachment:'.length)] : undefined;
+      if (attachment && /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test(attachment)) return <img src={attachment} alt={alt ?? ''} className="max-h-96 max-w-full rounded-lg object-contain" />;
+      const path = relativeFile(basePath, src ?? '');
+      const scope = chatId ? { kind: 'chat' as const, id: chatId } : teamId ? { kind: 'team' as const, id: teamId } : null;
+      if (scope && linkTarget(path).kind === 'local') return <LocalImage scope={scope} path={path} alt={alt ?? ''} />;
+      return /^https?:/i.test(path) ? <img src={path} alt={alt ?? ''} className="max-h-96 max-w-full rounded-lg object-contain" /> : <span>{alt}</span>;
+    },
+    a: ({ href, children }) => <MarkdownLink href={relativeFile(basePath, href ?? '')} teamId={teamId} chatId={chatId}>{children}</MarkdownLink>,
     p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>,
     h1: ({ children }) => <h3 className="mb-1.5 mt-3 text-base font-semibold first:mt-0">{children}</h3>,
     h2: ({ children }) => <h3 className="mb-1.5 mt-3 text-base font-semibold first:mt-0">{children}</h3>,
@@ -34,7 +45,7 @@ function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; cha
   };
   return (
     <div className="min-w-0 break-words">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(url) => (linkTarget(url).kind === 'blocked' ? '' : url)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(url, key) => (key === 'src' && url.startsWith('attachment:') && imageSources?.[url.slice(11)] ? url : linkTarget(url).kind === 'blocked' ? '' : url)}>
         {text}
       </ReactMarkdown>
     </div>
@@ -43,7 +54,7 @@ function Markdown({ text, teamId, chatId }: { text: string; teamId?: string; cha
 
 export default memo(Markdown);
 
-function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId?: string; chatId?: string; children: ReactNode }) {
+export function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId?: string; chatId?: string; children: ReactNode }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
   const target = linkTarget(href);
@@ -53,7 +64,8 @@ function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId
   if (target.kind === 'blocked') return <span>{children}</span>;
   const open = (reveal: boolean) => {
     setError('');
-    const opening = chatId ? api.openChatPath(chatId, target.path, reveal) : teamId ? api.openTeamPath(teamId, target.path, reveal) : Promise.reject(new Error('No workspace'));
+    const scope = chatId ? { kind: 'chat' as const, id: chatId } : teamId ? { kind: 'team' as const, id: teamId } : null;
+    const opening = !scope ? Promise.reject(new Error('No workspace')) : !reveal ? openWorkspaceFile(scope, target.path) : scope.kind === 'chat' ? api.openChatPath(scope.id, target.path, true) : api.openTeamPath(scope.id, target.path, true);
     opening.catch((err) => setError(apiErrorMessage(t, err)));
   };
   return (

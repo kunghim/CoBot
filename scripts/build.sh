@@ -95,7 +95,7 @@ case "$TARGET" in
     /usr/bin/plutil -replace CoBotVersion -string "$VERSION" "$PLIST"
     /usr/bin/plutil -replace NSHumanReadableCopyright -string 'Copyright 2026 CoBot contributors' "$PLIST"
     cp LICENSE "$APP/Contents/Resources/LICENSE.txt"
-    GOOS=darwin GOARCH="$BUILD_ARCH" CGO_ENABLED=1 node scripts/third-party-notices.mjs "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
+    GOOS=darwin GOARCH="$BUILD_ARCH" CGO_ENABLED=1 node scripts/third-party-notices.mjs "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt" "$APP/Contents/MacOS/cobot-desktop" "$APP/Contents/MacOS/cobot"
     # Adding the helper changes the bundle after Wails' ad-hoc signature.
     # This remains a local trial signature, not Developer ID / notarization.
     /usr/bin/codesign --force --sign - "$APP/Contents/MacOS/cobot"

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	patches "github.com/kunghim/CoBot/internal/changes"
 	"github.com/kunghim/CoBot/internal/engine"
 )
 
@@ -114,7 +115,10 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 		step.Kind = engine.StepFileChange
 		changes := make([]map[string]any, 0, len(item.Changes))
 		for _, change := range item.Changes {
-			entry := map[string]any{"path": change.Path, "kind": change.Kind.Type, "diff": clipHead(change.Diff, maxStepDiff)}
+			stats := patches.Count(change.Diff)
+			entry := map[string]any{"path": change.Path, "kind": change.Kind.Type, "diff": clipHead(change.Diff, maxStepDiff),
+				"additions": stats.Additions, "deletions": stats.Deletions, "statsComplete": stats.StatsComplete,
+				"binary": stats.Binary, "diffTruncated": len(change.Diff) > maxStepDiff}
 			if change.Kind.MovePath != "" {
 				entry["movePath"] = change.Kind.MovePath
 			}
@@ -271,4 +275,22 @@ func errorCode(raw json.RawMessage) string {
 		}
 	}
 	return ""
+}
+
+// Statistics and file positions are computed while the full turn patch is
+// available; a clipped preview must never change the totals shown later.
+func turnDiffDetail(diff string) map[string]any {
+	files, filesComplete := patches.ParseTurn(diff)
+	stored := clipHead(diff, maxTurnDiff)
+	truncated := len(diff) > maxTurnDiff
+	end := len(stored)
+	if truncated {
+		end -= len("\n…")
+	}
+	complete := filesComplete
+	for index := range files {
+		files[index].DiffTruncated = files[index].End > end
+		complete = complete && files[index].StatsComplete
+	}
+	return map[string]any{"diff": stored, "files": len(files), "changes": files, "filesComplete": filesComplete, "statsComplete": complete, "diffTruncated": truncated}
 }

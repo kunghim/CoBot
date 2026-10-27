@@ -1,0 +1,5 @@
+import { parseWorkbook } from './workbook';
+self.onmessage = async (event: MessageEvent<ArrayBuffer>) => {
+  try { self.postMessage({ data: await parseWorkbook(event.data) }); }
+  catch (error) { self.postMessage({ error: error instanceof Error && error.message === 'Workbook limit' ? 'limit' : 'invalid' }); }
+};

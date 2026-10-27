@@ -10,6 +10,7 @@ var HandledMessages = []string{
 	"account/rateLimits/updated",
 	"account/updated",
 	"error",
+	"fs/changed",
 	"hook/completed",
 	"item/agentMessage/delta",
 	"item/commandExecution/outputDelta",

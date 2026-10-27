@@ -90,6 +90,33 @@ describe('workspaceReducer', () => {
 });
 
 describe('workspace persistence', () => {
+  it('keeps file reading state while navigating and validates persisted values', () => {
+    let state = workspaceReducer(initialWorkspaceState(), { type: 'openTab', tab: fileTab('src/a.ts'), focus: true });
+    state = workspaceReducer(state, { type: 'updateTab', id: 'file:src/a.ts', patch: { fileView: { expanded: ['src'], treeWidth: 200, treeOpen: false } } });
+    state = workspaceReducer(state, { type: 'updateTab', id: 'file:src/a.ts', patch: { ref: 'src/b.ts', title: 'b.ts', fileView: { line: 12 } } });
+    expect(state.tabs[0].fileView).toEqual({ expanded: ['src'], treeWidth: 200, treeOpen: false, line: 12 });
+    expect(state.tabs[0].ref).toBe('src/b.ts');
+    const key = workspaceKey('file-state');
+    saveWorkspace(key, state);
+    expect(loadWorkspace(key)?.tabs[0].fileView).toEqual(state.tabs[0].fileView);
+    window.localStorage.setItem(key, JSON.stringify({ ...state, tabs: [{ ...state.tabs[0], fileView: { expanded: [1, 'src', 'src'], treeWidth: -20, treeOpen: 'no', line: '12', scrollTop: -3 } }] }));
+    const view = loadWorkspace(key)?.tabs[0].fileView;
+    expect(view?.expanded).toEqual(['src']);
+    expect(view?.treeWidth).toBe(140);
+    expect(view?.treeOpen).toBeUndefined();
+    expect(view?.line).toBeUndefined();
+    expect(view?.scrollTop).toBe(0);
+  });
+  it('restores a change selection independently and rejects malformed saved controls', () => {
+    const key = workspaceKey('changes-team');
+    let state = workspaceReducer(initialWorkspaceState(), { type: 'openTab', tab: { id: 'changes', kind: 'changes', title: 'Changes', ref: '' }, focus: true });
+    state = workspaceReducer(state, { type: 'updateTab', id: 'changes', patch: { changesView: { botId: 'member', runId: 'turn', path: 'src/a.ts' } } });
+    state = workspaceReducer(state, { type: 'updateTab', id: 'changes', patch: { changesView: { listWidth: 260, listOpen: false } } });
+    saveWorkspace(key, state);
+    expect(loadWorkspace(key)?.tabs[0].changesView).toEqual({ botId: 'member', runId: 'turn', path: 'src/a.ts', listWidth: 260, listOpen: false });
+    window.localStorage.setItem(key, JSON.stringify({ ...state, tabs: [{ ...state.tabs[0], changesView: { botId: 7, runId: ['turn'], path: 'x', listWidth: -1, listOpen: 'false' } }] }));
+    expect(loadWorkspace(key)?.tabs[0].changesView).toEqual({ botId: undefined, runId: undefined, path: 'x', listWidth: 160, listOpen: undefined });
+  });
   it('round-trips a team and refuses junk', () => {
     const key = workspaceKey('team-1');
     let state = workspaceReducer(initialWorkspaceState(), { type: 'openTab', tab: browserTab('t7', '页面'), focus: true });

@@ -26,11 +26,13 @@ type message struct {
 }
 
 var (
-	mu        sync.Mutex
-	out       = bufio.NewWriter(os.Stdout)
-	turnSeq   int
-	threadSeq int
-	threads   = map[string]bool{}
+	filesystemMu    sync.Mutex
+	filesystemStops = map[string]chan struct{}{}
+	mu              sync.Mutex
+	out             = bufio.NewWriter(os.Stdout)
+	turnSeq         int
+	threadSeq       int
+	threads         = map[string]bool{}
 
 	// FAKE_MODE controls the scripted behavior:
 	//   reply (default): complete turns with a canned assistant message
@@ -128,6 +130,8 @@ func notify(method string, params any) {
 }
 
 func main() {
+	defer stopFilesystemWatches()
+
 	if len(os.Args) > 1 && os.Args[1] == "--version" {
 		fmt.Println("codex-cli 0.161.0")
 		return
@@ -174,6 +178,29 @@ func routeReply(msg message) {
 
 func handleRequest(req message) {
 	switch req.Method {
+	case "fs/watch":
+		var params struct {
+			Path    string `json:"path"`
+			WatchID string `json:"watchId"`
+		}
+		_ = json.Unmarshal(req.Params, &params)
+		if err := watchFilesystem(params.WatchID, params.Path); err != nil {
+			send(message{ID: req.ID, Error: map[string]any{"code": -32602, "message": err.Error()}})
+			return
+		}
+		reply(req.ID, map[string]any{"path": params.Path})
+	case "fs/unwatch":
+		var params struct {
+			WatchID string `json:"watchId"`
+		}
+		_ = json.Unmarshal(req.Params, &params)
+		filesystemMu.Lock()
+		if stop := filesystemStops[params.WatchID]; stop != nil {
+			close(stop)
+			delete(filesystemStops, params.WatchID)
+		}
+		filesystemMu.Unlock()
+		reply(req.ID, map[string]any{})
 	case "initialize":
 		reply(req.ID, map[string]any{"serverInfo": map[string]any{"name": "fake-codex", "version": "0.0.1"}})
 	case "thread/start":
@@ -301,9 +328,16 @@ func runTurn(threadID, turnID, userText string) {
 		runProcess(threadID, turnID, userText)
 		return
 	}
+	if mode == "changes" {
+		runChanges(threadID, turnID)
+		return
+	}
 	status := "completed"
 	text := "收到：" + userText
 	switch {
+	case mode == "resources":
+		_ = os.WriteFile(filepath.Join(cwd(), "artifact.md"), []byte("# Artifact preview\n"), 0o644)
+		text = "## Resources ready\n\n[artifact](artifact.md) `./artifact.md` [absolute](" + filepath.ToSlash(filepath.Join(cwd(), "artifact.md")) + ") [missing](missing.md)\n\nhttp://localhost:3000/ http://127.0.0.1:8080/\n\n```txt\nignored.txt\n```"
 	case mode == "fail":
 		status = "failed"
 		text = ""
@@ -328,6 +362,43 @@ func runTurn(threadID, turnID, userText string) {
 		"threadId": threadID,
 		"turn":     map[string]any{"id": turnID, "status": status, "items": []any{}},
 	})
+}
+
+func runChanges(threadID, turnID string) {
+	changes := []any{}
+	var turn strings.Builder
+	add := func(path, kind, move, diff, full string) {
+		changeKind := map[string]any{"type": kind}
+		if move != "" {
+			changeKind["move_path"] = move
+		}
+		changes = append(changes, map[string]any{"path": path, "kind": changeKind, "diff": diff})
+		turn.WriteString(full)
+	}
+	add("deleted.txt", "delete", "", "-removed\n", "diff --git a/deleted.txt b/deleted.txt\ndeleted file mode 100644\n--- a/deleted.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-removed\n")
+	add("old-name.txt", "update", "renamed.txt", "", "diff --git a/old-name.txt b/renamed.txt\nsimilarity index 100%\nrename from old-name.txt\nrename to renamed.txt\n")
+	_ = os.WriteFile(filepath.Join(cwd(), "renamed.txt"), []byte("renamed fixture\n"), 0600)
+	add("binary.dat", "update", "", "Binary files a/binary.dat and b/binary.dat differ\n", "diff --git a/binary.dat b/binary.dat\nBinary files a/binary.dat and b/binary.dat differ\n")
+	for index := 0; index < 150; index++ {
+		path := fmt.Sprintf("file-%03d.txt", index)
+		text := fmt.Sprintf("content %d\n", index)
+		count := 1
+		if index == 0 {
+			var body strings.Builder
+			for line := 1; line <= 60000; line++ {
+				fmt.Fprintf(&body, "line %05d\n", line)
+			}
+			text, count = body.String(), 60000
+		}
+		_ = os.WriteFile(filepath.Join(cwd(), path), []byte(text), 0600)
+		patch := "+" + strings.ReplaceAll(strings.TrimSuffix(text, "\n"), "\n", "\n+") + "\n"
+		full := fmt.Sprintf("diff --git a/%s b/%s\nnew file mode 100644\n--- /dev/null\n+++ b/%s\n@@ -0,0 +1,%d @@\n%s", path, path, path, count, patch)
+		add(path, "add", "", patch, full)
+	}
+	notify("item/completed", map[string]any{"threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "file-changes", "type": "fileChange", "status": "completed", "changes": changes}})
+	notify("turn/diff/updated", map[string]any{"threadId": threadID, "turnId": turnID, "diff": turn.String()})
+	notify("item/completed", map[string]any{"threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "answer", "type": "agentMessage", "phase": "final_answer", "text": "## 批量变更完成"}})
+	notify("turn/completed", map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "status": "completed", "items": []any{}}})
 }
 
 // requestApproval simulates a native command approval, waits for the product
@@ -405,4 +476,61 @@ func runProcess(threadID, turnID, userText string) {
 	}
 	notify("item/completed", with(map[string]any{"completedAtMs": 1, "item": map[string]any{"type": "agentMessage", "id": "m1", "text": reply}}))
 	notify("turn/completed", map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "status": "completed", "items": []any{}}})
+}
+
+// Synthetic non-recursive directory notifications for browser tests only.
+func watchFilesystem(id, path string) error {
+	signature := func() (string, error) {
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return "", err
+		}
+		hash := sha256.New()
+		for _, entry := range entries {
+			info, err := entry.Info()
+			if err == nil {
+				fmt.Fprintf(hash, "%s:%d:%d:%d\n", entry.Name(), info.ModTime().UnixNano(), info.Size(), info.Mode())
+			}
+		}
+		return fmt.Sprintf("%x", hash.Sum(nil)), nil
+	}
+	previous, err := signature()
+	if err != nil {
+		return err
+	}
+	stop := make(chan struct{})
+	filesystemMu.Lock()
+	if old := filesystemStops[id]; old != nil {
+		close(old)
+	}
+	filesystemStops[id] = stop
+	filesystemMu.Unlock()
+	go func() {
+		timer := time.NewTicker(100 * time.Millisecond)
+		defer timer.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-timer.C:
+				current, err := signature()
+				if err != nil {
+					current = "missing"
+				}
+				if current != previous {
+					previous = current
+					notify("fs/changed", map[string]any{"watchId": id, "changedPaths": []string{path}})
+				}
+			}
+		}
+	}()
+	return nil
+}
+func stopFilesystemWatches() {
+	filesystemMu.Lock()
+	defer filesystemMu.Unlock()
+	for id, stop := range filesystemStops {
+		close(stop)
+		delete(filesystemStops, id)
+	}
 }

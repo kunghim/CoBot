@@ -149,13 +149,25 @@
         "internal/browser/**",
         "internal/app/browser.go",
         "internal/app/browser_panel.go",
+        "internal/app/workspace_files.go",
+        "internal/app/workspace_changes.go",
+        "internal/app/workspace_watch.go",
+        "internal/app/workspace_latex.go",
+        "internal/changes/**",
+        "internal/latex/**",
+        "internal/workspace/**",
+        "internal/api/http/handlers_workspace.go",
+        "internal/api/http/handlers_workspace_changes.go",
+        "internal/api/http/handlers_workspace_watch.go",
+        "internal/api/http/handlers_workspace_latex.go",
         "internal/app/web_surface.go",
         "internal/api/http/handlers_browser.go",
         "internal/api/http/handlers_web.go",
         "frontend/src/features/workspace/**",
         "frontend/src/components/WorkPanel.tsx",
         "frontend/src/app/workPanelNav.ts",
-        "frontend/src/app/workspacePath.ts"
+        "frontend/src/app/workspacePath.ts",
+        "frontend/src/app/useViewportWidth.ts"
       ]
     },
     {
@@ -248,6 +260,8 @@
         "scripts/verify-macos-package.sh",
         "scripts/release.mjs",
         "scripts/third-party-notices.mjs",
+        "scripts/dependency-policy.mjs",
+        "scripts/frontend-bundle.mjs",
         ".github/workflows/release.yml",
         "tests/installer/**"
       ]
@@ -289,6 +303,7 @@
     "scripts/live-test-*",
     "scripts/public-files-policy.json",
     "scripts/release.test.mjs",
+    "scripts/frontend-bundle.test.mjs",
     "scripts/sanitize-test-evidence.py",
     "scripts/test_sanitize_test_evidence.py",
     "scripts/repository-policy.test.mjs",

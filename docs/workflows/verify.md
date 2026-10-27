@@ -9,7 +9,7 @@
 | Go 代码 | `go test ./internal/... ./tests/...` |
 | 前端代码 | `npm run typecheck --prefix frontend`、`npm test --prefix frontend` |
 | 跨前后端的界面流程 | 浏览器测试：`cd tests/e2e`，`npm ci`，`npx playwright test` |
-| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs` |
+| `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/frontend-bundle.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs` |
 | 只改文档 | `node scripts/check-docs.mjs`（命名、索引、链接）和 `node scripts/check-public-files.mjs`；命令和说法自己核对 |
 
 改代码后、交付前运行完整检查 `./scripts/check.ps1` 或 `./scripts/check.sh`（Windows 加 `-Desktop` 会额外编译桌面壳）。

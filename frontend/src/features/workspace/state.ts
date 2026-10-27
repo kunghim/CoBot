@@ -6,12 +6,26 @@
 export type WorkspaceTabKind = 'new' | 'browser' | 'file' | 'changes';
 
 export interface WorkspaceTab {
-  /** Stable identity: "new", "browser:<panel tab id>", "file:<path>", "changes". */
+  /** Stable identity: "new", "browser:<panel tab id>", "file:<tab id>", "changes". */
   id: string;
   kind: WorkspaceTabKind;
   title: string;
   /** The panel tab id, the file path, or "" for the kinds that carry none. */
   ref: string;
+  changesView?: { botId?: string; runId?: string; path?: string; listWidth?: number; listOpen?: boolean };
+  fileView?: {
+    expanded?: string[];
+    treeWidth?: number;
+    treeOpen?: boolean;
+    hidden?: boolean;
+    line?: number;
+    column?: number;
+    endLine?: number;
+    scrollTop?: number;
+    offset?: number;
+    startLine?: number;
+    positionId?: number;
+  };
 }
 
 export interface WorkspaceState {
@@ -34,6 +48,7 @@ export function initialWorkspaceState(): WorkspaceState {
 }
 
 export type WorkspaceAction =
+  | { type: 'updateTab'; id: string; patch: Partial<Pick<WorkspaceTab, 'title' | 'ref' | 'fileView' | 'changesView'>> }
   | { type: 'collapse' }
   | { type: 'setWidth'; width: number }
   | { type: 'newTab' }
@@ -61,6 +76,10 @@ function neighbour(tabs: WorkspaceTab[], index: number): string | null {
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
+    case 'updateTab': {
+      if (!state.tabs.some((tab) => tab.id === action.id)) return state;
+      return { ...state, tabs: state.tabs.map((tab) => tab.id === action.id ? { ...tab, ...action.patch, fileView: { ...tab.fileView, ...action.patch.fileView }, changesView: { ...tab.changesView, ...action.patch.changesView } } : tab) };
+    }
     case 'collapse':
       return { ...state, open: false };
     case 'setWidth': {
@@ -140,7 +159,7 @@ export function loadWorkspace(key: string): WorkspaceState | null {
       typeof (tab as WorkspaceTab).title === 'string' && typeof (tab as WorkspaceTab).ref === 'string';
     // One unreadable entry means the whole saved view is not trustworthy.
     if (!parsed.tabs.every(valid)) return null;
-    const tabs = parsed.tabs;
+    const tabs = parsed.tabs.map((tab) => ({ ...tab, fileView: readFileView(tab.fileView), changesView: readChangesView(tab.changesView) }));
     const activeId = typeof parsed.activeId === 'string' && tabs.some((tab) => tab.id === parsed.activeId)
       ? parsed.activeId
       : (tabs.length > 0 ? tabs[tabs.length - 1].id : null);
@@ -153,6 +172,32 @@ export function loadWorkspace(key: string): WorkspaceState | null {
   } catch {
     return null;
   }
+}
+
+function readChangesView(raw: unknown): WorkspaceTab['changesView'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const string = (key: string, max: number) => typeof value[key] === 'string' && value[key].length <= max ? value[key] : undefined;
+  return { botId: string('botId', 512), runId: string('runId', 512), path: string('path', 128 * 1024), listOpen: typeof value.listOpen === 'boolean' ? value.listOpen : undefined, listWidth: typeof value.listWidth === 'number' && Number.isFinite(value.listWidth) ? Math.round(Math.max(160, Math.min(400, value.listWidth))) : undefined };
+}
+
+function readFileView(raw: unknown): WorkspaceTab['fileView'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const number = (key: string, min: number, max: number): number | undefined => typeof value[key] === 'number' && Number.isFinite(value[key]) ? Math.round(Math.min(max, Math.max(min, value[key]))) : undefined;
+  return {
+    expanded: Array.isArray(value.expanded) ? [...new Set(value.expanded.filter((path): path is string => typeof path === 'string' && path.length < 4096))].slice(0, 1024) : undefined,
+    treeWidth: number('treeWidth', 140, 400),
+    treeOpen: typeof value.treeOpen === 'boolean' ? value.treeOpen : undefined,
+    hidden: typeof value.hidden === 'boolean' ? value.hidden : undefined,
+    line: number('line', 1, Number.MAX_SAFE_INTEGER),
+    column: number('column', 1, Number.MAX_SAFE_INTEGER),
+    endLine: number('endLine', 1, Number.MAX_SAFE_INTEGER),
+    scrollTop: number('scrollTop', 0, 100_000_000),
+    offset: number('offset', 0, 256 * 1024 * 1024),
+    startLine: number('startLine', 1, Number.MAX_SAFE_INTEGER),
+    positionId: number('positionId', 0, Number.MAX_SAFE_INTEGER),
+  };
 }
 
 export function saveWorkspace(key: string, state: WorkspaceState): void {

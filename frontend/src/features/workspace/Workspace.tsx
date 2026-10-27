@@ -9,6 +9,8 @@ import type { Bot } from '../../api/types';
 import { EmptyState, Icons, TabStrip } from '../../components/ui';
 import BrowserTab from './BrowserTab';
 import NewTabPage from './NewTabPage';
+import FileTab from './FileTab';
+import ChangesTab from './ChangesTab';
 import { useWorkspace } from './WorkspaceProvider';
 import type { WorkspaceTabKind } from './state';
 
@@ -19,10 +21,10 @@ const KIND_ICONS: Record<WorkspaceTabKind, typeof Icons.add> = {
   changes: Icons.diff,
 };
 
-export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[] }) {
+export default function Workspace({ teamId, bots = [] }: { teamId?: string; bots?: Bot[] }) {
   const { t } = useTranslation();
-  const { state, newTab, openTab, focusTab, closeTab, collapse } = useWorkspace();
-  const browser = useTeamBrowser(teamId);
+  const { state, scope, newTab, openTab, focusTab, closeTab, collapse } = useWorkspace();
+  const browser = useTeamBrowser(teamId ?? '', !!teamId);
 
   // A page a member opens shows up as a tab (its title follows the page);
   // the view stays where the user put it. A page the user opened keeps its
@@ -54,7 +56,7 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
           const Icon = KIND_ICONS[tab.kind];
           return {
             id: tab.id,
-            label: tab.kind === 'new' ? t('workspace.newTab') : tab.title || t('browser.blank'),
+            label: tab.kind === 'changes' ? t('workspace.newPage.changes') : tab.kind === 'new' ? t('workspace.newTab') : tab.title || t(tab.kind === 'file' ? 'workspace.files.title' : 'browser.blank'),
             icon: <Icon size={13} aria-hidden />,
           };
         })}
@@ -70,12 +72,11 @@ export default function Workspace({ teamId, bots }: { teamId: string; bots: Bot[
       />
       <div role="tabpanel" aria-label={t('workspace.tablist')} id={`tabpanel-${state.activeId ?? 'none'}`} className="min-h-0 flex-1 overflow-hidden rounded-tl-xl bg-canvas">
         {active?.kind === 'new' && <NewTabPage teamId={teamId} bots={bots} />}
-        {active?.kind === 'browser' && (
+        {active?.kind === 'browser' && teamId && (
           <BrowserTab teamId={teamId} panelTabId={active.ref} bots={bots} onClose={() => closeTab(active.id)} />
         )}
-        {(active?.kind === 'file' || active?.kind === 'changes') && (
-          <EmptyState icon={<Icons.view size={20} aria-hidden />} title={t('workspace.newPage.later')} />
-        )}
+        {active?.kind === 'file' && scope && <FileTab key={`${scope.kind}:${scope.id}:${active.id}`} scope={scope} tab={active} />}
+        {active?.kind === 'changes' && scope && <ChangesTab key={`${scope.kind}:${scope.id}:${active.id}`} scope={scope} tab={active} bots={bots} />}
         {!active && <EmptyState icon={<Icons.add size={20} aria-hidden />} title={t('workspace.newPage.later')} />}
       </div>
     </div>

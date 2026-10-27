@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTeams } from '../api/queries';
@@ -11,6 +11,7 @@ import { findBotContext } from '../features/teams/teamUtils';
 import { useSelectedBot } from './SelectedBotContext';
 import { useShell } from './shell';
 import { rememberWorkspacePath } from './workspacePath';
+import { useViewportWidth } from './useViewportWidth';
 
 /**
  * Layout implements the product shell: the icon rail, the team list, the
@@ -54,17 +55,6 @@ export default function Layout() {
       <Columns context={context} teamList={teamList} listOpen={shell.listOpen} />
     </WorkspaceProvider>
   );
-}
-
-/** The window's width, kept current as the window is resized. */
-function useViewportWidth(): number {
-  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth));
-  useEffect(() => {
-    const update = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  return width;
 }
 
 /**

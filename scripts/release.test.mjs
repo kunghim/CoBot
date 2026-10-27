@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { reviewedCanvasLicense, embeddedReadmeLicense, reviewedResvgLicense } from './dependency-policy.mjs';
 import { chooseVersions, createRelease, expectedAssets, nextMsiVersion, nextProductVersion, prepareRelease, releaseNotes, validateInputs, validateSource, validateUnusedVersion, verifyAssets } from './release.mjs';
 
 const version = '0.1.0-beta.2';
@@ -248,4 +249,33 @@ test('explicit stable promotion publishes as latest without the prerelease flag'
   const create = github.commands.find((args) => args[0] === 'release' && args[1] === 'create');
   assert.ok(!create.includes('--prerelease'));
   assert.ok(github.commands.some((args) => args[0] === 'release' && args[1] === 'edit' && args.includes('--latest=true')));
+});
+
+test('reviewed canvas license cannot be reused for another version or unrelated package', () => {
+  const manifest = { name: '@napi-rs/canvas-darwin-arm64', version: '1.0.13', license: 'MIT' };
+  const parent = { name: '@napi-rs/canvas', version: '1.0.13', optionalDependencies: { [manifest.name]: '1.0.13' } };
+  assert.equal(reviewedCanvasLicense(manifest, parent), true);
+  assert.equal(reviewedCanvasLicense({ ...manifest, version: '1.0.14' }, parent), false);
+  assert.equal(reviewedCanvasLicense({ ...manifest, name: 'unrelated' }, parent), false);
+  assert.equal(reviewedCanvasLicense({ ...manifest, license: 'unknown' }, parent), false);
+});
+
+
+test('embedded README licenses are limited to reviewed package versions and complete text', () => {
+  const manifest = { name: 'isarray', version: '1.0.0', license: 'MIT' };
+  const text = '\n## License\n' + "(MIT)\n\nCopyright (c) 2013 Julian Gruber &lt;julian@juliangruber.com&gt;\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.";
+  assert.match(embeddedReadmeLicense(manifest, text), /Copyright/);
+  assert.equal(embeddedReadmeLicense({ ...manifest, version: '2.0.0' }, text), undefined);
+  assert.equal(embeddedReadmeLicense({ ...manifest, name: 'other' }, text), undefined);
+  assert.equal(embeddedReadmeLicense(manifest, text.replace('SOFTWARE.', '')), undefined);
+});
+
+
+test('resvg native license reuse requires matching parent version and published binding map', () => {
+  const manifest = { name: '@resvg/resvg-js-darwin-arm64', version: '2.6.2', license: 'MPL-2.0' };
+  const parent = { name: '@resvg/resvg-js', version: '2.6.2', license: 'MPL-2.0', optionalDependencies: { [manifest.name]: '2.6.2' } };
+  assert.equal(reviewedResvgLicense(manifest, parent), true);
+  assert.equal(reviewedResvgLicense({ ...manifest, version: '2.6.3' }, parent), false);
+  assert.equal(reviewedResvgLicense({ ...manifest, license: 'MIT' }, parent), false);
+  assert.equal(reviewedResvgLicense(manifest, { ...parent, optionalDependencies: {} }), false);
 });

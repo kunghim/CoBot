@@ -30,6 +30,7 @@ import (
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/hookrun"
+	"github.com/kunghim/CoBot/internal/latex"
 	"github.com/kunghim/CoBot/internal/logging"
 	"github.com/kunghim/CoBot/internal/modelcatalog"
 	"github.com/kunghim/CoBot/internal/platform"
@@ -225,6 +226,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		ServiceEpoch: serviceEpoch,
 		Version:      opts.Version,
 		Logger:       logger,
+	}
+	if resources, err := latex.Provisioned(os.Getenv("COBOT_LATEX_BINARY"), os.Getenv("COBOT_LATEX_CACHE"), filepath.Join(paths.CacheDir(), "latex-output")); err != nil {
+		logger.Warn("LaTeX preview resources unavailable", "error", err)
+	} else {
+		application.WorkspaceLatex = resources
 	}
 	// The avatar catalog is downloaded, not bundled. A bad address in
 	// config.json falls back to the published one instead of failing startup.

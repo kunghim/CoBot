@@ -1,0 +1,57 @@
+import { test, expect } from '@playwright/test';
+import { mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { authorize } from './helpers';
+test.beforeEach(async ({ context }) => { await authorize(context); });
+async function createChat(page: import('@playwright/test').Page) {
+  await page.goto('/chat/new');
+  const response = page.waitForResponse((item) => item.url().endsWith('/api/v1/chats') && item.request().method() === 'POST');
+  await page.getByRole('textbox', { name: '发送消息' }).fill('watch setup');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  const created = (await (await response).json()).data;
+  await expect(page.getByText('收到：watch setup', { exact: true })).toBeVisible();
+  return created.chat;
+}
+test('workspace native hints refresh expanded directories, current content and renamed files', async ({ page }) => {
+  const chat = await createChat(page);
+  mkdirSync(join(chat.workspace, 'docs'));
+  writeFileSync(join(chat.workspace, 'docs', 'note.md'), '# Before native update\n');
+  const watchRequests: string[][] = [];
+  page.on('request', (request) => { if (request.url().endsWith('/watch')) watchRequests.push(request.postDataJSON().paths); });
+  await page.getByRole('button', { name: '创建标签页', exact: true }).click();
+  await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
+  const workspace = page.getByRole('tabpanel', { name: '工作区' });
+  const tree = workspace.getByRole('tree', { name: '项目文件' });
+  const watching = page.waitForResponse((response) => response.url().endsWith('/watch') && response.status() === 200 && response.request().postDataJSON().paths.includes('docs'));
+  await tree.getByRole('treeitem', { name: 'docs', exact: true }).click();
+  await watching;
+  writeFileSync(join(chat.workspace, 'docs', 'later.txt'), 'created externally\n');
+  await expect(tree.getByRole('treeitem', { name: 'later.txt', exact: true })).toBeVisible();
+  await tree.getByRole('treeitem', { name: 'note.md', exact: true }).click();
+  await expect(workspace.getByRole('heading', { name: 'Before native update', exact: true })).toBeVisible();
+  writeFileSync(join(chat.workspace, 'docs', 'note.md'), '# Changed outside engine\n');
+  await expect(workspace.getByRole('heading', { name: 'Changed outside engine', exact: true })).toBeVisible();
+  renameSync(join(chat.workspace, 'docs', 'note.md'), join(chat.workspace, 'docs', 'moved.md'));
+  await expect(tree.getByRole('treeitem', { name: 'moved.md', exact: true })).toBeVisible();
+  await expect(workspace.getByText('此文件已不存在', { exact: true })).toBeVisible();
+  await tree.getByRole('treeitem', { name: 'moved.md', exact: true }).click();
+  await expect(workspace.getByRole('heading', { name: 'Changed outside engine', exact: true })).toBeVisible();
+  unlinkSync(join(chat.workspace, 'docs', 'later.txt'));
+  await expect(tree.getByRole('treeitem', { name: 'later.txt', exact: true })).toHaveCount(0);
+  expect(watchRequests.length).toBeLessThan(8);
+  await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'filesystem-watch.png') });
+  await page.goto('/chat/new');
+  await expect(page.getByRole('tabpanel', { name: '工作区' })).toHaveCount(0);
+});
+test('manual refresh stays available when native watching is unavailable', async ({ page }) => {
+  const chat = await createChat(page);
+  await page.route('**/api/v1/workspaces/**/watch', (route) => route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'capability_missing', messageKey: 'error.workspace.watch_unavailable', params: {} }, requestId: 'watch-unavailable' }) }));
+  await page.getByRole('button', { name: '创建标签页', exact: true }).click();
+  await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
+  const workspace = page.getByRole('tabpanel', { name: '工作区' });
+  await expect(workspace.getByText('自动文件更新暂不可用，请手动刷新。', { exact: true })).toBeVisible();
+  writeFileSync(join(chat.workspace, 'manual.txt'), 'manual refresh fixture\n');
+  await workspace.getByRole('complementary', { name: '项目文件', exact: true }).getByRole('button', { name: '刷新文件', exact: true }).click();
+  await workspace.getByRole('treeitem', { name: 'manual.txt', exact: true }).click();
+  await expect(workspace.getByText('manual refresh fixture', { exact: true })).toBeVisible();
+});

@@ -21,6 +21,7 @@ import (
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
+	"github.com/kunghim/CoBot/internal/latex"
 	"github.com/kunghim/CoBot/internal/modelcatalog"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/secrets"
@@ -41,11 +42,16 @@ type App struct {
 	Live *events.LiveHub
 	// OpenLocal launches a team file for the user; nil uses the system
 	// opener (tests replace it).
-	OpenLocal    func(path string, reveal bool) error
-	InstanceID   string
-	ServiceEpoch string
-	Version      string
-	Logger       *slog.Logger
+	OpenLocal func(path string, reveal bool) error
+	// WorkspaceWatchFactory optionally supplies native invalidation subscriptions.
+	// Nil uses the profile control app-server.
+	WorkspaceWatchFactory func(context.Context, string) (<-chan struct{}, error)
+	// WorkspaceLatex supplies explicitly provisioned, offline compilation resources.
+	WorkspaceLatex *latex.Config
+	InstanceID     string
+	ServiceEpoch   string
+	Version        string
+	Logger         *slog.Logger
 	// Updates answers the "check for updates" button; nil disables it.
 	Updates *updates.Checker
 	// ModelCatalog knows models by id: their context, input and thinking.
@@ -55,6 +61,7 @@ type App struct {
 	ClientCatalogs *codex.CatalogBuilder
 	writeLocksMu   sync.Mutex
 	writeLocks     map[string]*writeLock
+	latexMu        sync.Mutex
 
 	// Scheduler dispatches queued deliveries to team app-servers; it is
 	// assigned during composition so tests can inject a fake factory.
