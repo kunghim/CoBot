@@ -84,7 +84,7 @@ func TestWorkspaceIndexesUpgradeV33WithoutChangingHistoricalSteps(t *testing.T) 
 		t.Fatal(err)
 	}
 	version, err := current.CurrentVersion(ctx)
-	if err != nil || version != 34 {
+	if err != nil || version != MaxSupportedVersion {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 	var after string
