@@ -94,11 +94,18 @@ func TestWindowsDesktopPackageDiscoveryUsesManifestAndRejectsAmbiguity(t *testin
 	if err := os.Remove(second); err != nil {
 		t.Fatal(err)
 	}
-	writeDesktopFixture(t, manifest, `<Package><Identity Name="OpenAI.Codex" Publisher="CN=Other" /></Package>`)
-	if isDesktopEngine(binary) {
-		t.Fatal("unrelated publisher accepted")
+	// The store-assigned identity OpenAI.Codex is enough: the live app has
+	// shipped with a bare-GUID publisher subject, so the exact name carries
+	// the check and the publisher only guards a loose ChatGPT-branded name.
+	writeDesktopFixture(t, manifest, `<Package><Identity Name="OpenAI.Codex" Publisher="CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B" /></Package>`)
+	if !isDesktopEngine(binary) {
+		t.Fatal("the real GUID-publisher OpenAI.Codex package was rejected")
 	}
-	if _, err := findDesktopEngine([]string{root}); err == nil {
-		t.Fatal("unrelated package auto-detected")
+	if _, err := findDesktopEngine([]string{root}); err != nil {
+		t.Fatal("the real OpenAI.Codex package was not auto-detected:", err)
+	}
+	writeDesktopFixture(t, manifest, `<Package><Identity Name="Contoso.ChatGPT" Publisher="CN=Other" /></Package>`)
+	if isDesktopEngine(binary) {
+		t.Fatal("a ChatGPT-branded package from an unrelated publisher was accepted")
 	}
 }

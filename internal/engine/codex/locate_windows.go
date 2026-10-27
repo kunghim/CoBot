@@ -16,7 +16,10 @@ func locatePlatformBinary() (string, error) {
 	defer cancel()
 	powershell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 	// The desktop app retains the OpenAI.Codex package identity after renaming.
-	cmd := exec.CommandContext(ctx, powershell, "-NoProfile", "-NonInteractive", "-Command", `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); $ErrorActionPreference = 'Stop'; $apps = @(Get-AppxPackage | Where-Object { ($_.Name -eq 'OpenAI.Codex' -or $_.Name -match 'ChatGPT') -and $_.Publisher -match 'OpenAI' } | Sort-Object Version -Descending | ForEach-Object { $_.InstallLocation }); ConvertTo-Json -InputObject $apps -Compress`)
+	// The manifest's publisher subject varies (it has been a bare GUID), so
+	// candidate filtering is by name here and desktopWindowsBundle applies
+	// the identity policy on the manifest itself.
+	cmd := exec.CommandContext(ctx, powershell, "-NoProfile", "-NonInteractive", "-Command", `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); $ErrorActionPreference = 'Stop'; $apps = @(Get-AppxPackage | Where-Object { ($_.Name -eq 'OpenAI.Codex' -or $_.Name -match 'ChatGPT') } | Sort-Object Version -Descending | ForEach-Object { $_.InstallLocation }); ConvertTo-Json -InputObject $apps -Compress`)
 	hideChildWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {

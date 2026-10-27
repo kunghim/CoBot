@@ -9,7 +9,10 @@ import (
 )
 
 // Desktop identity and bundle boundaries keep old standalone installations
-// from silently taking the place of the desktop app's engine.
+// from silently taking the place of the desktop app's engine. The exact
+// package identity OpenAI.Codex is store-assigned and sufficient on its own;
+// its publisher subject has been seen as a bare GUID, so a publisher match
+// is only required when the name alone is loose (a ChatGPT-branded package).
 func isDesktopEngine(path string) bool {
 	if !regularFile(path) {
 		return false
@@ -94,7 +97,7 @@ func desktopWindowsBundle(root string) bool {
 					publisher = strings.ToLower(attr.Value)
 				}
 			}
-			return (name == "openai.codex" || strings.Contains(name, "chatgpt")) && strings.Contains(publisher, "openai")
+			return name == "openai.codex" || (strings.Contains(name, "chatgpt") && strings.Contains(publisher, "openai"))
 		}
 	}
 }
