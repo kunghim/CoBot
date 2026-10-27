@@ -20,7 +20,7 @@ import (
 )
 
 // controlServer is the profile-wide app-server used only for account and
-// model operations (login coordinator). Business turns never run on it; it
+// model operations and read-only filesystem invalidation. Business turns never run on it; it
 // shares the environment's private CODEX_HOME so every team reuses one login.
 type controlServer struct {
 	mu         sync.Mutex

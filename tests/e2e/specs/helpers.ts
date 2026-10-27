@@ -2,7 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, request as pwRequest, type BrowserContext } from '@playwright/test';
+import { expect, request as pwRequest, type BrowserContext, type Page } from '@playwright/test';
+
+// Metadata selection is asynchronous. An identical error from the previous
+// file must not satisfy the next file's preview assertion before it is selected.
+export async function selectWorkspaceFile(page: Page, name: string): Promise<void> {
+  await page.getByRole('treeitem', { name, exact: true }).click();
+  await expect(page.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true');
+}
 
 // Redeems a freshly minted one-time startup secret for a page session. Each
 // spec must mint its own: the product's startup secrets are single-use by
@@ -38,7 +45,7 @@ export async function authorize(context: BrowserContext): Promise<void> {
 // The file is keyed by the team's working directory, matching the engine: each
 // team runs its own app-server against one shared core, so a single file would
 // leak one team's mode into another team's turn.
-export function setEngineMode(mode: 'reply' | 'approve' | 'deny' | 'fail' | 'process', teamDir: string): void {
+export function setEngineMode(mode: 'reply' | 'approve' | 'deny' | 'fail' | 'process' | 'changes' | 'resources', teamDir: string): void {
   const base = process.env.COBOT_E2E_FAKE_CONTROL;
   if (!base) throw new Error('COBOT_E2E_FAKE_CONTROL is not set');
   mkdirSync(base, { recursive: true });

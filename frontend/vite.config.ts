@@ -2,6 +2,9 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { officeAssets } from './scripts/officeAssets';
+import { pdfAssets } from './scripts/pdfAssets';
+import { bundleLicenses } from './scripts/bundleLicenses';
 
 // The dev server proxies /api to the Go core started by scripts/dev.*. The
 // endpoint and the same-user runtime secret are injected through process
@@ -41,8 +44,10 @@ function devAuthorization(): Plugin {
   };
 }
 
+const licenses = bundleLicenses();
 export default defineConfig({
-  plugins: [react(), tailwindcss(), devAuthorization()],
+  plugins: [react(), tailwindcss(), devAuthorization(), pdfAssets(licenses.recordResource), officeAssets(licenses.worker), licenses.main],
+  worker: { plugins: () => [licenses.worker()] },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],

@@ -47,7 +47,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $payload $name) -Destination $staging -Force
     }
     Copy-Item -LiteralPath (Join-Path $root "LICENSE") -Destination $staging -Force
-    & node scripts/third-party-notices.mjs (Join-Path $staging "THIRD-PARTY-NOTICES.txt")
+    & node scripts/third-party-notices.mjs (Join-Path $staging "THIRD-PARTY-NOTICES.txt") (Join-Path $staging "cobot-desktop.exe") (Join-Path $staging "cobot-helper.exe") (Join-Path $staging "cobot.exe")
     if ($LASTEXITCODE -ne 0) { throw "Dependency notices need review" }
     $license = [IO.File]::ReadAllText((Join-Path $root "LICENSE"))
     $rtfText = $license.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}').Replace([string][char]13, '').Replace([string][char]10, '\par ')

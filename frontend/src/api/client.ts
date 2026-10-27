@@ -102,8 +102,9 @@ export function reportUnauthorized(): void {
   notifyUnauthorized();
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   await initializeTransport();
+  signal?.throwIfAborted();
   const headers: Record<string, string> = {};
   const writing = !['GET', 'HEAD'].includes(method);
   const input = (body ?? {}) as Record<string, unknown>;
@@ -123,12 +124,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (token) headers.Authorization = 'Bearer ' + token;
   else headers['X-CSRF-Token'] = csrfToken();
   // Only durable business writes are safe to retry after a lost response.
-  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/');
+  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/') && !path.endsWith('/latex');
   let resp: Response;
-  try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload }); }
+  try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload, signal }); }
   catch (error) {
-    if (!retryable) throw error;
-    resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload });
+    if (!retryable || signal?.aborted) throw error;
+    resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload, signal });
   }
   const text = await resp.text();
   let parsed: unknown;
@@ -151,7 +152,33 @@ function pageQuery(params: Record<string, string | number | undefined>): string 
   return query.size ? '?' + query.toString() : '';
 }
 
+function workspaceBase(scope: import('./types').WorkspaceScope): string {
+  return `/api/v1/workspaces/${scope.kind}/${encodeURIComponent(scope.id)}`;
+}
+
 export const api = {
+  workspaceChangeRuns: (scope: import('./types').WorkspaceScope, botId = '', cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeRunsPage>('GET', workspaceBase(scope) + '/changes' + pageQuery({ botId: botId || undefined, cursor: cursor || undefined }), undefined, signal),
+  workspaceChangeFiles: (scope: import('./types').WorkspaceScope, runId: string, cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeFilesPage>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + pageQuery({ cursor: cursor || undefined }), undefined, signal),
+  workspaceChangeDiff: (scope: import('./types').WorkspaceScope, runId: string, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceChangeDiff>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + '/file' + pageQuery({ path }), undefined, signal),
+  workspaceLatex: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceLatexProject>('GET', workspaceBase(scope) + '/latex' + pageQuery({ path }), undefined, signal),
+  compileWorkspaceLatex: (scope: import('./types').WorkspaceScope, main: string, signal: AbortSignal) => request<import('./types').WorkspaceLatexResult>('POST', workspaceBase(scope) + '/latex', { main }, signal),
+  workspaceFile: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceFile>('GET', workspaceBase(scope) + '/file' + pageQuery({ path }), undefined, signal),
+  workspaceEntries: (scope: import('./types').WorkspaceScope, path = '', cursor = '', includeHidden = false, signal?: AbortSignal) => request<import('./types').WorkspaceDirectory>('GET', workspaceBase(scope) + '/entries' + pageQuery({ path, cursor, includeHidden: includeHidden ? 'true' : undefined }), undefined, signal),
+  workspaceBytes: async (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal, range?: string, version?: string): Promise<Blob> => {
+    await initializeTransport();
+    const token = bearerToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (range) headers.Range = range;
+    if (version) headers['If-Match'] = version;
+    const response = await fetch(apiUrl(workspaceBase(scope) + '/content' + pageQuery({ path })), { headers, credentials: token ? 'omit' : 'include', signal });
+    if (!response.ok) {
+      const error = await response.json().catch(() => undefined) as ErrorEnvelope | undefined;
+      if (response.status === 401) { clearBearer(); notifyUnauthorized(); }
+      throw new ApiError(response.status, error?.error?.code ?? 'internal', error?.error?.messageKey ?? (response.status === 412 ? 'error.workspace.changed' : 'error.internal'), error?.error?.params ?? {});
+    }
+    return response.blob();
+  },
   listChats: (cursor = '', filter: { pinned?: string; archived?: boolean; sort?: string; search?: string; section?: string } = {}) => request<import('./types').ChatList>('GET', '/api/v1/chats' + pageQuery({ cursor, ...filter, archived: filter.archived ? 'true' : undefined })),
   searchConversations: (q: string) => request<import('./types').SearchResults>('GET', '/api/v1/search' + pageQuery({ q })),
   chatNavigation: () => request<import('./types').ChatNavigation>('GET', '/api/v1/chat-navigation'),
@@ -480,4 +507,40 @@ export async function devLinkSecret(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Watches only invalidation hints. Re-read state after ready, including on
+ * reconnection, because events may have been missed while disconnected. */
+export async function streamWorkspace(scope: import('./types').WorkspaceScope, paths: string[], onEvent: (event: 'ready' | 'changed') => void, signal: AbortSignal): Promise<'unavailable' | null> {
+  await initializeTransport();
+  signal.throwIfAborted();
+  const response = await fetch(apiUrl(workspaceBase(scope) + '/watch'), {
+    method: 'POST', headers: { ...authHeaders(true), Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+    credentials: bearerToken() ? 'omit' : 'include', body: JSON.stringify({ requestId: newRequestId(), paths }), signal,
+  });
+  if (response.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!response.ok || !response.body || !response.headers.get('Content-Type')?.startsWith('text/event-stream')) {
+    const envelope = (await response.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(response.status, envelope?.error?.code ?? 'capability_missing', envelope?.error?.messageKey ?? 'error.workspace.watch_unavailable', envelope?.error?.params ?? {});
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) return null;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      if (buffer.length > 65536) throw new ApiError(503, 'capability_missing', 'error.workspace.watch_unavailable', {});
+      let boundary = /\r?\n\r?\n/.exec(buffer);
+      while (boundary) {
+        const frame = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
+        const event = frame.split(/\r?\n/).find((line) => line.startsWith('event:'))?.slice(6).trim();
+        if (event === 'ready' || event === 'changed') onEvent(event);
+        else if (event === 'unavailable') return 'unavailable';
+        boundary = /\r?\n\r?\n/.exec(buffer);
+      }
+    }
+  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }

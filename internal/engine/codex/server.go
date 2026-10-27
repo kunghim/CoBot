@@ -51,6 +51,7 @@ type Server struct {
 	closed    bool
 	cwd       string
 	fileItems map[nativeItemKey][]engine.FileChange
+	watches   map[string]chan struct{}
 	waitOnce  sync.Once
 	waitDone  chan struct{}
 	waitErr   error
@@ -344,6 +345,9 @@ func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemI
 func (s *Server) handleNotify(method string, params json.RawMessage) {
 	n := engine.Notification{Method: method, Raw: params}
 	switch method {
+	case "fs/changed":
+		s.filesystemChanged(params)
+		return
 	case "turn/diff/updated":
 		var p struct {
 			ThreadID string `json:"threadId"`
@@ -352,7 +356,7 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		}
 		if json.Unmarshal(params, &p) == nil {
 			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
-			detail, _ := json.Marshal(map[string]any{"diff": clipHead(p.Diff, maxTurnDiff), "files": strings.Count(p.Diff, "diff --git ")})
+			detail, _ := json.Marshal(turnDiffDetail(p.Diff))
 			n.Step = &engine.Step{ID: "turn-diff", Kind: engine.StepDiff, Status: engine.StepCompleted, Detail: detail}
 		}
 	case "serverRequest/resolved":

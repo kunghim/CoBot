@@ -1,0 +1,14 @@
+@napi-rs/canvas platform packages 1.0.13
+
+The published platform binary packages identify MIT as their license but omit
+its text. This unmodified upstream project license is from the matching tag:
+https://raw.githubusercontent.com/Brooooooklyn/canvas/v1.0.13/LICENSE
+SHA-256: 0b8e3b4f0042f33677406344854c1dcce3a2878eb3a3f6baee58c6f5752655ce
+It also matches the LICENSE shipped by @napi-rs/canvas 1.0.13 byte for byte.
+The upstream text includes the Chromium broken-image icon notice.
+
+These packages are optional Node.js dependencies of pdfjs-dist. The browser
+preview does not load their native Node.js binaries. This copy is retained
+because CoBot's dependency notice collector covers installed production
+packages, including optional platform dependencies. A different package or
+version must be reviewed separately; it cannot silently reuse this copy.

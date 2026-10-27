@@ -316,3 +316,44 @@ body {
 @keyframes effort-text {
   to { background-position: -200% 0; }
 }
+
+/* Source tokens share the application palette in every theme. */
+.source-highlight .hljs-keyword,
+.source-highlight .hljs-selector-tag,
+.source-highlight .hljs-built_in { @apply text-signal-600 dark:text-signal-400; }
+.source-highlight .hljs-string,
+.source-highlight .hljs-regexp,
+.source-highlight .hljs-attr { @apply text-emerald-700 dark:text-emerald-300; }
+.source-highlight .hljs-number,
+.source-highlight .hljs-literal { @apply text-amber-700 dark:text-amber-300; }
+.source-highlight .hljs-title,
+.source-highlight .hljs-type { @apply text-sky-700 dark:text-sky-300; }
+.source-highlight .hljs-comment,
+.source-highlight .hljs-meta { @apply text-neutral-500 dark:text-neutral-400; }
+
+/* PDF.js text geometry, adapted from pdf_viewer.css (Apache-2.0). */
+.pdf-text-layer {
+  position: absolute; inset: 0; overflow: clip; line-height: 1;
+  text-align: initial; letter-spacing: normal; word-spacing: normal;
+  transform-origin: 0 0; text-size-adjust: none; forced-color-adjust: none;
+  --scale-round-x: 1px; --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.pdf-text-layer :is(span, br) {
+  color: transparent; position: absolute; white-space: pre;
+  cursor: text; transform-origin: 0 0; user-select: text;
+}
+.pdf-text-layer > :not(.markedContent),
+.pdf-text-layer .markedContent span:not(.markedContent) {
+  --font-height: 0; --scale-x: 1; --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.pdf-text-layer .markedContent { display: contents; }
+.pdf-text-layer ::selection { background: color-mix(in srgb, AccentColor, transparent 50%); color: transparent; }
+
+.pdf-text-layer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.pdf-text-layer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.pdf-text-layer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }

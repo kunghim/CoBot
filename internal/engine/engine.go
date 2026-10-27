@@ -186,13 +186,13 @@ const (
 //
 //	reasoning:   {text}
 //	command:     {command, cwd, exitCode?, durationMs?, output}
-//	file_change: {changes: [{path, kind: add|delete|update, movePath?, diff}]}
+//	file_change: {changes: [{path, kind: add|delete|update, movePath?, diff, additions, deletions, statsComplete, binary, diffTruncated}]}
 //	tool:        {server, tool, arguments, result?, error?, durationMs?}
 //	web_search:  {query}
 //	plan:        {text}
 //	message:     {text}  (what the model says while working)
 //	agent:       {tool, agents, prompt?} | {activity, agent}  (Codex sub-agents)
-//	diff:        {diff, files}  (the turn's changes so far)
+//	diff:        {diff, files, changes, filesComplete, statsComplete, diffTruncated}  (the turn's changes so far)
 //	compaction:  {}
 type Step struct {
 	ID     string

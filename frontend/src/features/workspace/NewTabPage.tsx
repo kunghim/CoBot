@@ -8,13 +8,13 @@ import { useOpenBrowserTab, useTeamBrowser } from '../../api/queries';
 import type { Bot } from '../../api/types';
 import { Alert, Icons } from '../../components/ui';
 import { useWorkspace } from './WorkspaceProvider';
-import { NEW_TAB_ID } from './state';
+import { CHANGES_TAB_ID, NEW_TAB_ID } from './state';
 
-export default function NewTabPage({ teamId, bots }: { teamId: string; bots: Bot[] }) {
+export default function NewTabPage({ teamId, bots }: { teamId?: string; bots: Bot[] }) {
   const { t } = useTranslation();
-  const browser = useTeamBrowser(teamId);
-  const openOwn = useOpenBrowserTab(teamId);
-  const { openTab, closeTab } = useWorkspace();
+  const browser = useTeamBrowser(teamId ?? '', !!teamId);
+  const openOwn = useOpenBrowserTab(teamId ?? '');
+  const { openTab, closeTab, newFile, scope } = useWorkspace();
   const [error, setError] = useState<string | null>(null);
 
   const memberName = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
@@ -57,11 +57,12 @@ export default function NewTabPage({ teamId, bots }: { teamId: string; bots: Bot
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col gap-1 overflow-y-auto px-4 py-4">
       {error && <Alert tone="danger">{error}</Alert>}
-      {option(Icons.webSearch, t('workspace.newPage.browser'), t('workspace.newPage.browserHint'), true, createBrowser)}
-      {option(Icons.view, t('workspace.newPage.file'), t('workspace.newPage.later'), false, () => {})}
-      {option(Icons.diff, t('workspace.newPage.changes'), t('workspace.newPage.later'), false, () => {})}
+      {teamId && option(Icons.webSearch, t('workspace.newPage.browser'), t('workspace.newPage.browserHint'), true, createBrowser)}
+      {option(Icons.view, t('workspace.newPage.file'), t('workspace.files.fileHint'), !!scope, () => { newFile(); closeTab(NEW_TAB_ID); })}
+      {option(Icons.diff, t('workspace.newPage.changes'), t('workspace.changes.hint'), !!scope, () => { openTab({ id: CHANGES_TAB_ID, kind: 'changes', ref: '', title: t('workspace.newPage.changes') }, true); closeTab(NEW_TAB_ID); })}
       {option(Icons.command, t('workspace.newPage.terminal'), t('workspace.newPage.later'), false, () => {})}
 
+      {teamId && <>
       <p className="mt-4 px-3 text-2xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">
         {t('workspace.newPage.memberPages')}
       </p>
@@ -87,6 +88,7 @@ export default function NewTabPage({ teamId, bots }: { teamId: string; bots: Bot
           })}
         </ul>
       )}
+      </>}
     </div>
   );
 }

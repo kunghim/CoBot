@@ -12,7 +12,7 @@ Set-Location $root
 Write-Host "==> public file policy"
 node scripts/check-public-files.mjs
 if ($LASTEXITCODE -ne 0) { throw "public file policy failed" }
-node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/check-docs.test.mjs scripts/check-upgrade.test.mjs scripts/live-test-plan.test.mjs
+node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/frontend-bundle.test.mjs scripts/check-docs.test.mjs scripts/check-upgrade.test.mjs scripts/live-test-plan.test.mjs
 if ($LASTEXITCODE -ne 0) { throw "repository policy tests failed" }
 
 Write-Host "==> docs and locale keys"
