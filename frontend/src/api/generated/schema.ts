@@ -1575,6 +1575,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find chats and team members by conversation content */
+        get: operations["searchConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/collaboration": {
         parameters: {
             query?: never;
@@ -1707,6 +1724,27 @@ export interface components {
         ChatList: {
             items: components["schemas"]["Chat"][];
             nextCursor: string;
+        };
+        SearchResults: {
+            query: string;
+            chats: components["schemas"]["ChatSearchResult"][];
+            members: components["schemas"]["MemberSearchResult"][];
+        };
+        ChatSearchResult: {
+            chatId: string;
+            title: string;
+            /** @description Excerpt of the latest matching message; empty when only the title matched. */
+            snippet: string;
+            activityAt?: string;
+        };
+        MemberSearchResult: {
+            teamId: string;
+            teamName: string;
+            botId: string;
+            botName: string;
+            /** @description Excerpt of the member's latest matching message. */
+            snippet: string;
+            activityAt?: string;
         };
         ChatSendInput: {
             requestId: string;
@@ -1990,13 +2028,18 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             answeredAt?: string;
+            /** @description A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served. */
+            canSkipChecks?: boolean;
         };
         Message: {
             id: string;
             teamId: string;
             botId: string;
-            /** @enum {string} */
-            kind: "user" | "assistant" | "collaboration" | "system";
+            /**
+             * @description document is a relay-posted document (the requirement to confirm
+             * @enum {string}
+             */
+            kind: "user" | "assistant" | "collaboration" | "system" | "document";
             blocks: components["schemas"]["TextBlock"][];
             requestId?: string;
             /** @enum {string} */
@@ -2278,6 +2321,11 @@ export interface components {
             /** Format: int64 */
             budgetTokens: number;
             enginePath: string;
+            /**
+             * @description When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+             * @enum {string}
+             */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         SettingsPatch: {
             /** @enum {string} */
@@ -2297,6 +2345,8 @@ export interface components {
             /** Format: int64 */
             budgetTokens?: number;
             enginePath?: string;
+            /** @enum {string} */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         Snapshot: {
             /** Format: int64 */
@@ -2353,14 +2403,21 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             lastMessage?: components["schemas"]["MessagePreview"];
+            /**
+             * @description How the member's latest finished run ended; only team listings fill it.
+             * @enum {string}
+             */
+            lastRunStatus?: "completed" | "failed" | "interrupted" | "";
         };
-        /** @description The start of the latest message between the user and a member, for the team list. */
+        /** @description The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list. */
         MessagePreview: {
             /** @enum {string} */
-            kind: "user" | "assistant";
+            kind: "user" | "assistant" | "system" | "collaboration";
             text: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Who sent it */
+            senderBotId?: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];
@@ -5897,6 +5954,32 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    searchConversations: {
+        parameters: {
+            query: {
+                /** @description Plain text matched against chat titles */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest matches first, a few per group; archived and deleted conversations are never returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["SearchResults"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
         };
     };
     collaborationTool: {

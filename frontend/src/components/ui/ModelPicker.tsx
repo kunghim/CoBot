@@ -196,9 +196,16 @@ export function ModelEffortPanel({ models, model, onModel, levels, effort, onEff
   );
 }
 
-/** The composer's trigger and the floating panel it opens. */
-export function ModelEffortPicker({ placement = 'top-start', triggerLabel, disabled = false, note, ...panel }: Parameters<typeof ModelEffortPanel>[0] & { placement?: Placement; triggerLabel: string; disabled?: boolean; note?: ReactNode }) {
-  const [open, setOpen] = useState(false);
+/** The composer's trigger and the floating panel it opens. The open state
+ * can be controlled, so an entry elsewhere — a failed turn's switch-model
+ * action — can open the same picker. */
+export function ModelEffortPicker({ placement = 'top-start', triggerLabel, disabled = false, note, open: openProp, onOpenChange, ...panel }: Parameters<typeof ModelEffortPanel>[0] & { placement?: Placement; triggerLabel: string; disabled?: boolean; note?: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (value: boolean) => {
+    setOpenState(value);
+    onOpenChange?.(value);
+  };
   const root = useRef<HTMLDivElement>(null);
   const floating = useRef<HTMLDivElement>(null);
   const placed = useFloatingPlacement(floating, open, placement);

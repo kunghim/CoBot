@@ -113,7 +113,7 @@ CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这�
 | [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
 | [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | 将 **CoBot.app** 复制到「应用程序」，弹出映像后打开（需要 Codex CLI 0.146.0 或更新版本） |
 
-两种 Windows 下载包含相同的程序文件。Windows 需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
+上述已发布的 beta.2 下载尚未采用“只使用桌面端引擎”的新规则。两种 Windows 下载包含相同的程序文件，这些旧版在 Windows 需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
 以及已在 `PATH` 上安装的官方 **Codex CLI**，具备可用账号和访问 Codex 服务的网络。
 安装包不包含 Codex；只随 Codex 桌面版附带的引擎找不到。成员可以使用官方 ChatGPT 账号，
 也可以使用兼容 OpenAI Responses 接口的 API 供应商。
@@ -134,9 +134,10 @@ CoBot 使用自己的私有 Codex 环境，需要独立登录。
 
 **构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
 以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
-让 Agent 工作还需在 `PATH` 上安装 [Codex CLI](https://github.com/openai/codex)
-（建议使用最新版），具备可使用 Codex 的账号和访问其服务的网络。
-Go、Node 用于构建；构建后的 CoBot 程序仍需 Codex 执行 Agent 工作。本地优先不等于模型调用离线。
+让 Agent 工作还需安装 [ChatGPT 桌面端](https://learn.chatgpt.com/docs/app)。
+当前源码只使用该应用内置的 Codex，账号在 CoBot 的私有环境中独立登录，不使用独立安装的 CLI。
+macOS 应用包与 Windows Store 包可自动发现；暂不支持 Linux 桌面安装布局。
+Go、Node 用于构建。本地优先不等于模型调用离线。
 
 #### Windows（PowerShell）
 
@@ -172,7 +173,7 @@ Apple Silicon 可通过已安装的 Rosetta 做 Intel 包冒烟测试，但不�
 但 Gatekeeper 评估会拒绝该包，浏览器下载后的首次打开及手动允许流程尚未验收。
 
 macOS 的 Codex 0.146.0 冒烟测试使用隔离数据目录和真实模型，不代表已完成 Windows 全部验收项。
-图形启动的 `PATH` 精简时，还会检查常见 standalone、Cargo 和 Homebrew 安装目录。
+当前源码直接发现 ChatGPT 桌面端，图形启动不依赖终端 `PATH`。
 未显式提供代理环境变量时，Codex 会继承 macOS 的静态系统代理；不会修改系统设置，也不会执行自动代理（PAC）脚本。
 
 请在浏览器和团队文件所在的同一台电脑运行这些命令。这启动的是本机 Web 应用，

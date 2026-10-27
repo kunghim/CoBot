@@ -24,7 +24,7 @@ test('Vite registers the dev authorization route against the real core', async (
   const port=(reservation.address() as AddressInfo).port;
   await new Promise<void>((closed,failed)=>reservation.close((error)=>error?failed(error):closed()));
   const endpoint=`http://127.0.0.1:${port}`;
-  const child=spawn(process.execPath,[resolve(root,'frontend/node_modules/vite/bin/vite.js'),'--port',String(port),'--strictPort'],{
+  const child=spawn(process.execPath,[resolve(root,'frontend/node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{
     cwd:resolve(root,'frontend'),windowsHide:true,stdio:['ignore','pipe','pipe'],
     env:{...process.env,COBOT_API_ENDPOINT:process.env.COBOT_E2E_ENDPOINT!,COBOT_ADMIN_SECRET:process.env.COBOT_E2E_ADMIN_SECRET!},
   });

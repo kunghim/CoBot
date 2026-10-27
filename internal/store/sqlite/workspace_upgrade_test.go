@@ -13,7 +13,7 @@ import (
 	"github.com/kunghim/CoBot/internal/testutil"
 )
 
-func TestWorkspaceIndexesUpgradeV32WithoutChangingHistoricalSteps(t *testing.T) {
+func TestWorkspaceIndexesUpgradeV33WithoutChangingHistoricalSteps(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join("..", "..", "..", ".tmp", "test-runs")
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -24,7 +24,7 @@ func TestWorkspaceIndexesUpgradeV32WithoutChangingHistoricalSteps(t *testing.T) 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	path := filepath.Join(dir, "v32.sqlite")
+	path := filepath.Join(dir, "v33.sqlite")
 	db, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestWorkspaceIndexesUpgradeV32WithoutChangingHistoricalSteps(t *testing.T) 
 	oldSource := map[string]string{}
 	for _, path := range files {
 		name := strings.TrimPrefix(path, "migrations/")
-		if name < "00033" {
+		if name < "00034" {
 			data, err := fs.ReadFile(migrationsFS, path)
 			if err != nil {
 				t.Fatal(err)
@@ -84,7 +84,7 @@ func TestWorkspaceIndexesUpgradeV32WithoutChangingHistoricalSteps(t *testing.T) 
 		t.Fatal(err)
 	}
 	version, err := current.CurrentVersion(ctx)
-	if err != nil || version != 33 {
+	if err != nil || version != 34 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 	var after string
@@ -97,7 +97,7 @@ func TestWorkspaceIndexesUpgradeV32WithoutChangingHistoricalSteps(t *testing.T) 
 	if saved, err := GetChat(ctx, db, chat.ID); err != nil || saved.Title != chat.Title {
 		t.Fatalf("chat=%+v err=%v", saved, err)
 	}
-	snapshots, err := filepath.Glob(filepath.Join(backups, "cobot-v32-*.sqlite"))
+	snapshots, err := filepath.Glob(filepath.Join(backups, "cobot-v33-*.sqlite"))
 	if err != nil || len(snapshots) != 1 {
 		t.Fatalf("backups=%v err=%v", snapshots, err)
 	}

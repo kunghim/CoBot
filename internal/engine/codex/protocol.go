@@ -11,7 +11,13 @@ type ClientInfo struct {
 
 // InitializeParams starts the protocol handshake.
 type InitializeParams struct {
-	ClientInfo ClientInfo `json:"clientInfo"`
+	ClientInfo   ClientInfo              `json:"clientInfo"`
+	Capabilities *InitializeCapabilities `json:"capabilities,omitempty"`
+}
+
+// InitializeCapabilities opts into the protocol fields the adapter uses.
+type InitializeCapabilities struct {
+	ExperimentalAPI bool `json:"experimentalApi"`
 }
 
 // ThreadStartParams mirrors the app-server thread/start request.

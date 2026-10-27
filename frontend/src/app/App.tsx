@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, devLinkSecret, desktopSecret, onUnauthorized } from '../api/client';
 import { queryKeys, useEventStream, useSnapshot, useStatus, useTeams } from '../api/queries';
 import ChatLayout from '../features/chats/ChatLayout';
 import ChatRoute from '../features/chats/ChatPage';
 import { savedMode, lastChatPath, writeLocal } from './mode';
-import ModeSwitch from './ModeSwitch';
-import { modeHeaderClass } from './ModeSelector';
 import Layout from './Layout';
 import { SelectedBotProvider } from './SelectedBotContext';
 import { useAppearance } from './appearance';
-import { AppModeHeader, AppTitleBar, BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
-import { useDesktopWindow, type DesktopWindow } from '../platform/desktopWindow';
-import { ShellProvider, ShellToggle, useShell } from './shell';
+import { BrandMark, Button, Card, Icons, Spinner, ToastProvider } from '../components/ui';
+import { DesktopWindowContext, useDesktopWindow } from '../platform/desktopWindow';
+import { ShellProvider } from './shell';
+import { ConversationHeader, WindowCorner } from './WindowChrome';
 import { authStateFrom, type AuthState } from './authState';
 import HomePage from '../features/home/HomePage';
 import SettingsPage from '../features/settings/SettingsPage';
@@ -43,43 +42,29 @@ async function obtainAndExchangeSecret(): Promise<void> {
 
 export default function App() {
   const desktop = useDesktopWindow();
-  // The desktop shell hides the system title bar; the app draws its own,
-  // in CoBot's theme, above every screen.
+  // The desktop shell hides the system title bar; the columns draw their own
+  // header rows (see WindowChrome) in CoBot's theme, so the layout reaches
+  // the top of the window.
   return (
     <ShellProvider titleBar>
-      <div className="flex h-full flex-col">
-        <TitleBar desktop={desktop} />
-        <div className="min-h-0 flex-1">
+      <SelectedBotProvider>
+        <DesktopWindowContext.Provider value={desktop}>
           <Screens />
-        </div>
-      </div>
+        </DesktopWindowContext.Provider>
+      </SelectedBotProvider>
     </ShellProvider>
   );
 }
 
-function TitleBar({ desktop }: { desktop: DesktopWindow | null }) {
-  const { t } = useTranslation();
-  // The toggle belongs to the workspace; Settings has no side panels.
-  const path = useLocation().pathname;
-  const { listOpen } = useShell();
-  const workspace = !path.startsWith('/settings');
-  if (!desktop && !workspace) return null;
+/** Settings has no rail or sidebar of its own; the corner reservation and a
+ * conversation-style head without the list toggle still frame the window. */
+function SettingsShell() {
   return (
-    <AppTitleBar
-      platform={desktop?.platform ?? 'windows'}
-      flushLeft
-      left={workspace ? <div className={modeHeaderClass(listOpen)}><AppModeHeader brandLabel={t('app.title')} compact={!!desktop} toggle={<ShellToggle place="titlebar" />}><ModeSwitch value={path.startsWith('/chat') ? 'chat' : 'work'} /></AppModeHeader></div> : undefined}
-      windowControls={desktop ? {
-        minimizeLabel: t('window.minimize'),
-        maximizeLabel: t('window.maximize'),
-        restoreLabel: t('window.restore'),
-        closeLabel: t('window.close'),
-        maximized: desktop.maximized,
-        onMinimize: desktop.minimize,
-        onToggleMaximize: desktop.toggleMaximize,
-        onClose: desktop.close,
-      } : undefined}
-    />
+    <div className="relative flex h-full flex-col bg-side text-neutral-900 dark:text-neutral-100">
+      <WindowCorner />
+      <ConversationHeader toggle={false} alwaysInset />
+      <div className="min-h-0 flex-1"><SettingsPage /></div>
+    </div>
   );
 }
 
@@ -187,10 +172,9 @@ function Screens() {
 
   return (
     <ToastProvider closeLabel={t('common.close')}>
-    <SelectedBotProvider>
       <Routes>
         <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-        <Route path="/settings/:section" element={<SettingsPage />} />
+        <Route path="/settings/:section" element={<SettingsShell />} />
         <Route path="/chat" element={<ChatLayout />}>
           <Route index element={<Navigate to="new" replace />} />
           <Route path="new" element={<ChatRoute />} />
@@ -201,7 +185,6 @@ function Screens() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
-    </SelectedBotProvider>
     </ToastProvider>
   );
 }

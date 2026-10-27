@@ -57,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/file", s.handleWorkspaceFile)
 	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/content", s.handleWorkspaceContent)
 	mux.HandleFunc("GET /api/v1/chats", s.handleListChats)
+	mux.HandleFunc("GET /api/v1/search", s.handleSearchConversations)
 	mux.HandleFunc("GET /api/v1/chat-navigation", s.handleChatNavigation)
 	mux.HandleFunc("POST /api/v1/chat-navigation", s.handleChangeChatNavigation)
 	mux.HandleFunc("POST /api/v1/chats/{chatId}/actions/{action}", s.handleChatAction)

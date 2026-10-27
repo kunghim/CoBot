@@ -22,10 +22,16 @@ export const queryKeys = {
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
   requirements: (teamId: string) => ['requirements', teamId] as const,
   questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
+  conversationSearch: (q: string) => ['conversationSearch', q] as const,
 };
 
 export function useStatus() {
   return useQuery({ queryKey: queryKeys.status, queryFn: api.getStatus, retry: false });
+}
+
+/** One lookup per settled query; an empty query closes the field without a request. */
+export function useConversationSearch(query: string) {
+  return useQuery({ queryKey: queryKeys.conversationSearch(query), queryFn: () => api.searchConversations(query), enabled: query !== '', staleTime: 30_000 });
 }
 
 /** GET /teams/{id}/budget: a team's daily limit, each member's, and today's spend. */

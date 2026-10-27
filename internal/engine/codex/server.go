@@ -192,6 +192,9 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	defer cancel()
 	if err := s.client.Call(handshakeCtx, "initialize", InitializeParams{
 		ClientInfo: opts.Client,
+		// thread/resume.excludeTurns is gated by this capability, including
+		// when a chat resumes a thread still loaded in the same process.
+		Capabilities: &InitializeCapabilities{ExperimentalAPI: true},
 	}, nil); err != nil {
 		s.kill()
 		s.waitProcess()

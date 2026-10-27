@@ -114,6 +114,7 @@
     "collapse": "收起团队",
     "leader": "项目经理",
     "previewYou": "你：",
+    "previewFrom": "{{name}}：{{text}}",
     "loading": "加载团队中…",
     "loadFailed": "团队列表加载失败",
     "badge": {
@@ -194,6 +195,12 @@
     "chooseModel": "选择模型",
     "back": "返回",
     "saveFailed": "思考强度没有改成",
+    "switchOthersTitle": "也给其他 {{count}} 位成员换成 {{model}} 吗？",
+    "switchOthersNote": "模型属于每位成员；正在工作的成员从下一轮起生效。",
+    "switchAll": "全部换",
+    "switchThisOnly": "只换这一位",
+    "modelSwitchedAll": "已把 {{count}} 位成员换成 {{model}}",
+    "modelSwitchedAllFailed": "这些成员没有换成：{{names}}",
     "level": {
       "none": "不思考",
       "minimal": "最低",
@@ -320,6 +327,7 @@
     "step": {
       "reasoning": "思考",
       "message": "说明",
+      "switchModel": "换模型",
       "diff": "本轮改动 {{count}} 个文件",
       "agent": {
         "badge": "子智能体",
@@ -386,6 +394,13 @@
       "accepted": "已发送",
       "cancelled": "已取消",
       "unknown": "待核对"
+    },
+    "webLink": {
+      "openFailed": "网页没能打开"
+    },
+    "document": {
+      "label": "文档",
+      "untitled": "文档"
     }
   },
   "approvals": {
@@ -407,7 +422,6 @@
       "budget": "每日预算"
     },
     "requester": "发起者：{{name}}",
-    "requesterAsks": "请求你批准",
     "reason": "理由",
     "prev": "上一张审批卡",
     "next": "下一张审批卡",
@@ -549,6 +563,7 @@
   "panel": {
     "noSelection": "先在左侧选择一个成员",
     "tablist": "工作面板页面",
+    "end": "已经到底了",
     "tabs": {
       "tasks": "任务",
       "approvals": "审批",
@@ -569,8 +584,10 @@
     "reload": "刷新",
     "address": "地址",
     "view": "团队浏览器画面，可直接点击和输入",
-    "userTab": "你打开的",
-    "sharedHint": "这是和成员共用的浏览器：你的操作会直接作用在页面上，成员下次操作时会知道你动过。登录一次，团队里所有成员共用登录状态。"
+    "emptyTitle": "浏览器",
+    "emptyHint": "粘贴或输入 URL 以打开网页",
+    "addressPlaceholder": "输入网址后回车",
+    "openExternal": "在系统浏览器打开"
   },
   "workspace": {
     "changes": {
@@ -714,11 +731,7 @@
       "noMemberPages": "成员还没有打开页面"
     },
     "browser": {
-      "memberTab": "{{name}} 的标签页",
       "memberBusy": "正在操作",
-      "memberHint": "你也可以直接点击、输入，不会打断他",
-      "userOwn": "你打开的",
-      "userHint": "成员需要时可以查看",
       "closed": "页面已关闭",
       "closeClosed": "关闭这个标签页",
       "viewport": "视口大小",
@@ -727,7 +740,10 @@
       "viewportDesktop": "桌面 1280 × 744",
       "viewportTablet": "平板 768 × 1024",
       "viewportPhone": "手机 390 × 844",
-      "notAvailable": "浏览器用不了"
+      "notAvailable": "浏览器用不了",
+      "viewportSizeTitle": "页面的真实视口：在这里改，所有成员看到同一尺寸",
+      "viewportWidth": "页面宽度（像素）",
+      "viewportHeight": "页面高度（像素）"
     },
     "resources": {
       "title": "本轮资源",
@@ -735,7 +751,9 @@
       "reviewTurn": "审查本轮变更",
       "review": "审查",
       "open": "打开"
-    }
+    },
+    "fullView": "进入完整视图 ⇧⌘F",
+    "exitFullView": "退出完整视图 ⇧⌘F"
   },
   "tasks": {
     "ownerUser": "你",
@@ -804,8 +822,8 @@
       "title": "需要你确认",
       "accept": "确认，继续",
       "revise": "提修改意见",
-      "changesPlaceholder": "需要修改什么（选「提修改意见」时必填）",
-      "returnToMe": "改完直接回到我确认（不再重新评审）"
+      "changesPlaceholder": "有修改意见写在这里；留空直接确认",
+      "returnToMe": "改完直接回到我确认（中间的检查不再重来）"
     },
     "title": "待你回答",
     "loadFailed": "问题加载失败",
@@ -815,10 +833,11 @@
       "title": "交付验收",
       "accept": "验收通过",
       "revise": "继续修改",
-      "changesPlaceholder": "需要修改什么（选「继续修改」时必填）"
+      "changesPlaceholder": "有修改意见写在这里；留空即验收通过"
     },
     "answerIsInput": "回答会作为普通消息发给提问的成员，不是安全授权",
-    "cancel": "不再需要"
+    "dismissed": "{{count}} 张待验收",
+    "cancel": "忽略"
   },
   "engine": {
     "hook": "安全钩子",
@@ -1084,7 +1103,7 @@
       "general": "界面语言等基础偏好。",
       "appearance": "浅色、深色或跟随系统，以及界面配色。成员的角色颜色在所有主题里不变。",
       "roles": "每个角色的默认头像。没有单独设置头像的成员会跟着角色变；在成员的会话里点头像，可以只改这一个成员。",
-      "engine": "CoBot 启动时自动检测 Codex 并授权安全钩子，这里只展示结果。引擎不绑定账号。",
+      "engine": "CoBot 使用 ChatGPT 桌面端内置的 Codex，启动时自动检测并授权安全钩子。账号在 CoBot 的私有环境中独立登录。",
       "models": "成员还没在会话里选过模型时用它，对之后开始的任务起作用。",
       "providers": "配置一次，Codex 与 Claude Code 通用。启用的供应商的模型都可以在会话里选，在厂商自己的供应商里换模型，会接着原来的会话；换供应商或在网关里换模型，会开一个新会话，并把之前的完整记录交给新模型。",
       "collaboration": "控制团队规模、成员互相唤醒的次数和用量预算。",
@@ -1151,7 +1170,13 @@
     "saved": "已保存",
     "saveFailed": "保存失败",
     "engineAccountHint": "引擎不绑定账号：每个成员用哪个供应商的模型，在会话里选择；ChatGPT 账号在「模型供应商」里登录。",
-    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。"
+    "modelsNeedProvider": "还没有可选的模型：在「模型供应商」里登录 ChatGPT 账号，或添加一个供应商。",
+    "modelSwitchTitle": "批量切换模型",
+    "modelSwitchHint": "给一位成员换模型时，是否顺手把还在用原模型的其他成员一起换掉。",
+    "modelSwitchPrompt": "提示时机",
+    "modelSwitchAlways": "每次都提示",
+    "modelSwitchSmart": "仅当原模型的成员上次会话失败时提示",
+    "modelSwitchNever": "不提示"
   },
   "auth": {
     "authorizing": "正在授权…",
@@ -1278,8 +1303,8 @@
     "error.run.bot_busy": "成员正在执行，等它结束后再重试",
     "error.run.not_latest": "这一轮之后成员已经有了新的执行，不能再重试它",
     "error.run.nothing_to_retry": "这一轮要做的事已经没有可重新执行的了（卡片已交接或取消）",
-    "error.engine.not_found": "未找到 Codex。请安装 Codex CLI 0.161.0 或更新版本，确认终端里能运行 `codex`，然后重新打开 CoBot",
-    "error.engine.not_found_macos": "未找到 Codex。请安装 Codex CLI 0.146.0 或更新版本，确认终端里能运行 `codex`，然后重新打开 CoBot",
+    "error.engine.not_found": "未找到 ChatGPT 桌面端内置的 Codex。请安装或更新 ChatGPT 桌面端后重新打开 CoBot；手动配置的引擎路径也必须位于该应用内。",
+    "error.engine.not_found_macos": "未找到 ChatGPT 桌面端内置的 Codex。请安装或更新 ChatGPT 桌面端后重新打开 CoBot；手动配置的引擎路径也必须位于该应用内。",
     "error.engine.version_probe_failed": "无法读取 Codex 版本",
     "error.engine.control_unavailable": "引擎控制进程不可用",
     "error.engine.settings_unreadable": "引擎设置读取失败",
@@ -1486,5 +1511,13 @@
     "chatsDeleted": "已删除 {{count}} 段聊天",
     "chatDeleteFailed": "{{count}} 段聊天删除失败：{{reason}}",
     "chatDeleteMany": "删除 {{count}} 段聊天？"
+  },
+  "searchBox": {
+    "placeholder": "搜索会话",
+    "chats": "聊天",
+    "members": "团队成员",
+    "searching": "正在搜索…",
+    "noResults": "没有匹配的会话",
+    "error": "搜索失败，请稍后再试"
   }
 }

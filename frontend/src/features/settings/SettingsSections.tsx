@@ -451,6 +451,21 @@ export function CollaborationSection({ settings, save, errors, budgetScale = 're
           )}
         </div>
       </Card>
+      <Card title={t('settings.modelSwitchTitle')} description={t('settings.modelSwitchHint')}>
+        <div className="max-w-md">
+          <Field label={t('settings.modelSwitchPrompt')}>
+            <Select
+              value={settings.modelSwitchPrompt || 'always'}
+              options={[
+                { value: 'always', label: t('settings.modelSwitchAlways') },
+                { value: 'smart', label: t('settings.modelSwitchSmart') },
+                { value: 'never', label: t('settings.modelSwitchNever') },
+              ]}
+              onChange={(next) => save('modelSwitchPrompt', { modelSwitchPrompt: next as Settings['modelSwitchPrompt'] })}
+            />
+          </Field>
+        </div>
+      </Card>
     </div>
   );
 }

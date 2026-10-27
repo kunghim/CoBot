@@ -65,7 +65,7 @@ func newGateway(t *testing.T, name string) *gateway {
 		}
 		if payload.Stream {
 			w.Header().Set("Content-Type", "text/event-stream")
-			fmt.Fprintf(w, "event: response.completed\ndata: %s\n\n", mustJSON(response))
+			fmt.Fprintf(w, "event: response.completed\ndata: %s\n\n", mustJSON(map[string]any{"type": "response.completed", "response": response}))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -160,6 +160,47 @@ func startRealEngine(t *testing.T, paths platform.Paths, env []string) *Server {
 		_ = server.Shutdown(ctx)
 	})
 	return server
+}
+
+// Resuming without the turn history requires a capability negotiated by the
+// adapter's real initialize handshake, even when the thread is already loaded.
+func TestRealEngineResumesWithoutTurnHistory(t *testing.T) {
+	if os.Getenv("COBOT_R_SMOKE") != "1" {
+		t.Skip("set COBOT_R_SMOKE=1 to run the real engine resume check")
+	}
+	alpha := newGateway(t, "alpha")
+	gateways := map[string]*gateway{"alpha": alpha}
+	paths := realProviderHome(t, gateways)
+	server := startRealEngine(t, paths, realEngineEnv(paths, gateways))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	spec := engine.ThreadSpec{Permission: "read_only", Model: "gpt-5.6-sol", ModelProvider: "alpha"}
+	info, err := server.StartThread(ctx, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	turnID, err := server.StartTurn(ctx, info.ThreadID, "ping", engine.TurnOptions{Model: spec.Model})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		status, err := server.InspectTurn(ctx, info.ThreadID, turnID)
+		if err == nil && status == "completed" {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("initial turn did not complete: %v", err)
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	resumed, err := server.ResumeThread(ctx, info.ThreadID, spec)
+	if err != nil {
+		t.Fatalf("resume without turn history: %v", err)
+	}
+	if resumed.ThreadID != info.ThreadID || resumed.ModelProvider != "alpha" {
+		t.Fatalf("resume changed the thread or provider: %+v", resumed)
+	}
 }
 
 // A thread that names a provider has to reach that provider, with that

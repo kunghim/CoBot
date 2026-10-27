@@ -170,7 +170,9 @@ func (f reviewFlow) said(ctx context.Context, bot domain.Bot) string {
 	}
 	var out []string
 	for _, m := range messages {
-		if m.Kind == domain.MessageKindAssistant {
+		// Replies and relay-posted documents both say something the
+		// conversation holds.
+		if m.Kind == domain.MessageKindAssistant || m.Kind == domain.MessageKindDocument {
 			out = append(out, m.RenderText())
 		}
 	}

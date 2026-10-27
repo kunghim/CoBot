@@ -1,15 +1,17 @@
 // The desktop window as the page sees it. The Wails shell hides the system
 // title bar on Windows (frameless) and macOS (hidden inset, traffic lights
-// kept), so the page draws its own: it needs the platform and the window
-// controls of the Wails runtime, which the shell injects as window.runtime.
-// In a browser there is no runtime and no title bar.
-import { useEffect, useState } from 'react';
+// kept), so the page draws its own header rows: it needs the platform and
+// the window controls of the Wails runtime, which the shell injects as
+// window.runtime. In a browser there is no runtime and no header rows.
+import { createContext, useContext, useEffect, useState } from 'react';
 
 interface WailsRuntime {
   Environment(): Promise<{ platform: string }>;
   WindowMinimise(): void;
   WindowToggleMaximise(): void;
   WindowIsMaximised(): Promise<boolean>;
+  WindowIsFullscreen(): Promise<boolean>;
+  WindowSetTitle?(title: string): void;
   Quit(): void;
 }
 
@@ -26,15 +28,29 @@ export type TitleBarPlatform = 'windows' | 'mac';
 export interface DesktopWindow {
   platform: TitleBarPlatform;
   maximized: boolean;
+  fullscreen: boolean;
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
+  /** Names the window: macOS draws it beside the traffic lights when the
+   * fullscreen hover reveals the titlebar. Empty string clears it. */
+  setNativeTitle: (title: string) => void;
+}
+
+/** The app shell provides the window once, high above the layouts; column
+ * headers and the corner reservation read it through this context. */
+export const DesktopWindowContext = createContext<DesktopWindow | null>(null);
+
+/** The window frame, or null in a plain browser tab. */
+export function useWindowFrame(): DesktopWindow | null {
+  return useContext(DesktopWindowContext);
 }
 
 /** The desktop window, or null in a browser (and on Linux, which keeps the system bar). */
 export function useDesktopWindow(): DesktopWindow | null {
   const [platform, setPlatform] = useState<TitleBarPlatform | null>(null);
   const [maximized, setMaximized] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
     const rt = runtime();
     if (!rt) return;
@@ -45,12 +61,55 @@ export function useDesktopWindow(): DesktopWindow | null {
       else if (env.platform === 'darwin') setPlatform('mac');
     });
     // Maximizing resizes the page; that is when to read the state again.
-    const refresh = () => void rt.WindowIsMaximised().then((value) => !cancelled && setMaximized(value));
+    // An injected runtime that predates WindowIsFullscreen must not also
+    // freeze the maximize state.
+    const readFullscreen = () => (typeof rt.WindowIsFullscreen === 'function' ? rt.WindowIsFullscreen() : Promise.resolve(false));
+    const refresh = () => void Promise.all([rt.WindowIsMaximised(), readFullscreen()])
+      .then(([maximized, isFullscreen]) => {
+        if (!cancelled) {
+          setMaximized(maximized);
+          setFullscreen(isFullscreen);
+        }
+      })
+      .catch(() => undefined);
+    // Entering or leaving fullscreen fires no event and resizes only at the
+    // end of the animation, so the traffic lights appear (or vanish) a beat
+    // before our reservation catches up. While the flag and the window
+    // disagree — transition — poll fast; otherwise resize alone suffices.
+    let lastFullscreen = false;
+    let watch: ReturnType<typeof setInterval> | null = null;
+    const watchTransition = () => {
+      if (watch) return;
+      watch = setInterval(() => {
+        void readFullscreen().then((isFullscreen) => {
+          if (cancelled) return;
+          if (watch && isFullscreen === lastFullscreen) {
+            clearInterval(watch);
+            watch = null;
+          } else {
+            lastFullscreen = isFullscreen;
+            setFullscreen(isFullscreen);
+          }
+        }).catch(() => undefined);
+      }, 120);
+    };
+    void readFullscreen().then((isFullscreen) => { lastFullscreen = isFullscreen; }).catch(() => undefined);
     refresh();
-    window.addEventListener('resize', refresh);
+    const onResize = () => {
+      void readFullscreen().then((isFullscreen) => {
+        if (isFullscreen !== lastFullscreen) {
+          lastFullscreen = isFullscreen;
+          if (!cancelled) setFullscreen(isFullscreen);
+          watchTransition();
+        }
+      }).catch(() => undefined);
+      refresh();
+    };
+    window.addEventListener('resize', onResize);
     return () => {
       cancelled = true;
-      window.removeEventListener('resize', refresh);
+      window.removeEventListener('resize', onResize);
+      if (watch) clearInterval(watch);
     };
   }, []);
   const rt = runtime();
@@ -58,8 +117,10 @@ export function useDesktopWindow(): DesktopWindow | null {
   return {
     platform,
     maximized,
+    fullscreen,
     minimize: () => rt.WindowMinimise(),
     toggleMaximize: () => rt.WindowToggleMaximise(),
     close: () => rt.Quit(),
+    setNativeTitle: (title: string) => rt.WindowSetTitle?.(title),
   };
 }

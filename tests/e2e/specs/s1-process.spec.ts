@@ -5,6 +5,8 @@ import { authorize, setEngineMode } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await authorize(context);
+  // These scenarios exercise teams; a fresh profile now opens in chat mode.
+  await context.addInitScript(() => localStorage.setItem('cobot.mode', 'work'));
 });
 
 // The conversation shows what the member is doing while it works (Codex

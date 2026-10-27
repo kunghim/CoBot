@@ -37,7 +37,7 @@ export default function NavigationOverlays() {
     <Chapter id="navigation" title="导航与浮层" intro="导航把人带到别处；浮层临时盖在页面上。所有导航项都有静止、悬停、当前三种看得出的状态；所有浮层都能用 Esc 关闭，关闭后焦点回到打开它的按钮。">
       <Doc id="rail" name="RailItem 一级图标栏" file="components/ui/Navigation.tsx" use="最左侧的一级导航（首页、设置）。当前页是填充的方块。" a11y="每项都有 label，当前项标记 aria-current=page。">
         <Demo surface="sunken">
-          <div className="flex w-14 flex-col items-center gap-1 rounded-xl py-2">
+          <div className="flex w-11 flex-col items-center gap-1 rounded-xl py-2">
             <RailItem icon={Home} label="首页" current={rail === 'home'} onClick={() => setRail('home')} />
             <RailItem icon={Users} label="团队" current={rail === 'teams'} onClick={() => setRail('teams')} badge={<Count value={2} tone="danger" label="2 项等你处理" />} />
             <RailItem icon={Settings} label="设置" current={rail === 'settings'} onClick={() => setRail('settings')} />
@@ -220,7 +220,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，打开时内容为它让位。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，按内容决定高度、从打开处向下展开，最高到会话区底缘，超出后内部滚动；关闭按钮在内容第一行的行尾。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
         <Demo title="文件树宽度：拖动或用左右方向键调整左栏">
           <div className="flex h-24 overflow-hidden rounded-xl bg-sunk">
             <div style={{ width: Math.min(wsWidth, 300) }} className="shrink-0 p-3 text-sm">文件树</div>

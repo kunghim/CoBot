@@ -20,6 +20,7 @@ interface WorkspaceContext {
   focusTab: (id: string) => void;
   closeTab: (id: string) => void;
   collapse: () => void;
+  toggleFullView: () => void;
   setWidth: (width: number) => void;
   cardOpen: boolean;
   setCardOpen: (open: boolean) => void;
@@ -76,7 +77,7 @@ export function WorkspaceProvider({ teamId = null, chatId = null, botId = null, 
 
   const [cardOpen, setCardOpen] = useState(false);
   useEffect(() => setCardOpen(false), [botId, chatId]);
-  useWorkPanelRequests(useCallback(() => { if (teamId) setCardOpen(true); }, [teamId]));
+  useWorkPanelRequests(useCallback(() => setCardOpen(true), []));
   const state = entry.key === key ? entry.state : initialWorkspaceState();
   const value = useMemo<WorkspaceContext>(() => ({
     teamId, botId, scope, state,
@@ -87,6 +88,7 @@ export function WorkspaceProvider({ teamId = null, chatId = null, botId = null, 
     focusTab: (id) => dispatch({ type: 'focus', id }),
     closeTab: (id) => dispatch({ type: 'close', id }),
     collapse: () => dispatch({ type: 'collapse' }),
+    toggleFullView: () => dispatch({ type: 'toggleFullView' }),
     setWidth: (width) => dispatch({ type: 'setWidth', width }),
     cardOpen, setCardOpen,
   }), [teamId, botId, scope, state, dispatch, cardOpen]);

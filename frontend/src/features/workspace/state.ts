@@ -33,6 +33,9 @@ export interface WorkspaceState {
   width: number;
   tabs: WorkspaceTab[];
   activeId: string | null;
+  /** Full view: the workspace takes the whole room and the conversation
+   * waits. Only meaningful while the workspace is open. */
+  fullView: boolean;
 }
 
 export const DEFAULT_WIDTH = 640;
@@ -44,12 +47,13 @@ export const NEW_TAB_ID = 'new';
 export const CHANGES_TAB_ID = 'changes';
 
 export function initialWorkspaceState(): WorkspaceState {
-  return { open: false, width: DEFAULT_WIDTH, tabs: [], activeId: null };
+  return { open: false, width: DEFAULT_WIDTH, tabs: [], activeId: null, fullView: false };
 }
 
 export type WorkspaceAction =
   | { type: 'updateTab'; id: string; patch: Partial<Pick<WorkspaceTab, 'title' | 'ref' | 'fileView' | 'changesView'>> }
   | { type: 'collapse' }
+  | { type: 'toggleFullView' }
   | { type: 'setWidth'; width: number }
   | { type: 'newTab' }
   | { type: 'openTab'; tab: WorkspaceTab; focus?: boolean }
@@ -81,7 +85,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return { ...state, tabs: state.tabs.map((tab) => tab.id === action.id ? { ...tab, ...action.patch, fileView: { ...tab.fileView, ...action.patch.fileView }, changesView: { ...tab.changesView, ...action.patch.changesView } } : tab) };
     }
     case 'collapse':
-      return { ...state, open: false };
+      return { ...state, open: false, fullView: false };
+    case 'toggleFullView':
+      return state.open ? { ...state, fullView: !state.fullView } : state;
     case 'setWidth': {
       const width = clampWidth(action.width);
       return width === state.width ? state : { ...state, width };
@@ -135,7 +141,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const tabs = state.tabs.filter((tab) => tab.id !== action.id);
       // Closing the last tab closes the workspace; closing another moves the
       // view onto a neighbour.
-      if (tabs.length === 0) return { ...state, tabs, open: false, activeId: null };
+      if (tabs.length === 0) return { ...state, tabs, open: false, activeId: null, fullView: false };
       const activeId = state.activeId === action.id ? neighbour(tabs, Math.min(index, tabs.length - 1)) : state.activeId;
       return { ...state, tabs, activeId };
     }
@@ -168,6 +174,7 @@ export function loadWorkspace(key: string): WorkspaceState | null {
       width: clampWidth(typeof parsed.width === 'number' ? parsed.width : DEFAULT_WIDTH),
       tabs,
       activeId,
+      fullView: parsed.fullView === true && parsed.open === true,
     };
   } catch {
     return null;
@@ -238,8 +245,9 @@ export interface ColumnLayout {
  * The user's own choices (list open, workspace width) are kept: this only
  * decides what is drawn at this width.
  */
-export function layoutColumns(viewport: number, listOpen: boolean, workspaceOpen: boolean, workspaceWidth: number): ColumnLayout {
+export function layoutColumns(viewport: number, listOpen: boolean, workspaceOpen: boolean, workspaceWidth: number, fullView = false): ColumnLayout {
   if (!workspaceOpen) return { showList: listOpen, showConversation: true, workspaceWidth: 0 };
+  if (fullView) return { showList: false, showConversation: false, workspaceWidth: Math.max(0, viewport - RAIL_WIDTH - HANDLE_WIDTH) };
   const room = (withList: boolean) => viewport - RAIL_WIDTH - (withList ? teamListWidth(viewport) : 0) - CONVERSATION_MIN_WIDTH - HANDLE_WIDTH;
   const wanted = clampWidth(workspaceWidth);
   if (listOpen && room(true) >= MIN_WIDTH) return { showList: true, showConversation: true, workspaceWidth: Math.min(wanted, room(true)) };

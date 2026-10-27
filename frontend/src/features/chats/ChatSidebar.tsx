@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import type { Chat, ChatNavigation, ChatNavigationInput, ChatSection } from '../../api/types';
 import { Alert, AlertDialog, Button, IconButton, Icons, Menu, TextInput, cx, type MenuItem } from '../../components/ui';
-import { modeIcons } from '../../app/ModeSelector';
 import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
 import { useChatNavigation, useChats } from './queries';
@@ -34,9 +33,12 @@ export default function ChatSidebar() {
     { id: 'archived', label: t('chatNav.archived'), icon: Icons.archive, onSelect: () => navigate('/settings/archived?type=chat') },
   ];
   return <div className="flex min-h-0 flex-1 flex-col">
-    <div className="px-3 pt-2 pb-2">
-      <Button block variant="ghost" icon={modeIcons.chat} onClick={() => navigate('/chat/new')} className="justify-start text-neutral-600 dark:text-neutral-300">{t('chat.new')}</Button>
-      <div className="mt-3 flex items-center justify-between pl-3.5"><p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('chat.history')}</p>
+    {/* The rail already offers new chat; the list title keeps a compact + so
+        the action stays one click from the history it adds to. */}
+    <div className="flex items-center justify-between px-4 pb-1 pt-2">
+      <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('chat.history')}</p>
+      <div className="flex items-center gap-0.5">
+        <IconButton size="sm" icon={Icons.add} label={t('chat.new')} onClick={() => navigate('/chat/new')} />
         <Menu label={t('chatNav.organize')} trigger={<IconButton size="sm" icon={Icons.more} label={t('chatNav.organize')} />} items={entries} />
       </div>
     </div>

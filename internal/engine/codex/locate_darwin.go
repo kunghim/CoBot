@@ -3,25 +3,24 @@
 package codex
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
-// Finder provides a minimal PATH. Check normal CLI installation directories
-// after PATH lookup fails; never install a CLI or alter the user's shell.
 func locatePlatformBinary() (string, error) {
-	var candidates []string
+	roots := []string{"/Applications/ChatGPT.app"}
 	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates,
-			filepath.Join(home, ".local", "bin", "codex"),
-			filepath.Join(home, ".cargo", "bin", "codex"))
+		roots = append(roots, filepath.Join(home, "Applications", "ChatGPT.app"))
 	}
-	candidates = append(candidates, "/opt/homebrew/bin/codex", "/usr/local/bin/codex")
-	for _, candidate := range candidates {
-		if found, err := exec.LookPath(candidate); err == nil {
-			return found, nil
-		}
+	// Registered apps may have been renamed or installed outside Applications.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "/usr/bin/mdfind", `kMDItemCFBundleIdentifier == "com.openai.codex" || kMDItemCFBundleIdentifier == "com.openai.chat"`).Output(); err == nil {
+		roots = append(roots, strings.Split(strings.TrimSpace(string(out)), "\n")...)
 	}
-	return "", exec.ErrNotFound
+	return findDesktopEngine(roots)
 }

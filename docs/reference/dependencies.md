@@ -86,7 +86,7 @@ Vite、TypeScript、Tailwind、Vitest、Playwright 和接口生成工具等开�
 
 ## 外部运行条件
 
-Codex CLI 由用户安装，CoBot 不将其放入发行包。当前兼容性下限按平台区分，见[引擎适配规则](../rules/engine.md)。
+用户需安装 ChatGPT 桌面端；CoBot 只复用其中的 Codex 程序，不将引擎放入发行包，也不使用独立 CLI。发现方式与私有环境边界见[引擎适配规则](../rules/engine.md)。
 Windows 桌面依赖已有 WebView2 Runtime；macOS 原生构建依赖平台工具链。
 LaTeX 当前可使用明确提供的 macOS Tectonic 离线资源：启动环境变量 `COBOT_LATEX_BINARY` 和 `COBOT_LATEX_CACHE` 均需为绝对路径，前者指向可执行文件，后者指向完整的既有 Tectonic 缓存。临时输出只写当前数据根的缓存目录，退出后删除；不继承编译器密钥，不自动安装或下载。按[现有决定](../product/decisions.md)，本轮保留这些条件，暂缓资源包正式分发及其他平台隔离编译，不作为文件系统交付的阻塞项；不宣称发行包内置编译资源或已支持其他平台。
 

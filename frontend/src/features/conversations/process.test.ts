@@ -169,6 +169,10 @@ describe('exchange lines', () => {
   const base = { id: 'm', teamId: 't', createdAt: '2026-10-17T10:00:00Z' };
   it('treats member messages, task assignments and review notices as exchanges', () => {
     expect(isExchange({ ...base, botId: 'fe', kind: 'collaboration', sourceBotId: 'lead', blocks: [] } as Message)).toBe(true);
+    // A note the product addresses to its own sender (the cancelled-
+    // requirement record in the project manager's conversation) is a
+    // record, not an exchange with itself.
+    expect(isExchange({ ...base, botId: 'lead', kind: 'collaboration', sourceBotId: 'lead', blocks: [] } as Message)).toBe(false);
     const assignment = { ...base, botId: 'fe', kind: 'system', blocks: [{ type: 'text', text: '你被指派了任务…' }, { type: 'task', text: JSON.stringify({ taskId: 't1', title: '做页面' }) }] } as Message;
     expect(isExchange(assignment)).toBe(true);
     expect(isExchange({ ...base, botId: 'lead', kind: 'system', sourceBotId: 'fe', blocks: [{ type: 'text', text: '提交验收' }] } as Message)).toBe(true);
