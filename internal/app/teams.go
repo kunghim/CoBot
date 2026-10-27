@@ -718,17 +718,12 @@ func (a *App) retireForeignMarker(ctx context.Context, canon platform.CanonicalD
 	if err := a.refuseForeignOnly(ctx, canon.Display); err != nil {
 		return err
 	}
-	marker := filepath.Join(canon.Display, ".cobot", "team.json")
-	if root, err := os.OpenRoot(canon.Display); err == nil {
-		defer root.Close()
-		if err := root.Remove(filepath.Join(".cobot", "team.json")); err == nil {
-			return nil
-		}
+	root, err := os.OpenRoot(canon.Display)
+	if err != nil {
+		return domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
 	}
-	// Older kernels without os.Root support keep the plain removal; the path
-	// is the canonical display path, and refuseForeignOnly has just verified
-	// it is a foreign CoBot marker.
-	if err := os.Remove(marker); err != nil {
+	defer root.Close()
+	if err := root.Remove(filepath.Join(".cobot", "team.json")); err != nil {
 		return domain.Conflict("error.team.prepare_failed", map[string]any{"detail": err.Error()})
 	}
 	return nil
