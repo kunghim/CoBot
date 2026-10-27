@@ -22,10 +22,90 @@ export const queryKeys = {
   taskDetail: (taskId: string) => ['taskDetail', taskId] as const,
   requirements: (teamId: string) => ['requirements', teamId] as const,
   questions: (teamId: string, status: string) => ['questions', teamId, status] as const,
+  conversationSearch: (q: string) => ['conversationSearch', q] as const,
 };
 
 export function useStatus() {
   return useQuery({ queryKey: queryKeys.status, queryFn: api.getStatus, retry: false });
+}
+
+/** One lookup per settled query; an empty query closes the field without a request. */
+export function useConversationSearch(query: string) {
+  return useQuery({ queryKey: queryKeys.conversationSearch(query), queryFn: () => api.searchConversations(query), enabled: query !== '', staleTime: 30_000 });
+}
+
+/** GET /teams/{id}/budget: a team's daily limit, each member's, and today's spend. */
+export function useTeamBudget(teamId: string, enabled = true) {
+  return useQuery({ queryKey: ['teamBudget', teamId], queryFn: () => api.getTeamBudget(teamId), enabled, staleTime: 0 });
+}
+
+/** Sets the team's own daily limit (null follows the default, 0 is none). */
+export function useSetTeamBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (limit: number | null) => api.setTeamBudget(teamId, limit),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Sets a member's own daily limit the same way. */
+export function useSetBotBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ botId, limit }: { botId: string; limit: number | null }) => api.setBotBudget(botId, limit),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Starts counting today's spend again from now, for the team and its members. */
+export function useResetTeamBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.resetTeamBudget(teamId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** Starts counting one member's spend again from now. */
+export function useResetBotBudget(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (botId: string) => api.resetBotBudget(botId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teamBudget', teamId] }),
+  });
+}
+
+/** GET /model-catalog: which model catalog is in use. */
+export function useModelCatalog() {
+  return useQuery({ queryKey: ['modelCatalog'], queryFn: api.modelCatalog });
+}
+
+/** POST /model-catalog/apply: stops the idle engines that run an older model catalog. */
+export function useApplyEngineCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.applyEngineCatalog(),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['modelCatalog'] }),
+  });
+}
+
+/** POST /model-catalog/update: downloads the newest model catalog when the user presses the button. */
+export function useUpdateModelCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.updateModelCatalog(),
+    onSuccess: (result) => {
+      if (result.state !== 'updated') return;
+      qc.invalidateQueries({ queryKey: ['modelCatalog'] });
+      // What providers know about their models comes from the catalog.
+      qc.invalidateQueries({ queryKey: queryKeys.providers });
+    },
+  });
+}
+
+/** POST /updates/check: asks GitHub for the newest release when the user presses the button. */
+export function useCheckForUpdate() {
+  return useMutation({ mutationFn: () => api.checkForUpdate() });
 }
 
 export function useSnapshot(enabled: boolean) {
@@ -238,6 +318,30 @@ export function useCreateTeam() {
   });
 }
 
+export function useStartPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string) => api.startPreview(teamId, command),
+  });
+}
+
+export function useStopPreview(teamId: string) {
+  return useMutation({
+    mutationFn: (command: string | undefined) => api.stopPreview(teamId, command),
+  });
+}
+
+export function useAdoptTeam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { path: string; name: string; initialRoleIds: string[] }) => api.adoptTeam(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+      void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      void qc.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+
 export function useRoles(enabled = true) {
   return useQuery({ queryKey: queryKeys.roles, queryFn: api.listRoles, enabled });
 }
@@ -263,6 +367,8 @@ export function useSaveProvider() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.providers });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
+      // A provider's models decide what the engines should be started with.
+      void qc.invalidateQueries({ queryKey: ['modelCatalog'] });
     },
   });
 }
@@ -346,6 +452,28 @@ export function useCancelMessage(botId: string) {
   });
 }
 
+export function useEditMessage(botId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editMessage(messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.messages(botId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.teams });
+    },
+  });
+}
+
+export function useEditChatMessage(chatId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, text }: { messageId: string; text: string }) => api.editChatMessage(chatId, messageId, text),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chat', chatId] });
+      void qc.invalidateQueries({ queryKey: ['chats'] });
+    },
+  });
+}
+
 export function useRetryRun(botId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -376,8 +504,8 @@ export function useApprovals(teamId: string | null, state: 'pending' | 'history'
 export function useDecideApproval() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ approvalId, optionId, expectedRevision }: { approvalId: string; optionId: string; expectedRevision: number }) =>
-      api.decideApproval(approvalId, { optionId, expectedRevision }),
+    mutationFn: ({ approvalId, optionId, expectedRevision, content }: { approvalId: string; optionId: string; expectedRevision: number; content?: Record<string, unknown> }) =>
+      api.decideApproval(approvalId, { optionId, expectedRevision, content }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['approvals'] });
       void qc.invalidateQueries({ queryKey: queryKeys.snapshot });
@@ -472,17 +600,6 @@ export function useEngineLogout() {
   });
 }
 
-/** POST /session/logout: ends the page session on the core. */
-export function useSessionLogout() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.sessionLogout(),
-    onSuccess: () => {
-      void qc.clear();
-    },
-  });
-}
-
 /** POST /engine/check: re-runs the self-check, including native hook trust,
  * and replaces the cached engine projection with the fresh one. */
 export function useEngineCheck() {
@@ -563,7 +680,7 @@ export function useAnswerQuestion() {
     }: {
       questionId: string;
       answerText: string;
-      decision?: 'accept' | 'revise';
+      decision?: 'accept' | 'revise' | 'approve' | 'reject';
       /** For revise on a confirmation: where the fixed work goes. */
       mode?: 'rerun' | 'return_to_me';
       expectedRevision: number;
@@ -691,24 +808,5 @@ export function useDeleteBot() {
   return useMutation({
     mutationFn: ({ botId, expectedRevision }: { botId: string; expectedRevision?: number }) => api.deleteBot(botId, expectedRevision),
     onSuccess: invalidate,
-  });
-}
-
-/** GET /authorizations: live bridge credentials without token values. */
-export function useAuthorizations(enabled = true) {
-  return useQuery({
-    queryKey: ['authorizations'],
-    queryFn: api.listAuthorizations,
-    enabled,
-  });
-}
-
-export function useRevokeAuthorization() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (botId: string) => api.revokeAuthorization(botId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['authorizations'] });
-    },
   });
 }

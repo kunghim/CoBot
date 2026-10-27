@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	patches "github.com/kunghim/CoBot/internal/changes"
 	"github.com/kunghim/CoBot/internal/engine"
 )
 
@@ -32,14 +33,16 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 	var detail any
 	switch head.Type {
 	case "agentMessage":
-		// Only what the model says while it works is a step; the answer is
-		// the turn's reply.
+		// What the model says is a step, in the place it was said, whether the
+		// engine called it a working remark or gave it no phase at all (a
+		// third-party model does not). Only the answer the engine marks as
+		// final is left out: it is the turn's reply.
 		var item struct {
 			Text  string `json:"text"`
 			Phase string `json:"phase"`
 		}
 		_ = json.Unmarshal(raw, &item)
-		if item.Phase != "commentary" {
+		if item.Phase == "final_answer" {
 			return nil
 		}
 		step.Kind = engine.StepMessage
@@ -112,7 +115,10 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 		step.Kind = engine.StepFileChange
 		changes := make([]map[string]any, 0, len(item.Changes))
 		for _, change := range item.Changes {
-			entry := map[string]any{"path": change.Path, "kind": change.Kind.Type, "diff": clipHead(change.Diff, maxStepDiff)}
+			stats := patches.Count(change.Diff)
+			entry := map[string]any{"path": change.Path, "kind": change.Kind.Type, "diff": clipHead(change.Diff, maxStepDiff),
+				"additions": stats.Additions, "deletions": stats.Deletions, "statsComplete": stats.StatsComplete,
+				"binary": stats.Binary, "diffTruncated": len(change.Diff) > maxStepDiff}
 			if change.Kind.MovePath != "" {
 				entry["movePath"] = change.Kind.MovePath
 			}
@@ -181,6 +187,9 @@ func normalizeStep(raw json.RawMessage) *engine.Step {
 		_ = json.Unmarshal(raw, &item)
 		step.Kind = engine.StepWebSearch
 		detail = map[string]any{"query": item.Query}
+	case "contextCompaction":
+		step.Kind = engine.StepCompaction
+		detail = map[string]any{}
 	case "plan":
 		var item struct {
 			Text string `json:"text"`
@@ -266,4 +275,22 @@ func errorCode(raw json.RawMessage) string {
 		}
 	}
 	return ""
+}
+
+// Statistics and file positions are computed while the full turn patch is
+// available; a clipped preview must never change the totals shown later.
+func turnDiffDetail(diff string) map[string]any {
+	files, filesComplete := patches.ParseTurn(diff)
+	stored := clipHead(diff, maxTurnDiff)
+	truncated := len(diff) > maxTurnDiff
+	end := len(stored)
+	if truncated {
+		end -= len("\n…")
+	}
+	complete := filesComplete
+	for index := range files {
+		files[index].DiffTruncated = files[index].End > end
+		complete = complete && files[index].StatsComplete
+	}
+	return map[string]any{"diff": stored, "files": len(files), "changes": files, "filesComplete": filesComplete, "statsComplete": complete, "diffTruncated": truncated}
 }

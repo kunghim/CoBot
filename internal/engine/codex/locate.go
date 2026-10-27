@@ -8,19 +8,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/platform"
 )
 
-// ErrNotFound reports that no codex binary could be located.
-var ErrNotFound = errors.New("codex binary not found")
+// ErrNotFound reports that the desktop app has no usable bundled engine.
+var ErrNotFound = errors.New("ChatGPT desktop Codex engine not found")
 
-// Locate resolves the codex executable: an explicit configured path wins,
-// otherwise PATH lookup. No health diagnostic that touches the legacy
-// sandbox is ever run here.
+// Locate only accepts the engine shipped inside the ChatGPT desktop app.
+// An explicit path supports nonstandard app locations, not standalone CLIs.
 func Locate(configuredPath string) (string, error) {
 	configuredPath = strings.TrimSpace(configuredPath)
 	if configuredPath != "" {
@@ -32,53 +30,17 @@ func Locate(configuredPath string) (string, error) {
 		if err != nil || info.IsDir() {
 			return "", fmt.Errorf("configured codex path is not a file: %s", abs)
 		}
-		return abs, nil
+		resolved, err := filepath.EvalSymlinks(abs)
+		if err != nil || !isDesktopEngine(resolved) {
+			return "", fmt.Errorf("%w: configured path must be inside the ChatGPT desktop app", ErrNotFound)
+		}
+		return resolved, nil
 	}
-	found, err := exec.LookPath("codex")
+	found, err := locatePlatformBinary()
 	if err != nil {
-		found, err = locatePlatformBinary()
-		if err != nil {
-			return "", fmt.Errorf("%w (not on PATH or in a supported installation directory)", ErrNotFound)
-		}
+		return "", fmt.Errorf("%w: %v", ErrNotFound, err)
 	}
-	return resolveLauncher(found), nil
-}
-
-// VersionSupported reports whether a `codex --version` result is at least
-// MinSupportedVersion. Pre-release suffixes count as their release, and an
-// unparsable version is unsupported.
-func VersionSupported(version string) bool {
-	return versionSupported(version, MinSupportedVersion)
-}
-
-func versionSupported(version, minimum string) bool {
-	parse := func(v string) ([3]int, bool) {
-		var out [3]int
-		core, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(v), "v"), "-")
-		parts := strings.Split(core, ".")
-		if len(parts) != 3 {
-			return out, false
-		}
-		for i, part := range parts {
-			n, err := strconv.Atoi(part)
-			if err != nil || n < 0 {
-				return out, false
-			}
-			out[i] = n
-		}
-		return out, true
-	}
-	have, ok := parse(version)
-	want, validMinimum := parse(minimum)
-	if !ok || !validMinimum {
-		return false
-	}
-	for i := range have {
-		if have[i] != want[i] {
-			return have[i] > want[i]
-		}
-	}
-	return true
+	return found, nil
 }
 
 // ProbeVersion runs `codex --version` and returns the CLI version string.

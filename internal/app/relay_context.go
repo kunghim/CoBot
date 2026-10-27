@@ -136,6 +136,21 @@ func routeText(req domain.Requirement, current int, names map[string]string) str
 	return b.String()
 }
 
+// routeListText is the route for the user to read: a Markdown ordered list,
+// one stage per line, the current one marked. Unlike routeText it is not
+// written for models, so it uses Markdown's own list shape.
+func routeListText(req domain.Requirement, current int, names map[string]string) string {
+	var b strings.Builder
+	for i, stage := range req.Stages {
+		marker := ""
+		if i == current {
+			marker = " ← 当前"
+		}
+		fmt.Fprintf(&b, "%d. %s（%s）%s\n", i+1, stage.Name, stageOwnerName(stage, names), marker)
+	}
+	return b.String()
+}
+
 var outcomeNames = map[string]string{
 	domain.HandoffDone: "完成", domain.HandoffBack: "退回", domain.HandoffEscalate: "上报", domain.HandoffResume: "交回继续",
 }
@@ -352,9 +367,7 @@ func (a *App) confirmText(ctx context.Context, q sqlite.Queryer, req domain.Requ
 		}
 	}
 	b.WriteString("### 链路\n\n")
-	for _, line := range strings.Split(strings.TrimRight(routeText(req, idx, names), "\n"), "\n") {
-		b.WriteString(line + "\n")
-	}
+	b.WriteString(routeListText(req, idx, names))
 	return b.String(), nil
 }
 

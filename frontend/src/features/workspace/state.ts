@@ -6,12 +6,26 @@
 export type WorkspaceTabKind = 'new' | 'browser' | 'file' | 'changes';
 
 export interface WorkspaceTab {
-  /** Stable identity: "new", "browser:<panel tab id>", "file:<path>", "changes". */
+  /** Stable identity: "new", "browser:<panel tab id>", "file:<tab id>", "changes". */
   id: string;
   kind: WorkspaceTabKind;
   title: string;
   /** The panel tab id, the file path, or "" for the kinds that carry none. */
   ref: string;
+  changesView?: { botId?: string; runId?: string; path?: string; listWidth?: number; listOpen?: boolean };
+  fileView?: {
+    expanded?: string[];
+    treeWidth?: number;
+    treeOpen?: boolean;
+    hidden?: boolean;
+    line?: number;
+    column?: number;
+    endLine?: number;
+    scrollTop?: number;
+    offset?: number;
+    startLine?: number;
+    positionId?: number;
+  };
 }
 
 export interface WorkspaceState {
@@ -19,6 +33,9 @@ export interface WorkspaceState {
   width: number;
   tabs: WorkspaceTab[];
   activeId: string | null;
+  /** Full view: the workspace takes the whole room and the conversation
+   * waits. Only meaningful while the workspace is open. */
+  fullView: boolean;
 }
 
 export const DEFAULT_WIDTH = 640;
@@ -30,11 +47,13 @@ export const NEW_TAB_ID = 'new';
 export const CHANGES_TAB_ID = 'changes';
 
 export function initialWorkspaceState(): WorkspaceState {
-  return { open: false, width: DEFAULT_WIDTH, tabs: [], activeId: null };
+  return { open: false, width: DEFAULT_WIDTH, tabs: [], activeId: null, fullView: false };
 }
 
 export type WorkspaceAction =
+  | { type: 'updateTab'; id: string; patch: Partial<Pick<WorkspaceTab, 'title' | 'ref' | 'fileView' | 'changesView'>> }
   | { type: 'collapse' }
+  | { type: 'toggleFullView' }
   | { type: 'setWidth'; width: number }
   | { type: 'newTab' }
   | { type: 'openTab'; tab: WorkspaceTab; focus?: boolean }
@@ -61,8 +80,14 @@ function neighbour(tabs: WorkspaceTab[], index: number): string | null {
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
+    case 'updateTab': {
+      if (!state.tabs.some((tab) => tab.id === action.id)) return state;
+      return { ...state, tabs: state.tabs.map((tab) => tab.id === action.id ? { ...tab, ...action.patch, fileView: { ...tab.fileView, ...action.patch.fileView }, changesView: { ...tab.changesView, ...action.patch.changesView } } : tab) };
+    }
     case 'collapse':
-      return { ...state, open: false };
+      return { ...state, open: false, fullView: false };
+    case 'toggleFullView':
+      return state.open ? { ...state, fullView: !state.fullView } : state;
     case 'setWidth': {
       const width = clampWidth(action.width);
       return width === state.width ? state : { ...state, width };
@@ -99,7 +124,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       }
       return {
         ...state,
-        open: first ? true : state.open,
+        open: focus ? true : state.open,
         tabs: [...state.tabs, tab],
         activeId: focus ? tab.id : state.activeId,
       };
@@ -116,7 +141,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const tabs = state.tabs.filter((tab) => tab.id !== action.id);
       // Closing the last tab closes the workspace; closing another moves the
       // view onto a neighbour.
-      if (tabs.length === 0) return { ...state, tabs, open: false, activeId: null };
+      if (tabs.length === 0) return { ...state, tabs, open: false, activeId: null, fullView: false };
       const activeId = state.activeId === action.id ? neighbour(tabs, Math.min(index, tabs.length - 1)) : state.activeId;
       return { ...state, tabs, activeId };
     }
@@ -140,7 +165,7 @@ export function loadWorkspace(key: string): WorkspaceState | null {
       typeof (tab as WorkspaceTab).title === 'string' && typeof (tab as WorkspaceTab).ref === 'string';
     // One unreadable entry means the whole saved view is not trustworthy.
     if (!parsed.tabs.every(valid)) return null;
-    const tabs = parsed.tabs;
+    const tabs = parsed.tabs.map((tab) => ({ ...tab, fileView: readFileView(tab.fileView), changesView: readChangesView(tab.changesView) }));
     const activeId = typeof parsed.activeId === 'string' && tabs.some((tab) => tab.id === parsed.activeId)
       ? parsed.activeId
       : (tabs.length > 0 ? tabs[tabs.length - 1].id : null);
@@ -149,10 +174,37 @@ export function loadWorkspace(key: string): WorkspaceState | null {
       width: clampWidth(typeof parsed.width === 'number' ? parsed.width : DEFAULT_WIDTH),
       tabs,
       activeId,
+      fullView: parsed.fullView === true && parsed.open === true,
     };
   } catch {
     return null;
   }
+}
+
+function readChangesView(raw: unknown): WorkspaceTab['changesView'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const string = (key: string, max: number) => typeof value[key] === 'string' && value[key].length <= max ? value[key] : undefined;
+  return { botId: string('botId', 512), runId: string('runId', 512), path: string('path', 128 * 1024), listOpen: typeof value.listOpen === 'boolean' ? value.listOpen : undefined, listWidth: typeof value.listWidth === 'number' && Number.isFinite(value.listWidth) ? Math.round(Math.max(160, Math.min(400, value.listWidth))) : undefined };
+}
+
+function readFileView(raw: unknown): WorkspaceTab['fileView'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const number = (key: string, min: number, max: number): number | undefined => typeof value[key] === 'number' && Number.isFinite(value[key]) ? Math.round(Math.min(max, Math.max(min, value[key]))) : undefined;
+  return {
+    expanded: Array.isArray(value.expanded) ? [...new Set(value.expanded.filter((path): path is string => typeof path === 'string' && path.length < 4096))].slice(0, 1024) : undefined,
+    treeWidth: number('treeWidth', 140, 400),
+    treeOpen: typeof value.treeOpen === 'boolean' ? value.treeOpen : undefined,
+    hidden: typeof value.hidden === 'boolean' ? value.hidden : undefined,
+    line: number('line', 1, Number.MAX_SAFE_INTEGER),
+    column: number('column', 1, Number.MAX_SAFE_INTEGER),
+    endLine: number('endLine', 1, Number.MAX_SAFE_INTEGER),
+    scrollTop: number('scrollTop', 0, 100_000_000),
+    offset: number('offset', 0, 256 * 1024 * 1024),
+    startLine: number('startLine', 1, Number.MAX_SAFE_INTEGER),
+    positionId: number('positionId', 0, Number.MAX_SAFE_INTEGER),
+  };
 }
 
 export function saveWorkspace(key: string, state: WorkspaceState): void {
@@ -193,8 +245,9 @@ export interface ColumnLayout {
  * The user's own choices (list open, workspace width) are kept: this only
  * decides what is drawn at this width.
  */
-export function layoutColumns(viewport: number, listOpen: boolean, workspaceOpen: boolean, workspaceWidth: number): ColumnLayout {
+export function layoutColumns(viewport: number, listOpen: boolean, workspaceOpen: boolean, workspaceWidth: number, fullView = false): ColumnLayout {
   if (!workspaceOpen) return { showList: listOpen, showConversation: true, workspaceWidth: 0 };
+  if (fullView) return { showList: false, showConversation: false, workspaceWidth: Math.max(0, viewport - RAIL_WIDTH - HANDLE_WIDTH) };
   const room = (withList: boolean) => viewport - RAIL_WIDTH - (withList ? teamListWidth(viewport) : 0) - CONVERSATION_MIN_WIDTH - HANDLE_WIDTH;
   const wanted = clampWidth(workspaceWidth);
   if (listOpen && room(true) >= MIN_WIDTH) return { showList: true, showConversation: true, workspaceWidth: Math.min(wanted, room(true)) };

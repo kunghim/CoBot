@@ -50,6 +50,9 @@ const server = await createServer({
   root: frontend,
   logLevel: 'warn',
   appType: 'custom',
+  // Only gallery modules are loaded; scanning the product entry would require
+  // its format-specific virtual assets, which the standalone gallery omits.
+  optimizeDeps: { noDiscovery: true },
   plugins: [react()],
   server: { middlewareMode: true, hmr: false, fs: { allow: [repo] } },
 });

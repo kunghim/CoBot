@@ -17,6 +17,8 @@ export default function NavigationOverlays() {
   const [pill, setPill] = useState<'all' | 'open' | 'done'>('open');
   const [page, setPage] = useState(3);
   const [node, setNode] = useState('lead');
+  const [fileExpanded, setFileExpanded] = useState<string[]>(['src']);
+  const [fileSelected, setFileSelected] = useState('src/main.ts');
   const [dialog, setDialog] = useState(false);
   const [alert, setAlert] = useState(false);
   const [sheet, setSheet] = useState<'left' | 'right' | null>(null);
@@ -35,7 +37,7 @@ export default function NavigationOverlays() {
     <Chapter id="navigation" title="导航与浮层" intro="导航把人带到别处；浮层临时盖在页面上。所有导航项都有静止、悬停、当前三种看得出的状态；所有浮层都能用 Esc 关闭，关闭后焦点回到打开它的按钮。">
       <Doc id="rail" name="RailItem 一级图标栏" file="components/ui/Navigation.tsx" use="最左侧的一级导航（首页、设置）。当前页是填充的方块。" a11y="每项都有 label，当前项标记 aria-current=page。">
         <Demo surface="sunken">
-          <div className="flex w-14 flex-col items-center gap-1 rounded-xl py-2">
+          <div className="flex w-11 flex-col items-center gap-1 rounded-xl py-2">
             <RailItem icon={Home} label="首页" current={rail === 'home'} onClick={() => setRail('home')} />
             <RailItem icon={Users} label="团队" current={rail === 'teams'} onClick={() => setRail('teams')} badge={<Count value={2} tone="danger" label="2 项等你处理" />} />
             <RailItem icon={Settings} label="设置" current={rail === 'settings'} onClick={() => setRail('settings')} />
@@ -48,7 +50,7 @@ export default function NavigationOverlays() {
           <div className="w-56 space-y-4">
             <NavItem icon={Settings2} label="返回工作区" onClick={() => undefined} />
             <NavSection title="设置">
-              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档团队', Archive]].map(([id, label, Icon]) => (
+              {[['general', '通用', Settings2], ['appearance', '外观', Palette], ['roles', '角色', Smile], ['archived', '已归档', Archive]].map(([id, label, Icon]) => (
                 <NavItem key={id as string} icon={Icon as typeof Settings2} label={label as string} current={nav === id} onClick={() => setNav(id as string)} />
               ))}
             </NavSection>
@@ -86,6 +88,15 @@ export default function NavigationOverlays() {
       </Doc>
 
       <Doc id="tree" name="Tree 树" file="components/ui/Tree.tsx" use="可以展开的层级（团队和成员）。" a11y="上下键移动；右键展开或进入；左键收起或回到上一级；回车选择。">
+        <Demo title="受控文件树：空目录、加载中、循环别名和不可访问项" surface="sunken">
+          <Tree label="项目文件" selected={fileSelected} onSelect={setFileSelected} expanded={fileExpanded} onExpandedChange={setFileExpanded} nodes={[
+            { id: 'src', label: 'src', directory: true, children: [{ id: 'src/main.ts', label: 'main.ts' }, { id: 'src/empty', label: 'empty', directory: true }] },
+            { id: 'linked-root', label: 'linked-root', directory: true, children: [{ id: '\0cycle:linked-root', label: '此目录指向已显示的上级目录。', disabled: true }] },
+            { id: 'loading', label: 'assets', directory: true, trailing: <span role="status" className="text-xs text-neutral-500">加载中</span> },
+            { id: 'blocked', label: 'external-link', disabled: true, trailing: <span className="text-xs text-neutral-500">无法访问</span> },
+          ]} />
+          <p role="status" className="border-t border-neutral-200 px-3 py-1 text-xs text-neutral-500 dark:border-neutral-800">自动文件更新暂不可用，请手动刷新。</p>
+        </Demo>
         <Demo surface="sunken">
           <div className="w-64">
             <Tree
@@ -105,7 +116,7 @@ export default function NavigationOverlays() {
       <Doc id="breadcrumbs" name="Breadcrumbs 面包屑 · Steps 步骤 · Pagination 分页" file="components/ui/Navigation.tsx" use="面包屑：页面在哪一层。步骤：一个短流程走到哪一步。分页：很长的列表（短列表用“加载更多”）。">
         <Demo surface="raised">
           <div className="space-y-5">
-            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档团队', onClick: () => undefined }, { label: '官网改版' }]} />
+            <Breadcrumbs label="位置" items={[{ label: '设置', onClick: () => undefined }, { label: '已归档', onClick: () => undefined }, { label: '官网改版' }]} />
             <Steps label="新建团队" current={1} steps={['选择目录', '选择成员', '完成']} />
             <Pagination label="分页" page={page} pages={12} onChange={setPage} previousLabel="上一页" nextLabel="下一页" />
           </div>
@@ -166,7 +177,7 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
+      <Doc id="dialog" name="Dialog 对话框 · AlertDialog 确认框" file="components/ui/Overlay.tsx" use="Dialog：需要先完成再回到页面的事（新建团队、更换头像）。内容超过窗口时标题和按钮不动，中间区域自己滚动；需要更矮的上限时传 maxHeight（如 32rem），它不会超过窗口能给的高度。AlertDialog：做不可撤销的事之前确认，确认按钮写出动作本身；要先选一项才能做（删除哪个成员）时，把选择放进 children，用 confirmDisabled 等选好再放开。" avoid="不要用对话框显示只需要看一眼的消息（用 Toast 或 Alert）。" a11y="打开时焦点进入、Tab 在内部循环；Esc 和点遮罩关闭（处理中时不能关）；关闭后焦点回到打开它的按钮。">
         <Demo>
           <Matrix
             items={[
@@ -209,7 +220,14 @@ export default function NavigationOverlays() {
         </Demo>
       </Doc>
 
-      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，打开时内容为它让位。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+      <Doc id="workspace" name="TabStrip 工作区标签条 · SplitHandle 调宽线 · FloatingCard 悬浮信息卡" file="components/ui/{TabStrip,SplitHandle,FloatingCard}.tsx" use="工作区（会话右侧的标签区）：TabStrip 是可关闭、可滚动的标签条，选中的标签与内容同为白底；SplitHandle 是会话与工作区之间的调宽线；FloatingCard 是浮在会话角落的信息卡，按内容决定高度、从打开处向下展开，最高到会话区底缘，超出后内部滚动；关闭按钮在内容第一行的行尾。" a11y="标签条按 tablist 语义：←→ 切换、Home/End 到两端、Delete 关闭；调宽线是 separator，左右方向键调整（Shift 加大步长）；悬浮卡有 region 标签，Esc 收起。">
+        <Demo title="文件树宽度：拖动或用左右方向键调整左栏">
+          <div className="flex h-24 overflow-hidden rounded-xl bg-sunk">
+            <div style={{ width: Math.min(wsWidth, 300) }} className="shrink-0 p-3 text-sm">文件树</div>
+            <SplitHandle side="left" value={Math.min(wsWidth, 300)} min={140} max={300} label="文件树宽度" onChange={setWsWidth} />
+            <div className="min-w-0 flex-1 bg-canvas p-3 text-sm">文件预览</div>
+          </div>
+        </Demo>
         <Demo surface="sunken">
           <div className="flex h-64 w-full">
             <div className="min-w-0 flex-1">

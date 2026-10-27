@@ -2,7 +2,33 @@
 // Entity shapes come from OpenAPI; page composites add local view metadata.
 import type { components } from './generated/schema';
 
+export interface WorkspaceScope { kind: 'team' | 'chat'; id: string }
+export type WorkspaceFile = components['schemas']['WorkspaceFile'];
+export type WorkspaceDirectory = components['schemas']['WorkspaceDirectory'];
+export type WorkspaceChangeFile = components['schemas']['WorkspaceChangeFile'];
+export type WorkspaceChangeRun = components['schemas']['WorkspaceChangeRun'];
+export type WorkspaceChangeRunsPage = components['schemas']['WorkspaceChangeRunsPage'];
+export type WorkspaceChangeFilesPage = components['schemas']['WorkspaceChangeFilesPage'];
+export type WorkspaceChangeDiff = components['schemas']['WorkspaceChangeDiff'];
+
+export type Chat = components['schemas']['Chat'];
+export type ChatNavigation = components['schemas']['ChatNavigation'];
+export type ChatSection = components['schemas']['ChatSection'];
+export type ChatNavigationInput = Omit<components['schemas']['ChatNavigationInput'], 'requestId'>;
+export type ChatPage = components['schemas']['ChatPage'];
+export type ChatList = components['schemas']['ChatList'];
+export type SearchResults = components['schemas']['SearchResults'];
+export type ChatSearchResult = components['schemas']['ChatSearchResult'];
+export type MemberSearchResult = components['schemas']['MemberSearchResult'];
+export type ChatRun = components['schemas']['ChatRun'];
+export type ChatRequest = components['schemas']['ChatRequest'];
+export type ChatStep = components['schemas']['ChatStep'];
+export type ChatSendInput = Omit<components['schemas']['ChatSendInput'], 'requestId'>;
+
 export type Status = components['schemas']['Status'];
+export type UpdateCheck = components['schemas']['UpdateCheck'];
+export type TeamBudget = components['schemas']['TeamBudget'];
+export type BudgetLine = components['schemas']['BudgetLine'];
 export type Settings = components['schemas']['Settings'];
 export type AvatarCatalog = components['schemas']['AvatarCatalog'];
 export type AvatarSeries = components['schemas']['AvatarSeries'];
@@ -41,6 +67,10 @@ export type EngineLogin = components['schemas']['EngineLogin'];
 export type Provider = components['schemas']['Provider'];
 export type ProviderEndpoint = components['schemas']['ProviderEndpoint'];
 export type ProviderModel = components['schemas']['ProviderModel'];
+export type ModelSpec = components['schemas']['ModelSpec'];
+export type ModelCatalogStatus = components['schemas']['ModelCatalogStatus'];
+export type ModelCatalogUpdate = components['schemas']['ModelCatalogUpdate'];
+export type ApplyEngineCatalogResult = components['schemas']['ApplyEngineCatalogResult'];
 export type ProviderRetries = components['schemas']['ProviderRetries'];
 /** The body of a provider write. The request id is not part of it: the api
  * client adds one to every write, the way it does for every other endpoint. */
@@ -49,7 +79,7 @@ export type ProviderPreset = components['schemas']['ProviderPreset'];
 export type ProviderProbeResult = components['schemas']['ProviderProbeResult'];
 
 /** The dialects an engine can speak. */
-export type ProviderDialect = 'openai-responses' | 'anthropic-messages';
+export type ProviderDialect = 'openai-responses';
 
 /** GET /providers */
 export interface ProviderListResult {
@@ -196,6 +226,7 @@ export interface ConversationResult {
 /** A transient `cobot.live` stream frame: a step that changed or streamed
  * text of a running turn. */
 export interface LiveSignal {
+	chatId?: string;
   type: 'step' | 'delta';
   teamId: string;
   botId: string;
@@ -256,6 +287,17 @@ export interface MemoryListResult {
 export type Memory = components['schemas']['Memory'];
 
 /** POST /directories/check */
+/** What POST /teams/open decided a folder is good for. */
+export interface OpenTeamResult {
+  action: 'open' | 'restore' | 'adopt' | 'create';
+  teamId?: string;
+  teamName?: string;
+  archived?: boolean;
+  /** For create and adopt: the folder name, or the foreign marker's name. */
+  suggestedName?: string;
+  directory: string;
+}
+
 export interface DirectoryCheckResult {
   canonical: string;
   ok: boolean;
@@ -267,14 +309,6 @@ export interface DirectoryCheckResult {
   archived?: boolean;
   teamId?: string;
   teamName?: string;
-}
-
-/** GET /authorizations — live bridge credentials, never token values. */
-export interface AuthorizationBinding {
-  botId: string;
-  teamId: string;
-  engineEpoch: string;
-  expiresAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,3 +363,6 @@ export interface QuestionListResult {
   nextCursor: string;
 }
 
+
+export type WorkspaceLatexProject = components['schemas']['WorkspaceLatexProject'];
+export type WorkspaceLatexResult = components['schemas']['WorkspaceLatexResult'];

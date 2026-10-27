@@ -47,6 +47,30 @@ type Server struct {
 // Handler builds the full HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexProject)
+	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexCompile)
+	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/watch", s.handleWorkspaceWatch)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/entries", s.handleWorkspaceEntries)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes", s.handleWorkspaceChangeRuns)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes/{runId}", s.handleWorkspaceChangeFiles)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes/{runId}/file", s.handleWorkspaceChangeDiff)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/file", s.handleWorkspaceFile)
+	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/content", s.handleWorkspaceContent)
+	mux.HandleFunc("GET /api/v1/chats", s.handleListChats)
+	mux.HandleFunc("GET /api/v1/search", s.handleSearchConversations)
+	mux.HandleFunc("GET /api/v1/chat-navigation", s.handleChatNavigation)
+	mux.HandleFunc("POST /api/v1/chat-navigation", s.handleChangeChatNavigation)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/actions/{action}", s.handleChatAction)
+	mux.HandleFunc("POST /api/v1/chats", s.handleSendChat)
+	mux.HandleFunc("GET /api/v1/chats/{chatId}", s.handleGetChat)
+	mux.HandleFunc("PATCH /api/v1/chats/{chatId}", s.handleRenameChat)
+	mux.HandleFunc("DELETE /api/v1/chats/{chatId}", s.handleDeleteChat)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/messages", s.handleSendChat)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/runs/{runId}/{action}", s.handleChatRunAction)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/messages/{messageId}/edit", s.handleChatMessageEdit)
+	mux.HandleFunc("POST /api/v1/messages/{messageId}/edit", s.handleMessageEdit)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/requests/{requestId}/reply", s.handleChatReply)
+	mux.HandleFunc("POST /api/v1/chats/{chatId}/open-path", s.handleOpenChatPath)
 
 	mux.HandleFunc("GET /api/v1/status", s.handleStatus)
 	mux.HandleFunc("POST /api/v1/session/bootstrap", s.handleSessionBootstrap)
@@ -92,12 +116,21 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/bots/{id}", s.handlePatchBot)
 	mux.HandleFunc("PUT /api/v1/bots/{id}/model", s.handlePutBotModel)
 	mux.HandleFunc("PUT /api/v1/roles/{id}/avatar", s.handlePutRoleAvatar)
+	mux.HandleFunc("GET /api/v1/teams/{id}/budget", s.handleGetTeamBudget)
+	mux.HandleFunc("PUT /api/v1/teams/{id}/budget", s.handlePutTeamBudget)
+	mux.HandleFunc("PUT /api/v1/bots/{id}/budget", s.handlePutBotBudget)
+	mux.HandleFunc("POST /api/v1/teams/{id}/budget/reset", s.handleResetTeamBudget)
+	mux.HandleFunc("POST /api/v1/bots/{id}/budget/reset", s.handleResetBotBudget)
 	mux.HandleFunc("GET /api/v1/teams/{id}/activity", s.handleListActivity)
 	mux.HandleFunc("GET /api/v1/bots/{id}/memories", s.handleListMemories)
 	mux.HandleFunc("DELETE /api/v1/bots/{id}/memories/{memoryId}", s.handleDeleteMemory)
 	mux.HandleFunc("GET /api/v1/directories", s.handleListDirectories)
 	mux.HandleFunc("POST /api/v1/directories/pick", s.handlePickDirectory)
 	mux.HandleFunc("POST /api/v1/directories/check", s.handleCheckDirectory)
+	mux.HandleFunc("POST /api/v1/teams/open", s.handleOpenTeam)
+	mux.HandleFunc("POST /api/v1/teams/adopt", s.handleAdoptTeam)
+	mux.HandleFunc("POST /api/v1/teams/{id}/preview/start", s.handleStartPreview)
+	mux.HandleFunc("POST /api/v1/teams/{id}/preview/stop", s.handleStopPreview)
 	mux.HandleFunc("GET /api/v1/authorizations", s.handleListAuthorizations)
 	mux.HandleFunc("POST /api/v1/authorizations/{id}/revoke", s.handleRevokeAuthorization)
 	mux.HandleFunc("POST /api/v1/teams/{id}/bots", s.handleAddBot)
@@ -110,6 +143,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/teams/{id}/browser/tabs/{tab}", s.handleCloseBrowserTab)
 	mux.HandleFunc("POST /api/v1/teams/{id}/browser/tabs/{tab}/viewport", s.handleBrowserViewport)
 	mux.HandleFunc("GET /api/v1/roles", s.handleListRoles)
+	mux.HandleFunc("POST /api/v1/updates/check", s.handleCheckForUpdate)
+	mux.HandleFunc("GET /api/v1/model-catalog", s.handleModelCatalog)
+	mux.HandleFunc("POST /api/v1/model-catalog/resolve", s.handleResolveModels)
+	mux.HandleFunc("POST /api/v1/model-catalog/apply", s.handleApplyEngineCatalog)
+	mux.HandleFunc("POST /api/v1/model-catalog/update", s.handleUpdateModelCatalog)
 	mux.HandleFunc("GET /api/v1/avatars/catalog", s.handleGetAvatarCatalog)
 	mux.HandleFunc("POST /api/v1/avatars/catalog/sync", s.handleSyncAvatarCatalog)
 	mux.HandleFunc("POST /api/v1/avatars/uploads", s.handleSaveAvatarUpload)
@@ -188,8 +226,10 @@ func contentTypeFor(path string) string {
 	switch {
 	case strings.HasSuffix(path, ".html"):
 		return "text/html; charset=utf-8"
-	case strings.HasSuffix(path, ".js"):
+	case strings.HasSuffix(path, ".js"), strings.HasSuffix(path, ".mjs"):
 		return "text/javascript; charset=utf-8"
+	case strings.HasSuffix(path, ".wasm"):
+		return "application/wasm"
 	case strings.HasSuffix(path, ".css"):
 		return "text/css; charset=utf-8"
 	case strings.HasSuffix(path, ".svg"):

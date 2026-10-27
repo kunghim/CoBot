@@ -678,7 +678,7 @@ func TestNativeApprovalRoundTrip(t *testing.T) {
 		t.Fatalf("bot status = %s, want waiting_approval", detail.Bots[0].Status)
 	}
 
-	decided, err := h.app.DecideApproval(ctx, h.user, approval.ID, "accept", "", approval.Revision)
+	decided, err := h.app.DecideApproval(ctx, h.user, approval.ID, "accept", "", approval.Revision, nil)
 	if err != nil {
 		t.Fatalf("decide: %v", err)
 	}
@@ -690,7 +690,7 @@ func TestNativeApprovalRoundTrip(t *testing.T) {
 		t.Fatalf("engine reply missing/wrong: %+v", replies)
 	}
 	// Double decide is refused.
-	if _, err := h.app.DecideApproval(ctx, h.user, approval.ID, "decline", "", decided.Revision); err == nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, approval.ID, "decline", "", decided.Revision, nil); err == nil {
 		t.Fatal("second decision must conflict")
 	}
 	// History keeps the original options and choice.
@@ -750,7 +750,7 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	if invalidated.ResponseState != domain.ResponseExpired {
 		t.Fatalf("card response = %q, want expired", invalidated.ResponseState)
 	}
-	if _, derr := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0); derr == nil {
+	if _, derr := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0, nil); derr == nil {
 		t.Fatal("an invalidated card must refuse a new decision")
 	}
 	// Decided history rules still hold for cards decided before the crash:
@@ -788,7 +788,7 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	// The app-server died. The unknown run keeps the bot locked until a human
 	// verifies it, so resolve it first — this is what recovery does.
 	h.resolveUnknownRun(t, bot.ID)
-	decided2, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
+	decided2, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0, nil)
 	if err == nil {
 		t.Fatal("second decision on the same approval must conflict")
 	}
@@ -836,7 +836,7 @@ func TestApprovalExpiresAfterEngineRestart(t *testing.T) {
 	if invalidated2.RequestState != domain.ApprovalStateInvalidated || invalidated2.ResponseState != domain.ResponseExpired {
 		t.Fatalf("card after second crash = %s/%s, want invalidated/expired", invalidated2.RequestState, invalidated2.ResponseState)
 	}
-	if _, derr := h.app.DecideApproval(ctx, h.user, pending2[0].ID, "decline", "", 0); derr == nil {
+	if _, derr := h.app.DecideApproval(ctx, h.user, pending2[0].ID, "decline", "", 0, nil); derr == nil {
 		t.Fatal("an invalidated card must refuse a decision after the second crash")
 	}
 }

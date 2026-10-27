@@ -15,10 +15,11 @@ import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useReprobeProvider, useSaveProvider } from '../../api/queries';
-import type { Provider, ProviderEndpoint, ProviderModel, ProviderPreset, ProviderProbeResult, ProviderRequest } from '../../api/types';
+import type { ModelSpec, Provider, ProviderEndpoint, ProviderModel, ProviderPreset, ProviderProbeResult, ProviderRequest } from '../../api/types';
 import { Alert, Badge, Button, Dialog, Field, Icons, LogoTile, SearchInput, TextInput, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
-import ModelPick from './ModelPick';
+import ModelAdvanced from './ModelAdvanced';
+import ModelPick, { modelsToProbe, withSelection } from './ModelPick';
 
 // ---------------------------------------------------------------------------
 // The vocabulary of dialects and engines, shared with the settings section.
@@ -26,20 +27,16 @@ import ModelPick from './ModelPick';
 
 /** The dialect Codex speaks. */
 export const CODEX_DIALECT = 'openai-responses';
-/** The dialect Claude Code speaks. */
-export const CLAUDE_DIALECT = 'anthropic-messages';
 
 /** The engine that can speak a dialect. */
 export function engineOf(dialect: string): string {
   if (dialect === CODEX_DIALECT) return 'Codex';
-  if (dialect === CLAUDE_DIALECT) return 'Claude Code';
   return dialect;
 }
 
 /** What a dialect is called in the interface. */
 export function dialectLabel(dialect: string, t: TFunction): string {
   if (dialect === CODEX_DIALECT) return t('providers.dialectResponses');
-  if (dialect === CLAUDE_DIALECT) return t('providers.dialectAnthropic');
   return dialect;
 }
 
@@ -100,19 +97,43 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [openaiBase, setOpenaiBase] = useState('');
-  const [anthropicBase, setAnthropicBase] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  // What the user entered for each kept model (alias, limits, abilities, thinking);
+  // only what they changed, the model catalog answers for the rest.
+  const [entries, setEntries] = useState<Record<string, ProviderModel>>({});
+  // What is known about each kept model, worked out by the core from the catalog and the entries.
+  const [specs, setSpecs] = useState<Record<string, ModelSpec>>({});
   const [statuses, setStatuses] = useState<Record<string, ProviderProbeResult>>({});
   const [discovering, setDiscovering] = useState(false);
   const [probing, setProbing] = useState(false);
+  const [probingIds, setProbingIds] = useState<string[]>([]);
   const [probed, setProbed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [note, setNote] = useState('');
 
   const editing = provider ?? null;
+  const changeEntry = (id: string, patch: Partial<ProviderModel>) => setEntries((current) => ({ ...current, [id]: { ...current[id], id, ...patch } }));
+  // Ask the core what is known about the kept models whenever they or the entries change.
+  useEffect(() => {
+    if (!open || selected.length === 0) {
+      setSpecs({});
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      api
+        .resolveModels(selected.map((id) => entries[id] ?? { id }))
+        .then((result) => live && setSpecs(result.specs))
+        .catch(() => undefined);
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, selected, entries]);
   // The form starts fresh every time the dialog opens.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resetKey = open ? (editing?.id ?? 'new') : null;
@@ -130,10 +151,11 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       setPreset(presets.find((entry) => entry.id === editing.presetId) ?? null);
       setName(editing.name);
       setOpenaiBase(editing.endpoints.find((endpoint) => endpoint.dialect === CODEX_DIALECT)?.baseUrl ?? '');
-      setAnthropicBase(editing.endpoints.find((endpoint) => endpoint.dialect === CLAUDE_DIALECT)?.baseUrl ?? '');
       const ids = editing.models.map((model) => model.id);
       setModels(ids);
       setSelected(ids);
+      // The stored entries, without the computed spec and the last check.
+      setEntries(Object.fromEntries(editing.models.map(({ spec: _spec, status: _status, failure: _failure, message: _message, ...own }) => [own.id, own])));
       setStatuses(
         Object.fromEntries(
           editing.models
@@ -144,10 +166,11 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     } else {
       setName('');
       setOpenaiBase('');
-      setAnthropicBase('');
       setModels([]);
       setSelected([]);
+      setEntries({});
     }
+    setSpecs({});
   }, [resetKey]);
 
   const addedIds = useMemo(() => new Set(providers.map((entry) => entry.presetId).filter((id): id is string => !!id)), [providers]);
@@ -170,9 +193,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     if (preset) return preset.endpoints.map((endpoint) => ({ dialect: endpoint.dialect, baseUrl: absoluteBase(endpoint.baseUrl) }));
     const out: ProviderEndpoint[] = [];
     if (openaiBase.trim()) out.push({ dialect: CODEX_DIALECT, baseUrl: openaiBase.trim() });
-    if (anthropicBase.trim()) out.push({ dialect: CLAUDE_DIALECT, baseUrl: anthropicBase.trim() });
     return out;
-  }, [preset, openaiBase, anthropicBase]);
+  }, [preset, openaiBase]);
 
   const codexEndpoint = endpoints.find((endpoint) => endpoint.dialect === CODEX_DIALECT) ?? null;
   const key = apiKey.trim();
@@ -214,14 +236,23 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     setView('form');
   };
 
+  // A model that answered keeps its answer when it is ticked off and on again:
+  // the answer belongs to the endpoint and the key, and changing either one
+  // clears it (see forgetAnswers).
   const toggleModel = (id: string) => {
-    setSelected((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
-    setStatuses((current) => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+    setSelected((current) => withSelection(current, [id], !current.includes(id)));
+    setProbed(false);
+  };
+
+  const selectMany = (ids: string[], on: boolean) => {
+    setSelected((current) => withSelection(current, ids, on));
+    setProbed(false);
+  };
+
+  // The answers were given by one endpoint with one key; with another they
+  // say nothing.
+  const forgetAnswers = () => {
+    setStatuses({});
     setProbed(false);
   };
 
@@ -246,7 +277,8 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       const result = await api.discoverProviderModels(codexEndpoint.baseUrl, key || undefined, editing?.id);
       setModels(result.models);
       setSelected((current) => current.filter((id) => result.models.includes(id)));
-      setStatuses({});
+      // What a model answered stays true while it is still on offer.
+      setStatuses((current) => Object.fromEntries(Object.entries(current).filter(([id]) => result.models.includes(id))));
       setProbed(false);
       setNote(t('providers.dialog.discovered', { base: codexEndpoint.baseUrl.replace(/^https?:\/\//, ''), count: result.models.length }));
     } catch (error) {
@@ -275,13 +307,30 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     try {
       // A key the user pasted is used here; without one the server checks
       // with the key the stored provider keeps. Either way it is the models
-      // ticked now that are checked, not the ones stored last time.
-      const results =
-        editing && !key && !codexEndpoint
-          ? (await reprobe.mutateAsync(editing.id)).results
-          : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', selected, key || undefined, editing?.id)).results;
-      setStatuses(results);
+      // ticked now that are checked, not the ones stored last time, and only
+      // those that have not already passed.
+      const todo = modelsToProbe(selected, statuses);
+      const fresh =
+        todo.length === 0
+          ? {}
+          : editing && !key && !codexEndpoint
+            ? (await reprobe.mutateAsync(editing.id)).results
+            : (await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', todo, key || undefined, editing?.id)).results;
+      const merged = Object.fromEntries(
+        selected.flatMap((id) => {
+          const answer = fresh[id] ?? statuses[id];
+          return answer ? [[id, answer] as const] : [];
+        }),
+      );
+      setStatuses(merged);
       setProbed(true);
+      // All of them answering is the only case that needs no word from the
+      // user. Otherwise the notice below says which did not, and saving then
+      // is the user's own press of the button.
+      if (selected.every((id) => merged[id]?.ok)) {
+        setProbing(false);
+        await write(false, merged);
+      }
     } catch (error) {
       setErrorText(apiErrorMessage(t, error));
     } finally {
@@ -289,7 +338,39 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
     }
   };
 
-  const write = async (force: boolean) => {
+  // Checks one model on its own, from the button on its chip.
+  const probeOne = async (id: string) => {
+    if (!codexEndpoint && !editing) {
+      toast.show({ tone: 'warning', title: t('providers.dialog.needEndpoint') });
+      return;
+    }
+    if (!editing && !key) {
+      toast.show({ tone: 'warning', title: t('providers.dialog.needKey') });
+      return;
+    }
+    setProbingIds((current) => [...current, id]);
+    setErrorText('');
+    try {
+      const { results } = await api.probeProviderModels(codexEndpoint?.baseUrl ?? '', [id], key || undefined, editing?.id);
+      const answer = results[id];
+      if (answer) {
+        setStatuses((current) => ({ ...current, [id]: answer }));
+        // The button's own answer: the chip changes too, but a mark that small
+        // is easy to miss.
+        if (answer.ok) toast.show({ tone: 'success', title: t('providers.dialog.modelOk', { id }) });
+        // Not 'danger': that one stays until it is closed, and a model that does
+        // not answer is an answer, not a fault of the page.
+        else toast.show({ tone: 'warning', duration: 5000, title: t('providers.dialog.modelFailed', { id }), description: reasonOf(answer) });
+      }
+      setProbed(false);
+    } catch (error) {
+      setErrorText(apiErrorMessage(t, error));
+    } finally {
+      setProbingIds((current) => current.filter((entry) => entry !== id));
+    }
+  };
+
+  const write = async (force: boolean, answers: Record<string, ProviderProbeResult> = statuses) => {
     if (!preset && !name.trim()) {
       toast.show({ tone: 'warning', title: t('providers.dialog.needName') });
       return;
@@ -302,12 +383,14 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       toast.show({ tone: 'warning', title: t('providers.dialog.needModels') });
       return;
     }
+    // Each model is kept with what the user entered; the core drops what the catalog answers for.
     const kept: ProviderModel[] = selected.map((id) => {
-      const status = statuses[id];
-      if (force) return { id, status: 'failed', failure: status?.code ?? '', message: status?.message ?? '' };
-      if (!status) return { id, status: 'unknown' };
-      if (status.ok) return { id, status: 'ok' };
-      return { id, status: 'failed', failure: status.code, message: status.message };
+      const status = answers[id];
+      const declared = { ...entries[id] };
+      if (force) return { ...declared, id, status: 'failed', failure: status?.code ?? '', message: status?.message ?? '' };
+      if (!status) return { ...declared, id, status: 'unknown' };
+      if (status.ok) return { ...declared, id, status: 'ok' };
+      return { ...declared, id, status: 'failed', failure: status.code, message: status.message };
     });
     const body: ProviderRequest = {
       // A vendor from the catalogue keeps its own id; a gateway of the
@@ -367,7 +450,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
                 </span>
                 <span className="mt-1 flex flex-wrap items-center gap-1">
                   {entry.endpoints.some((endpoint) => endpoint.dialect === CODEX_DIALECT) && <Badge>{t('providers.badgeCodex')}</Badge>}
-                  {entry.endpoints.some((endpoint) => endpoint.dialect === CLAUDE_DIALECT) && <Badge>{t('providers.badgeClaudeCode')}</Badge>}
                 </span>
               </span>
             </button>
@@ -392,10 +474,6 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
 
   const formView = (
     <div className="space-y-4">
-      {probeImpossible && (
-        <Alert tone="warning">{t('providers.dialog.noCodexEndpoint')}</Alert>
-      )}
-
       {preset ? (
         <div>
           <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100">{t('providers.dialog.endpoints')}</p>
@@ -415,12 +493,11 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
             <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder={t('providers.dialog.displayNamePlaceholder')} />
           </Field>
           <Field label={t('providers.dialog.openaiEndpoint')} hint={t('providers.dialog.openaiEndpointHint')}>
-            <TextInput mono value={openaiBase} onChange={(event) => setOpenaiBase(event.target.value)} placeholder="https://gateway.example/v1" />
+            <TextInput mono value={openaiBase} onChange={(event) => {
+                setOpenaiBase(event.target.value);
+                forgetAnswers();
+              }} placeholder="https://gateway.example/v1" />
           </Field>
-          <Field label={t('providers.dialog.anthropicEndpoint')} hint={t('providers.dialog.anthropicEndpointHint')}>
-            <TextInput mono value={anthropicBase} onChange={(event) => setAnthropicBase(event.target.value)} placeholder="https://gateway.example/anthropic" />
-          </Field>
-          <p className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">{t('providers.dialog.endpointHint')}</p>
         </div>
       )}
 
@@ -450,7 +527,10 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
           mono
           type="password"
           value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
+          onChange={(event) => {
+            setApiKey(event.target.value);
+            forgetAnswers();
+          }}
           placeholder={t('providers.dialog.apiKeyPlaceholder')}
         />
       </Field>
@@ -473,6 +553,9 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
         selected={selected}
         statuses={statuses}
         onToggle={toggleModel}
+        onProbe={probeImpossible ? undefined : (id) => void probeOne(id)}
+        probing={probingIds}
+        onSelectMany={selectMany}
         onAdd={addModel}
         labels={{
           title: t('providers.dialog.models'),
@@ -485,8 +568,14 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
           reason: reasonOf,
           noModels: t('providers.dialog.noModels'),
           note: t('providers.dialog.modelsHint'),
+          selectAll: t('providers.dialog.selectAll'),
+          clearAll: t('providers.dialog.clearAll'),
+          testOne: (id) => t('providers.dialog.testOne', { id }),
+          retryOne: (id) => t('providers.dialog.retryOne', { id }),
         }}
       />
+
+      <ModelAdvanced selected={selected} entries={entries} specs={specs} onChange={changeEntry} />
 
       {probed && okCount === 0 && (
         <div className="space-y-2">
@@ -539,9 +628,16 @@ export default function AddProviderDialog({ open, onClose, presets, providers, p
       </Button>
     ) : (
       <>
-        <Button variant="ghost" onClick={() => setView('pick')}>
-          {t('providers.dialog.back')}
-        </Button>
+        {/* Editing a provider has no vendor list to go back to. */}
+        {editing ? (
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => setView('pick')}>
+            {t('providers.dialog.back')}
+          </Button>
+        )}
         <Button
           variant="primary"
           loading={probing || saving}

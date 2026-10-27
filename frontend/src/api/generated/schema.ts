@@ -4,6 +4,265 @@
  */
 
 export interface paths {
+    "/api/v1/workspaces/{scope}/{id}/latex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bounded read-only discovery of TeX main files for the selected file. */
+        get: operations["getWorkspaceLatexProject"];
+        put?: never;
+        /** @description Ephemeral isolated compilation, not a durable business command. Only one compilation runs per core; disconnect cancels it. No automatic downloads. TeX failures return success=false with bounded diagnostics and no PDF. */
+        post: operations["compileWorkspaceLatex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Subscribe to invalidation hints for up to 64 validated directories. This creates only an ephemeral subscription, not a durable command. SSE events ready and changed have an empty JSON object; unavailable signals loss of native watching. Reconnect after EOF and re-read workspace state after ready. The stream rotates within 90 seconds. */
+        post: operations["watchWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceChangeRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceChangeFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/changes/{runId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceChangeDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{scope}/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat-navigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getChatNavigation"];
+        put?: never;
+        post: operations["changeChatNavigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["organizeChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/open-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["openChatPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listChats"];
+        put?: never;
+        post: operations["createChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getChat"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteChat"];
+        options?: never;
+        head?: never;
+        patch: operations["renameChat"];
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sendChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/runs/{runId}/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["chatRunAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/requests/{requestId}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["replyChatRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/status": {
         parameters: {
             query?: never;
@@ -186,6 +445,160 @@ export interface paths {
         put?: never;
         /** Check for a newer avatar catalog now; a failed download keeps the cache and is reported in status */
         post: operations["syncAvatarCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A team's daily token limit, each member's, and what was spent today */
+        get: operations["getTeamBudget"];
+        /** Set the team's own daily token limit; null follows the default in the settings, 0 is no limit */
+        put: operations["setTeamBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the member's own daily token limit; null follows the default in the settings, 0 is no limit */
+        put: operations["setBotBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/budget/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start counting today's spend again from now, for the team and its members */
+        post: operations["resetTeamBudget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bots/{id}/budget/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start counting one member's spend today again from now */
+        post: operations["resetBotBudget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/updates/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask GitHub now whether a newer release exists; an unreachable GitHub is reported in state, not as an error */
+        post: operations["checkForUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which model catalog is in use */
+        get: operations["getModelCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What is known about models that are not stored yet (catalog and the entries given, put together) */
+        post: operations["resolveModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop the idle team engines that run an older model catalog; their next turn starts with the current one */
+        post: operations["applyEngineCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-catalog/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download the newest model catalog now; an unreachable or unusable source is reported in state, not as an error */
+        post: operations["updateModelCatalog"];
         delete?: never;
         options?: never;
         head?: never;
@@ -591,6 +1004,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{id}/preview/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a preview process the user opened from an acceptance card */
+        post: operations["startPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/preview/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a preview process (or all of the team's) */
+        post: operations["stopPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{id}/browser": {
         parameters: {
             query?: never;
@@ -742,6 +1189,40 @@ export interface paths {
         put?: never;
         /** Send a user message (persisted and queued; answered with 202) */
         post: operations["sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chats/{chatId}/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of the chat's last user message and send them again */
+        post: operations["editChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/{messageId}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the words of a member's last user message and send them again */
+        post: operations["editMessage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1091,6 +1572,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a project folder to the team action that fits it */
+        post: operations["openTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bind a folder another CoBot instance marked to a new team here */
+        post: operations["adoptTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations": {
         parameters: {
             query?: never;
@@ -1162,6 +1677,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find chats and team members by conversation content */
+        get: operations["searchConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/collaboration": {
         parameters: {
             query?: never;
@@ -1183,6 +1715,164 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChatSection: {
+            id: string;
+            name: string;
+            /** Format: int64 */
+            order: number;
+        };
+        ChatNavigation: {
+            /** Format: int64 */
+            revision: number;
+            /** @enum {string} */
+            sort: "recent" | "manual";
+            /** @enum {string} */
+            grouping: "sections" | "merged";
+            sections: components["schemas"]["ChatSection"][];
+        };
+        ChatNavigationInput: {
+            requestId: string;
+            /** @enum {string} */
+            action: "preferences" | "create" | "rename" | "delete" | "reorder";
+            /** Format: int64 */
+            expectedRevision: number;
+            id?: string;
+            name?: string;
+            beforeId?: string;
+            /** @enum {string} */
+            sort?: "recent" | "manual";
+            /** @enum {string} */
+            grouping?: "sections" | "merged";
+        };
+        Chat: {
+            id: string;
+            title: string;
+            providerId: string;
+            model: string;
+            permissionMode: string;
+            reasoningEffort: string;
+            workspace: string;
+            createdAt: string;
+            updatedAt: string;
+            /** Format: int64 */
+            revision: number;
+            busy?: boolean;
+            archivedAt?: string;
+            /** @enum {string} */
+            archiveOperation?: "archive" | "restore";
+            archiveError?: string;
+            sectionId?: string;
+            pinned?: boolean;
+            /** Format: int64 */
+            manualOrder?: number;
+        };
+        ChatMessage: {
+            id: string;
+            chatId: string;
+            runId: string;
+            kind: string;
+            text: string;
+            createdAt: string;
+        };
+        ChatStep: {
+            id: string;
+            kind: string;
+            status: string;
+            /** Format: int64 */
+            seq: number;
+            detail: {
+                [key: string]: unknown;
+            };
+        };
+        ChatRun: {
+            stopRequested?: boolean;
+            id: string;
+            chatId: string;
+            messageId: string;
+            status: string;
+            threadId: string;
+            turnId: string;
+            epoch: string;
+            errorKey: string;
+            startedAt: string;
+            endedAt: string;
+            steps: components["schemas"]["ChatStep"][];
+        };
+        ChatRequest: {
+            decision?: string;
+            id: string;
+            chatId: string;
+            runId: string;
+            type: string;
+            method: string;
+            summary: string;
+            reason: string;
+            state: string;
+            responseState: string;
+            /** Format: int64 */
+            revision: number;
+            options: components["schemas"]["ApprovalOption"][];
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        ChatPage: {
+            chat: components["schemas"]["Chat"];
+            messages: components["schemas"]["ChatMessage"][];
+            runs: components["schemas"]["ChatRun"][];
+            requests: components["schemas"]["ChatRequest"][];
+            nextCursor: string;
+        };
+        ChatList: {
+            items: components["schemas"]["Chat"][];
+            nextCursor: string;
+        };
+        SearchResults: {
+            query: string;
+            chats: components["schemas"]["ChatSearchResult"][];
+            members: components["schemas"]["MemberSearchResult"][];
+        };
+        ChatSearchResult: {
+            chatId: string;
+            title: string;
+            /** @description Excerpt of the latest matching message; empty when only the title matched. */
+            snippet: string;
+            activityAt?: string;
+        };
+        MemberSearchResult: {
+            teamId: string;
+            teamName: string;
+            botId: string;
+            botName: string;
+            /** @description Excerpt of the member's latest matching message. */
+            snippet: string;
+            activityAt?: string;
+        };
+        ChatSendInput: {
+            requestId: string;
+            text: string;
+            providerId?: string;
+            model?: string;
+            /** @description Sent with a model: the thinking level for the model chosen (empty is the model's own). */
+            reasoningEffort?: string;
+            /**
+             * @description Empty keeps the chat's. Holds from this message on.
+             * @enum {string}
+             */
+            permissionMode?: "read_only" | "default" | "full";
+        };
+        ChatActionInput: {
+            sectionId?: string;
+            beforeId?: string;
+            requestId: string;
+            title?: string;
+            optionId?: string;
+            /** Format: int64 */
+            expectedRevision?: number;
+            answers?: {
+                [key: string]: string[];
+            };
+        };
         /** @description A model vendor or gateway the engine can call. The secret is never part of it. */
         Provider: {
             id: string;
@@ -1212,22 +1902,77 @@ export interface components {
         /** @description One wire dialect the provider offers. */
         ProviderEndpoint: {
             /** @enum {string} */
-            dialect: "openai-responses" | "anthropic-messages";
+            dialect: "openai-responses";
             baseUrl: string;
         };
         ProviderModel: {
             id: string;
+            /** @description The user's own name for the model */
             displayName?: string;
             contextWindow?: number;
+            maxOutput?: number;
             defaultEffort?: string;
             supportedEfforts?: string[];
+            thinkingToggle?: boolean;
             inputModalities?: string[];
+            webSearch?: boolean;
+            spec?: components["schemas"]["ModelSpec"];
             /** @enum {string} */
             status?: "ok" | "failed" | "unknown";
             /** @description Stable machine code of the last check. */
             failure?: string;
             /** @description Human-readable detail of the last check. */
             message?: string;
+        };
+        /** @description What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored. */
+        ModelSpec: {
+            name?: string;
+            alias?: string;
+            displayName: string;
+            /** @description In use. The user's own number when it is below the limit */
+            contextWindow: number;
+            maxOutput: number;
+            /** @description The most the catalog says the model reads; 0 when it does not know the model. */
+            contextLimit: number;
+            maxOutputLimit: number;
+            inputModalities: string[];
+            /** @description The kinds of input the model may be said to take. */
+            inputOptions: string[];
+            webSearch: boolean;
+            thinking: {
+                toggle: boolean;
+                efforts: string[];
+                defaultEffort?: string;
+            };
+            /** @enum {string} */
+            source: "catalog" | "custom";
+            catalogId?: string;
+            /** @description Fields the catalog gives and the user cannot change; the others only have limits. */
+            locked: ("contextWindow" | "maxOutput" | "inputModalities" | "thinking")[];
+        };
+        /** @description How the running engines stand against the model catalog now wanted (the context windows of third-party models). */
+        EngineCatalogState: {
+            /** @description Whether a generated catalog is wanted at all. */
+            active: boolean;
+            /** @description Running team engines started without the catalog now wanted. */
+            stale: number;
+        };
+        ModelCatalogStatus: {
+            /** @enum {string} */
+            source: "bundled" | "downloaded";
+            /** Format: date-time */
+            updatedAt?: string;
+            models: number;
+            from?: string;
+            engine: components["schemas"]["EngineCatalogState"];
+        };
+        ApplyEngineCatalogResult: {
+            restarted: number;
+            busy: number;
+        };
+        ModelCatalogUpdate: components["schemas"]["ModelCatalogStatus"] & {
+            /** @enum {string} */
+            state: "updated" | "unreachable" | "rejected";
         };
         /** @description How often the engine may retry a request to this provider. */
         ProviderRetries: {
@@ -1322,6 +2067,10 @@ export interface components {
             /** @enum {string} */
             mode?: "rerun" | "return_to_me";
             suggestions?: string;
+            /** @description With a runnable result */
+            previewCommand?: string;
+            /** @description The address to open once the preview answers. */
+            previewUrl?: string;
             execution?: components["schemas"]["Execution"];
             /** Format: date-time */
             createdAt: string;
@@ -1363,10 +2112,10 @@ export interface components {
         Question: {
             id: string;
             /**
-             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+             * @description confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
              * @enum {string}
              */
-            kind: "" | "confirm" | "acceptance";
+            kind: "" | "confirm" | "acceptance" | "recruitment";
             requirementId?: string;
             stageIndex?: number;
             teamId: string;
@@ -1375,6 +2124,8 @@ export interface components {
             runId?: string;
             question: string;
             options: string[];
+            /** @description A recruitment question only: the role IDs the project manager asked to add. */
+            roleIds?: string[];
             /** @enum {string} */
             status: "open" | "answered" | "cancelled";
             answerText?: string;
@@ -1385,13 +2136,18 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             answeredAt?: string;
+            /** @description A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served. */
+            canSkipChecks?: boolean;
         };
         Message: {
             id: string;
             teamId: string;
             botId: string;
-            /** @enum {string} */
-            kind: "user" | "assistant" | "collaboration" | "system";
+            /**
+             * @description document is a relay-posted document (the requirement to confirm
+             * @enum {string}
+             */
+            kind: "user" | "assistant" | "collaboration" | "system" | "document";
             blocks: components["schemas"]["TextBlock"][];
             requestId?: string;
             /** @enum {string} */
@@ -1460,10 +2216,10 @@ export interface components {
             /** @description The answer; for a confirmation or acceptance */
             answerText: string;
             /**
-             * @description Required for a confirmation or acceptance question, refused for any other.
+             * @description Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
              * @enum {string}
              */
-            decision?: "accept" | "revise";
+            decision?: "accept" | "revise" | "approve" | "reject";
             /**
              * @description For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
              * @enum {string}
@@ -1563,6 +2319,63 @@ export interface components {
             /** Format: date-time */
             bearerExpiresAt?: string;
         };
+        UpdateCheck: {
+            /**
+             * @description upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+             * @enum {string}
+             */
+            state: "upToDate" | "available" | "unknown" | "unreachable" | "rejected";
+            current: string;
+            latest?: string;
+            releaseUrl?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        /** @description One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight. */
+        BudgetLine: {
+            /** Format: int64 */
+            override: number | null;
+            /** Format: int64 */
+            default: number;
+            /** Format: int64 */
+            effective: number;
+            /**
+             * @description What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+             * @enum {string}
+             */
+            limitedBy: "none" | "default" | "own" | "team";
+            /**
+             * Format: int64
+             * @description The most a member may set for itself, its team's limit; 0 when the team has none.
+             */
+            ceiling: number;
+            /** Format: int64 */
+            usedToday: number;
+        };
+        MemberBudget: components["schemas"]["BudgetLine"] & {
+            botId: string;
+        };
+        TeamBudget: {
+            team: components["schemas"]["BudgetLine"];
+            members: components["schemas"]["MemberBudget"][];
+        };
+        BudgetLimitRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: int64 */
+            limit: number | null;
+        };
+        BudgetLimitResult: {
+            /** Format: int64 */
+            limit: number | null;
+            /** @description How many members had a limit above the team's, or none, and were brought down to the team's. */
+            clamped: number;
+        };
+        BudgetResetResult: {
+            reset: boolean;
+        };
         AvatarCatalog: {
             series: components["schemas"]["AvatarSeries"][];
             status: {
@@ -1616,6 +2429,11 @@ export interface components {
             /** Format: int64 */
             budgetTokens: number;
             enginePath: string;
+            /**
+             * @description When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+             * @enum {string}
+             */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         SettingsPatch: {
             /** @enum {string} */
@@ -1635,6 +2453,8 @@ export interface components {
             /** Format: int64 */
             budgetTokens?: number;
             enginePath?: string;
+            /** @enum {string} */
+            modelSwitchPrompt?: "always" | "smart" | "never";
         };
         Snapshot: {
             /** Format: int64 */
@@ -1691,14 +2511,21 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             lastMessage?: components["schemas"]["MessagePreview"];
+            /**
+             * @description How the member's latest finished run ended; only team listings fill it.
+             * @enum {string}
+             */
+            lastRunStatus?: "completed" | "failed" | "interrupted" | "";
         };
-        /** @description The start of the latest message between the user and a member, for the team list. */
+        /** @description The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list. */
         MessagePreview: {
             /** @enum {string} */
-            kind: "user" | "assistant";
+            kind: "user" | "assistant" | "system" | "collaboration";
             text: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Who sent it */
+            senderBotId?: string;
         };
         TeamWithBots: {
             team: components["schemas"]["Team"];
@@ -1724,7 +2551,7 @@ export interface components {
             requesterBotId: string;
             runId?: string;
             /** @enum {string} */
-            type: "native_tool" | "recovery" | "chain";
+            type: "native_tool" | "recovery" | "chain" | "budget";
             method?: string;
             summary: string;
             reason?: string;
@@ -1785,10 +2612,16 @@ export interface components {
              * @description The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
              * @enum {string}
              */
-            kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "notice" | "retry";
+            kind: "reasoning" | "command" | "file_change" | "tool" | "web_search" | "plan" | "message" | "agent" | "diff" | "compaction" | "notice" | "retry";
             /** @enum {string} */
             status: "in_progress" | "completed" | "failed" | "declined" | "interrupted";
-            /** @description Kind-specific payload. */
+            /**
+             * @description Kind-specific payload. New file_change changes carry additions,
+             *     deletions, statsComplete, binary and diffTruncated computed before
+             *     storage clipping. New diff steps also carry changes (file metadata
+             *     with byte start/end offsets), filesComplete and statsComplete.
+             *     Missing completeness fields on older records mean unknown, not true.
+             */
             detail: {
                 [key: string]: unknown;
             };
@@ -1829,6 +2662,84 @@ export interface components {
                 description: string;
             }[];
         };
+        WorkspaceChangeFile: {
+            path: string;
+            /** @enum {string} */
+            kind: "add" | "update" | "delete";
+            movePath?: string;
+            additions: number;
+            deletions: number;
+            /** @description Missing historical counters are never inferred to be exact. */
+            statsComplete: boolean;
+            binary: boolean;
+            diffTruncated: boolean;
+        };
+        WorkspaceChangeRun: {
+            id: string;
+            botId: string;
+            status: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string;
+            /** @enum {string} */
+            source: "turn_diff" | "file_change";
+            fileCount: number;
+            filesComplete: boolean;
+            additions: number;
+            deletions: number;
+            statsComplete: boolean;
+        };
+        WorkspaceChangeRunsPage: {
+            runs: components["schemas"]["WorkspaceChangeRun"][];
+            nextCursor: string;
+        };
+        WorkspaceChangeFilesPage: {
+            run: components["schemas"]["WorkspaceChangeRun"];
+            files: components["schemas"]["WorkspaceChangeFile"][];
+            nextCursor: string;
+        };
+        WorkspaceChangeDiff: {
+            run: components["schemas"]["WorkspaceChangeRun"];
+            file: components["schemas"]["WorkspaceChangeFile"];
+            diff: string;
+            diffTruncated: boolean;
+        };
+        WorkspaceLatexProject: {
+            candidates: components["schemas"]["WorkspaceFile"][];
+            suggested: string;
+            truncated: boolean;
+            available: boolean;
+        };
+        WorkspaceLatexResult: {
+            success: boolean;
+            log: string;
+            logTruncated: boolean;
+            main: string;
+            /** Format: byte */
+            pdf?: string;
+            errorKey?: string;
+        };
+        WorkspaceFile: {
+            /** @description Canonical path relative to the workspace root. */
+            path: string;
+            name: string;
+            /** @enum {string} */
+            kind: "directory" | "text" | "markdown" | "html" | "svg" | "image" | "pdf" | "audio" | "video" | "document" | "spreadsheet" | "presentation" | "notebook" | "latex" | "binary" | "blocked";
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            modifiedAt: string;
+            version: string;
+            line?: number;
+            column?: number;
+            endLine?: number;
+        };
+        WorkspaceDirectory: {
+            path: string;
+            entries: components["schemas"]["WorkspaceFile"][];
+            nextCursor?: string;
+        };
     };
     responses: {
         /** @description Structured error */
@@ -1848,6 +2759,654 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getWorkspaceLatexProject: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Canonical main-file candidates and compiler availability. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceLatexProject"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    compileWorkspaceLatex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    main: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Compilation result; PDF bytes are base64 and limited to 32 MiB decoded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceLatexResult"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    watchWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    paths: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Native directory invalidation stream; no paths or file contents are exposed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceChangeRuns: {
+        parameters: {
+            query?: {
+                /** @description For team scopes, the member whose recorded changes are listed. */
+                botId?: string;
+                /** @description Last run id from the preceding page. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeRunsPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceChangeFiles: {
+        parameters: {
+            query?: {
+                /** @description Last file path from the preceding page. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeFilesPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceChangeDiff: {
+        parameters: {
+            query: {
+                /** @description The recorded source path, without resolving the current disk. */
+                path: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded changes; current disk content is fetched separately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceChangeDiff"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listWorkspaceEntries: {
+        parameters: {
+            query?: {
+                path?: string;
+                includeHidden?: boolean;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceDirectory"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["WorkspaceFile"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWorkspaceContent: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-None-Match"?: string;
+                "If-Match"?: string;
+            };
+            path: {
+                scope: "team" | "chat";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes with Content-Type, ETag and Accept-Ranges; HTML is sandboxed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description A requested byte range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The file has not changed. */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file changed since it was inspected. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getChatNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatNavigation"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    changeChatNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatNavigationInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatNavigation"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    organizeChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                action: "pin" | "unpin" | "move" | "reorder" | "archive" | "restore";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    openChatPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestId: string;
+                    path: string;
+                    reveal?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Opened file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: {
+                            path: string;
+                        };
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listChats: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pinned?: "only" | "exclude";
+                archived?: boolean;
+                sort?: "recent" | "manual" | "name" | "created" | "archived";
+                search?: string;
+                section?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatList"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getChat: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    renameChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["Chat"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    sendChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatPage"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    chatRunAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                runId: string;
+                action: "interrupt" | "verify";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatRun"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    replyChatRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatActionInput"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["ChatRequest"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getStatus: {
         parameters: {
             query?: never;
@@ -2177,6 +3736,308 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: components["schemas"]["AvatarCatalog"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The team's and its members' limits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TeamBudget"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetLimitRequest"];
+            };
+        };
+        responses: {
+            /** @description The limit now set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetLimitResult"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    setBotBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetLimitRequest"];
+            };
+        };
+        responses: {
+            /** @description The limit now set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetLimitResult"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    resetTeamBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Counting started again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetResetResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    resetBotBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Counting started again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["BudgetResetResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    checkForUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description How the installed version stands against the newest release */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["UpdateCheck"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getModelCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source, date and size of the catalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ModelCatalogStatus"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    resolveModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    models: components["schemas"]["ProviderModel"][];
+                };
+            };
+        };
+        responses: {
+            /** @description A spec for each model id */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            specs: {
+                                [key: string]: components["schemas"]["ModelSpec"];
+                            };
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    applyEngineCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description How many engines were stopped, and how many were left because a turn is running */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ApplyEngineCatalogResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    updateModelCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Outcome, and the catalog now in use */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["ModelCatalogUpdate"];
                     };
                 };
             };
@@ -3067,6 +4928,67 @@ export interface operations {
             404: components["responses"]["Error"];
         };
     };
+    startPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The start command from the acceptance handoff's preview; run in the team directory. */
+                    command: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Started (or already running from an earlier press) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    stopPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    /** @description The command that started it; omit to stop every preview of the team. */
+                    command?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stopped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+        };
+    };
     getTeamBrowser: {
         parameters: {
             query?: never;
@@ -3437,6 +5359,67 @@ export interface operations {
             409: components["responses"]["Error"];
         };
     };
+    editChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatId: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    editMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The turn was rolled back and the new words queued; delivery status arrives via events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     cancelMessage: {
         parameters: {
             query?: never;
@@ -3574,6 +5557,8 @@ export interface operations {
                     comment?: string;
                     /** Format: int64 */
                     expectedRevision: number;
+                    /** @description An MCP elicitation's accepted form values, keyed by field name. */
+                    content?: Record<string, never>;
                 };
             };
         };
@@ -4068,6 +6053,86 @@ export interface operations {
             400: components["responses"]["Error"];
         };
     };
+    openTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The action to take: open, restore, adopt or create */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            /**
+                             * @description open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                             * @enum {string}
+                             */
+                            action: "open" | "restore" | "adopt" | "create";
+                            teamId?: string;
+                            teamName?: string;
+                            archived?: boolean;
+                            /** @description For the create and adopt actions; the folder name or the foreign marker's team name. */
+                            suggestedName?: string;
+                            directory: string;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    adoptTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestId: string;
+                    path: string;
+                    name: string;
+                    initialRoleIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The adopted team with its members; the folder's marker now names this instance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: {
+                            team?: components["schemas"]["Team"];
+                            bots?: components["schemas"]["Bot"][];
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
     listAuthorizations: {
         parameters: {
             query?: never;
@@ -4201,6 +6266,32 @@ export interface operations {
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             409: components["responses"]["Error"];
+        };
+    };
+    searchConversations: {
+        parameters: {
+            query: {
+                /** @description Plain text matched against chat titles */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest matches first, a few per group; archived and deleted conversations are never returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["SearchResults"];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
         };
     };
     collaborationTool: {

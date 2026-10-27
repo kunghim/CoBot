@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { useDeleteProvider, useProviderPresets, useProviders, useSetProviderEnabled } from '../../api/queries';
+import { useDeleteProvider, useApplyEngineCatalog, useModelCatalog, useProviderPresets, useProviders, useSetProviderEnabled, useUpdateModelCatalog } from '../../api/queries';
 import type { Provider, ProviderPreset } from '../../api/types';
 import { Alert, AlertDialog, Badge, Button, Card, Icons, LogoTile, Skeleton, Switch, cx, useToast } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
@@ -20,6 +20,8 @@ import { desktopBridge } from '../../platform/native-bridge';
 import AddProviderDialog, { CODEX_DIALECT, engineOf, presetName, providerMark } from './AddProviderDialog';
 import { isOfficial } from './providerModels';
 import { useChatGPTAccount } from './useChatGPTAccount';
+import type { SectionProps } from '../settings/SettingsSections';
+import { DefaultModelCard } from '../settings/SettingsSections';
 
 /** The ChatGPT account's own sign-in controls. */
 function AccountControls({ t }: { t: TFunction }) {
@@ -96,6 +98,10 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
   const endpoint = provider.endpoints.find((entry) => entry.dialect === CODEX_DIALECT)?.baseUrl ?? provider.endpoints[0]?.baseUrl ?? '';
   const engines = [...new Set(provider.endpoints.map((entry) => engineOf(entry.dialect)))];
   const usable = provider.models.filter((entry) => entry.status !== 'failed').length;
+  // A provider without any endpoint spoke a dialect CoBot no longer has (the
+  // migration that removed it left the row in place, switched off); it stays
+  // until the user removes it, and nothing else can be done with it here.
+  const legacyClaude = !official && provider.endpoints.length === 0;
   return (
     <div
       className={cx(
@@ -120,9 +126,11 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
           </>
         ) : (
           <>
-            <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{endpoint}</p>
+            {!legacyClaude && (
+              <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{endpoint}</p>
+            )}
             <p className="mt-0.5 text-xs leading-5 text-neutral-600 dark:text-neutral-300">
-              {t('providers.modelSummary', { count: provider.models.length, usable })}
+              {legacyClaude ? t('providers.unusableClaude') : t('providers.modelSummary', { count: provider.models.length, usable })}
               {engines.length ? ` · ${t('providers.usableWith', { engines: engines.join(t('providers.listSeparator')) })}` : ''}
             </p>
           </>
@@ -134,18 +142,79 @@ function ProviderRow({ provider, preset, signedIn, switching, t, onToggle, onEdi
             <Button size="sm" onClick={onEdit}>
               {t('providers.edit')}
             </Button>
-            <Button size="sm" variant="ghost" onClick={onRemove}>
+            <Button size="sm" className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={onRemove}>
               {t('providers.remove')}
             </Button>
           </>
         )}
-        <Switch checked={provider.enabled} disabled={switching} label={t('providers.enabledLabel')} onChange={onToggle} />
+        <Switch checked={provider.enabled} disabled={switching || legacyClaude} label={t('providers.enabledLabel')} hideLabel onChange={onToggle} />
       </div>
     </div>
   );
 }
 
-export default function ProviderSection() {
+/** Which model catalog is in use, and the button that fetches the newest one. */
+function ModelCatalogCard() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const catalog = useModelCatalog();
+  const update = useUpdateModelCatalog();
+  const apply = useApplyEngineCatalog();
+  const data = catalog.data;
+  const result = update.data;
+  const when = data?.updatedAt ? new Date(data.updatedAt).toLocaleDateString(i18n.language) : '';
+  return (
+    <Card
+      title={t('providers.catalog.title')}
+      action={
+        <Button
+          icon={Icons.refresh}
+          loading={update.isPending}
+          onClick={() =>
+            update.mutate(undefined, {
+              onSuccess: (outcome) => outcome.state === 'updated' && toast.show({ tone: 'success', title: t('providers.catalog.updated', { count: outcome.models }) }),
+              onError: (error) => toast.show({ tone: 'warning', duration: 5000, title: apiErrorMessage(t, error) }),
+            })
+          }
+        >
+          {t('providers.catalog.update')}
+        </Button>
+      }
+    >
+      <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('providers.catalog.intro')}</p>
+      {data && (
+        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {t(`providers.catalog.source.${data.source}`, { count: data.models, date: when })}
+        </p>
+      )}
+      {data && data.engine.stale > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">{t('providers.catalog.stale', { count: data.engine.stale })}</p>
+          <Button
+            size="sm"
+            loading={apply.isPending}
+            onClick={() =>
+              apply.mutate(undefined, {
+                onSuccess: (outcome) =>
+                  toast.show({ tone: outcome.busy > 0 ? 'info' : 'success', title: t('providers.catalog.applied', { count: outcome.restarted, busy: outcome.busy }) }),
+                onError: (error) => toast.show({ tone: 'warning', duration: 5000, title: apiErrorMessage(t, error) }),
+              })
+            }
+          >
+            {t('providers.catalog.apply')}
+          </Button>
+        </div>
+      )}
+      {result && result.state !== 'updated' && (
+        <div className="mt-3">
+          <Alert tone="warning">{t(`providers.catalog.${result.state}`)}</Alert>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export default function ProviderSection({ settings, save, errors }: SectionProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const providers = useProviders();
@@ -214,6 +283,7 @@ export default function ProviderSection() {
 
   return (
     <div className="space-y-6">
+      <DefaultModelCard settings={settings} save={save} errors={errors} />
       <Card
         title={t('providers.title')}
         action={
@@ -260,6 +330,8 @@ export default function ProviderSection() {
           </div>
         )}
       </Card>
+
+      <ModelCatalogCard />
 
       <AddProviderDialog
         open={dialogOpen}

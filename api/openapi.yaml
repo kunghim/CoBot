@@ -11,6 +11,687 @@ info:
 servers:
   - url: http://127.0.0.1:0
 paths:
+  /api/v1/workspaces/{scope}/{id}/latex:
+    get:
+      operationId: getWorkspaceLatexProject
+      description: Bounded read-only discovery of TeX main files for the selected file.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string, maxLength: 4096 } }
+      responses:
+        "200":
+          description: Canonical main-file candidates and compiler availability.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceLatexProject" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: compileWorkspaceLatex
+      description: >
+        Ephemeral isolated compilation, not a durable business command. Only one
+        compilation runs per core; disconnect cancels it. No automatic downloads.
+        TeX failures return success=false with bounded diagnostics and no PDF.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, main]
+              properties:
+                requestId: { type: string }
+                main: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Compilation result; PDF bytes are base64 and limited to 32 MiB decoded.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceLatexResult" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/watch:
+    post:
+      operationId: watchWorkspace
+      description: >
+        Subscribe to invalidation hints for up to 64 validated directories.
+        This creates only an ephemeral subscription, not a durable command.
+        SSE events ready and changed have an empty JSON object; unavailable
+        signals loss of native watching. Reconnect after EOF and re-read
+        workspace state after ready. The stream rotates within 90 seconds.
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, paths]
+              properties:
+                requestId: { type: string }
+                paths:
+                  type: array
+                  minItems: 1
+                  maxItems: 64
+                  items: { type: string, maxLength: 4096 }
+      responses:
+        "200":
+          description: Native directory invalidation stream; no paths or file contents are exposed.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes:
+    get:
+      operationId: listWorkspaceChangeRuns
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - name: botId
+          in: query
+          required: false
+          description: For team scopes, the member whose recorded changes are listed.
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          description: Last run id from the preceding page.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeRunsPage" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes/{runId}:
+    get:
+      operationId: listWorkspaceChangeFiles
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: runId, in: path, required: true, schema: { type: string } }
+        - name: cursor
+          in: query
+          required: false
+          description: Last file path from the preceding page.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeFilesPage" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/changes/{runId}/file:
+    get:
+      operationId: getWorkspaceChangeDiff
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: runId, in: path, required: true, schema: { type: string } }
+        - name: path
+          in: query
+          required: true
+          description: The recorded source path, without resolving the current disk.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Recorded changes; current disk content is fetched separately.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceChangeDiff" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/entries:
+    get:
+      operationId: listWorkspaceEntries
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+        - { name: includeHidden, in: query, schema: { type: boolean, default: false } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceDirectory" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/file:
+    get:
+      operationId: getWorkspaceFile
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkspaceFile" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{scope}/{id}/content:
+    get:
+      operationId: getWorkspaceContent
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string, default: "" } }
+        - { name: Range, in: header, schema: { type: string } }
+        - { name: If-None-Match, in: header, schema: { type: string } }
+        - { name: If-Match, in: header, schema: { type: string } }
+      responses:
+        "200":
+          description: File bytes with Content-Type, ETag and Accept-Ranges; HTML is sandboxed.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "206":
+          description: A requested byte range.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "304":
+          description: The file has not changed.
+        "412":
+          description: The file changed since it was inspected.
+        "416":
+          description: The requested range is not satisfiable.
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chat-navigation:
+    get:
+      operationId: getChatNavigation
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/ChatNavigation" }
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: changeChatNavigation
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatNavigationInput" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/ChatNavigation" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/actions/{action}:
+    post:
+      operationId: organizeChat
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      parameters:
+        - { name: chatId, in: path, required: true, schema: { type: string } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [pin, unpin, move, reorder, archive, restore] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatActionInput" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Envelope" }
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/Chat" }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/open-path:
+    post:
+      operationId: openChatPath
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      parameters:
+        - { name: chatId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string }
+                path: { type: string }
+                reveal: { type: boolean }
+      responses:
+        "200":
+          description: Opened file
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [path]
+                        properties:
+                          path: { type: string }
+        default:
+          $ref: "#/components/responses/Error"
+  /api/v1/chats:
+    get:
+      operationId: "listChats"
+      security:
+        -
+          SessionCookie: []
+      parameters:
+        -
+          name: "cursor"
+          in: "query"
+          schema:
+            type: "string"
+        - { name: pinned, in: query, schema: { type: string, enum: [only, exclude] } }
+        - { name: archived, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [recent, manual, name, created, archived] } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: section, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: "createChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters: []
+      responses:
+        "202":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatSendInput"
+  /api/v1/chats/{chatId}:
+    get:
+      operationId: "getChat"
+      security:
+        -
+          SessionCookie: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "cursor"
+          in: "query"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: "renameChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Chat"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+    delete:
+      operationId: "deleteChat"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Chat"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+  /api/v1/chats/{chatId}/messages:
+    post:
+      operationId: "sendChatMessage"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "202":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatPage"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatSendInput"
+  /api/v1/chats/{chatId}/runs/{runId}/{action}:
+    post:
+      operationId: "chatRunAction"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "runId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "action"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            enum:
+              - "interrupt"
+              - "verify"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatRun"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
+  /api/v1/chats/{chatId}/requests/{requestId}/reply:
+    post:
+      operationId: "replyChatRequest"
+      security:
+        -
+          SessionCookie: []
+          CSRFToken: []
+      parameters:
+        -
+          name: "chatId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "requestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  -
+                    $ref: "#/components/schemas/Envelope"
+                  -
+                    type: "object"
+                    required:
+                      - "data"
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ChatRequest"
+        default:
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatActionInput"
   /api/v1/status:
     get:
       operationId: getStatus
@@ -340,6 +1021,314 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/AvatarCatalog"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/budget:
+    get:
+      operationId: getTeamBudget
+      security:
+        - SessionCookie: []
+      summary: A team's daily token limit, each member's, and what was spent today
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The team's and its members' limits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TeamBudget"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: setTeamBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set the team's own daily token limit; null follows the default in the settings, 0 is no limit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLimitRequest"
+      responses:
+        "200":
+          description: The limit now set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetLimitResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/budget:
+    put:
+      operationId: setBotBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Set the member's own daily token limit; null follows the default in the settings, 0 is no limit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLimitRequest"
+      responses:
+        "200":
+          description: The limit now set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetLimitResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/budget/reset:
+    post:
+      operationId: resetTeamBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start counting today's spend again from now, for the team and its members
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Counting started again
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetResetResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/bots/{id}/budget/reset:
+    post:
+      operationId: resetBotBudget
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start counting one member's spend today again from now
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Counting started again
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BudgetResetResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/updates/check:
+    post:
+      operationId: checkForUpdate
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Ask GitHub now whether a newer release exists; an unreachable GitHub is reported in state, not as an error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: How the installed version stands against the newest release
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/UpdateCheck"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog:
+    get:
+      operationId: getModelCatalog
+      security:
+        - SessionCookie: []
+      summary: Which model catalog is in use
+      responses:
+        "200":
+          description: Source, date and size of the catalog
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ModelCatalogStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/resolve:
+    post:
+      operationId: resolveModels
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: What is known about models that are not stored yet (catalog and the entries given, put together)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, models]
+              properties:
+                requestId: { type: string, format: uuid }
+                models:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: "#/components/schemas/ProviderModel"
+      responses:
+        "200":
+          description: A spec for each model id
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [specs]
+                        properties:
+                          specs:
+                            type: object
+                            additionalProperties:
+                              $ref: "#/components/schemas/ModelSpec"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/apply:
+    post:
+      operationId: applyEngineCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Stop the idle team engines that run an older model catalog; their next turn starts with the current one
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: How many engines were stopped, and how many were left because a turn is running
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ApplyEngineCatalogResult"
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/model-catalog/update:
+    post:
+      operationId: updateModelCatalog
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Download the newest model catalog now; an unreachable or unusable source is reported in state, not as an error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Outcome, and the catalog now in use
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ModelCatalogUpdate"
         "401":
           $ref: "#/components/responses/Error"
   /api/v1/engine/check:
@@ -1267,6 +2256,66 @@ paths:
           description: Warm-up started (or not needed)
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/start:
+    post:
+      operationId: startPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Start a preview process the user opened from an acceptance card
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, command]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: The start command from the acceptance handoff's preview; run in the team directory. }
+      responses:
+        "200":
+          description: Started (or already running from an earlier press)
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/{id}/preview/stop:
+    post:
+      operationId: stopPreview
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Stop a preview process (or all of the team's)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, format: uuid }
+                command: { type: string, description: "The command that started it; omit to stop every preview of the team." }
+      responses:
+        "200":
+          description: Stopped
+        "400":
+          $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/browser:
     get:
       operationId: getTeamBrowser
@@ -1650,6 +2699,72 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/chats/{chatId}/messages/{messageId}/edit:
+    post:
+      operationId: editChatMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of the chat's last user message and send them again
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: A turn still running was stopped and is replaced once it ends; a finished one was rolled back and resent
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/messages/{messageId}/edit:
+    post:
+      operationId: editMessage
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Replace the words of a member's last user message and send them again
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, text]
+              properties:
+                requestId: { type: string, format: uuid }
+                text: { type: string }
+      responses:
+        "200":
+          description: The turn was rolled back and the new words queued; delivery status arrives via events
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/messages/{id}/cancel:
     post:
       operationId: cancelMessage
@@ -1807,6 +2922,9 @@ paths:
                 optionId: { type: string }
                 comment: { type: string }
                 expectedRevision: { type: integer, format: int64 }
+                content:
+                  type: object
+                  description: An MCP elicitation's accepted form values, keyed by field name.
       responses:
         "200":
           description: Decided approval (with responseState)
@@ -2368,6 +3486,91 @@ paths:
                             description: The folder belongs to an archived team; restoring that team is the way to use it again.
         "400":
           $ref: "#/components/responses/Error"
+  /api/v1/teams/open:
+    post:
+      operationId: openTeam
+      security:
+        - SessionCookie: []
+      summary: Resolve a project folder to the team action that fits it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+      responses:
+        "200":
+          description: "The action to take: open, restore, adopt or create"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [action, directory]
+                        properties:
+                          action:
+                            type: string
+                            enum: [open, restore, adopt, create]
+                            description: open jumps to a live team; restore names an archived one; adopt confirms a folder another CoBot instance marked; create starts a new team in an unmarked folder.
+                          teamId: { type: string }
+                          teamName: { type: string }
+                          archived: { type: boolean }
+                          suggestedName: { type: string, description: For the create and adopt actions; the folder name or the foreign marker's team name. }
+                          directory: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/teams/adopt:
+    post:
+      operationId: adoptTeam
+      # Cookie-authenticated writes must echo the CSRF token; the scheme
+      # documents the header rather than changing the handler.
+      security:
+        - SessionCookie: []
+          CSRFToken: []
+      summary: Bind a folder another CoBot instance marked to a new team here
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, path, name]
+              properties:
+                requestId: { type: string, format: uuid }
+                path: { type: string }
+                name: { type: string }
+                initialRoleIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: The adopted team with its members; the folder's marker now names this instance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          team: { $ref: "#/components/schemas/Team" }
+                          bots:
+                            type: array
+                            items: { $ref: "#/components/schemas/Bot" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/authorizations:
     get:
       operationId: listAuthorizations
@@ -2509,6 +3712,28 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/search:
+    get:
+      operationId: searchConversations
+      summary: Find chats and team members by conversation content
+      security:
+        - SessionCookie: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, description: Plain text matched against chat titles, chat message text, and team member message text. }
+      responses:
+        "200":
+          description: Newest matches first, a few per group; archived and deleted conversations are never returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: "#/components/schemas/SearchResults" }
+        default:
+          $ref: "#/components/responses/Error"
   /internal/v1/collaboration:
     post:
       operationId: collaborationTool
@@ -2565,6 +3790,313 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    ChatSection:
+      type: object
+      required: [id, name, order]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        order: { type: integer, format: int64 }
+    ChatNavigation:
+      type: object
+      required: [revision, sort, grouping, sections]
+      properties:
+        revision: { type: integer, format: int64 }
+        sort: { type: string, enum: [recent, manual] }
+        grouping: { type: string, enum: [sections, merged] }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/ChatSection" }
+    ChatNavigationInput:
+      type: object
+      required: [requestId, action, expectedRevision]
+      properties:
+        requestId: { type: string }
+        action: { type: string, enum: [preferences, create, rename, delete, reorder] }
+        expectedRevision: { type: integer, format: int64 }
+        id: { type: string }
+        name: { type: string }
+        beforeId: { type: string }
+        sort: { type: string, enum: [recent, manual] }
+        grouping: { type: string, enum: [sections, merged] }
+    Chat:
+      type: "object"
+      required:
+        - "id"
+        - "title"
+        - "providerId"
+        - "model"
+        - "permissionMode"
+        - "reasoningEffort"
+        - "workspace"
+        - "createdAt"
+        - "updatedAt"
+        - "revision"
+      properties:
+        id:
+          type: "string"
+        title:
+          type: "string"
+        providerId:
+          type: "string"
+        model:
+          type: "string"
+        permissionMode:
+          type: "string"
+        reasoningEffort:
+          type: "string"
+        workspace:
+          type: "string"
+        createdAt:
+          type: "string"
+        updatedAt:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        busy: { type: boolean }
+        archivedAt: { type: string }
+        archiveOperation: { type: string, enum: [archive, restore] }
+        archiveError: { type: string }
+        sectionId: { type: string }
+        pinned: { type: boolean }
+        manualOrder: { type: integer, format: int64 }
+    ChatMessage:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "runId"
+        - "kind"
+        - "text"
+        - "createdAt"
+      properties:
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        runId:
+          type: "string"
+        kind:
+          type: "string"
+        text:
+          type: "string"
+        createdAt:
+          type: "string"
+    ChatStep:
+      type: "object"
+      required:
+        - "id"
+        - "kind"
+        - "status"
+        - "seq"
+        - "detail"
+      properties:
+        id:
+          type: "string"
+        kind:
+          type: "string"
+        status:
+          type: "string"
+        seq:
+          type: "integer"
+          format: "int64"
+        detail:
+          type: "object"
+          additionalProperties: true
+    ChatRun:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "messageId"
+        - "status"
+        - "threadId"
+        - "turnId"
+        - "epoch"
+        - "errorKey"
+        - "startedAt"
+        - "endedAt"
+        - "steps"
+      properties:
+        stopRequested: { type: boolean }
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        messageId:
+          type: "string"
+        status:
+          type: "string"
+        threadId:
+          type: "string"
+        turnId:
+          type: "string"
+        epoch:
+          type: "string"
+        errorKey:
+          type: "string"
+        startedAt:
+          type: "string"
+        endedAt:
+          type: "string"
+        steps:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatStep"
+    ChatRequest:
+      type: "object"
+      required:
+        - "id"
+        - "chatId"
+        - "runId"
+        - "type"
+        - "method"
+        - "summary"
+        - "reason"
+        - "state"
+        - "responseState"
+        - "revision"
+        - "options"
+      properties:
+        decision: { type: string }
+        id:
+          type: "string"
+        chatId:
+          type: "string"
+        runId:
+          type: "string"
+        type:
+          type: "string"
+        method:
+          type: "string"
+        summary:
+          type: "string"
+        reason:
+          type: "string"
+        state:
+          type: "string"
+        responseState:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        options:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ApprovalOption"
+        params:
+          type: "object"
+          additionalProperties: true
+    ChatPage:
+      type: "object"
+      required:
+        - "chat"
+        - "messages"
+        - "runs"
+        - "requests"
+        - "nextCursor"
+      properties:
+        chat:
+          $ref: "#/components/schemas/Chat"
+        messages:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        runs:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatRun"
+        requests:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ChatRequest"
+        nextCursor:
+          type: "string"
+    ChatList:
+      type: "object"
+      required:
+        - "items"
+        - "nextCursor"
+      properties:
+        items:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Chat"
+        nextCursor:
+          type: "string"
+    SearchResults:
+      type: object
+      required: [query, chats, members]
+      properties:
+        query: { type: string }
+        chats:
+          type: array
+          items: { $ref: "#/components/schemas/ChatSearchResult" }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/MemberSearchResult" }
+    ChatSearchResult:
+      type: object
+      required: [chatId, title, snippet]
+      properties:
+        chatId: { type: string }
+        title: { type: string }
+        snippet: { type: string, description: Excerpt of the latest matching message; empty when only the title matched. }
+        activityAt: { type: string }
+    MemberSearchResult:
+      type: object
+      required: [teamId, teamName, botId, botName, snippet]
+      properties:
+        teamId: { type: string }
+        teamName: { type: string }
+        botId: { type: string }
+        botName: { type: string }
+        snippet: { type: string, description: Excerpt of the member's latest matching message. }
+        activityAt: { type: string }
+    ChatSendInput:
+      type: "object"
+      required:
+        - "requestId"
+        - "text"
+      properties:
+        requestId:
+          type: "string"
+        text:
+          type: "string"
+        providerId:
+          type: "string"
+        model:
+          type: "string"
+        reasoningEffort:
+          type: "string"
+          description: "Sent with a model: the thinking level for the model chosen (empty is the model's own)."
+        permissionMode:
+          type: "string"
+          enum: [read_only, default, full]
+          description: "Empty keeps the chat's. Holds from this message on."
+    ChatActionInput:
+      type: "object"
+      required:
+        - "requestId"
+      properties:
+        sectionId: { type: string }
+        beforeId: { type: string }
+        requestId:
+          type: "string"
+        title:
+          type: "string"
+        optionId:
+          type: "string"
+        expectedRevision:
+          type: "integer"
+          format: "int64"
+        answers:
+          type: "object"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
     Provider:
       type: object
       description: A model vendor or gateway the engine can call. The secret is never part of it.
@@ -2595,25 +4127,95 @@ components:
       description: One wire dialect the provider offers.
       required: [dialect, baseUrl]
       properties:
-        dialect: { type: string, enum: [openai-responses, anthropic-messages] }
+        dialect: { type: string, enum: [openai-responses] }
         baseUrl: { type: string }
     ProviderModel:
       type: object
       required: [id]
       properties:
         id: { type: string }
-        displayName: { type: string }
+        displayName: { type: string, description: The user's own name for the model, shown in its place. }
         contextWindow: { type: integer }
+        maxOutput: { type: integer }
         defaultEffort: { type: string }
         supportedEfforts:
           type: array
           items: { type: string }
+        thinkingToggle: { type: boolean }
         inputModalities:
           type: array
           items: { type: string }
+        webSearch: { type: boolean }
+        spec:
+          $ref: "#/components/schemas/ModelSpec"
         status: { type: string, enum: [ok, failed, unknown] }
         failure: { type: string, description: Stable machine code of the last check. }
         message: { type: string, description: Human-readable detail of the last check. }
+    ModelSpec:
+      type: object
+      description: What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+      required: [displayName, contextWindow, maxOutput, contextLimit, maxOutputLimit, inputModalities, inputOptions, webSearch, thinking, source, locked]
+      properties:
+        name: { type: string }
+        alias: { type: string }
+        displayName: { type: string }
+        contextWindow: { type: integer, description: In use. The user's own number when it is below the limit, else the catalog's. }
+        maxOutput: { type: integer }
+        contextLimit: { type: integer, description: The most the catalog says the model reads; 0 when it does not know the model. }
+        maxOutputLimit: { type: integer }
+        inputModalities:
+          type: array
+          items: { type: string }
+        inputOptions:
+          type: array
+          description: The kinds of input the model may be said to take.
+          items: { type: string }
+        webSearch: { type: boolean }
+        thinking:
+          type: object
+          required: [toggle, efforts]
+          properties:
+            toggle: { type: boolean }
+            efforts:
+              type: array
+              items: { type: string }
+            defaultEffort: { type: string }
+        source: { type: string, enum: [catalog, custom] }
+        catalogId: { type: string }
+        locked:
+          type: array
+          description: Fields the catalog gives and the user cannot change; the others only have limits.
+          items: { type: string, enum: [contextWindow, maxOutput, inputModalities, thinking] }
+    EngineCatalogState:
+      type: object
+      description: How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+      required: [active, stale]
+      properties:
+        active: { type: boolean, description: Whether a generated catalog is wanted at all. }
+        stale: { type: integer, description: Running team engines started without the catalog now wanted. }
+    ModelCatalogStatus:
+      type: object
+      required: [source, models, engine]
+      properties:
+        source: { type: string, enum: [bundled, downloaded] }
+        updatedAt: { type: string, format: date-time }
+        models: { type: integer }
+        from: { type: string }
+        engine:
+          $ref: "#/components/schemas/EngineCatalogState"
+    ApplyEngineCatalogResult:
+      type: object
+      required: [restarted, busy]
+      properties:
+        restarted: { type: integer }
+        busy: { type: integer }
+    ModelCatalogUpdate:
+      allOf:
+        - $ref: "#/components/schemas/ModelCatalogStatus"
+        - type: object
+          required: [state]
+          properties:
+            state: { type: string, enum: [updated, unreachable, rejected] }
     ProviderRetries:
       type: object
       description: How often the engine may retry a request to this provider.
@@ -2720,6 +4322,8 @@ components:
         outcome: { type: string, enum: [done, back, escalate, resume] }
         mode: { type: string, enum: [rerun, return_to_me] }
         suggestions: { type: string }
+        previewCommand: { type: string, description: With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it. }
+        previewUrl: { type: string, description: The address to open once the preview answers. }
         execution: { $ref: "#/components/schemas/Execution" }
         createdAt: { type: string, format: date-time }
     Execution:
@@ -2770,8 +4374,8 @@ components:
         id: { type: string }
         kind:
           type: string
-          enum: ['', confirm, acceptance]
-          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
+          enum: ['', confirm, acceptance, recruitment]
+          description: confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
         requirementId: { type: string }
         stageIndex: { type: integer }
         teamId: { type: string }
@@ -2782,12 +4386,19 @@ components:
         options:
           type: array
           items: { type: string }
+        roleIds:
+          type: array
+          items: { type: string }
+          description: "A recruitment question only: the role IDs the project manager asked to add."
         status: { type: string, enum: [open, answered, cancelled] }
         answerText: { type: string }
         answerMessageId: { type: string }
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         answeredAt: { type: string, format: date-time }
+        canSkipChecks:
+          type: boolean
+          description: "A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served."
     Message:
       type: object
       required: [id, teamId, botId, kind, blocks, createdAt]
@@ -2795,7 +4406,7 @@ components:
         id: { type: string }
         teamId: { type: string }
         botId: { type: string }
-        kind: { type: string, enum: [user, assistant, collaboration, system] }
+        kind: { type: string, enum: [user, assistant, collaboration, system, document], description: document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card. }
         blocks:
           type: array
           items: { $ref: "#/components/schemas/TextBlock" }
@@ -2846,11 +4457,11 @@ components:
       required: [requestId, answerText, expectedRevision]
       properties:
         requestId: { type: string, format: uuid }
-        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise). }
+        answerText: { type: string, description: The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager. }
         decision:
           type: string
-          enum: [accept, revise]
-          description: Required for a confirmation or acceptance question, refused for any other.
+          enum: [accept, revise, approve, reject]
+          description: Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
         mode:
           type: string
           enum: [rerun, return_to_me]
@@ -2966,6 +4577,83 @@ components:
           type: string
           description: Desktop-shell bearer (30 min, renewable); browser flow ignores it
         bearerExpiresAt: { type: string, format: date-time }
+    UpdateCheck:
+      type: object
+      required: [state, current, checkedAt]
+      properties:
+        state:
+          type: string
+          description: >-
+            upToDate: nothing newer; available: a newer release exists;
+            unknown: the installed build is not a release number, so it cannot
+            be compared; unreachable: GitHub could not be reached; rejected:
+            GitHub answered with something that is not a release list.
+          enum: [upToDate, available, unknown, unreachable, rejected]
+        current: { type: string }
+        latest: { type: string }
+        releaseUrl: { type: string }
+        publishedAt: { type: string, format: date-time }
+        checkedAt: { type: string, format: date-time }
+    BudgetLine:
+      type: object
+      description: >-
+        One daily token limit. override is what this team or member set for
+        itself (null: it follows the default; 0: no limit). default is what it
+        follows, effective what is in force now (0 means none), usedToday what
+        was spent since local midnight.
+      required: [override, default, effective, limitedBy, ceiling, usedToday]
+      properties:
+        override: { type: integer, format: int64, nullable: true }
+        default: { type: integer, format: int64 }
+        effective: { type: integer, format: int64 }
+        limitedBy:
+          type: string
+          description: >-
+            What the effective limit comes from: none (no limit), default (the
+            settings), own (set on this team or member) or team (a member held
+            to its team's limit).
+          enum: [none, default, own, team]
+        ceiling:
+          type: integer
+          format: int64
+          description: The most a member may set for itself, its team's limit; 0 when the team has none.
+        usedToday: { type: integer, format: int64 }
+    MemberBudget:
+      allOf:
+        - $ref: "#/components/schemas/BudgetLine"
+        - type: object
+          required: [botId]
+          properties:
+            botId: { type: string }
+    TeamBudget:
+      type: object
+      required: [team, members]
+      properties:
+        team:
+          $ref: "#/components/schemas/BudgetLine"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberBudget"
+    BudgetLimitRequest:
+      type: object
+      required: [requestId, limit]
+      properties:
+        requestId: { type: string, format: uuid }
+        limit: { type: integer, format: int64, nullable: true, minimum: 0 }
+    BudgetLimitResult:
+      type: object
+      required: [limit, clamped]
+      properties:
+        limit: { type: integer, format: int64, nullable: true }
+        clamped:
+          type: integer
+          description: How many members had a limit above the team's, or none, and were brought down to the team's.
+    BudgetResetResult:
+      type: object
+      required: [reset]
+      properties:
+        reset: { type: boolean }
     AvatarCatalog:
       type: object
       required: [series, status]
@@ -3026,6 +4714,10 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt:
+          type: string
+          enum: [always, smart, never]
+          description: When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
     SettingsPatch:
       type: object
       properties:
@@ -3040,6 +4732,7 @@ components:
         budgetScope: { type: string, enum: ["", bot, team] }
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
+        modelSwitchPrompt: { type: string, enum: [always, smart, never] }
     Snapshot:
       type: object
       required: [seq, instanceId, settings, teams, engine]
@@ -3104,14 +4797,19 @@ components:
         revision: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         lastMessage: { $ref: "#/components/schemas/MessagePreview" }
+        lastRunStatus:
+          type: string
+          enum: [completed, failed, interrupted, ""]
+          description: How the member's latest finished run ended; only team listings fill it.
     MessagePreview:
       type: object
-      description: The start of the latest message between the user and a member, for the team list.
+      description: The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
       required: [kind, text, createdAt]
       properties:
-        kind: { type: string, enum: [user, assistant] }
+        kind: { type: string, enum: [user, assistant, system, collaboration] }
         text: { type: string }
         createdAt: { type: string, format: date-time }
+        senderBotId: { type: string, description: Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user. }
     TeamWithBots:
       type: object
       required: [team, bots]
@@ -3145,7 +4843,7 @@ components:
         teamId: { type: string }
         requesterBotId: { type: string }
         runId: { type: string }
-        type: { type: string, enum: [native_tool, recovery, chain] }
+        type: { type: string, enum: [native_tool, recovery, chain, budget] }
         method: { type: string }
         summary: { type: string }
         reason: { type: string }
@@ -3202,7 +4900,7 @@ components:
         seq: { type: integer }
         kind:
           type: string
-          enum: [reasoning, command, file_change, tool, web_search, plan, message, agent, diff, notice, retry]
+          enum: [reasoning, command, file_change, tool, web_search, plan, message, agent, diff, compaction, notice, retry]
           description: The engine's step kinds plus CoBot's notice (engine error/warning) and retry (reconnect attempt).
         status:
           type: string
@@ -3210,7 +4908,12 @@ components:
         detail:
           type: object
           additionalProperties: true
-          description: Kind-specific payload.
+          description: |
+            Kind-specific payload. New file_change changes carry additions,
+            deletions, statsComplete, binary and diffTruncated computed before
+            storage clipping. New diff steps also carry changes (file metadata
+            with byte start/end offsets), filesComplete and statsComplete.
+            Missing completeness fields on older records mean unknown, not true.
         startedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     RunWithSteps:
@@ -3268,3 +4971,97 @@ components:
             properties:
               effort: { type: string }
               description: { type: string }
+    WorkspaceChangeFile:
+      type: object
+      required: [path, kind, additions, deletions, statsComplete, binary, diffTruncated]
+      properties:
+        path: { type: string }
+        kind: { type: string, enum: [add, update, delete] }
+        movePath: { type: string }
+        additions: { type: integer }
+        deletions: { type: integer }
+        statsComplete: { type: boolean, description: Missing historical counters are never inferred to be exact. }
+        binary: { type: boolean }
+        diffTruncated: { type: boolean }
+    WorkspaceChangeRun:
+      type: object
+      required: [id, botId, status, startedAt, endedAt, source, fileCount, filesComplete, additions, deletions, statsComplete]
+      properties:
+        id: { type: string }
+        botId: { type: string }
+        status: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        source: { type: string, enum: [turn_diff, file_change] }
+        fileCount: { type: integer }
+        filesComplete: { type: boolean }
+        additions: { type: integer }
+        deletions: { type: integer }
+        statsComplete: { type: boolean }
+    WorkspaceChangeRunsPage:
+      type: object
+      required: [runs, nextCursor]
+      properties:
+        runs:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        nextCursor: { type: string }
+    WorkspaceChangeFilesPage:
+      type: object
+      required: [run, files, nextCursor]
+      properties:
+        run: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceChangeFile" }
+        nextCursor: { type: string }
+    WorkspaceChangeDiff:
+      type: object
+      required: [run, file, diff, diffTruncated]
+      properties:
+        run: { $ref: "#/components/schemas/WorkspaceChangeRun" }
+        file: { $ref: "#/components/schemas/WorkspaceChangeFile" }
+        diff: { type: string }
+        diffTruncated: { type: boolean }
+    WorkspaceLatexProject:
+      type: object
+      required: [candidates, suggested, truncated, available]
+      properties:
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceFile" }
+        suggested: { type: string }
+        truncated: { type: boolean }
+        available: { type: boolean }
+    WorkspaceLatexResult:
+      type: object
+      required: [success, log, logTruncated, main]
+      properties:
+        success: { type: boolean }
+        log: { type: string, maxLength: 131072 }
+        logTruncated: { type: boolean }
+        main: { type: string }
+        pdf: { type: string, format: byte }
+        errorKey: { type: string }
+    WorkspaceFile:
+      type: object
+      required: [path, name, kind, size, modifiedAt, version]
+      properties:
+        path: { type: string, description: Canonical path relative to the workspace root. }
+        name: { type: string }
+        kind: { type: string, enum: [directory, text, markdown, html, svg, image, pdf, audio, video, document, spreadsheet, presentation, notebook, latex, binary, blocked] }
+        size: { type: integer, format: int64 }
+        modifiedAt: { type: string, format: date-time }
+        version: { type: string }
+        line: { type: integer }
+        column: { type: integer }
+        endLine: { type: integer }
+    WorkspaceDirectory:
+      type: object
+      required: [path, entries]
+      properties:
+        path: { type: string }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/WorkspaceFile" }
+        nextCursor: { type: string }

@@ -336,7 +336,7 @@ func TestProviderPresetsCarryTheirDialectAndKeyPatterns(t *testing.T) {
 		}
 		seen[p.ID] = true
 		for _, e := range p.Endpoints {
-			if e.Dialect != domain.DialectOpenAIResponses && e.Dialect != domain.DialectAnthropicMessages {
+			if e.Dialect != domain.DialectOpenAIResponses {
 				t.Fatalf("preset %s declares an unknown dialect: %q", p.ID, e.Dialect)
 			}
 		}
@@ -351,8 +351,9 @@ func TestProviderPresetsCarryTheirDialectAndKeyPatterns(t *testing.T) {
 }
 
 func TestDetectProviderFromKeyNeverGuesses(t *testing.T) {
-	if got := DetectProviderFromKey("sk-ant-api03-" + strings.Repeat("A", 92)); got != "anthropic" {
-		t.Fatalf("Anthropic key not recognised: %q", got)
+	// An Anthropic key is no longer a vendor CoBot knows.
+	if got := DetectProviderFromKey("sk-ant-api03-" + strings.Repeat("A", 92)); got != "" {
+		t.Fatalf("an Anthropic key was guessed: %q", got)
 	}
 	if got := DetectProviderFromKey("sk-or-v1-" + strings.Repeat("a", 64)); got != "openrouter" {
 		t.Fatalf("OpenRouter key not recognised: %q", got)
@@ -442,11 +443,15 @@ func TestProbeProviderRefusesAProviderWithNoOpenAIEndpoint(t *testing.T) {
 	ctx := context.Background()
 	a := providerTestApp(t, &fakeBinder{})
 
+	// The stored state is arranged directly in the store, without
+	// validation: a provider left without any endpoint exists only as the
+	// leftover of the migration that removed the Claude dialect, and it must
+	// refuse to be probed instead of pretending to check anything.
 	p := testProvider()
-	p.Endpoints = []domain.ProviderEndpoint{
-		{Dialect: domain.DialectAnthropicMessages, BaseURL: "https://api.deepseek.com/anthropic"},
-	}
 	if _, err := a.SaveProvider(ctx, p, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DB.ExecContext(ctx, `UPDATE model_providers SET endpoints_json = '[]' WHERE id = ?`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.ProbeProvider(ctx, "cobot_deepseek"); err == nil {
@@ -565,5 +570,37 @@ func TestRebindProvidersHandsStoredKeyProvidersToTheEngineAgain(t *testing.T) {
 	a.RebindProviders(ctx)
 	if len(binder.bound) != 1 || binder.bound[0].ID != "cobot_deepseek" {
 		t.Fatalf("bound after rebind = %+v, want only the key provider", binder.bound)
+	}
+}
+
+func TestAThinkingLevelReachesOnlyTheModelsThatDeclaredIt(t *testing.T) {
+	a := providerTestApp(t, newFakeBinder())
+	ctx := context.Background()
+	gateway := testProvider()
+	gateway.Models = []domain.ProviderModel{
+		{ID: "plain"},
+		{ID: "thinker", SupportedEfforts: []string{"low", "high"}},
+	}
+	if _, err := a.SaveProvider(ctx, gateway, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name   string
+		choice ModelChoice
+		model  string
+		effort string
+		want   string
+	}{
+		{"no level set", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "", ""},
+		{"a gateway model that declared nothing gets the defaults", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "high", "high"},
+		{"but not a level beyond them", ModelChoice{ProviderID: gateway.ID, Model: "plain"}, "plain", "xhigh", ""},
+		{"a model that lists the level", ModelChoice{ProviderID: gateway.ID, Model: "thinker"}, "thinker", "high", "high"},
+		{"a model that does not list this level", ModelChoice{ProviderID: gateway.ID, Model: "thinker"}, "thinker", "ultra", ""},
+		{"the engine's own account", ModelChoice{}, "gpt", "ultra", "ultra"},
+		{"a provider that is gone", ModelChoice{ProviderID: "gone", Model: "x"}, "x", "high", ""},
+	} {
+		if got := a.effortFor(ctx, c.choice, c.model, c.effort); got != c.want {
+			t.Errorf("%s: effort = %q, want %q", c.name, got, c.want)
+		}
 	}
 }

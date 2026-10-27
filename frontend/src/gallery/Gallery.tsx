@@ -12,6 +12,7 @@ import Foundations from './Foundations';
 import NavigationOverlays from './NavigationOverlays';
 import Patterns from './Patterns';
 import TeamConversation from './TeamConversation';
+import ChatPatterns from './ChatPatterns';
 import { Rules } from './parts';
 
 const TOC: Array<[string, string, Array<[string, string]>]> = [
@@ -101,7 +102,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
                     '按钮形状：页面、设置、表单用 rounded；会话里的卡片和浮动卡片（审批、提问）用 pill，答复按钮靠右，主要的放最右。',
                     '图标从 Icons 按意思取（Icons.team、Icons.delete），一个意思一个图标。',
                     '会话里提到成员时用“头像 + 名字”；RoleChip 只用在放不下头像的紧凑场合。',
-                    '侧栏开合用 PanelToggle：同一个按钮、同一个位置、同一对图标；桌面端放在 AppTitleBar 两端，网页端放在会话标题行两端。',
+                    '侧栏开合用 PanelToggle：同一个按钮、同一个位置、同一对图标；Logo 只放在主导航主页按钮上方；模式切换固定在二级菜单右上角，开关固定在会话区左上角，网页与桌面保持一致。',
                     '只有图标的按钮必须有 label；所有文字走 i18n，两个语言包键名一致。',
                     '机器的值（路径、ID、数字、命令）用等宽字体（mono）。',
                     '改完界面后：重新生成本画廊（npm run gallery），并在四个主题、深浅两种模式下看一遍。',
@@ -114,6 +115,7 @@ export default function Gallery({ generatedAt }: { generatedAt: string }) {
             <NavigationOverlays />
             <FeedbackData />
             <TeamConversation />
+            <ChatPatterns />
             <Patterns />
           </main>
         </div>

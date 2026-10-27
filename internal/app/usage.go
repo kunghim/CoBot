@@ -167,48 +167,15 @@ const reserveTurns = 5
 // BudgetPause describes why new turns for a bot are held.
 type BudgetPause struct {
 	Reason string // exceeded | usage_unknown | reserve
-}
-
-// budgetPaused evaluates the configured budget against the ledger. With no
-// budget configured nothing is paused (the default). An unknown usage row in
-// the scope pauses too: a budget cannot be trusted without knowing the spend,
-// and the product says so instead of guessing. The sum may overshoot
-// under concurrency; no precise hard cap is promised.
-func (a *App) budgetPaused(ctx context.Context, teamID, botID string, settings domain.Settings) (*BudgetPause, error) {
-	if settings.BudgetScope == domain.BudgetScopeNone || settings.BudgetTokens <= 0 {
-		return nil, nil
-	}
-	scopeBot := ""
-	if settings.BudgetScope == domain.BudgetScopeBot {
-		scopeBot = botID
-	}
-	billable, unknown, err := sqlite.SumUsage(ctx, a.DB, teamID, scopeBot)
-	if err != nil {
-		return nil, err
-	}
-	if unknown > 0 {
-		return &BudgetPause{Reason: "usage_unknown"}, nil
-	}
-	if billable >= settings.BudgetTokens {
-		return &BudgetPause{Reason: "exceeded"}, nil
-	}
-	// A turn cannot be stopped once it runs, so a new one only starts when
-	// what is left covers about what this member's recent turns cost. It is
-	// an estimate: a turn may still cost more than its predecessors.
-	estimate, _, err := sqlite.AverageTurnUsage(ctx, a.DB, botID, reserveTurns)
-	if err != nil {
-		return nil, err
-	}
-	if estimate > 0 && billable+estimate > settings.BudgetTokens {
-		return &BudgetPause{Reason: "reserve"}, nil
-	}
-	return nil, nil
+	Scope  string // team | bot: whose limit it was
 }
 
 // ResumeBudgetPausedBots re-wakes every bot that still has queued work after
 // a settings change, so fixing or removing a budget continues exactly the
 // deliveries it held back.
 func (a *App) ResumeBudgetPausedBots(ctx context.Context) {
+	// A card about a limit that no longer holds anyone has nothing left to ask.
+	a.closeFreedBudgetCards(ctx)
 	if a.Scheduler == nil {
 		return
 	}

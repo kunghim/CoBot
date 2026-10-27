@@ -40,7 +40,7 @@ func TestRerunFromAcceptedDelivery(t *testing.T) {
 		t.Fatalf("reconcile: %v", err)
 	}
 	decision := findRecoveryDecision(t, h, team.ID, runID)
-	if _, err := h.app.DecideApproval(ctx, h.user, decision.ID, domain.RecoveryOptionRerun, "", decision.Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, decision.ID, domain.RecoveryOptionRerun, "", decision.Revision, nil); err != nil {
 		t.Fatalf("rerun decision: %v", err)
 	}
 	requeued, err := sqlite.GetDelivery(ctx, h.app.DB, deliveryID)
@@ -191,7 +191,7 @@ func TestDecisionKeptWhenReplyFails(t *testing.T) {
 	// The RPC delivery fails; the decision must still stand, truthfully
 	// reporting that nothing reached the engine.
 	fake.ReplyErr = errors.New("rpc connection lost")
-	decided, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
+	decided, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0, nil)
 	if err != nil {
 		t.Fatalf("decide: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestDecisionKeptWhenReplyFails(t *testing.T) {
 		t.Fatalf("response = %q, want unknown after a failed reply", decided.ResponseState)
 	}
 	// Exactly once: the second decision conflicts.
-	if _, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "decline", "", 0); err == nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "decline", "", 0, nil); err == nil {
 		t.Fatal("second decision must conflict")
 	}
 	fake.ReplyErr = nil
@@ -229,7 +229,7 @@ func TestDecidedHistorySurvivesEngineExit(t *testing.T) {
 		return len(items) == 1
 	})
 	pending, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
-	decided, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0)
+	decided, err := h.app.DecideApproval(ctx, h.user, pending[0].ID, "accept", "", 0, nil)
 	if err != nil {
 		t.Fatalf("decide: %v", err)
 	}

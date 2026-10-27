@@ -20,7 +20,7 @@ import (
 )
 
 // controlServer is the profile-wide app-server used only for account and
-// model operations (login coordinator). Business turns never run on it; it
+// model operations and read-only filesystem invalidation. Business turns never run on it; it
 // shares the environment's private CODEX_HOME so every team reuses one login.
 type controlServer struct {
 	mu         sync.Mutex
@@ -71,15 +71,6 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		return info
 	}
 	info.Version = version
-	if !codex.VersionSupported(version) {
-		info.Status = "error"
-		info.ErrorKey = "error.engine.version_unsupported"
-		if runtime.GOOS == "darwin" {
-			info.ErrorKey = "error.engine.version_unsupported_macos"
-		}
-		a.cacheEngineStatus(info)
-		return info
-	}
 	probe := codex.Probe(ctx, binary, version)
 	info.Protocol = probe.Protocol
 	info.Capabilities = probe.Capabilities
@@ -280,6 +271,8 @@ func (a *App) control(ctx context.Context) (*codex.Server, error) {
 
 // ShutdownControl stops the profile-wide control server during core exit.
 func (a *App) ShutdownControl(ctx context.Context) error {
+	// Preview processes are the core's children; they must not outlive it.
+	a.stopAllPreviews()
 	a.engineControlMu.Lock()
 	control := a.engineControl
 	a.engineControl = nil

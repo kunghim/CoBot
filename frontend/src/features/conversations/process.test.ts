@@ -5,7 +5,7 @@ import { buildTimeline } from './ConversationView';
 import { messageText } from './delivery';
 import { isExchange, taskCardOf } from './ExchangeLine';
 import { linkTarget } from './links';
-import { describeStep, displayCommand, durationPhrase, runPhase, visibleSteps } from './steps';
+import { describeStep, displayCommand, durationPhrase, runPhase, isPartOfReply, turnBlocks, visibleSteps, workNeedsAttention, workSummary } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({
   id: 's', runId: 'r1', teamId: 't', botId: 'b', seq: 1, kind: 'command', status: 'completed',
@@ -169,6 +169,10 @@ describe('exchange lines', () => {
   const base = { id: 'm', teamId: 't', createdAt: '2026-10-17T10:00:00Z' };
   it('treats member messages, task assignments and review notices as exchanges', () => {
     expect(isExchange({ ...base, botId: 'fe', kind: 'collaboration', sourceBotId: 'lead', blocks: [] } as Message)).toBe(true);
+    // A note the product addresses to its own sender (the cancelled-
+    // requirement record in the project manager's conversation) is a
+    // record, not an exchange with itself.
+    expect(isExchange({ ...base, botId: 'lead', kind: 'collaboration', sourceBotId: 'lead', blocks: [] } as Message)).toBe(false);
     const assignment = { ...base, botId: 'fe', kind: 'system', blocks: [{ type: 'text', text: '你被指派了任务…' }, { type: 'task', text: JSON.stringify({ taskId: 't1', title: '做页面' }) }] } as Message;
     expect(isExchange(assignment)).toBe(true);
     expect(isExchange({ ...base, botId: 'lead', kind: 'system', sourceBotId: 'fe', blocks: [{ type: 'text', text: '提交验收' }] } as Message)).toBe(true);
@@ -190,5 +194,65 @@ describe('task assignments', () => {
     const legacy = taskCardOf([{ type: 'text', text: '你被指派了任务：登录页\n任务 ID：task-9\n详细要求：做表单\n完成标准：能登录\n且能退出' }]);
     expect(legacy).toEqual({ title: '登录页', taskId: 'task-9' });
     expect(taskCardOf([{ type: 'text', text: '普通系统消息' }])).toBeNull();
+  });
+});
+
+describe('a turn read in the order it happened', () => {
+  const said = (id: string, text: string) => step({ id, kind: 'message', detail: { text } });
+  it('keeps what was said and the work between the sayings in order, work grouped', () => {
+    const steps = [said('m1', '我先看看'), step({ id: 'c1' }), step({ id: 'c2' }), said('m2', '看完了'), step({ id: 'f1', kind: 'file_change' }), said('m3', '改好了')];
+    expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : block.steps.map((s) => s.id).join('+')))).toEqual(['m1', 'c1+c2', 'm2', 'f1', 'm3']);
+  });
+  it('splits a stretch when the kind changes, and lets uncounted steps follow along', () => {
+    const steps = [
+      step({ id: 'c1' }),
+      step({ id: 'c2' }),
+      step({ id: 'f1', kind: 'file_change' }),
+      step({ id: 'c3' }),
+      step({ id: 't1', kind: 'tool' }),
+      step({ id: 'r1', kind: 'reasoning', detail: { text: '想想' } }),
+      step({ id: 'n1', kind: 'notice', detail: { level: 'warning', message: '慢' } }),
+      step({ id: 't2', kind: 'tool' }),
+    ];
+    expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : `${block.of}:${block.steps.map((s) => s.id).join('+')}`))).toEqual([
+      'command:c1+c2',
+      'file_change:f1',
+      'command:c3',
+      'tool:t1+r1+n1+t2',
+    ]);
+  });
+  it('opens a fresh stretch after a saying, even of the same kind', () => {
+    const steps = [step({ id: 'c1' }), said('m1', '说一下'), step({ id: 'c2' })];
+    expect(turnBlocks(steps).map((block) => (block.kind === 'text' ? block.step.id : block.steps.map((s) => s.id).join('+')))).toEqual(['c1', 'm1', 'c2']);
+  });
+  it('says each stretch of work in a line', () => {
+    expect(workSummary([step({ id: 'a' }), step({ id: 'b' }), step({ id: 'c', kind: 'file_change' })])).toEqual([
+      { key: 'conversation.process.group.command', params: { count: 2 } },
+      { key: 'conversation.process.group.file_operation', params: { count: 1 } },
+    ]);
+    expect(workSummary([step({ kind: 'diff' })])).toEqual([{ key: 'conversation.process.group.other', params: { count: 1 } }]);
+  });
+  it('counts unique file paths across file change events', () => {
+    expect(workSummary([step({ kind: 'file_change', detail: { changes: [{ path: 'a' }, { path: 'b' }] } }), step({ kind: 'file_change', detail: { changes: [{ path: 'a' }] } })])).toEqual([{ key: 'conversation.process.group.file_change', params: { count: 2 } }]);
+  });
+  it('leaves open the work that went wrong', () => {
+    expect(workNeedsAttention([step({ status: 'completed' })])).toBe(false);
+    expect(workNeedsAttention([step({ status: 'failed' })])).toBe(true);
+    expect(workNeedsAttention([step({ kind: 'notice' })])).toBe(true);
+  });
+  it('does not say the reply twice', () => {
+    const steps = [said('m1', '我先看看'), step({ id: 'c1' }), said('m2', '看完了，结果是 42')];
+    expect(visibleSteps(steps, undefined, '看完了，结果是 42').map((s) => s.id)).toEqual(['m1', 'c1']);
+    // Nothing to compare with while the turn runs.
+    expect(visibleSteps(steps, undefined).map((s) => s.id)).toEqual(['m1', 'c1', 'm2']);
+  });
+  it('hides only what the reply is made of, not a short word it happens to contain', () => {
+    expect(isPartOfReply('好', '好')).toBe(true);
+    expect(isPartOfReply('第一点', '第一点\n\n第二点')).toBe(true);
+    expect(isPartOfReply('第二点', '第一点\n\n第二点')).toBe(true);
+    expect(isPartOfReply('第二点', '第一点\n\n第二点\n\n第三点')).toBe(true);
+    expect(isPartOfReply('好', '好的，已经改好了')).toBe(false);
+    const steps = [{ ...step({ id: 'm1', kind: 'message', detail: { text: '好' } }) }, step({ id: 'c1' })];
+    expect(visibleSteps(steps, undefined, '好的，已经改好了').map((s) => s.id)).toEqual(['m1', 'c1']);
   });
 });

@@ -2,8 +2,9 @@
 // screen readers. Errors sit under the field they are about and say how to
 // fix it; saving succeeded is announced by a toast, not next to the field.
 import { createContext, useContext, useId, type ReactNode } from 'react';
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert, Info } from 'lucide-react';
 import { cx } from './foundation';
+import { Tooltip } from './Overlay';
 
 interface FieldContext {
   id: string;
@@ -21,13 +22,18 @@ export function useField(): FieldContext | null {
 export function Field({
   label,
   hint,
+  info,
   error,
   required = false,
   children,
   className,
 }: {
   label: ReactNode;
+  /** A hint the reader needs in plain sight; it sits under the control. */
   hint?: ReactNode;
+  /** A secondary note (units, defaults, provenance): it folds into an info
+   * icon by the label, shown on hover or keyboard focus. */
+  info?: ReactNode;
   error?: ReactNode;
   required?: boolean;
   children: ReactNode;
@@ -40,8 +46,19 @@ export function Field({
   return (
     <Context.Provider value={{ id, describedBy, invalid: !!error }}>
       <div className={cx('space-y-1.5', className)}>
-        <label htmlFor={id} className="block text-sm font-medium text-neutral-800 dark:text-neutral-100">
-          {label}
+        <label htmlFor={id} className="flex items-center gap-1 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+          <span>{label}</span>
+          {info && (
+            <Tooltip content={info}>
+              <button
+                type="button"
+                aria-label={typeof info === 'string' ? info : undefined}
+                className="rounded text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:text-neutral-700 dark:hover:text-neutral-200 dark:focus-visible:text-neutral-200"
+              >
+                <Info size={13} aria-hidden />
+              </button>
+            </Tooltip>
+          )}
           {required && <span className="ml-0.5 text-red-600" aria-hidden>*</span>}
         </label>
         {children}

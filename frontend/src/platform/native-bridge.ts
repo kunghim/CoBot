@@ -11,6 +11,11 @@ interface DesktopBridge {
   OpenDirectory(): Promise<string>;
   /** Opens official sign-in in the system default browser. */
   OpenLoginURL(url: string): Promise<void>;
+  /** Opens a page of the project's own repository in the default browser. */
+  OpenProjectURL(url: string): Promise<void>;
+  /** Opens an http(s) address in the default browser, where the user's own
+   * tabs live. */
+  OpenExternalURL(url: string): Promise<void>;
   /** Asks the host to quit the application. */
   Quit(): Promise<void>;
 }
@@ -22,4 +27,25 @@ interface BridgeWindow {
 export function desktopBridge(): DesktopBridge | null {
   const w = window as unknown as BridgeWindow;
   return w.go?.desktop?.Bridge ?? null;
+}
+
+/**
+ * Opens a page of the project in the user's browser. The desktop shell hands it
+ * to the system; a browser tab simply follows the link.
+ */
+export function openProjectPage(url: string): void {
+  const bridge = desktopBridge();
+  if (bridge) void bridge.OpenProjectURL(url).catch(() => undefined);
+  else window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * Opens an http(s) address the user is looking at in their own browser: the
+ * desktop shell hands it to the system default browser, a browser tab
+ * follows the link itself.
+ */
+export function openExternal(url: string): void {
+  const bridge = desktopBridge();
+  if (bridge) void bridge.OpenExternalURL(url).catch(() => undefined);
+  else window.open(url, '_blank', 'noopener,noreferrer');
 }

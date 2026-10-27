@@ -24,6 +24,9 @@ import (
 type ServerOptions struct {
 	Binary    string   // resolved codex executable
 	ExtraArgs []string // e.g. -c key=value overrides
+	// Catalog is the model catalog the process is started with, when it is
+	// (ExtraArgs does not have to carry it).
+	Catalog   ClientCatalog
 	Cwd       string   // team working directory (startup cwd = writable root)
 	Env       []string // full environment for the child; nil inherits ours
 	Client    ClientInfo
@@ -48,9 +51,14 @@ type Server struct {
 	closed    bool
 	cwd       string
 	fileItems map[nativeItemKey][]engine.FileChange
+	watches   map[string]chan struct{}
 	waitOnce  sync.Once
 	waitDone  chan struct{}
 	waitErr   error
+
+	// catalog is the fingerprint of the model catalog this process was
+	// started with; empty when it knows only the engine's own models.
+	catalog string
 
 	loaded map[string]bool   // threads this app-server has loaded
 	phases map[string]string // agent message item -> phase, while it streams
@@ -117,6 +125,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		opts.Logger = slog.Default()
 	}
 	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
+	args = append(args, opts.Catalog.CatalogArgs()...)
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = opts.Cwd
@@ -169,6 +178,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		cwd:       opts.Cwd,
 		fileItems: map[nativeItemKey][]engine.FileChange{},
 		callbacks: opts.Callbacks,
+		catalog:   opts.Catalog.Fingerprint,
 	}
 	s.trace, s.tracePeer, s.traceStderr = opts.Trace, peer, stderrLines
 	s.client = NewClient(stdin, stdout, ClientHooks{
@@ -182,6 +192,9 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	defer cancel()
 	if err := s.client.Call(handshakeCtx, "initialize", InitializeParams{
 		ClientInfo: opts.Client,
+		// thread/resume.excludeTurns is gated by this capability, including
+		// when a chat resumes a thread still loaded in the same process.
+		Capabilities: &InitializeCapabilities{ExperimentalAPI: true},
 	}, nil); err != nil {
 		s.kill()
 		s.waitProcess()
@@ -198,13 +211,20 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 
 func (s *Server) handleRequest(req InboundRequest) {
 	switch req.Method {
+	case "item/tool/requestUserInput":
+		if s.callbacks.OnInput == nil {
+			_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
+			return
+		}
 	case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval":
 		// Only verified native contracts become actionable product cards.
 	case "mcpServer/elicitation/request":
-		// MCP forms/URL authentication are not command approvals. This build
-		// cannot render them, so answer with the verified cancellation shape.
-		_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
-		return
+		// An MCP form or URL authentication becomes a card like the others;
+		// a build that cannot show it cancels instead of hanging the server.
+		if s.callbacks.OnApproval == nil {
+			_ = s.client.Reply(req.ID, map[string]any{"action": "cancel"})
+			return
+		}
 	default:
 		_ = s.client.ReplyError(req.ID, -32601, "CoBot does not support this server request")
 		return
@@ -220,8 +240,13 @@ func (s *Server) handleRequest(req InboundRequest) {
 		Permissions json.RawMessage `json:"permissions"`
 		// command requests that need the network
 		NetworkApprovalContext json.RawMessage `json:"networkApprovalContext"`
+		// MCP elicitation: what the server asks, in its own words
+		Message string `json:"message"`
 	}
 	_ = json.Unmarshal(req.Params, &base)
+	if base.Reason == "" {
+		base.Reason = base.Message
+	}
 
 	var paths []string
 	var fileChange struct {
@@ -268,7 +293,11 @@ func (s *Server) handleRequest(req InboundRequest) {
 		approval.Permissions = base.Permissions
 	}
 	approval.Network = len(base.NetworkApprovalContext) > 0 && string(base.NetworkApprovalContext) != "null"
-	if s.callbacks.OnApproval == nil {
+	callback := s.callbacks.OnApproval
+	if req.Method == "item/tool/requestUserInput" {
+		callback = s.callbacks.OnInput
+	}
+	if callback == nil {
 		return
 	}
 	if req.Method == "item/fileChange/requestApproval" && len(approval.Changes) == 0 && s.client != nil {
@@ -288,7 +317,7 @@ func (s *Server) handleRequest(req InboundRequest) {
 		}()
 		return
 	}
-	s.callbacks.OnApproval(approval)
+	callback(approval)
 }
 
 func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemID string) ([]engine.FileChange, error) {
@@ -323,6 +352,9 @@ func (s *Server) inspectFileChanges(ctx context.Context, threadID, turnID, itemI
 func (s *Server) handleNotify(method string, params json.RawMessage) {
 	n := engine.Notification{Method: method, Raw: params}
 	switch method {
+	case "fs/changed":
+		s.filesystemChanged(params)
+		return
 	case "turn/diff/updated":
 		var p struct {
 			ThreadID string `json:"threadId"`
@@ -331,7 +363,7 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 		}
 		if json.Unmarshal(params, &p) == nil {
 			n.ThreadID, n.TurnID = p.ThreadID, p.TurnID
-			detail, _ := json.Marshal(map[string]any{"diff": clipHead(p.Diff, maxTurnDiff), "files": strings.Count(p.Diff, "diff --git ")})
+			detail, _ := json.Marshal(turnDiffDetail(p.Diff))
 			n.Step = &engine.Step{ID: "turn-diff", Kind: engine.StepDiff, Status: engine.StepCompleted, Detail: detail}
 		}
 	case "serverRequest/resolved":
@@ -441,8 +473,17 @@ func (s *Server) handleNotify(method string, params json.RawMessage) {
 			n.ItemID = p.ItemID
 			n.Text = p.Delta
 			n.DeltaKind, n.Delta = "message", p.Delta
-			if s.itemPhase(p.ItemID) == "commentary" {
+			// A message with no phase streams where it sits among the steps; its
+			// place as the reply is decided when the turn ends. An item the turn
+			// never announced (a gateway can stream deltas without an
+			// item/started) counts as one of those, and gets a step to stream
+			// into, so the words appear where they were said instead of piling
+			// up in the reply.
+			if phase := s.itemPhase(p.ItemID); phase == "" || phase == "commentary" || phase == noPhase {
 				n.DeltaKind, n.Phase = "commentary", "commentary"
+				if phase == "" {
+					n.Step = &engine.Step{ID: p.ItemID, Kind: engine.StepMessage, Status: engine.StepInProgress}
+				}
 			}
 		}
 	case "item/reasoning/summaryTextDelta", "item/commandExecution/outputDelta":
@@ -558,6 +599,10 @@ func secretEnvName(name string) bool {
 // Epoch identifies this app-server lifetime (leases/requests reference it).
 func (s *Server) Epoch() string { return s.epoch }
 
+// CatalogFingerprint identifies the model catalog this process was started
+// with; empty when there is none.
+func (s *Server) CatalogFingerprint() string { return s.catalog }
+
 // StartThread creates a new provider thread for one bot.
 func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
@@ -637,6 +682,25 @@ func (s *Server) UnarchiveThread(ctx context.Context, threadID string) error {
 	return nil
 }
 
+// ThreadArchiveState uses the exact persisted log path returned by Codex,
+// not the continued existence of an app-server process, as archive evidence.
+func (s *Server) ThreadArchiveState(ctx context.Context, threadID string) (bool, error) {
+	path, err := s.ThreadPath(ctx, threadID)
+	if err != nil {
+		return false, err
+	}
+	parts := strings.Split(strings.ReplaceAll(path, "\\", "/"), "/")
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] == "archived_sessions" {
+			return true, nil
+		}
+		if parts[i] == "sessions" {
+			return false, nil
+		}
+	}
+	return false, errors.New("thread archive path could not be verified")
+}
+
 // ThreadLoaded reports whether this app-server has the thread loaded: it
 // was started or resumed here and Codex has not closed or unloaded it since.
 // A loaded thread takes a new turn directly, with no resume first.
@@ -713,15 +777,22 @@ func (s *Server) RootThread(threadID string) string {
 func (s *Server) setItemPhase(itemID, phase string, done bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if done || phase == "" {
+	if done {
 		delete(s.phases, itemID)
 		return
 	}
 	if s.phases == nil {
 		s.phases = map[string]string{}
 	}
+	if phase == "" {
+		phase = noPhase
+	}
 	s.phases[itemID] = phase
 }
+
+// noPhase marks a message the engine gave no phase: it is known, unlike an
+// item that was never seen.
+const noPhase = "-"
 
 func (s *Server) itemPhase(itemID string) string {
 	s.mu.Lock()
@@ -816,6 +887,19 @@ func (s *Server) InterruptTurn(ctx context.Context, threadID, turnID string) err
 	}
 	if err := s.client.Call(ctx, "turn/interrupt", map[string]any{"threadId": threadID, "turnId": turnID}, nil); err != nil {
 		return fmt.Errorf("turn/interrupt: %w", err)
+	}
+	return nil
+}
+
+// RevertTurn replaces the thread's durable history with the part before one
+// turn, that turn included. The engine answers with the truncated thread;
+// the model never sees the reverted turns again.
+func (s *Server) RevertTurn(ctx context.Context, threadID, beforeTurnID string) error {
+	if threadID == "" || beforeTurnID == "" {
+		return errors.New("revert requires thread and turn identity")
+	}
+	if err := s.client.Call(ctx, "thread/revert", map[string]any{"threadId": threadID, "beforeTurnId": beforeTurnID}, nil); err != nil {
+		return fmt.Errorf("thread/revert: %w", err)
 	}
 	return nil
 }

@@ -214,6 +214,12 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	if question.Status != domain.QuestionOpen {
 		return domain.Question{}, domain.Conflict("error.question.already_answered", map[string]any{"status": question.Status})
 	}
+	// A recruitment request has exactly two outcomes for the leader, approve
+	// and reject; withdrawing it silently would leave the project manager
+	// waiting on a decision that never comes.
+	if question.Kind == domain.QuestionKindRecruitment {
+		return domain.Question{}, domain.InvalidRequest("error.question.recruitment_decide", nil)
+	}
 	if expectedRevision > 0 && question.Revision != expectedRevision {
 		return domain.Question{}, domain.RevisionConflict("error.question.revision_conflict", map[string]any{"expected": expectedRevision, "actual": question.Revision})
 	}
@@ -224,6 +230,16 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	defer tx.Rollback()
 	if _, err := sqlite.CancelQuestionRow(ctx, tx, questionID, expectedRevision); err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
+	}
+	// The user's ignore is recorded where the question was asked, so the
+	// conversation shows what happened to the card. The member itself is
+	// not told what to do next; it is woken as before. A confirm or
+	// acceptance question is cancelled through its requirement instead,
+	// which leaves its own record.
+	if principal.Kind == auth.KindUser && question.Kind == domain.QuestionKindAsk {
+		if err := systemNoteLocked(ctx, tx, question.TeamID, question.RequesterBotID, "你忽略了提问："+summarizeLine(question.Question)); err != nil {
+			return domain.Question{}, err
+		}
 	}
 	cancelled, err := sqlite.GetQuestion(ctx, tx, questionID)
 	if err != nil {

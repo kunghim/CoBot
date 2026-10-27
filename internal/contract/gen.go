@@ -18,8 +18,10 @@ const (
 
 // Defines values for AnswerQuestionRequestDecision.
 const (
-	AnswerQuestionRequestDecisionAccept AnswerQuestionRequestDecision = "accept"
-	AnswerQuestionRequestDecisionRevise AnswerQuestionRequestDecision = "revise"
+	AnswerQuestionRequestDecisionAccept  AnswerQuestionRequestDecision = "accept"
+	AnswerQuestionRequestDecisionApprove AnswerQuestionRequestDecision = "approve"
+	AnswerQuestionRequestDecisionReject  AnswerQuestionRequestDecision = "reject"
+	AnswerQuestionRequestDecisionRevise  AnswerQuestionRequestDecision = "revise"
 )
 
 // Defines values for AnswerQuestionRequestMode.
@@ -45,6 +47,7 @@ const (
 
 // Defines values for ApprovalType.
 const (
+	Budget     ApprovalType = "budget"
 	Chain      ApprovalType = "chain"
 	NativeTool ApprovalType = "native_tool"
 	Recovery   ApprovalType = "recovery"
@@ -58,8 +61,16 @@ const (
 
 // Defines values for AvatarRefKind.
 const (
-	Catalog AvatarRefKind = "catalog"
-	Upload  AvatarRefKind = "upload"
+	AvatarRefKindCatalog AvatarRefKind = "catalog"
+	AvatarRefKindUpload  AvatarRefKind = "upload"
+)
+
+// Defines values for BotLastRunStatus.
+const (
+	BotLastRunStatusCompleted   BotLastRunStatus = "completed"
+	BotLastRunStatusEmpty       BotLastRunStatus = ""
+	BotLastRunStatusFailed      BotLastRunStatus = "failed"
+	BotLastRunStatusInterrupted BotLastRunStatus = "interrupted"
 )
 
 // Defines values for BotStatus.
@@ -71,6 +82,60 @@ const (
 	BotStatusWaitingApproval BotStatus = "waiting_approval"
 	BotStatusWaitingInput    BotStatus = "waiting_input"
 	BotStatusWorking         BotStatus = "working"
+)
+
+// Defines values for BudgetLineLimitedBy.
+const (
+	BudgetLineLimitedByDefault BudgetLineLimitedBy = "default"
+	BudgetLineLimitedByNone    BudgetLineLimitedBy = "none"
+	BudgetLineLimitedByOwn     BudgetLineLimitedBy = "own"
+	BudgetLineLimitedByTeam    BudgetLineLimitedBy = "team"
+)
+
+// Defines values for ChatArchiveOperation.
+const (
+	ChatArchiveOperationArchive ChatArchiveOperation = "archive"
+	ChatArchiveOperationRestore ChatArchiveOperation = "restore"
+)
+
+// Defines values for ChatNavigationGrouping.
+const (
+	ChatNavigationGroupingMerged   ChatNavigationGrouping = "merged"
+	ChatNavigationGroupingSections ChatNavigationGrouping = "sections"
+)
+
+// Defines values for ChatNavigationSort.
+const (
+	ChatNavigationSortManual ChatNavigationSort = "manual"
+	ChatNavigationSortRecent ChatNavigationSort = "recent"
+)
+
+// Defines values for ChatNavigationInputAction.
+const (
+	ChatNavigationInputActionCreate      ChatNavigationInputAction = "create"
+	ChatNavigationInputActionDelete      ChatNavigationInputAction = "delete"
+	ChatNavigationInputActionPreferences ChatNavigationInputAction = "preferences"
+	ChatNavigationInputActionRename      ChatNavigationInputAction = "rename"
+	ChatNavigationInputActionReorder     ChatNavigationInputAction = "reorder"
+)
+
+// Defines values for ChatNavigationInputGrouping.
+const (
+	ChatNavigationInputGroupingMerged   ChatNavigationInputGrouping = "merged"
+	ChatNavigationInputGroupingSections ChatNavigationInputGrouping = "sections"
+)
+
+// Defines values for ChatNavigationInputSort.
+const (
+	ChatNavigationInputSortManual ChatNavigationInputSort = "manual"
+	ChatNavigationInputSortRecent ChatNavigationInputSort = "recent"
+)
+
+// Defines values for ChatSendInputPermissionMode.
+const (
+	ChatSendInputPermissionModeDefault  ChatSendInputPermissionMode = "default"
+	ChatSendInputPermissionModeFull     ChatSendInputPermissionMode = "full"
+	ChatSendInputPermissionModeReadOnly ChatSendInputPermissionMode = "read_only"
 )
 
 // Defines values for CollaborationRequestTool.
@@ -124,6 +189,14 @@ const (
 	EvidenceOutcomeResume   EvidenceOutcome = "resume"
 )
 
+// Defines values for MemberBudgetLimitedBy.
+const (
+	MemberBudgetLimitedByDefault MemberBudgetLimitedBy = "default"
+	MemberBudgetLimitedByNone    MemberBudgetLimitedBy = "none"
+	MemberBudgetLimitedByOwn     MemberBudgetLimitedBy = "own"
+	MemberBudgetLimitedByTeam    MemberBudgetLimitedBy = "team"
+)
+
 // Defines values for MessageDeliveryStatus.
 const (
 	MessageDeliveryStatusAccepted          MessageDeliveryStatus = "accepted"
@@ -138,14 +211,50 @@ const (
 const (
 	MessageKindAssistant     MessageKind = "assistant"
 	MessageKindCollaboration MessageKind = "collaboration"
+	MessageKindDocument      MessageKind = "document"
 	MessageKindSystem        MessageKind = "system"
 	MessageKindUser          MessageKind = "user"
 )
 
 // Defines values for MessagePreviewKind.
 const (
-	MessagePreviewKindAssistant MessagePreviewKind = "assistant"
-	MessagePreviewKindUser      MessagePreviewKind = "user"
+	MessagePreviewKindAssistant     MessagePreviewKind = "assistant"
+	MessagePreviewKindCollaboration MessagePreviewKind = "collaboration"
+	MessagePreviewKindSystem        MessagePreviewKind = "system"
+	MessagePreviewKindUser          MessagePreviewKind = "user"
+)
+
+// Defines values for ModelCatalogStatusSource.
+const (
+	ModelCatalogStatusSourceBundled    ModelCatalogStatusSource = "bundled"
+	ModelCatalogStatusSourceDownloaded ModelCatalogStatusSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateSource.
+const (
+	ModelCatalogUpdateSourceBundled    ModelCatalogUpdateSource = "bundled"
+	ModelCatalogUpdateSourceDownloaded ModelCatalogUpdateSource = "downloaded"
+)
+
+// Defines values for ModelCatalogUpdateState.
+const (
+	ModelCatalogUpdateStateRejected    ModelCatalogUpdateState = "rejected"
+	ModelCatalogUpdateStateUnreachable ModelCatalogUpdateState = "unreachable"
+	ModelCatalogUpdateStateUpdated     ModelCatalogUpdateState = "updated"
+)
+
+// Defines values for ModelSpecLocked.
+const (
+	ContextWindow   ModelSpecLocked = "contextWindow"
+	InputModalities ModelSpecLocked = "inputModalities"
+	MaxOutput       ModelSpecLocked = "maxOutput"
+	Thinking        ModelSpecLocked = "thinking"
+)
+
+// Defines values for ModelSpecSource.
+const (
+	ModelSpecSourceCatalog ModelSpecSource = "catalog"
+	ModelSpecSourceCustom  ModelSpecSource = "custom"
 )
 
 // Defines values for ProviderAuthMode.
@@ -162,8 +271,7 @@ const (
 
 // Defines values for ProviderEndpointDialect.
 const (
-	AnthropicMessages ProviderEndpointDialect = "anthropic-messages"
-	OpenaiResponses   ProviderEndpointDialect = "openai-responses"
+	OpenaiResponses ProviderEndpointDialect = "openai-responses"
 )
 
 // Defines values for ProviderModelStatus.
@@ -193,9 +301,10 @@ const (
 
 // Defines values for QuestionKind.
 const (
-	QuestionKindAcceptance QuestionKind = "acceptance"
-	QuestionKindConfirm    QuestionKind = "confirm"
-	QuestionKindEmpty      QuestionKind = ""
+	QuestionKindAcceptance  QuestionKind = "acceptance"
+	QuestionKindConfirm     QuestionKind = "confirm"
+	QuestionKindEmpty       QuestionKind = ""
+	QuestionKindRecruitment QuestionKind = "recruitment"
 )
 
 // Defines values for QuestionStatus.
@@ -229,6 +338,7 @@ const (
 const (
 	RunStepKindAgent      RunStepKind = "agent"
 	RunStepKindCommand    RunStepKind = "command"
+	RunStepKindCompaction RunStepKind = "compaction"
 	RunStepKindDiff       RunStepKind = "diff"
 	RunStepKindFileChange RunStepKind = "file_change"
 	RunStepKindMessage    RunStepKind = "message"
@@ -281,6 +391,13 @@ const (
 	SettingsLanguageZhCN SettingsLanguage = "zh-CN"
 )
 
+// Defines values for SettingsModelSwitchPrompt.
+const (
+	SettingsModelSwitchPromptAlways SettingsModelSwitchPrompt = "always"
+	SettingsModelSwitchPromptNever  SettingsModelSwitchPrompt = "never"
+	SettingsModelSwitchPromptSmart  SettingsModelSwitchPrompt = "smart"
+)
+
 // Defines values for SettingsTheme.
 const (
 	SettingsThemeClassic  SettingsTheme = "classic"
@@ -307,6 +424,13 @@ const (
 const (
 	SettingsPatchLanguageEn   SettingsPatchLanguage = "en"
 	SettingsPatchLanguageZhCN SettingsPatchLanguage = "zh-CN"
+)
+
+// Defines values for SettingsPatchModelSwitchPrompt.
+const (
+	SettingsPatchModelSwitchPromptAlways SettingsPatchModelSwitchPrompt = "always"
+	SettingsPatchModelSwitchPromptNever  SettingsPatchModelSwitchPrompt = "never"
+	SettingsPatchModelSwitchPromptSmart  SettingsPatchModelSwitchPrompt = "smart"
 )
 
 // Defines values for SettingsPatchTheme.
@@ -388,10 +512,10 @@ const (
 
 // Defines values for TeamStatus.
 const (
-	Active           TeamStatus = "active"
-	Archived         TeamStatus = "archived"
-	Deleted          TeamStatus = "deleted"
-	DirectoryMissing TeamStatus = "directory_missing"
+	TeamStatusActive           TeamStatus = "active"
+	TeamStatusArchived         TeamStatus = "archived"
+	TeamStatusDeleted          TeamStatus = "deleted"
+	TeamStatusDirectoryMissing TeamStatus = "directory_missing"
 )
 
 // Defines values for ToolResultStatus.
@@ -404,17 +528,90 @@ const (
 	ToolResultStatusWaiting     ToolResultStatus = "waiting"
 )
 
+// Defines values for UpdateCheckState.
+const (
+	UpdateCheckStateAvailable   UpdateCheckState = "available"
+	UpdateCheckStateRejected    UpdateCheckState = "rejected"
+	UpdateCheckStateUnknown     UpdateCheckState = "unknown"
+	UpdateCheckStateUnreachable UpdateCheckState = "unreachable"
+	UpdateCheckStateUpToDate    UpdateCheckState = "upToDate"
+)
+
+// Defines values for WorkspaceChangeFileKind.
+const (
+	WorkspaceChangeFileKindAdd    WorkspaceChangeFileKind = "add"
+	WorkspaceChangeFileKindDelete WorkspaceChangeFileKind = "delete"
+	WorkspaceChangeFileKindUpdate WorkspaceChangeFileKind = "update"
+)
+
+// Defines values for WorkspaceChangeRunSource.
+const (
+	WorkspaceChangeRunSourceFileChange WorkspaceChangeRunSource = "file_change"
+	WorkspaceChangeRunSourceTurnDiff   WorkspaceChangeRunSource = "turn_diff"
+)
+
+// Defines values for WorkspaceFileKind.
+const (
+	WorkspaceFileKindAudio        WorkspaceFileKind = "audio"
+	WorkspaceFileKindBinary       WorkspaceFileKind = "binary"
+	WorkspaceFileKindBlocked      WorkspaceFileKind = "blocked"
+	WorkspaceFileKindDirectory    WorkspaceFileKind = "directory"
+	WorkspaceFileKindDocument     WorkspaceFileKind = "document"
+	WorkspaceFileKindHtml         WorkspaceFileKind = "html"
+	WorkspaceFileKindImage        WorkspaceFileKind = "image"
+	WorkspaceFileKindLatex        WorkspaceFileKind = "latex"
+	WorkspaceFileKindMarkdown     WorkspaceFileKind = "markdown"
+	WorkspaceFileKindNotebook     WorkspaceFileKind = "notebook"
+	WorkspaceFileKindPdf          WorkspaceFileKind = "pdf"
+	WorkspaceFileKindPresentation WorkspaceFileKind = "presentation"
+	WorkspaceFileKindSpreadsheet  WorkspaceFileKind = "spreadsheet"
+	WorkspaceFileKindSvg          WorkspaceFileKind = "svg"
+	WorkspaceFileKindText         WorkspaceFileKind = "text"
+	WorkspaceFileKindVideo        WorkspaceFileKind = "video"
+)
+
 // Defines values for ListApprovalsParamsState.
 const (
 	ListApprovalsParamsStateHistory ListApprovalsParamsState = "history"
 	ListApprovalsParamsStatePending ListApprovalsParamsState = "pending"
 )
 
+// Defines values for ListChatsParamsPinned.
+const (
+	Exclude ListChatsParamsPinned = "exclude"
+	Only    ListChatsParamsPinned = "only"
+)
+
+// Defines values for ListChatsParamsSort.
+const (
+	ListChatsParamsSortArchived ListChatsParamsSort = "archived"
+	ListChatsParamsSortCreated  ListChatsParamsSort = "created"
+	ListChatsParamsSortManual   ListChatsParamsSort = "manual"
+	ListChatsParamsSortName     ListChatsParamsSort = "name"
+	ListChatsParamsSortRecent   ListChatsParamsSort = "recent"
+)
+
+// Defines values for OrganizeChatParamsAction.
+const (
+	OrganizeChatParamsActionArchive OrganizeChatParamsAction = "archive"
+	OrganizeChatParamsActionMove    OrganizeChatParamsAction = "move"
+	OrganizeChatParamsActionPin     OrganizeChatParamsAction = "pin"
+	OrganizeChatParamsActionReorder OrganizeChatParamsAction = "reorder"
+	OrganizeChatParamsActionRestore OrganizeChatParamsAction = "restore"
+	OrganizeChatParamsActionUnpin   OrganizeChatParamsAction = "unpin"
+)
+
+// Defines values for ChatRunActionParamsAction.
+const (
+	Interrupt ChatRunActionParamsAction = "interrupt"
+	Verify    ChatRunActionParamsAction = "verify"
+)
+
 // Defines values for ListQuestionsParamsStatus.
 const (
-	Answered  ListQuestionsParamsStatus = "answered"
-	Cancelled ListQuestionsParamsStatus = "cancelled"
-	Open      ListQuestionsParamsStatus = "open"
+	ListQuestionsParamsStatusAnswered  ListQuestionsParamsStatus = "answered"
+	ListQuestionsParamsStatusCancelled ListQuestionsParamsStatus = "cancelled"
+	ListQuestionsParamsStatusOpen      ListQuestionsParamsStatus = "open"
 )
 
 // Defines values for PatchTeamJSONBodyPermissionMode.
@@ -433,11 +630,11 @@ const (
 
 // Defines values for SendTeamBrowserInputJSONBodyKind.
 const (
-	Key   SendTeamBrowserInputJSONBodyKind = "key"
-	Mouse SendTeamBrowserInputJSONBodyKind = "mouse"
-	Nav   SendTeamBrowserInputJSONBodyKind = "nav"
-	Text  SendTeamBrowserInputJSONBodyKind = "text"
-	Wheel SendTeamBrowserInputJSONBodyKind = "wheel"
+	SendTeamBrowserInputJSONBodyKindKey   SendTeamBrowserInputJSONBodyKind = "key"
+	SendTeamBrowserInputJSONBodyKindMouse SendTeamBrowserInputJSONBodyKind = "mouse"
+	SendTeamBrowserInputJSONBodyKindNav   SendTeamBrowserInputJSONBodyKind = "nav"
+	SendTeamBrowserInputJSONBodyKindText  SendTeamBrowserInputJSONBodyKind = "text"
+	SendTeamBrowserInputJSONBodyKindWheel SendTeamBrowserInputJSONBodyKind = "wheel"
 )
 
 // Defines values for SetTeamBrowserTabViewportJSONBodyPreset.
@@ -448,12 +645,66 @@ const (
 	Tablet  SetTeamBrowserTabViewportJSONBodyPreset = "tablet"
 )
 
+// Defines values for ListWorkspaceChangeRunsParamsScope.
+const (
+	ListWorkspaceChangeRunsParamsScopeChat ListWorkspaceChangeRunsParamsScope = "chat"
+	ListWorkspaceChangeRunsParamsScopeTeam ListWorkspaceChangeRunsParamsScope = "team"
+)
+
+// Defines values for ListWorkspaceChangeFilesParamsScope.
+const (
+	ListWorkspaceChangeFilesParamsScopeChat ListWorkspaceChangeFilesParamsScope = "chat"
+	ListWorkspaceChangeFilesParamsScopeTeam ListWorkspaceChangeFilesParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceChangeDiffParamsScope.
+const (
+	GetWorkspaceChangeDiffParamsScopeChat GetWorkspaceChangeDiffParamsScope = "chat"
+	GetWorkspaceChangeDiffParamsScopeTeam GetWorkspaceChangeDiffParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceContentParamsScope.
+const (
+	GetWorkspaceContentParamsScopeChat GetWorkspaceContentParamsScope = "chat"
+	GetWorkspaceContentParamsScopeTeam GetWorkspaceContentParamsScope = "team"
+)
+
+// Defines values for ListWorkspaceEntriesParamsScope.
+const (
+	ListWorkspaceEntriesParamsScopeChat ListWorkspaceEntriesParamsScope = "chat"
+	ListWorkspaceEntriesParamsScopeTeam ListWorkspaceEntriesParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceFileParamsScope.
+const (
+	GetWorkspaceFileParamsScopeChat GetWorkspaceFileParamsScope = "chat"
+	GetWorkspaceFileParamsScopeTeam GetWorkspaceFileParamsScope = "team"
+)
+
+// Defines values for GetWorkspaceLatexProjectParamsScope.
+const (
+	GetWorkspaceLatexProjectParamsScopeChat GetWorkspaceLatexProjectParamsScope = "chat"
+	GetWorkspaceLatexProjectParamsScopeTeam GetWorkspaceLatexProjectParamsScope = "team"
+)
+
+// Defines values for CompileWorkspaceLatexParamsScope.
+const (
+	CompileWorkspaceLatexParamsScopeChat CompileWorkspaceLatexParamsScope = "chat"
+	CompileWorkspaceLatexParamsScopeTeam CompileWorkspaceLatexParamsScope = "team"
+)
+
+// Defines values for WatchWorkspaceParamsScope.
+const (
+	WatchWorkspaceParamsScopeChat WatchWorkspaceParamsScope = "chat"
+	WatchWorkspaceParamsScopeTeam WatchWorkspaceParamsScope = "team"
+)
+
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
 	// AnswerText The answer; for a confirmation or acceptance
 	AnswerText string `json:"answerText"`
 
-	// Decision Required for a confirmation or acceptance question, refused for any other.
+	// Decision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 	Decision         *AnswerQuestionRequestDecision `json:"decision,omitempty"`
 	ExpectedRevision int64                          `json:"expectedRevision"`
 
@@ -462,11 +713,17 @@ type AnswerQuestionRequest struct {
 	RequestId openapi_types.UUID         `json:"requestId"`
 }
 
-// AnswerQuestionRequestDecision Required for a confirmation or acceptance question, refused for any other.
+// AnswerQuestionRequestDecision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
 type AnswerQuestionRequestDecision string
 
 // AnswerQuestionRequestMode For revise on a confirmation, where the fixed work goes. rerun (default) runs the stages in between again; return_to_me comes straight back to this confirmation.
 type AnswerQuestionRequestMode string
+
+// ApplyEngineCatalogResult defines model for ApplyEngineCatalogResult.
+type ApplyEngineCatalogResult struct {
+	Busy      int `json:"busy"`
+	Restarted int `json:"restarted"`
+}
 
 // Approval defines model for Approval.
 type Approval struct {
@@ -570,8 +827,11 @@ type Bot struct {
 	Id           string     `json:"id"`
 	IsLeader     bool       `json:"isLeader"`
 
-	// LastMessage The start of the latest message between the user and a member, for the team list.
+	// LastMessage The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 	LastMessage *MessagePreview `json:"lastMessage,omitempty"`
+
+	// LastRunStatus How the member's latest finished run ended; only team listings fill it.
+	LastRunStatus *BotLastRunStatus `json:"lastRunStatus,omitempty"`
 
 	// Model The model this member chose, one its provider serves.
 	Model *string `json:"model,omitempty"`
@@ -586,6 +846,9 @@ type Bot struct {
 	TeamId      string    `json:"teamId"`
 }
 
+// BotLastRunStatus How the member's latest finished run ended; only team listings fill it.
+type BotLastRunStatus string
+
 // BotStatus defines model for Bot.Status.
 type BotStatus string
 
@@ -594,6 +857,211 @@ type BrowserViewport struct {
 	Height int   `json:"height"`
 	Mobile *bool `json:"mobile,omitempty"`
 	Width  int   `json:"width"`
+}
+
+// BudgetLimitRequest defines model for BudgetLimitRequest.
+type BudgetLimitRequest struct {
+	Limit     *int64             `json:"limit"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// BudgetLimitResult defines model for BudgetLimitResult.
+type BudgetLimitResult struct {
+	// Clamped How many members had a limit above the team's, or none, and were brought down to the team's.
+	Clamped int    `json:"clamped"`
+	Limit   *int64 `json:"limit"`
+}
+
+// BudgetLine One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+type BudgetLine struct {
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy BudgetLineLimitedBy `json:"limitedBy"`
+	Override  *int64              `json:"override"`
+	UsedToday int64               `json:"usedToday"`
+}
+
+// BudgetLineLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type BudgetLineLimitedBy string
+
+// BudgetResetResult defines model for BudgetResetResult.
+type BudgetResetResult struct {
+	Reset bool `json:"reset"`
+}
+
+// Chat defines model for Chat.
+type Chat struct {
+	ArchiveError     *string               `json:"archiveError,omitempty"`
+	ArchiveOperation *ChatArchiveOperation `json:"archiveOperation,omitempty"`
+	ArchivedAt       *string               `json:"archivedAt,omitempty"`
+	Busy             *bool                 `json:"busy,omitempty"`
+	CreatedAt        string                `json:"createdAt"`
+	Id               string                `json:"id"`
+	ManualOrder      *int64                `json:"manualOrder,omitempty"`
+	Model            string                `json:"model"`
+	PermissionMode   string                `json:"permissionMode"`
+	Pinned           *bool                 `json:"pinned,omitempty"`
+	ProviderId       string                `json:"providerId"`
+	ReasoningEffort  string                `json:"reasoningEffort"`
+	Revision         int64                 `json:"revision"`
+	SectionId        *string               `json:"sectionId,omitempty"`
+	Title            string                `json:"title"`
+	UpdatedAt        string                `json:"updatedAt"`
+	Workspace        string                `json:"workspace"`
+}
+
+// ChatArchiveOperation defines model for Chat.ArchiveOperation.
+type ChatArchiveOperation string
+
+// ChatActionInput defines model for ChatActionInput.
+type ChatActionInput struct {
+	Answers          *map[string][]string `json:"answers,omitempty"`
+	BeforeId         *string              `json:"beforeId,omitempty"`
+	ExpectedRevision *int64               `json:"expectedRevision,omitempty"`
+	OptionId         *string              `json:"optionId,omitempty"`
+	RequestId        string               `json:"requestId"`
+	SectionId        *string              `json:"sectionId,omitempty"`
+	Title            *string              `json:"title,omitempty"`
+}
+
+// ChatList defines model for ChatList.
+type ChatList struct {
+	Items      []Chat `json:"items"`
+	NextCursor string `json:"nextCursor"`
+}
+
+// ChatMessage defines model for ChatMessage.
+type ChatMessage struct {
+	ChatId    string `json:"chatId"`
+	CreatedAt string `json:"createdAt"`
+	Id        string `json:"id"`
+	Kind      string `json:"kind"`
+	RunId     string `json:"runId"`
+	Text      string `json:"text"`
+}
+
+// ChatNavigation defines model for ChatNavigation.
+type ChatNavigation struct {
+	Grouping ChatNavigationGrouping `json:"grouping"`
+	Revision int64                  `json:"revision"`
+	Sections []ChatSection          `json:"sections"`
+	Sort     ChatNavigationSort     `json:"sort"`
+}
+
+// ChatNavigationGrouping defines model for ChatNavigation.Grouping.
+type ChatNavigationGrouping string
+
+// ChatNavigationSort defines model for ChatNavigation.Sort.
+type ChatNavigationSort string
+
+// ChatNavigationInput defines model for ChatNavigationInput.
+type ChatNavigationInput struct {
+	Action           ChatNavigationInputAction    `json:"action"`
+	BeforeId         *string                      `json:"beforeId,omitempty"`
+	ExpectedRevision int64                        `json:"expectedRevision"`
+	Grouping         *ChatNavigationInputGrouping `json:"grouping,omitempty"`
+	Id               *string                      `json:"id,omitempty"`
+	Name             *string                      `json:"name,omitempty"`
+	RequestId        string                       `json:"requestId"`
+	Sort             *ChatNavigationInputSort     `json:"sort,omitempty"`
+}
+
+// ChatNavigationInputAction defines model for ChatNavigationInput.Action.
+type ChatNavigationInputAction string
+
+// ChatNavigationInputGrouping defines model for ChatNavigationInput.Grouping.
+type ChatNavigationInputGrouping string
+
+// ChatNavigationInputSort defines model for ChatNavigationInput.Sort.
+type ChatNavigationInputSort string
+
+// ChatPage defines model for ChatPage.
+type ChatPage struct {
+	Chat       Chat          `json:"chat"`
+	Messages   []ChatMessage `json:"messages"`
+	NextCursor string        `json:"nextCursor"`
+	Requests   []ChatRequest `json:"requests"`
+	Runs       []ChatRun     `json:"runs"`
+}
+
+// ChatRequest defines model for ChatRequest.
+type ChatRequest struct {
+	ChatId        string                  `json:"chatId"`
+	Decision      *string                 `json:"decision,omitempty"`
+	Id            string                  `json:"id"`
+	Method        string                  `json:"method"`
+	Options       []ApprovalOption        `json:"options"`
+	Params        *map[string]interface{} `json:"params,omitempty"`
+	Reason        string                  `json:"reason"`
+	ResponseState string                  `json:"responseState"`
+	Revision      int64                   `json:"revision"`
+	RunId         string                  `json:"runId"`
+	State         string                  `json:"state"`
+	Summary       string                  `json:"summary"`
+	Type          string                  `json:"type"`
+}
+
+// ChatRun defines model for ChatRun.
+type ChatRun struct {
+	ChatId        string     `json:"chatId"`
+	EndedAt       string     `json:"endedAt"`
+	Epoch         string     `json:"epoch"`
+	ErrorKey      string     `json:"errorKey"`
+	Id            string     `json:"id"`
+	MessageId     string     `json:"messageId"`
+	StartedAt     string     `json:"startedAt"`
+	Status        string     `json:"status"`
+	Steps         []ChatStep `json:"steps"`
+	StopRequested *bool      `json:"stopRequested,omitempty"`
+	ThreadId      string     `json:"threadId"`
+	TurnId        string     `json:"turnId"`
+}
+
+// ChatSearchResult defines model for ChatSearchResult.
+type ChatSearchResult struct {
+	ActivityAt *string `json:"activityAt,omitempty"`
+	ChatId     string  `json:"chatId"`
+
+	// Snippet Excerpt of the latest matching message; empty when only the title matched.
+	Snippet string `json:"snippet"`
+	Title   string `json:"title"`
+}
+
+// ChatSection defines model for ChatSection.
+type ChatSection struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Order int64  `json:"order"`
+}
+
+// ChatSendInput defines model for ChatSendInput.
+type ChatSendInput struct {
+	Model *string `json:"model,omitempty"`
+
+	// PermissionMode Empty keeps the chat's. Holds from this message on.
+	PermissionMode *ChatSendInputPermissionMode `json:"permissionMode,omitempty"`
+	ProviderId     *string                      `json:"providerId,omitempty"`
+
+	// ReasoningEffort Sent with a model: the thinking level for the model chosen (empty is the model's own).
+	ReasoningEffort *string `json:"reasoningEffort,omitempty"`
+	RequestId       string  `json:"requestId"`
+	Text            string  `json:"text"`
+}
+
+// ChatSendInputPermissionMode Empty keeps the chat's. Holds from this message on.
+type ChatSendInputPermissionMode string
+
+// ChatStep defines model for ChatStep.
+type ChatStep struct {
+	Detail map[string]interface{} `json:"detail"`
+	Id     string                 `json:"id"`
+	Kind   string                 `json:"kind"`
+	Seq    int64                  `json:"seq"`
+	Status string                 `json:"status"`
 }
 
 // CollaborationRequest defines model for CollaborationRequest.
@@ -627,6 +1095,15 @@ type ConversationPage struct {
 
 	// Runs Runs started between this page's messages, with their visible steps.
 	Runs []RunWithSteps `json:"runs"`
+}
+
+// EngineCatalogState How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+type EngineCatalogState struct {
+	// Active Whether a generated catalog is wanted at all.
+	Active bool `json:"active"`
+
+	// Stale Running team engines started without the catalog now wanted.
+	Stale int `json:"stale"`
 }
 
 // EngineLogin defines model for EngineLogin.
@@ -693,13 +1170,19 @@ type Evidence struct {
 	CreatedAt    time.Time `json:"createdAt"`
 
 	// Execution What the engine reported a member ran and changed while it held the card.
-	Execution   *Execution       `json:"execution,omitempty"`
-	Id          string           `json:"id"`
-	Mode        *EvidenceMode    `json:"mode,omitempty"`
-	Outcome     *EvidenceOutcome `json:"outcome,omitempty"`
-	Suggestions *string          `json:"suggestions,omitempty"`
-	Summary     string           `json:"summary"`
-	TaskId      string           `json:"taskId"`
+	Execution *Execution       `json:"execution,omitempty"`
+	Id        string           `json:"id"`
+	Mode      *EvidenceMode    `json:"mode,omitempty"`
+	Outcome   *EvidenceOutcome `json:"outcome,omitempty"`
+
+	// PreviewCommand With a runnable result
+	PreviewCommand *string `json:"previewCommand,omitempty"`
+
+	// PreviewUrl The address to open once the preview answers.
+	PreviewUrl  *string `json:"previewUrl,omitempty"`
+	Suggestions *string `json:"suggestions,omitempty"`
+	Summary     string  `json:"summary"`
+	TaskId      string  `json:"taskId"`
 }
 
 // EvidenceMode defines model for Evidence.Mode.
@@ -715,6 +1198,36 @@ type Execution struct {
 		ExitCode *int   `json:"exitCode,omitempty"`
 	} `json:"commands"`
 	Files []string `json:"files"`
+}
+
+// MemberBudget defines model for MemberBudget.
+type MemberBudget struct {
+	BotId string `json:"botId"`
+
+	// Ceiling The most a member may set for itself, its team's limit; 0 when the team has none.
+	Ceiling   int64 `json:"ceiling"`
+	Default   int64 `json:"default"`
+	Effective int64 `json:"effective"`
+
+	// LimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+	LimitedBy MemberBudgetLimitedBy `json:"limitedBy"`
+	Override  *int64                `json:"override"`
+	UsedToday int64                 `json:"usedToday"`
+}
+
+// MemberBudgetLimitedBy What the effective limit comes from: none (no limit), default (the settings), own (set on this team or member) or team (a member held to its team's limit).
+type MemberBudgetLimitedBy string
+
+// MemberSearchResult defines model for MemberSearchResult.
+type MemberSearchResult struct {
+	ActivityAt *string `json:"activityAt,omitempty"`
+	BotId      string  `json:"botId"`
+	BotName    string  `json:"botName"`
+
+	// Snippet Excerpt of the member's latest matching message.
+	Snippet  string `json:"snippet"`
+	TeamId   string `json:"teamId"`
+	TeamName string `json:"teamName"`
 }
 
 // Memory defines model for Memory.
@@ -735,24 +1248,29 @@ type Message struct {
 	CreatedAt      time.Time              `json:"createdAt"`
 	DeliveryStatus *MessageDeliveryStatus `json:"deliveryStatus,omitempty"`
 	Id             string                 `json:"id"`
-	Kind           MessageKind            `json:"kind"`
-	RequestId      *string                `json:"requestId,omitempty"`
-	RunId          *string                `json:"runId,omitempty"`
-	SourceBotId    *string                `json:"sourceBotId,omitempty"`
-	TeamId         string                 `json:"teamId"`
+
+	// Kind document is a relay-posted document (the requirement to confirm
+	Kind        MessageKind `json:"kind"`
+	RequestId   *string     `json:"requestId,omitempty"`
+	RunId       *string     `json:"runId,omitempty"`
+	SourceBotId *string     `json:"sourceBotId,omitempty"`
+	TeamId      string      `json:"teamId"`
 }
 
 // MessageDeliveryStatus defines model for Message.DeliveryStatus.
 type MessageDeliveryStatus string
 
-// MessageKind defines model for Message.Kind.
+// MessageKind document is a relay-posted document (the requirement to confirm
 type MessageKind string
 
-// MessagePreview The start of the latest message between the user and a member, for the team list.
+// MessagePreview The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
 type MessagePreview struct {
 	CreatedAt time.Time          `json:"createdAt"`
 	Kind      MessagePreviewKind `json:"kind"`
-	Text      string             `json:"text"`
+
+	// SenderBotId Who sent it
+	SenderBotId *string `json:"senderBotId,omitempty"`
+	Text        string  `json:"text"`
 }
 
 // MessagePreviewKind defines model for MessagePreview.Kind.
@@ -773,6 +1291,72 @@ type Model struct {
 	} `json:"reasoningEfforts,omitempty"`
 	Slug *string `json:"slug,omitempty"`
 }
+
+// ModelCatalogStatus defines model for ModelCatalogStatus.
+type ModelCatalogStatus struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogStatusSource `json:"source"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogStatusSource defines model for ModelCatalogStatus.Source.
+type ModelCatalogStatusSource string
+
+// ModelCatalogUpdate defines model for ModelCatalogUpdate.
+type ModelCatalogUpdate struct {
+	// Engine How the running engines stand against the model catalog now wanted (the context windows of third-party models).
+	Engine    EngineCatalogState       `json:"engine"`
+	From      *string                  `json:"from,omitempty"`
+	Models    int                      `json:"models"`
+	Source    ModelCatalogUpdateSource `json:"source"`
+	State     ModelCatalogUpdateState  `json:"state"`
+	UpdatedAt *time.Time               `json:"updatedAt,omitempty"`
+}
+
+// ModelCatalogUpdateSource defines model for ModelCatalogUpdate.Source.
+type ModelCatalogUpdateSource string
+
+// ModelCatalogUpdateState defines model for ModelCatalogUpdate.State.
+type ModelCatalogUpdateState string
+
+// ModelSpec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+type ModelSpec struct {
+	Alias     *string `json:"alias,omitempty"`
+	CatalogId *string `json:"catalogId,omitempty"`
+
+	// ContextLimit The most the catalog says the model reads; 0 when it does not know the model.
+	ContextLimit int `json:"contextLimit"`
+
+	// ContextWindow In use. The user's own number when it is below the limit
+	ContextWindow   int      `json:"contextWindow"`
+	DisplayName     string   `json:"displayName"`
+	InputModalities []string `json:"inputModalities"`
+
+	// InputOptions The kinds of input the model may be said to take.
+	InputOptions []string `json:"inputOptions"`
+
+	// Locked Fields the catalog gives and the user cannot change; the others only have limits.
+	Locked         []ModelSpecLocked `json:"locked"`
+	MaxOutput      int               `json:"maxOutput"`
+	MaxOutputLimit int               `json:"maxOutputLimit"`
+	Name           *string           `json:"name,omitempty"`
+	Source         ModelSpecSource   `json:"source"`
+	Thinking       struct {
+		DefaultEffort *string  `json:"defaultEffort,omitempty"`
+		Efforts       []string `json:"efforts"`
+		Toggle        bool     `json:"toggle"`
+	} `json:"thinking"`
+	WebSearch bool `json:"webSearch"`
+}
+
+// ModelSpecLocked defines model for ModelSpec.Locked.
+type ModelSpecLocked string
+
+// ModelSpecSource defines model for ModelSpec.Source.
+type ModelSpecSource string
 
 // Provider A model vendor or gateway the engine can call. The secret is never part of it.
 type Provider struct {
@@ -820,17 +1404,25 @@ type ProviderEndpointDialect string
 type ProviderModel struct {
 	ContextWindow *int    `json:"contextWindow,omitempty"`
 	DefaultEffort *string `json:"defaultEffort,omitempty"`
-	DisplayName   *string `json:"displayName,omitempty"`
+
+	// DisplayName The user's own name for the model
+	DisplayName *string `json:"displayName,omitempty"`
 
 	// Failure Stable machine code of the last check.
 	Failure         *string   `json:"failure,omitempty"`
 	Id              string    `json:"id"`
 	InputModalities *[]string `json:"inputModalities,omitempty"`
+	MaxOutput       *int      `json:"maxOutput,omitempty"`
 
 	// Message Human-readable detail of the last check.
-	Message          *string              `json:"message,omitempty"`
+	Message *string `json:"message,omitempty"`
+
+	// Spec What is known about a model, the model catalog and the user's entries put together. Read-only; sent back on save it is ignored.
+	Spec             *ModelSpec           `json:"spec,omitempty"`
 	Status           *ProviderModelStatus `json:"status,omitempty"`
 	SupportedEfforts *[]string            `json:"supportedEfforts,omitempty"`
+	ThinkingToggle   *bool                `json:"thinkingToggle,omitempty"`
+	WebSearch        *bool                `json:"webSearch,omitempty"`
 }
 
 // ProviderModelStatus defines model for ProviderModel.Status.
@@ -899,24 +1491,30 @@ type Question struct {
 	AnswerMessageId *string    `json:"answerMessageId,omitempty"`
 	AnswerText      *string    `json:"answerText,omitempty"`
 	AnsweredAt      *time.Time `json:"answeredAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	Id              string     `json:"id"`
 
-	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question.
-	Kind           QuestionKind   `json:"kind"`
-	Options        []string       `json:"options"`
-	Question       string         `json:"question"`
-	RequesterBotId string         `json:"requesterBotId"`
-	RequirementId  *string        `json:"requirementId,omitempty"`
-	Revision       int64          `json:"revision"`
-	RunId          *string        `json:"runId,omitempty"`
-	StageIndex     *int           `json:"stageIndex,omitempty"`
-	Status         QuestionStatus `json:"status"`
-	TaskId         *string        `json:"taskId,omitempty"`
-	TeamId         string         `json:"teamId"`
+	// CanSkipChecks A confirm stage only: a revision can come straight back to this stage, and the stages a straight return skips include one that checks the work (a review or a test). Not stored; computed from the route where the question is served.
+	CanSkipChecks *bool     `json:"canSkipChecks,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Id            string    `json:"id"`
+
+	// Kind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; '' is an ask_user question; recruitment asks the user to add members the project manager requested.
+	Kind           QuestionKind `json:"kind"`
+	Options        []string     `json:"options"`
+	Question       string       `json:"question"`
+	RequesterBotId string       `json:"requesterBotId"`
+	RequirementId  *string      `json:"requirementId,omitempty"`
+	Revision       int64        `json:"revision"`
+
+	// RoleIds A recruitment question only: the role IDs the project manager asked to add.
+	RoleIds    *[]string      `json:"roleIds,omitempty"`
+	RunId      *string        `json:"runId,omitempty"`
+	StageIndex *int           `json:"stageIndex,omitempty"`
+	Status     QuestionStatus `json:"status"`
+	TaskId     *string        `json:"taskId,omitempty"`
+	TeamId     string         `json:"teamId"`
 }
 
-// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question.
+// QuestionKind confirm is a confirm stage of a route; acceptance hands a finished requirement to the user; ” is an ask_user question; recruitment asks the user to add members the project manager requested.
 type QuestionKind string
 
 // QuestionStatus defines model for Question.Status.
@@ -962,7 +1560,11 @@ type RunStatus string
 type RunStep struct {
 	BotId string `json:"botId"`
 
-	// Detail Kind-specific payload.
+	// Detail Kind-specific payload. New file_change changes carry additions,
+	// deletions, statsComplete, binary and diffTruncated computed before
+	// storage clipping. New diff steps also carry changes (file metadata
+	// with byte start/end offsets), filesComplete and statsComplete.
+	// Missing completeness fields on older records mean unknown, not true.
 	Detail map[string]interface{} `json:"detail"`
 	Id     string                 `json:"id"`
 
@@ -999,6 +1601,13 @@ type RunWithSteps struct {
 
 // RunWithStepsStatus defines model for RunWithSteps.Status.
 type RunWithStepsStatus string
+
+// SearchResults defines model for SearchResults.
+type SearchResults struct {
+	Chats   []ChatSearchResult   `json:"chats"`
+	Members []MemberSearchResult `json:"members"`
+	Query   string               `json:"query"`
+}
 
 // SessionStats defines model for SessionStats.
 type SessionStats struct {
@@ -1040,13 +1649,16 @@ type Settings struct {
 	DefaultModel string              `json:"defaultModel"`
 
 	// DefaultProvider The model provider the profile runs with; empty means the engine's own.
-	DefaultProvider   *string          `json:"defaultProvider,omitempty"`
-	EnginePath        string           `json:"enginePath"`
-	Language          SettingsLanguage `json:"language"`
-	MemberLimit       int              `json:"memberLimit"`
-	ReviewRejectLimit int              `json:"reviewRejectLimit"`
-	Revision          int64            `json:"revision"`
-	Theme             SettingsTheme    `json:"theme"`
+	DefaultProvider *string          `json:"defaultProvider,omitempty"`
+	EnginePath      string           `json:"enginePath"`
+	Language        SettingsLanguage `json:"language"`
+	MemberLimit     int              `json:"memberLimit"`
+
+	// ModelSwitchPrompt When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+	ModelSwitchPrompt *SettingsModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
+	ReviewRejectLimit int                        `json:"reviewRejectLimit"`
+	Revision          int64                      `json:"revision"`
+	Theme             SettingsTheme              `json:"theme"`
 }
 
 // SettingsBudgetScope defines model for Settings.BudgetScope.
@@ -1057,6 +1669,9 @@ type SettingsColorMode string
 
 // SettingsLanguage defines model for Settings.Language.
 type SettingsLanguage string
+
+// SettingsModelSwitchPrompt When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+type SettingsModelSwitchPrompt string
 
 // SettingsTheme defines model for Settings.Theme.
 type SettingsTheme string
@@ -1070,12 +1685,13 @@ type SettingsPatch struct {
 	DefaultModel *string                   `json:"defaultModel,omitempty"`
 
 	// DefaultProvider The model provider to run with; must name a configured provider.
-	DefaultProvider   *string                `json:"defaultProvider,omitempty"`
-	EnginePath        *string                `json:"enginePath,omitempty"`
-	Language          *SettingsPatchLanguage `json:"language,omitempty"`
-	MemberLimit       *int                   `json:"memberLimit,omitempty"`
-	ReviewRejectLimit *int                   `json:"reviewRejectLimit,omitempty"`
-	Theme             *SettingsPatchTheme    `json:"theme,omitempty"`
+	DefaultProvider   *string                         `json:"defaultProvider,omitempty"`
+	EnginePath        *string                         `json:"enginePath,omitempty"`
+	Language          *SettingsPatchLanguage          `json:"language,omitempty"`
+	MemberLimit       *int                            `json:"memberLimit,omitempty"`
+	ModelSwitchPrompt *SettingsPatchModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
+	ReviewRejectLimit *int                            `json:"reviewRejectLimit,omitempty"`
+	Theme             *SettingsPatchTheme             `json:"theme,omitempty"`
 }
 
 // SettingsPatchBudgetScope defines model for SettingsPatch.BudgetScope.
@@ -1086,6 +1702,9 @@ type SettingsPatchColorMode string
 
 // SettingsPatchLanguage defines model for SettingsPatch.Language.
 type SettingsPatchLanguage string
+
+// SettingsPatchModelSwitchPrompt defines model for SettingsPatch.ModelSwitchPrompt.
+type SettingsPatchModelSwitchPrompt string
 
 // SettingsPatchTheme defines model for SettingsPatch.Theme.
 type SettingsPatchTheme string
@@ -1211,6 +1830,14 @@ type TeamPermissionMode string
 // TeamStatus defines model for Team.Status.
 type TeamStatus string
 
+// TeamBudget defines model for TeamBudget.
+type TeamBudget struct {
+	Members []MemberBudget `json:"members"`
+
+	// Team One daily token limit. override is what this team or member set for itself (null: it follows the default; 0: no limit). default is what it follows, effective what is in force now (0 means none), usedToday what was spent since local midnight.
+	Team BudgetLine `json:"team"`
+}
+
 // TeamWithBots defines model for TeamWithBots.
 type TeamWithBots struct {
 	Bots []Bot `json:"bots"`
@@ -1238,6 +1865,120 @@ type ToolResult struct {
 // ToolResultStatus defines model for ToolResult.Status.
 type ToolResultStatus string
 
+// UpdateCheck defines model for UpdateCheck.
+type UpdateCheck struct {
+	CheckedAt   time.Time  `json:"checkedAt"`
+	Current     string     `json:"current"`
+	Latest      *string    `json:"latest,omitempty"`
+	PublishedAt *time.Time `json:"publishedAt,omitempty"`
+	ReleaseUrl  *string    `json:"releaseUrl,omitempty"`
+
+	// State upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+	State UpdateCheckState `json:"state"`
+}
+
+// UpdateCheckState upToDate: nothing newer; available: a newer release exists; unknown: the installed build is not a release number, so it cannot be compared; unreachable: GitHub could not be reached; rejected: GitHub answered with something that is not a release list.
+type UpdateCheckState string
+
+// WorkspaceChangeDiff defines model for WorkspaceChangeDiff.
+type WorkspaceChangeDiff struct {
+	Diff          string              `json:"diff"`
+	DiffTruncated bool                `json:"diffTruncated"`
+	File          WorkspaceChangeFile `json:"file"`
+	Run           WorkspaceChangeRun  `json:"run"`
+}
+
+// WorkspaceChangeFile defines model for WorkspaceChangeFile.
+type WorkspaceChangeFile struct {
+	Additions     int                     `json:"additions"`
+	Binary        bool                    `json:"binary"`
+	Deletions     int                     `json:"deletions"`
+	DiffTruncated bool                    `json:"diffTruncated"`
+	Kind          WorkspaceChangeFileKind `json:"kind"`
+	MovePath      *string                 `json:"movePath,omitempty"`
+	Path          string                  `json:"path"`
+
+	// StatsComplete Missing historical counters are never inferred to be exact.
+	StatsComplete bool `json:"statsComplete"`
+}
+
+// WorkspaceChangeFileKind defines model for WorkspaceChangeFile.Kind.
+type WorkspaceChangeFileKind string
+
+// WorkspaceChangeFilesPage defines model for WorkspaceChangeFilesPage.
+type WorkspaceChangeFilesPage struct {
+	Files      []WorkspaceChangeFile `json:"files"`
+	NextCursor string                `json:"nextCursor"`
+	Run        WorkspaceChangeRun    `json:"run"`
+}
+
+// WorkspaceChangeRun defines model for WorkspaceChangeRun.
+type WorkspaceChangeRun struct {
+	Additions     int                      `json:"additions"`
+	BotId         string                   `json:"botId"`
+	Deletions     int                      `json:"deletions"`
+	EndedAt       time.Time                `json:"endedAt"`
+	FileCount     int                      `json:"fileCount"`
+	FilesComplete bool                     `json:"filesComplete"`
+	Id            string                   `json:"id"`
+	Source        WorkspaceChangeRunSource `json:"source"`
+	StartedAt     time.Time                `json:"startedAt"`
+	StatsComplete bool                     `json:"statsComplete"`
+	Status        string                   `json:"status"`
+}
+
+// WorkspaceChangeRunSource defines model for WorkspaceChangeRun.Source.
+type WorkspaceChangeRunSource string
+
+// WorkspaceChangeRunsPage defines model for WorkspaceChangeRunsPage.
+type WorkspaceChangeRunsPage struct {
+	NextCursor string               `json:"nextCursor"`
+	Runs       []WorkspaceChangeRun `json:"runs"`
+}
+
+// WorkspaceDirectory defines model for WorkspaceDirectory.
+type WorkspaceDirectory struct {
+	Entries    []WorkspaceFile `json:"entries"`
+	NextCursor *string         `json:"nextCursor,omitempty"`
+	Path       string          `json:"path"`
+}
+
+// WorkspaceFile defines model for WorkspaceFile.
+type WorkspaceFile struct {
+	Column     *int              `json:"column,omitempty"`
+	EndLine    *int              `json:"endLine,omitempty"`
+	Kind       WorkspaceFileKind `json:"kind"`
+	Line       *int              `json:"line,omitempty"`
+	ModifiedAt time.Time         `json:"modifiedAt"`
+	Name       string            `json:"name"`
+
+	// Path Canonical path relative to the workspace root.
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	Version string `json:"version"`
+}
+
+// WorkspaceFileKind defines model for WorkspaceFile.Kind.
+type WorkspaceFileKind string
+
+// WorkspaceLatexProject defines model for WorkspaceLatexProject.
+type WorkspaceLatexProject struct {
+	Available  bool            `json:"available"`
+	Candidates []WorkspaceFile `json:"candidates"`
+	Suggested  string          `json:"suggested"`
+	Truncated  bool            `json:"truncated"`
+}
+
+// WorkspaceLatexResult defines model for WorkspaceLatexResult.
+type WorkspaceLatexResult struct {
+	ErrorKey     *string `json:"errorKey,omitempty"`
+	Log          string  `json:"log"`
+	LogTruncated bool    `json:"logTruncated"`
+	Main         string  `json:"main"`
+	Pdf          *[]byte `json:"pdf,omitempty"`
+	Success      bool    `json:"success"`
+}
+
 // Error defines model for Error.
 type Error = ErrorEnvelope
 
@@ -1258,10 +1999,13 @@ type ListApprovalsParamsState string
 
 // DecideApprovalJSONBody defines parameters for DecideApproval.
 type DecideApprovalJSONBody struct {
-	Comment          *string            `json:"comment,omitempty"`
-	ExpectedRevision int64              `json:"expectedRevision"`
-	OptionId         string             `json:"optionId"`
-	RequestId        openapi_types.UUID `json:"requestId"`
+	Comment *string `json:"comment,omitempty"`
+
+	// Content An MCP elicitation's accepted form values, keyed by field name.
+	Content          *map[string]interface{} `json:"content,omitempty"`
+	ExpectedRevision int64                   `json:"expectedRevision"`
+	OptionId         string                  `json:"optionId"`
+	RequestId        openapi_types.UUID      `json:"requestId"`
 }
 
 // EngineLoginJSONBody defines parameters for EngineLogin.
@@ -1308,6 +2052,11 @@ type PatchBotJSONBody struct {
 	Avatar           *AvatarRef         `json:"avatar"`
 	ExpectedRevision int64              `json:"expectedRevision"`
 	RequestId        openapi_types.UUID `json:"requestId"`
+}
+
+// ResetBotBudgetJSONBody defines parameters for ResetBotBudget.
+type ResetBotBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // ListCollaborationParams defines parameters for ListCollaboration.
@@ -1363,6 +2112,46 @@ type SetBotModelJSONBody struct {
 	RequestId        openapi_types.UUID `json:"requestId"`
 }
 
+// ListChatsParams defines parameters for ListChats.
+type ListChatsParams struct {
+	Cursor   *string                `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Pinned   *ListChatsParamsPinned `form:"pinned,omitempty" json:"pinned,omitempty"`
+	Archived *bool                  `form:"archived,omitempty" json:"archived,omitempty"`
+	Sort     *ListChatsParamsSort   `form:"sort,omitempty" json:"sort,omitempty"`
+	Search   *string                `form:"search,omitempty" json:"search,omitempty"`
+	Section  *string                `form:"section,omitempty" json:"section,omitempty"`
+}
+
+// ListChatsParamsPinned defines parameters for ListChats.
+type ListChatsParamsPinned string
+
+// ListChatsParamsSort defines parameters for ListChats.
+type ListChatsParamsSort string
+
+// GetChatParams defines parameters for GetChat.
+type GetChatParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// OrganizeChatParamsAction defines parameters for OrganizeChat.
+type OrganizeChatParamsAction string
+
+// EditChatMessageJSONBody defines parameters for EditChatMessage.
+type EditChatMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
+}
+
+// OpenChatPathJSONBody defines parameters for OpenChatPath.
+type OpenChatPathJSONBody struct {
+	Path      string `json:"path"`
+	RequestId string `json:"requestId"`
+	Reveal    *bool  `json:"reveal,omitempty"`
+}
+
+// ChatRunActionParamsAction defines parameters for ChatRunAction.
+type ChatRunActionParamsAction string
+
 // ListDirectoriesParams defines parameters for ListDirectories.
 type ListDirectoriesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
@@ -1393,6 +2182,28 @@ type StreamEventsParams struct {
 
 // CancelMessageJSONBody defines parameters for CancelMessage.
 type CancelMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// EditMessageJSONBody defines parameters for EditMessage.
+type EditMessageJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Text      string             `json:"text"`
+}
+
+// ApplyEngineCatalogJSONBody defines parameters for ApplyEngineCatalog.
+type ApplyEngineCatalogJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ResolveModelsJSONBody defines parameters for ResolveModels.
+type ResolveModelsJSONBody struct {
+	Models    []ProviderModel    `json:"models"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// UpdateModelCatalogJSONBody defines parameters for UpdateModelCatalog.
+type UpdateModelCatalogJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
@@ -1474,6 +2285,12 @@ type RetryRunJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
 
+// SearchConversationsParams defines parameters for SearchConversations.
+type SearchConversationsParams struct {
+	// Q Plain text matched against chat titles
+	Q string `form:"q" json:"q"`
+}
+
 // ExchangeBootstrapJSONBody defines parameters for ExchangeBootstrap.
 type ExchangeBootstrapJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
@@ -1502,6 +2319,20 @@ type CreateTeamJSONBody struct {
 	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
 	Name           string             `json:"name"`
 	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// AdoptTeamJSONBody defines parameters for AdoptTeam.
+type AdoptTeamJSONBody struct {
+	InitialRoleIds *[]string          `json:"initialRoleIds,omitempty"`
+	Name           string             `json:"name"`
+	Path           string             `json:"path"`
+	RequestId      openapi_types.UUID `json:"requestId"`
+}
+
+// OpenTeamJSONBody defines parameters for OpenTeam.
+type OpenTeamJSONBody struct {
+	Path      string             `json:"path"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // DeleteTeamParams defines parameters for DeleteTeam.
@@ -1613,6 +2444,11 @@ type SetTeamBrowserTabViewportJSONBody struct {
 // SetTeamBrowserTabViewportJSONBodyPreset defines parameters for SetTeamBrowserTabViewport.
 type SetTeamBrowserTabViewportJSONBodyPreset string
 
+// ResetTeamBudgetJSONBody defines parameters for ResetTeamBudget.
+type ResetTeamBudgetJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
 // OpenTeamPathJSONBody defines parameters for OpenTeamPath.
 type OpenTeamPathJSONBody struct {
 	// Path Link target as written by a member; absolute, relative to the team folder, or with a line suffix.
@@ -1621,6 +2457,20 @@ type OpenTeamPathJSONBody struct {
 
 	// Reveal Show the file in the file manager instead of opening it.
 	Reveal *bool `json:"reveal,omitempty"`
+}
+
+// StartPreviewJSONBody defines parameters for StartPreview.
+type StartPreviewJSONBody struct {
+	// Command The start command from the acceptance handoff's preview; run in the team directory.
+	Command   string             `json:"command"`
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// StopPreviewJSONBody defines parameters for StopPreview.
+type StopPreviewJSONBody struct {
+	// Command The command that started it; omit to stop every preview of the team.
+	Command   *string            `json:"command,omitempty"`
+	RequestId openapi_types.UUID `json:"requestId"`
 }
 
 // RestoreTeamJSONBody defines parameters for RestoreTeam.
@@ -1643,6 +2493,96 @@ type ListTasksParams struct {
 type WarmTeamJSONBody struct {
 	RequestId openapi_types.UUID `json:"requestId"`
 }
+
+// CheckForUpdateJSONBody defines parameters for CheckForUpdate.
+type CheckForUpdateJSONBody struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+}
+
+// ListWorkspaceChangeRunsParams defines parameters for ListWorkspaceChangeRuns.
+type ListWorkspaceChangeRunsParams struct {
+	// BotId For team scopes, the member whose recorded changes are listed.
+	BotId *string `form:"botId,omitempty" json:"botId,omitempty"`
+
+	// Cursor Last run id from the preceding page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceChangeRunsParamsScope defines parameters for ListWorkspaceChangeRuns.
+type ListWorkspaceChangeRunsParamsScope string
+
+// ListWorkspaceChangeFilesParams defines parameters for ListWorkspaceChangeFiles.
+type ListWorkspaceChangeFilesParams struct {
+	// Cursor Last file path from the preceding page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceChangeFilesParamsScope defines parameters for ListWorkspaceChangeFiles.
+type ListWorkspaceChangeFilesParamsScope string
+
+// GetWorkspaceChangeDiffParams defines parameters for GetWorkspaceChangeDiff.
+type GetWorkspaceChangeDiffParams struct {
+	// Path The recorded source path, without resolving the current disk.
+	Path string `form:"path" json:"path"`
+}
+
+// GetWorkspaceChangeDiffParamsScope defines parameters for GetWorkspaceChangeDiff.
+type GetWorkspaceChangeDiffParamsScope string
+
+// GetWorkspaceContentParams defines parameters for GetWorkspaceContent.
+type GetWorkspaceContentParams struct {
+	Path        *string `form:"path,omitempty" json:"path,omitempty"`
+	Range       *string `json:"Range,omitempty"`
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	IfMatch     *string `json:"If-Match,omitempty"`
+}
+
+// GetWorkspaceContentParamsScope defines parameters for GetWorkspaceContent.
+type GetWorkspaceContentParamsScope string
+
+// ListWorkspaceEntriesParams defines parameters for ListWorkspaceEntries.
+type ListWorkspaceEntriesParams struct {
+	Path          *string `form:"path,omitempty" json:"path,omitempty"`
+	IncludeHidden *bool   `form:"includeHidden,omitempty" json:"includeHidden,omitempty"`
+	Cursor        *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListWorkspaceEntriesParamsScope defines parameters for ListWorkspaceEntries.
+type ListWorkspaceEntriesParamsScope string
+
+// GetWorkspaceFileParams defines parameters for GetWorkspaceFile.
+type GetWorkspaceFileParams struct {
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// GetWorkspaceFileParamsScope defines parameters for GetWorkspaceFile.
+type GetWorkspaceFileParamsScope string
+
+// GetWorkspaceLatexProjectParams defines parameters for GetWorkspaceLatexProject.
+type GetWorkspaceLatexProjectParams struct {
+	Path string `form:"path" json:"path"`
+}
+
+// GetWorkspaceLatexProjectParamsScope defines parameters for GetWorkspaceLatexProject.
+type GetWorkspaceLatexProjectParamsScope string
+
+// CompileWorkspaceLatexJSONBody defines parameters for CompileWorkspaceLatex.
+type CompileWorkspaceLatexJSONBody struct {
+	Main      string `json:"main"`
+	RequestId string `json:"requestId"`
+}
+
+// CompileWorkspaceLatexParamsScope defines parameters for CompileWorkspaceLatex.
+type CompileWorkspaceLatexParamsScope string
+
+// WatchWorkspaceJSONBody defines parameters for WatchWorkspace.
+type WatchWorkspaceJSONBody struct {
+	Paths     []string `json:"paths"`
+	RequestId string   `json:"requestId"`
+}
+
+// WatchWorkspaceParamsScope defines parameters for WatchWorkspace.
+type WatchWorkspaceParamsScope string
 
 // InternalServiceStopJSONBody defines parameters for InternalServiceStop.
 type InternalServiceStopJSONBody struct {
@@ -1678,11 +2618,47 @@ type SaveAvatarUploadJSONRequestBody SaveAvatarUploadJSONBody
 // PatchBotJSONRequestBody defines body for PatchBot for application/json ContentType.
 type PatchBotJSONRequestBody PatchBotJSONBody
 
+// SetBotBudgetJSONRequestBody defines body for SetBotBudget for application/json ContentType.
+type SetBotBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetBotBudgetJSONRequestBody defines body for ResetBotBudget for application/json ContentType.
+type ResetBotBudgetJSONRequestBody ResetBotBudgetJSONBody
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody SendMessageJSONBody
 
 // SetBotModelJSONRequestBody defines body for SetBotModel for application/json ContentType.
 type SetBotModelJSONRequestBody SetBotModelJSONBody
+
+// ChangeChatNavigationJSONRequestBody defines body for ChangeChatNavigation for application/json ContentType.
+type ChangeChatNavigationJSONRequestBody = ChatNavigationInput
+
+// CreateChatJSONRequestBody defines body for CreateChat for application/json ContentType.
+type CreateChatJSONRequestBody = ChatSendInput
+
+// DeleteChatJSONRequestBody defines body for DeleteChat for application/json ContentType.
+type DeleteChatJSONRequestBody = ChatActionInput
+
+// RenameChatJSONRequestBody defines body for RenameChat for application/json ContentType.
+type RenameChatJSONRequestBody = ChatActionInput
+
+// OrganizeChatJSONRequestBody defines body for OrganizeChat for application/json ContentType.
+type OrganizeChatJSONRequestBody = ChatActionInput
+
+// SendChatMessageJSONRequestBody defines body for SendChatMessage for application/json ContentType.
+type SendChatMessageJSONRequestBody = ChatSendInput
+
+// EditChatMessageJSONRequestBody defines body for EditChatMessage for application/json ContentType.
+type EditChatMessageJSONRequestBody EditChatMessageJSONBody
+
+// OpenChatPathJSONRequestBody defines body for OpenChatPath for application/json ContentType.
+type OpenChatPathJSONRequestBody OpenChatPathJSONBody
+
+// ReplyChatRequestJSONRequestBody defines body for ReplyChatRequest for application/json ContentType.
+type ReplyChatRequestJSONRequestBody = ChatActionInput
+
+// ChatRunActionJSONRequestBody defines body for ChatRunAction for application/json ContentType.
+type ChatRunActionJSONRequestBody = ChatActionInput
 
 // CheckDirectoryJSONRequestBody defines body for CheckDirectory for application/json ContentType.
 type CheckDirectoryJSONRequestBody CheckDirectoryJSONBody
@@ -1695,6 +2671,18 @@ type CheckEngineJSONRequestBody CheckEngineJSONBody
 
 // CancelMessageJSONRequestBody defines body for CancelMessage for application/json ContentType.
 type CancelMessageJSONRequestBody CancelMessageJSONBody
+
+// EditMessageJSONRequestBody defines body for EditMessage for application/json ContentType.
+type EditMessageJSONRequestBody EditMessageJSONBody
+
+// ApplyEngineCatalogJSONRequestBody defines body for ApplyEngineCatalog for application/json ContentType.
+type ApplyEngineCatalogJSONRequestBody ApplyEngineCatalogJSONBody
+
+// ResolveModelsJSONRequestBody defines body for ResolveModels for application/json ContentType.
+type ResolveModelsJSONRequestBody ResolveModelsJSONBody
+
+// UpdateModelCatalogJSONRequestBody defines body for UpdateModelCatalog for application/json ContentType.
+type UpdateModelCatalogJSONRequestBody UpdateModelCatalogJSONBody
 
 // CreateProviderJSONRequestBody defines body for CreateProvider for application/json ContentType.
 type CreateProviderJSONRequestBody = ProviderRequest
@@ -1741,6 +2729,12 @@ type UpdateSettingsJSONRequestBody UpdateSettingsJSONBody
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody CreateTeamJSONBody
 
+// AdoptTeamJSONRequestBody defines body for AdoptTeam for application/json ContentType.
+type AdoptTeamJSONRequestBody AdoptTeamJSONBody
+
+// OpenTeamJSONRequestBody defines body for OpenTeam for application/json ContentType.
+type OpenTeamJSONRequestBody OpenTeamJSONBody
+
 // PatchTeamJSONRequestBody defines body for PatchTeam for application/json ContentType.
 type PatchTeamJSONRequestBody PatchTeamJSONBody
 
@@ -1759,14 +2753,35 @@ type OpenTeamBrowserTabJSONRequestBody OpenTeamBrowserTabJSONBody
 // SetTeamBrowserTabViewportJSONRequestBody defines body for SetTeamBrowserTabViewport for application/json ContentType.
 type SetTeamBrowserTabViewportJSONRequestBody SetTeamBrowserTabViewportJSONBody
 
+// SetTeamBudgetJSONRequestBody defines body for SetTeamBudget for application/json ContentType.
+type SetTeamBudgetJSONRequestBody = BudgetLimitRequest
+
+// ResetTeamBudgetJSONRequestBody defines body for ResetTeamBudget for application/json ContentType.
+type ResetTeamBudgetJSONRequestBody ResetTeamBudgetJSONBody
+
 // OpenTeamPathJSONRequestBody defines body for OpenTeamPath for application/json ContentType.
 type OpenTeamPathJSONRequestBody OpenTeamPathJSONBody
+
+// StartPreviewJSONRequestBody defines body for StartPreview for application/json ContentType.
+type StartPreviewJSONRequestBody StartPreviewJSONBody
+
+// StopPreviewJSONRequestBody defines body for StopPreview for application/json ContentType.
+type StopPreviewJSONRequestBody StopPreviewJSONBody
 
 // RestoreTeamJSONRequestBody defines body for RestoreTeam for application/json ContentType.
 type RestoreTeamJSONRequestBody RestoreTeamJSONBody
 
 // WarmTeamJSONRequestBody defines body for WarmTeam for application/json ContentType.
 type WarmTeamJSONRequestBody WarmTeamJSONBody
+
+// CheckForUpdateJSONRequestBody defines body for CheckForUpdate for application/json ContentType.
+type CheckForUpdateJSONRequestBody CheckForUpdateJSONBody
+
+// CompileWorkspaceLatexJSONRequestBody defines body for CompileWorkspaceLatex for application/json ContentType.
+type CompileWorkspaceLatexJSONRequestBody CompileWorkspaceLatexJSONBody
+
+// WatchWorkspaceJSONRequestBody defines body for WatchWorkspace for application/json ContentType.
+type WatchWorkspaceJSONRequestBody WatchWorkspaceJSONBody
 
 // CollaborationToolJSONRequestBody defines body for CollaborationTool for application/json ContentType.
 type CollaborationToolJSONRequestBody = CollaborationRequest

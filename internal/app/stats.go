@@ -72,7 +72,8 @@ func (a *App) BotStats(ctx context.Context, principal auth.Principal, botID stri
 	if principal.Kind != auth.KindUser {
 		return stats, domain.Unauthorized("error.unauthorized.user_required")
 	}
-	if _, err := sqlite.GetBot(ctx, a.DB, botID); err != nil {
+	bot, err := sqlite.GetBot(ctx, a.DB, botID)
+	if err != nil {
 		return stats, sqlite.NormalizeError(err)
 	}
 	parse := func(s string) time.Time {
@@ -163,8 +164,17 @@ func (a *App) BotStats(ctx context.Context, principal auth.Principal, botID stri
 		stats.Context.Used = snapshot.Last.InputTokens + snapshot.Last.OutputTokens
 		stats.Context.Window = snapshot.ContextWindow
 	}
-	accountRateLimits.mu.Lock()
-	stats.RateLimits = accountRateLimits.raw
-	accountRateLimits.mu.Unlock()
+	// The account's rate limits are the ChatGPT account's quota. A member
+	// resolved to another vendor's model — by its own choice, the default
+	// model, or the first enabled provider — spends none of it, so it is
+	// shown none.
+	// The same resolution a turn gets: the member's own choice, then the
+	// team's provider, then the default model, then the first enabled
+	// provider.
+	if choice, err := a.MemberModel(ctx, bot.TeamID, botID); err == nil && choice.EngineProvider == officialEngineProvider {
+		accountRateLimits.mu.Lock()
+		stats.RateLimits = accountRateLimits.raw
+		accountRateLimits.mu.Unlock()
+	}
 	return stats, nil
 }

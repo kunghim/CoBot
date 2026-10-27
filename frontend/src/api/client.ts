@@ -102,8 +102,9 @@ export function reportUnauthorized(): void {
   notifyUnauthorized();
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   await initializeTransport();
+  signal?.throwIfAborted();
   const headers: Record<string, string> = {};
   const writing = !['GET', 'HEAD'].includes(method);
   const input = (body ?? {}) as Record<string, unknown>;
@@ -123,12 +124,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (token) headers.Authorization = 'Bearer ' + token;
   else headers['X-CSRF-Token'] = csrfToken();
   // Only durable business writes are safe to retry after a lost response.
-  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/');
+  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/') && !path.endsWith('/latex');
   let resp: Response;
-  try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload }); }
+  try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload, signal }); }
   catch (error) {
-    if (!retryable) throw error;
-    resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload });
+    if (!retryable || signal?.aborted) throw error;
+    resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload, signal });
   }
   const text = await resp.text();
   let parsed: unknown;
@@ -151,12 +152,65 @@ function pageQuery(params: Record<string, string | number | undefined>): string 
   return query.size ? '?' + query.toString() : '';
 }
 
+function workspaceBase(scope: import('./types').WorkspaceScope): string {
+  return `/api/v1/workspaces/${scope.kind}/${encodeURIComponent(scope.id)}`;
+}
+
 export const api = {
+  workspaceChangeRuns: (scope: import('./types').WorkspaceScope, botId = '', cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeRunsPage>('GET', workspaceBase(scope) + '/changes' + pageQuery({ botId: botId || undefined, cursor: cursor || undefined }), undefined, signal),
+  workspaceChangeFiles: (scope: import('./types').WorkspaceScope, runId: string, cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeFilesPage>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + pageQuery({ cursor: cursor || undefined }), undefined, signal),
+  workspaceChangeDiff: (scope: import('./types').WorkspaceScope, runId: string, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceChangeDiff>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + '/file' + pageQuery({ path }), undefined, signal),
+  workspaceLatex: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceLatexProject>('GET', workspaceBase(scope) + '/latex' + pageQuery({ path }), undefined, signal),
+  compileWorkspaceLatex: (scope: import('./types').WorkspaceScope, main: string, signal: AbortSignal) => request<import('./types').WorkspaceLatexResult>('POST', workspaceBase(scope) + '/latex', { main }, signal),
+  workspaceFile: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceFile>('GET', workspaceBase(scope) + '/file' + pageQuery({ path }), undefined, signal),
+  workspaceEntries: (scope: import('./types').WorkspaceScope, path = '', cursor = '', includeHidden = false, signal?: AbortSignal) => request<import('./types').WorkspaceDirectory>('GET', workspaceBase(scope) + '/entries' + pageQuery({ path, cursor, includeHidden: includeHidden ? 'true' : undefined }), undefined, signal),
+  workspaceBytes: async (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal, range?: string, version?: string): Promise<Blob> => {
+    await initializeTransport();
+    const token = bearerToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (range) headers.Range = range;
+    if (version) headers['If-Match'] = version;
+    const response = await fetch(apiUrl(workspaceBase(scope) + '/content' + pageQuery({ path })), { headers, credentials: token ? 'omit' : 'include', signal });
+    if (!response.ok) {
+      const error = await response.json().catch(() => undefined) as ErrorEnvelope | undefined;
+      if (response.status === 401) { clearBearer(); notifyUnauthorized(); }
+      throw new ApiError(response.status, error?.error?.code ?? 'internal', error?.error?.messageKey ?? (response.status === 412 ? 'error.workspace.changed' : 'error.internal'), error?.error?.params ?? {});
+    }
+    return response.blob();
+  },
+  listChats: (cursor = '', filter: { pinned?: string; archived?: boolean; sort?: string; search?: string; section?: string } = {}) => request<import('./types').ChatList>('GET', '/api/v1/chats' + pageQuery({ cursor, ...filter, archived: filter.archived ? 'true' : undefined })),
+  searchConversations: (q: string) => request<import('./types').SearchResults>('GET', '/api/v1/search' + pageQuery({ q })),
+  chatNavigation: () => request<import('./types').ChatNavigation>('GET', '/api/v1/chat-navigation'),
+  changeChatNavigation: (body: import('./types').ChatNavigationInput) => request<import('./types').ChatNavigation>('POST', '/api/v1/chat-navigation', body),
+  organizeChat: (id: string, action: 'pin' | 'unpin' | 'move' | 'reorder' | 'archive' | 'restore', body: { expectedRevision: number; sectionId?: string; beforeId?: string }) => request<import('./types').Chat>('POST', `/api/v1/chats/${encodeURIComponent(id)}/actions/${action}`, body),
+  getChat: (id: string, cursor = '') => request<import('./types').ChatPage>('GET', `/api/v1/chats/${encodeURIComponent(id)}` + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')),
+  sendChat: (id: string | null, body: import('./types').ChatSendInput) => request<import('./types').ChatPage>('POST', id ? `/api/v1/chats/${encodeURIComponent(id)}/messages` : '/api/v1/chats', body),
+  renameChat: (id: string, title: string, expectedRevision: number) => request<import('./types').Chat>('PATCH', `/api/v1/chats/${encodeURIComponent(id)}`, { title, expectedRevision }),
+  deleteChat: (id: string, expectedRevision: number) => request<import('./types').Chat>('DELETE', `/api/v1/chats/${encodeURIComponent(id)}`, { expectedRevision }),
+  chatRunAction: (id: string, runId: string, action: 'interrupt' | 'verify') => request<import('./types').ChatRun>('POST', `/api/v1/chats/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/${action}`, {}),
+  editChatMessage: (id: string, messageId: string, text: string) => request<import('./types').ChatPage>('POST', `/api/v1/chats/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/edit`, { text }),
+  editMessage: (messageId: string, text: string) => request<import('./types').SendMessageResult>('POST', `/api/v1/messages/${encodeURIComponent(messageId)}/edit`, { text }),
+  replyChatRequest: (id: string, requestId: string, body: { expectedRevision: number; optionId?: string; answers?: Record<string, string[]>; content?: Record<string, unknown> }) => request<import('./types').ChatRequest>('POST', `/api/v1/chats/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}/reply`, body),
+  openChatPath: (id: string, path: string, reveal = false) => request<{ path: string }>('POST', `/api/v1/chats/${encodeURIComponent(id)}/open-path`, { path, reveal }),
   getStatus: async () => {
     const status = await request<import('./types').Status>('GET', '/api/v1/status');
     if (status.csrfCookieName) csrfCookieName = status.csrfCookieName;
     return status;
   },
+  getTeamBudget: (teamId: string) => request<import('./types').TeamBudget>('GET', `/api/v1/teams/${teamId}/budget`),
+  setTeamBudget: (teamId: string, limit: number | null) =>
+    request<{ limit: number | null; clamped: number }>('PUT', `/api/v1/teams/${teamId}/budget`, { limit }),
+  setBotBudget: (botId: string, limit: number | null) =>
+    request<{ limit: number | null; clamped: number }>('PUT', `/api/v1/bots/${botId}/budget`, { limit }),
+  resetTeamBudget: (teamId: string) => request<{ reset: boolean }>('POST', `/api/v1/teams/${teamId}/budget/reset`, {}),
+  resetBotBudget: (botId: string) => request<{ reset: boolean }>('POST', `/api/v1/bots/${botId}/budget/reset`, {}),
+  modelCatalog: () => request<import('./types').ModelCatalogStatus>('GET', '/api/v1/model-catalog'),
+  updateModelCatalog: () => request<import('./types').ModelCatalogUpdate>('POST', '/api/v1/model-catalog/update', {}),
+  applyEngineCatalog: () => request<import('./types').ApplyEngineCatalogResult>('POST', '/api/v1/model-catalog/apply', {}),
+  resolveModels: (models: import('./types').ProviderModel[]) =>
+    request<{ specs: Record<string, import('./types').ModelSpec> }>('POST', '/api/v1/model-catalog/resolve', { models }),
+  checkForUpdate: () => request<import('./types').UpdateCheck>('POST', '/api/v1/updates/check', {}),
   getSettings: () => request<import('./types').Settings>('GET', '/api/v1/settings'),
   updateSettings: (patch: import('./types').SettingsPatch, expectedRevision?: number) =>
     request<import('./types').Settings>('PATCH', '/api/v1/settings', {
@@ -262,7 +316,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').ApprovalListResult>('GET', `/api/v1/approvals?${query.toString()}`);
   },
-  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number }) =>
+  decideApproval: (approvalId: string, body: { optionId: string; comment?: string; expectedRevision: number; content?: Record<string, unknown> }) =>
     request<import('./types').Approval>('POST', `/api/v1/approvals/${approvalId}/decisions`, body),
 
   // Engine account and models (M2).
@@ -289,15 +343,6 @@ export const api = {
   engineLogin: () => request<import('./types').EngineLogin>('POST', '/api/v1/auth/login', {}),
   engineLoginCancel: () => request<{ loginCancelled: boolean }>('POST', '/api/v1/auth/login/cancel', {}),
   engineLogout: () => request<{ loggedOut: boolean }>('POST', '/api/v1/auth/logout', {}),
-  // sessionLogout ends this page's session on the core. The interface is told
-  // right away, so it shows the sign-in screen instead of waiting for the
-  // next request to come back unauthorized.
-  sessionLogout: async () => {
-    const result = await request<{ loggedOut: boolean }>('POST', '/api/v1/session/logout', {});
-    clearBearer();
-    notifyUnauthorized();
-    return result;
-  },
   listModels: () => request<import('./types').ModelListResult>('GET', '/api/v1/models'),
 
   // Requirements, cards and questions.
@@ -322,7 +367,7 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     return request<import('./types').QuestionListResult>('GET', `/api/v1/questions?${query.toString()}`);
   },
-  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise'; mode?: 'rerun' | 'return_to_me'; expectedRevision: number }) =>
+  answerQuestion: (questionId: string, body: { answerText: string; decision?: 'accept' | 'revise' | 'approve' | 'reject'; mode?: 'rerun' | 'return_to_me'; expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/answers`, body),
   cancelQuestion: (questionId: string, body: { expectedRevision: number }) =>
     request<import('./types').Question>('POST', `/api/v1/questions/${questionId}/cancel`, body),
@@ -357,12 +402,13 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}`),
   setBrowserTabViewport: (teamId: string, tab: string, body: BrowserViewportRequest) =>
     request<{ viewport: BrowserViewport | null }>('POST', `/api/v1/teams/${teamId}/browser/tabs/${encodeURIComponent(tab)}/viewport`, body),
+  startPreview: (teamId: string, command: string) => request<{ started: boolean; running: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/start`, { command }),
+  stopPreview: (teamId: string, command?: string) => request<{ stopped: boolean }>('POST', `/api/v1/teams/${encodeURIComponent(teamId)}/preview/stop`, command ? { command } : {}),
+  openTeam: (path: string) => request<import('./types').OpenTeamResult>('POST', '/api/v1/teams/open', { path }),
+  adoptTeam: (body: { path: string; name: string; initialRoleIds?: string[] }) =>
+    request<{ team: import('./types').Team; bots: import('./types').Bot[] }>('POST', '/api/v1/teams/adopt', body),
   checkDirectory: (path: string) =>
     request<import('./types').DirectoryCheckResult>('POST', '/api/v1/directories/check', { path }),
-  listAuthorizations: () =>
-    request<{ items: import('./types').AuthorizationBinding[] }>('GET', '/api/v1/authorizations'),
-  revokeAuthorization: (botId: string) =>
-    request<{ revoked: boolean }>('POST', `/api/v1/authorizations/${botId}/revoke`, {}),
 };
 
 import { desktopBridge } from '../platform/native-bridge';
@@ -468,4 +514,40 @@ export async function devLinkSecret(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Watches only invalidation hints. Re-read state after ready, including on
+ * reconnection, because events may have been missed while disconnected. */
+export async function streamWorkspace(scope: import('./types').WorkspaceScope, paths: string[], onEvent: (event: 'ready' | 'changed') => void, signal: AbortSignal): Promise<'unavailable' | null> {
+  await initializeTransport();
+  signal.throwIfAborted();
+  const response = await fetch(apiUrl(workspaceBase(scope) + '/watch'), {
+    method: 'POST', headers: { ...authHeaders(true), Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+    credentials: bearerToken() ? 'omit' : 'include', body: JSON.stringify({ requestId: newRequestId(), paths }), signal,
+  });
+  if (response.status === 401) { clearBearer(); notifyUnauthorized(); }
+  if (!response.ok || !response.body || !response.headers.get('Content-Type')?.startsWith('text/event-stream')) {
+    const envelope = (await response.json().catch(() => undefined)) as ErrorEnvelope | undefined;
+    throw new ApiError(response.status, envelope?.error?.code ?? 'capability_missing', envelope?.error?.messageKey ?? 'error.workspace.watch_unavailable', envelope?.error?.params ?? {});
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) return null;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      if (buffer.length > 65536) throw new ApiError(503, 'capability_missing', 'error.workspace.watch_unavailable', {});
+      let boundary = /\r?\n\r?\n/.exec(buffer);
+      while (boundary) {
+        const frame = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
+        const event = frame.split(/\r?\n/).find((line) => line.startsWith('event:'))?.slice(6).trim();
+        if (event === 'ready' || event === 'changed') onEvent(event);
+        else if (event === 'unavailable') return 'unavailable';
+        boundary = /\r?\n\r?\n/.exec(buffer);
+      }
+    }
+  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }

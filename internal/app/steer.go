@@ -86,3 +86,29 @@ func (s *Scheduler) trySteer(ctx context.Context, botID, deliveryID string, mess
 	s.app.Hub.Publish()
 	return true
 }
+
+// steerNoteToRunningTurn hands a system notice to a member's running turn —
+// the same channel a user's mid-turn message takes — so a fact the member
+// must know now (a requirement the user just cancelled) reaches the turn it
+// changes, not only the next one. Best effort: a turn that cannot take it
+// still reads the note from its next turn's context.
+func (s *Scheduler) steerNoteToRunningTurn(ctx context.Context, botID, text string) {
+	run, err := sqlite.FindActiveRun(ctx, s.app.DB, botID)
+	if err != nil || run.Status != domain.RunRunning || run.ProviderTurnID == "" {
+		return
+	}
+	rt := s.runtime(run.TeamID)
+	if rt == nil || rt.server == nil || rt.server.Epoch() != run.EngineEpoch {
+		return
+	}
+	session, err := sqlite.GetProviderSession(ctx, s.app.DB, botID)
+	if err != nil || session.ProviderThreadID == "" || session.EngineEpoch != run.EngineEpoch {
+		return
+	}
+	steerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := rt.server.SteerTurn(steerCtx, session.ProviderThreadID, run.ProviderTurnID, text); err != nil {
+		return
+	}
+	s.logger.Info("note steered into running turn", "botId", botID, "runId", run.ID)
+}

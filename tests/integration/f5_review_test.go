@@ -90,7 +90,7 @@ func TestUnknownExecutionHasRecoveryCardWithoutCoreRestart(t *testing.T) {
 			if err != nil || run.Status != domain.RunUnknown {
 				t.Fatal(run, err)
 			}
-			if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision); err == nil {
+			if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision, nil); err == nil {
 				t.Fatal("unverified execution was released")
 			}
 			cards, _ := h.app.PendingApprovals(ctx, h.user, team.ID, "")
@@ -105,7 +105,7 @@ func TestUnknownExecutionHasRecoveryCardWithoutCoreRestart(t *testing.T) {
 				}
 				current := h.fakeFor(t, team.ID)
 				current.SetTurnFact(session.ProviderThreadID, run.ProviderTurnID, domain.RunInterrupted)
-				if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision); err != nil {
+				if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision, nil); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := sqlite.FindActiveRun(ctx, h.app.DB, bots[0].ID); !errors.Is(err, sqlite.ErrNotFound) {

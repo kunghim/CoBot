@@ -26,11 +26,86 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	if n.Method == "item/completed" && n.ItemType == "agentMessage" {
 		s.bufferReply(ctx, source, n)
 	}
+	if n.Step != nil && isWorkStep(n.Step.Kind) {
+		s.noteWork(ctx, source, n)
+	}
 	if s.onProgress(ctx, teamID, source, n) {
 		return
 	}
 
 	switch n.Method {
+	case "turn/plan/updated":
+		// The model's plan for this turn, shown as one living plan step in
+		// the process; later updates overwrite it.
+		var p struct {
+			ThreadID    string `json:"threadId"`
+			TurnID      string `json:"turnId"`
+			Explanation string `json:"explanation"`
+			Plan        []struct {
+				Step   string `json:"step"`
+				Status string `json:"status"`
+			} `json:"plan"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil || len(p.Plan) == 0 {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		mark := map[string]string{"pending": "□", "inProgress": "◆", "completed": "■"}
+		lines := make([]string, 0, len(p.Plan))
+		for _, step := range p.Plan {
+			m := mark[step.Status]
+			if m == "" {
+				m = "□"
+			}
+			lines = append(lines, m+" "+step.Step)
+		}
+		if p.Explanation != "" {
+			lines = append([]string{p.Explanation}, lines...)
+		}
+		detail, _ := json.Marshal(map[string]any{"text": strings.Join(lines, "\n")})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "plan-" + p.TurnID, Kind: engine.StepPlan, Status: engine.StepInProgress, Detail: detail})
+	case "model/rerouted":
+		// The engine answers with another model than the one asked for; the
+		// member's turn should say so.
+		var p struct {
+			ThreadID  string `json:"threadId"`
+			TurnID    string `json:"turnId"`
+			FromModel string `json:"fromModel"`
+			ToModel   string `json:"toModel"`
+			Reason    string `json:"reason"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		message := p.FromModel + " → " + p.ToModel
+		if p.Reason != "" {
+			message += " (" + p.Reason + ")"
+		}
+		detail, _ := json.Marshal(map[string]any{"level": "warning", "code": "modelRerouted", "message": message})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "rerouted-" + p.TurnID, Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
+	case "guardianWarning":
+		// The engine's safety layer flags the turn; the member sees why.
+		var p struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+			Message  string `json:"message"`
+		}
+		if err := json.Unmarshal(n.Raw, &p); err != nil || p.Message == "" {
+			return
+		}
+		if _, ok := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID); !ok {
+			return
+		}
+		ref, _ := s.resolveLiveRun(ctx, teamID, source, p.ThreadID, p.TurnID)
+		detail, _ := json.Marshal(map[string]any{"level": "warning", "code": "guardian", "message": p.Message})
+		s.saveStep(ctx, ref, domain.RunStep{ID: "guardian-" + p.TurnID, Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: detail})
 	case "turn/started":
 		if run, ok := s.runForThread(ctx, source, n.ThreadID, n.TurnID); ok && s.app.Paths.Root != "" {
 			if run.Status == domain.RunStarting || run.Status == domain.RunRunning || run.Status == domain.RunWaitingApproval {
@@ -245,7 +320,40 @@ func takeReply(rt *teamRuntime, runID string) string {
 	if text := joinTexts(buf.texts); text != "" {
 		return text
 	}
+	if len(buf.loose) > 0 {
+		return joinTexts(looseReply(buf.loose, buf.work))
+	}
 	return buf.commentary
+}
+
+// looseReply is what a model that marks no phase said as its answer: the
+// messages after the last work step. A turn that ended on a work step (the
+// answer, then a hand-off call) answers with the last thing said.
+func looseReply(pieces []loosePiece, work int) []string {
+	var tail []string
+	for _, piece := range pieces {
+		if piece.work == work && strings.TrimSpace(piece.text) != "" {
+			tail = append(tail, piece.text)
+		}
+	}
+	if len(tail) == 0 {
+		for i := len(pieces) - 1; i >= 0; i-- {
+			if strings.TrimSpace(pieces[i].text) != "" {
+				return []string{pieces[i].text}
+			}
+		}
+	}
+	return tail
+}
+
+// isWorkStep says whether a step is the member doing something, as against
+// thinking, reporting or saying something.
+func isWorkStep(kind string) bool {
+	switch kind {
+	case engine.StepCommand, engine.StepFileChange, engine.StepTool, engine.StepWebSearch, engine.StepAgent:
+		return true
+	}
+	return false
 }
 
 // settleRetryDelays space the retries of a settlement whose write failed.
@@ -469,6 +577,28 @@ func runIDOrEmpty(run domain.Run) string {
 func approvalSummary(req engine.ApprovalRequest) string {
 	// The complete requested operation is needed for a meaningful decision.
 	// Keep only relevant public fields; never persist the transport envelope.
+	if req.Method == "mcpServer/elicitation/request" {
+		// What the MCP server asks, verbatim: its words, and the form or the
+		// address it wants acted on.
+		var payload struct {
+			ServerName      string          `json:"serverName"`
+			Message         string          `json:"message"`
+			Mode            string          `json:"mode"`
+			RequestedSchema json.RawMessage `json:"requestedSchema"`
+			URL             string          `json:"url"`
+		}
+		if json.Unmarshal(req.RawParams, &payload) == nil {
+			details := map[string]any{"server": payload.ServerName, "mode": payload.Mode, "message": payload.Message}
+			if len(payload.RequestedSchema) > 0 && string(payload.RequestedSchema) != "null" {
+				details["requestedSchema"] = payload.RequestedSchema
+			}
+			if payload.URL != "" {
+				details["url"] = payload.URL
+			}
+			value, _ := json.MarshalIndent(details, "", "  ")
+			return string(value)
+		}
+	}
 	details := map[string]any{}
 	if req.Command != "" {
 		details["command"] = req.Command
@@ -499,6 +629,12 @@ func approvalSummary(req engine.ApprovalRequest) string {
 // lasts for the member's engine session: Codex keeps the grant until its
 // thread is restarted, and nothing in CoBot can widen it further.
 func nativeToolOptions(method string) []domain.ApprovalOption {
+	if method == "mcpServer/elicitation/request" {
+		return []domain.ApprovalOption{
+			{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.elicit_submit"},
+			{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.elicit_decline"},
+		}
+	}
 	if method == "item/permissions/requestApproval" {
 		return []domain.ApprovalOption{
 			{ID: domain.DecisionGrantTurn, MessageKey: "approval.option.grant_turn"},
@@ -725,10 +861,40 @@ func (s *Scheduler) bufferReply(ctx context.Context, source *teamRuntime, n engi
 	if n.ItemID != "" && buf.items[n.ItemID] {
 		return
 	}
-	if n.Phase == "commentary" {
+	switch n.Phase {
+	case "commentary":
 		buf.commentary = n.Text
-	} else {
+	case "":
+		buf.loose = append(buf.loose, loosePiece{text: n.Text, work: buf.work})
+	default:
 		buf.texts = append(buf.texts, n.Text)
 	}
 	buf.items[n.ItemID] = true
+}
+
+// noteWork counts a work step the first time it is seen, so a message can say
+// how much work had begun before it.
+func (s *Scheduler) noteWork(ctx context.Context, source *teamRuntime, n engine.Notification) {
+	if n.TurnID == "" || source == nil {
+		return
+	}
+	runID := s.findRunByTurn(ctx, source.server.Epoch(), n.ThreadID, n.TurnID)
+	if runID == "" {
+		return
+	}
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	buf := source.buffer[runID]
+	if buf == nil {
+		buf = &runBuffer{items: map[string]bool{}}
+		source.buffer[runID] = buf
+	}
+	if buf.workSeen == nil {
+		buf.workSeen = map[string]bool{}
+	}
+	if buf.workSeen[n.Step.ID] {
+		return
+	}
+	buf.workSeen[n.Step.ID] = true
+	buf.work++
 }

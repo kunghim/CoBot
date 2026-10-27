@@ -76,7 +76,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	card := pending[0]
 
 	// Continue: the bound wake runs and the chain gets a fresh budget of 3.
-	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.ChainOptionContinue, "", card.Revision, nil); err != nil {
 		t.Fatalf("continue: %v", err)
 	}
 	waitUntil(t, 5*time.Second, "captain turn (wake 4)", func() bool { return len(fake.Turns()) == 5 })
@@ -103,7 +103,7 @@ func TestChainBudgetGatesBotWakes(t *testing.T) {
 	overCard := pending[0]
 
 	// Stopping cancels the chain's undelivered work.
-	if _, err := h.app.DecideApproval(ctx, h.user, overCard.ID, domain.ChainOptionStop, "", overCard.Revision); err != nil {
+	if _, err := h.app.DecideApproval(ctx, h.user, overCard.ID, domain.ChainOptionStop, "", overCard.Revision, nil); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
 	chain, err = sqlite.GetChain(ctx, h.app.DB, chain.ID)
@@ -254,7 +254,7 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 	if err := h.app.RecordUsage(ctx, second); err != nil {
 		t.Fatalf("second turn: %v", err)
 	}
-	billable, unknown, err := sqlite.SumUsage(ctx, h.app.DB, team.ID, "")
+	billable, unknown, err := sqlite.SumUsage(ctx, h.app.DB, team.ID, "", "")
 	if err != nil {
 		t.Fatalf("sum: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit: %v", err)
 	}
-	if _, unknown, err = sqlite.SumUsage(ctx, h.app.DB, team.ID, ""); err != nil || unknown != 1 {
+	if _, unknown, err = sqlite.SumUsage(ctx, h.app.DB, team.ID, "", ""); err != nil || unknown != 1 {
 		t.Fatalf("unknown count = %d (err %v), want 1", unknown, err)
 	}
 	real := base
@@ -283,7 +283,7 @@ func TestUsageLedgerSnapshotsAndDedupes(t *testing.T) {
 	if err := h.app.RecordUsage(ctx, real); err != nil {
 		t.Fatalf("resolve unknown: %v", err)
 	}
-	if _, unknown, _ = sqlite.SumUsage(ctx, h.app.DB, team.ID, ""); unknown != 0 {
+	if _, unknown, _ = sqlite.SumUsage(ctx, h.app.DB, team.ID, "", ""); unknown != 0 {
 		t.Fatalf("unknown count after real usage = %d, want 0", unknown)
 	}
 

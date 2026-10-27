@@ -54,7 +54,7 @@ func TestRecoveryRequiresExactTerminalFactBeforeDecision(t *testing.T) {
 				t.Fatal(err)
 			}
 			card := findRecoveryDecision(t, h, team.ID, runID)
-			_, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision)
+			_, err := h.app.DecideApproval(ctx, h.user, card.ID, domain.RecoveryOptionAbandon, "", card.Revision, nil)
 			got, _ := sqlite.GetRun(ctx, h.app.DB, runID)
 			if providerStatus == "" || providerStatus == "inProgress" {
 				if err == nil || got.Status != domain.RunUnknown {

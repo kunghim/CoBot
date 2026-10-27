@@ -221,15 +221,24 @@ func (a *App) enterStageLocked(ctx context.Context, tx *sql.Tx, req domain.Requi
 		if err != nil {
 			return effect, err
 		}
+		// The document is read in the conversation; the question only asks.
+		posted, err := postDocumentLocked(ctx, tx, req.TeamID, team.LeaderID, text)
+		if err != nil {
+			return effect, err
+		}
+		ask := "请确认上面的内容。"
+		if criteria := strings.TrimSpace(req.Stages[idx].Criteria); criteria != "" {
+			ask = "请确认：" + criteria
+		}
 		question := domain.Question{
 			ID: domain.NewID(), Kind: domain.QuestionKindConfirm, RequirementID: req.ID, StageIndex: idx,
-			TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: text, Options: []string{},
+			TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: ask, Options: []string{},
 			Status: domain.QuestionOpen, Revision: 1,
 		}
 		if err := sqlite.InsertQuestion(ctx, tx, question); err != nil {
 			return effect, err
 		}
-		effect.events = append(effect.events, domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID})
+		effect.events = append(effect.events, posted, domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID})
 		return effect, nil
 	}
 	card := domain.Task{
@@ -295,6 +304,19 @@ func producingStage(req domain.Requirement, idx int) int {
 	return -1
 }
 
+// routeCanSkipChecks reports whether a revision raised at the confirm stage
+// idx can come straight back to it: a straight return skips the stages
+// between the one that produced the work (or the document) and this
+// confirmation, so it only offers a choice when one of them checks the work.
+func routeCanSkipChecks(req domain.Requirement, idx int) bool {
+	for j := producingStage(req, idx) + 1; j < idx; j++ {
+		if req.Stages[j].ChecksWork() {
+			return true
+		}
+	}
+	return false
+}
+
 // reworkLocked sends work back to a stage (or to the requirement document)
 // with the reason; returnTo is where the fixed work goes next, -1 for the
 // route's own order.
@@ -320,6 +342,11 @@ type HandoffInput struct {
 	Mode         string
 	Suggestions  string
 	Document     string
+	// Preview carries, on a done handoff whose result the user can run, the
+	// command that starts it in the team directory and the address to open
+	// once it answers. It is stored on the record, never run by the handoff.
+	PreviewCommand string
+	PreviewURL     string
 }
 
 // Handoff records how a member hands a card off and moves the work along the
@@ -379,6 +406,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	record := domain.Evidence{
 		ID: domain.NewID(), TaskID: card.ID, AuthorID: principal.BotID, Summary: summary,
 		ArtifactRefs: in.ArtifactRefs, Outcome: in.Outcome, Suggestions: strings.TrimSpace(in.Suggestions), Execution: execution,
+		PreviewCommand: strings.TrimSpace(in.PreviewCommand), PreviewURL: strings.TrimSpace(in.PreviewURL),
 	}
 	e := relayEntry{from: principal.BotID, chain: chainOfRunLocked(ctx, tx, principal.BotID), sourceRun: principal.RunID, returnTo: -1}
 	from := stageLabel(req, card)
@@ -529,9 +557,14 @@ func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requ
 	} else if len(suggestions) > 0 {
 		text += "\n\n遗留建议：\n- " + strings.Join(suggestions, "\n- ")
 	}
+	// The report is read in the conversation; the question only asks.
+	posted, err := postDocumentLocked(ctx, tx, req.TeamID, team.LeaderID, fmt.Sprintf("## %s · 验收汇报\n\n%s", req.Title, text))
+	if err != nil {
+		return effect, err
+	}
 	question := domain.Question{
 		ID: domain.NewID(), Kind: domain.QuestionKindAcceptance, RequirementID: req.ID, StageIndex: len(req.Stages) - 1,
-		TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: text, Options: []string{},
+		TeamID: req.TeamID, RequesterBotID: team.LeaderID, Question: fmt.Sprintf("需求「%s」已完成，请按上面的汇报验收。", req.Title), Options: []string{},
 		Status: domain.QuestionOpen, Revision: 1,
 	}
 	if err := sqlite.InsertQuestion(ctx, tx, question); err != nil {
@@ -540,10 +573,29 @@ func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requ
 	if _, err := sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementAccepting); err != nil {
 		return effect, err
 	}
-	effect.events = append(effect.events,
+	effect.events = append(effect.events, posted,
 		domain.Event{Type: domain.EventQuestionCreated, TeamID: req.TeamID, BotID: team.LeaderID, ResourceID: question.ID},
 		domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 	return effect, nil
+}
+
+// postDocumentLocked puts a document (the requirement to confirm, the report
+// to accept) into the project manager's conversation, as a message from it,
+// so it is read where the conversation is, before the question that asks for
+// the decision. It stays in the history after the decision.
+func postDocumentLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text string) (domain.Event, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return domain.Event{}, err
+	}
+	message := domain.Message{
+		ID: domain.NewID(), TeamID: teamID, BotID: botID,
+		Kind: domain.MessageKindDocument, Blocks: blocks, CreatedAt: time.Now().UTC(),
+	}
+	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+		return domain.Event{}, err
+	}
+	return domain.Event{Type: domain.EventMessageCreated, TeamID: teamID, BotID: botID, ResourceID: message.ID}, nil
 }
 
 func requirementSuggestions(ctx context.Context, q sqlite.Queryer, requirementID string) ([]string, error) {
@@ -626,32 +678,67 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		if req.Status != domain.RequirementActive {
 			return domain.Question{}, domain.Conflict("error.requirement.not_active", map[string]any{"status": req.Status})
 		}
+		team, _, err := sqlite.GetTeam(ctx, tx, req.TeamID)
+		if err != nil {
+			return domain.Question{}, err
+		}
 		// The user's decision is fresh input: it opens its own chain.
 		chain, err := a.openChainLocked(ctx, tx, req.TeamID, question.ID, "")
 		if err != nil {
 			return domain.Question{}, err
 		}
-		e := relayEntry{chain: chain.ID, returnTo: -1}
 		if decision == domain.AcceptanceAccept {
-			effect, err = a.enterStageLocked(ctx, tx, req, question.StageIndex+1, e)
+			next := question.StageIndex + 1
+			e := relayEntry{chain: chain.ID, returnTo: -1}
+			// The confirmed route dispatches in the project manager's
+			// name, so the member sees where the card came from and can
+			// open it. A card that lands on the project manager itself
+			// (the acceptance report) stays the user's doing.
+			if owner := req.Stages[next].OwnerID; owner != "" && owner != team.LeaderID {
+				e.from = team.LeaderID
+			}
+			var err error
+			effect, err = a.enterStageLocked(ctx, tx, req, next, e)
+			if err != nil {
+				return domain.Question{}, err
+			}
+			names := memberNames(ctx, tx, req.TeamID)
+			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmAcceptedNote(req, next, names)); err != nil {
+				return domain.Question{}, err
+			}
 		} else {
+			producer := producingStage(req, question.StageIndex)
+			e := relayEntry{chain: chain.ID, returnTo: -1}
+			// A member's rework goes out in the project manager's name;
+			// a revision of the document itself stays the user's input.
+			if producer >= 0 {
+				e.from = team.LeaderID
+			}
 			after := "改完后按链路重新往下走，会再经过评审"
 			if mode == domain.ReworkReturnToMe {
 				e.returnTo = question.StageIndex
 				after = "改完后直接回到用户确认"
 			}
 			e.note = "用户在「" + req.Stages[question.StageIndex].Name + "」提出修改意见（" + after + "）：" + comment
-			effect, err = a.reworkLocked(ctx, tx, req, producingStage(req, question.StageIndex), e)
-		}
-		if err != nil {
-			return domain.Question{}, err
+			effect, err = a.reworkLocked(ctx, tx, req, producer, e)
+			if err != nil {
+				return domain.Question{}, err
+			}
+			names := memberNames(ctx, tx, req.TeamID)
+			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmRevisedNote(req, question.StageIndex, producer, mode, comment, names)); err != nil {
+				return domain.Question{}, err
+			}
 		}
 	} else {
 		if _, err := sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementDone); err != nil {
 			return domain.Question{}, err
 		}
 		effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
-		if decision == domain.AcceptanceRevise {
+		if decision == domain.AcceptanceAccept {
+			if err := systemNoteLocked(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
+				return domain.Question{}, err
+			}
+		} else {
 			if messageID, err = a.reviseAsNewInputLocked(ctx, tx, question, comment); err != nil {
 				return domain.Question{}, err
 			}
@@ -677,7 +764,15 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 // reviseAsNewInputLocked hands the user's changes to a finished requirement
 // to the project manager as the user's own message.
 func (a *App) reviseAsNewInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, comment string) (string, error) {
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: "验收未通过，需要修改：" + comment}})
+	return a.deliverDecisionInputLocked(ctx, tx, question, "验收未通过，需要修改："+comment)
+}
+
+// deliverDecisionInputLocked puts the outcome of a question card in front of
+// the member that asked it, as the user's own fresh input: the message joins
+// a new causal chain, the member reads it with a woken turn. The user's
+// decision is input, never an authorization.
+func (a *App) deliverDecisionInputLocked(ctx context.Context, tx *sql.Tx, question domain.Question, text string) (string, error) {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
 	if err != nil {
 		return "", err
 	}
@@ -771,6 +866,22 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		domain.QuestionCancelled, req.ID, domain.QuestionOpen); err != nil {
 		return domain.Requirement{}, err
 	}
+	// A confirmation ignored from its card cancels the requirement so the
+	// user can keep talking first. The project manager learns why with its
+	// next turn, without a wake, and the user keeps a record where the card
+	// was.
+	team, _, err := sqlite.GetTeam(ctx, tx, req.TeamID)
+	if err != nil {
+		return domain.Requirement{}, err
+	}
+	if err := noteLocked(ctx, tx, req.TeamID, team.LeaderID, team.LeaderID, req.ID,
+		"用户取消了需求「"+summarizeLine(req.Title)+"」；方向谈清楚后请重新提交需求。"); err != nil {
+		return domain.Requirement{}, err
+	}
+	if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID,
+		"你取消了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
+		return domain.Requirement{}, err
+	}
 	if req, err = sqlite.UpdateRequirement(ctx, tx, req.ID, req.Document, domain.RequirementCancelled); err != nil {
 		return domain.Requirement{}, err
 	}
@@ -783,6 +894,14 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 	a.publishRelay(ctx, effect)
 	a.interruptCancelledWork(ctx, cancelled)
+	// The project manager's turn that submitted the requirement may still
+	// be running: without this, a user message arriving mid-turn is steered
+	// into a model that still believes the requirement is on its way, and
+	// it answers from that belief instead of submitting anew.
+	if a.Scheduler != nil {
+		a.Scheduler.steerNoteToRunningTurn(ctx, team.LeaderID,
+			"系统提示：用户刚取消了需求「"+summarizeLine(req.Title)+"」，它不会再推进。用户接下来是想先讨论；谈清楚后请用 start_requirement 重新提交。")
+	}
 	return req, nil
 }
 
@@ -997,4 +1116,53 @@ func noteLocked(ctx context.Context, tx *sql.Tx, teamID, target, source, about, 
 		ID: domain.NewID(), TeamID: teamID, BotID: target,
 		Kind: domain.MessageKindCollaboration, Blocks: blocks, SourceBotID: source, RunID: about,
 	})
+}
+
+// systemNoteLocked leaves the user a note in a member's conversation, about a
+// decision made from a card there. It wakes nobody and the engine never reads
+// it: it is a record of what happened, not an instruction.
+func systemNoteLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text string) error {
+	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
+	if err != nil {
+		return err
+	}
+	return sqlite.InsertMessage(ctx, tx, domain.Message{
+		ID: domain.NewID(), TeamID: teamID, BotID: botID,
+		Kind: domain.MessageKindSystem, Blocks: blocks, CreatedAt: time.Now().UTC(),
+	})
+}
+
+// confirmAcceptedNote says what the user's confirmation set in motion. The
+// title and stage names are the project manager's wording, so they get the
+// same one-line budget as user comments: the note reads as CoBot's own.
+func confirmAcceptedNote(req domain.Requirement, next int, names map[string]string) string {
+	stage := req.Stages[next]
+	owner := stageOwnerName(stage, names)
+	if stage.Kind == domain.StageConfirm {
+		owner = "你"
+	}
+	return fmt.Sprintf("你确认了需求「%s」。下一环：%s（%s）。", summarizeLine(req.Title), summarizeLine(stage.Name), owner)
+}
+
+// confirmRevisedNote says where the user's revision went and what happens
+// after the fix.
+func confirmRevisedNote(req domain.Requirement, idx, producer int, mode, comment string, names map[string]string) string {
+	to := "项目经理"
+	if producer >= 0 {
+		to = stageOwnerName(req.Stages[producer], names)
+	}
+	note := fmt.Sprintf("你对「%s」提了修改意见：%s，已交给 %s 修改。", summarizeLine(req.Stages[idx].Name), summarizeLine(comment), to)
+	if mode == domain.ReworkReturnToMe {
+		return note + "改完后直接回到你确认。"
+	}
+	return note + "改完后按链路继续。"
+}
+
+// summarizeLine shortens a user comment for one line of a note.
+func summarizeLine(text string) string {
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= 80 {
+		return string(runes)
+	}
+	return string(runes[:80]) + "…"
 }

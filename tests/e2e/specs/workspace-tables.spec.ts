@@ -1,0 +1,82 @@
+import { test, expect } from '@playwright/test';
+import { truncateSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { utils, write } from '../../../frontend/node_modules/xlsx/xlsx.mjs';
+import { authorize, selectWorkspaceFile } from './helpers';
+test.beforeEach(async ({ context }) => { await authorize(context); });
+test('CSV and TSV preserve cells, page dimensions and offer source for malformed text', async ({ page }) => {
+  await page.goto('/chat/new');
+  const response = page.waitForResponse((item) => item.url().endsWith('/api/v1/chats') && item.request().method() === 'POST');
+  await page.getByRole('textbox', { name: '发送消息' }).fill('table setup');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  const created = (await (await response).json()).data;
+  await expect(page.getByText('收到：table setup', { exact: true })).toBeVisible();
+  const rows = Array.from({ length: 105 }, (_, row) => Array.from({ length: 55 }, (_, column) => `r${row + 1}c${column + 1}`).join(','));
+  rows[0] = '"a,b","line 1\nline 2",=1+2,<script>literal</script>';
+  writeFileSync(join(created.chat.workspace, 'data.csv'), '\uFEFF' + rows.join('\r\n'));
+  writeFileSync(join(created.chat.workspace, 'data.tsv'), 'name\tvalue\nitem\t"quoted\tvalue"\n');
+  writeFileSync(join(created.chat.workspace, 'broken.csv'), '"unclosed');
+  writeFileSync(join(created.chat.workspace, 'empty.csv'), '');
+  const book = utils.book_new();
+  utils.book_append_sheet(book, utils.aoa_to_sheet([['Name', 'Count'], ['Workbook fixture', 42]]), 'Summary');
+  utils.book_append_sheet(book, { A1: { t: 'n', v: 3, f: '1+2' }, '!ref': 'A1' }, 'Formula');
+  utils.book_append_sheet(book, { A1: { t: 'n', v: 45292, z: 'yyyy-mm-dd' }, B1: { t: 'n', v: 0.125, z: '0.0%' }, '!ref': 'A1:B1' }, 'Formatted');
+  utils.book_append_sheet(book, {}, 'Empty');
+  for (const bookType of ['xlsx', 'xlsm'] as const) writeFileSync(join(created.chat.workspace, 'book.' + bookType), write(book, { type: 'buffer', bookType, compression: true }));
+  writeFileSync(join(created.chat.workspace, 'damaged.xlsx'), 'bad zip');
+  const content: string[] = [];
+  page.on('request', (request) => { const url = new URL(request.url()); if (url.pathname.endsWith('/content')) content.push(url.searchParams.get('path') ?? ''); });
+  for (const extension of ['csv', 'xlsx', 'xlsm']) {
+    const path = join(created.chat.workspace, 'oversized.' + extension);
+    writeFileSync(path, ''); truncateSync(path, 11 * 1024 * 1024);
+  }
+  await page.getByRole('button', { name: '创建标签页', exact: true }).click();
+  await page.getByRole('button', { name: /文件 浏览当前工作区的文件/ }).click();
+  await selectWorkspaceFile(page, 'data.csv');
+  const workspace = page.getByRole('tabpanel', { name: '工作区' });
+  const table = workspace.getByRole('table', { name: '表格预览' });
+  await expect(table.getByRole('cell', { name: 'a,b', exact: true })).toBeVisible();
+  await expect(table.getByRole('cell', { name: '=1+2', exact: true })).toBeVisible();
+  await expect(table.getByRole('cell', { name: '<script>literal</script>', exact: true })).toBeVisible();
+  await expect(table.getByRole('row')).toHaveCount(101);
+  await expect(table.getByRole('columnheader')).toHaveCount(51);
+  await workspace.getByRole('button', { name: '下一页', exact: true }).click();
+  await expect(table.getByRole('cell', { name: 'r101c1', exact: true })).toBeVisible();
+  await expect(table.getByRole('row')).toHaveCount(6);
+  await workspace.getByRole('button', { name: '下一组列', exact: true }).click();
+  await expect(table.getByRole('cell', { name: 'r101c51', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader')).toHaveCount(6);
+  await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'filesystem-table-paging.png') });
+  await selectWorkspaceFile(page, 'data.tsv');
+  await expect(table.getByRole('cell', { name: 'quoted value', exact: true })).toBeVisible();
+  await selectWorkspaceFile(page, 'broken.csv');
+  await expect(workspace.getByText('此表格已损坏或不是有效的 UTF-8 分隔文本。', { exact: true })).toBeVisible();
+  await workspace.getByRole('button', { name: '源码', exact: true }).click();
+  await expect(workspace.getByText('"unclosed', { exact: true })).toBeVisible();
+  for (const extension of ['xlsx', 'xlsm']) {
+    await selectWorkspaceFile(page, 'book.' + extension);
+    await expect(table.getByRole('cell', { name: 'Workbook fixture', exact: true })).toBeVisible();
+    await workspace.getByRole('combobox', { name: '工作表', exact: true }).click();
+    await page.getByRole('option', { name: 'Formula', exact: true }).click();
+    await expect(table.getByRole('cell', { name: '3', exact: true })).toBeVisible();
+    await expect(workspace.getByText('显示已保存值 · 不执行宏和外部链接', { exact: true })).toBeVisible();
+    await workspace.getByRole('combobox', { name: '工作表', exact: true }).click();
+    await page.getByRole('option', { name: 'Formatted', exact: true }).click();
+    await expect(table.getByRole('cell', { name: '2024-01-01', exact: true })).toBeVisible();
+    await expect(table.getByRole('cell', { name: '12.5%', exact: true })).toBeVisible();
+    await workspace.getByRole('combobox', { name: '工作表', exact: true }).click();
+    await page.getByRole('option', { name: 'Empty', exact: true }).click();
+    await expect(workspace.getByText('此表格为空。', { exact: true })).toBeVisible();
+  }
+  await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'filesystem-workbook.png') });
+  await selectWorkspaceFile(page, 'damaged.xlsx');
+  await expect(workspace.getByText('此工作簿已损坏、已加密或不受支持。', { exact: true })).toBeVisible();
+  await selectWorkspaceFile(page, 'empty.csv');
+  await expect(workspace.getByText('此表格为空。', { exact: true })).toBeVisible();
+  for (const extension of ['csv', 'xlsx', 'xlsm']) {
+    const name = 'oversized.' + extension;
+    await selectWorkspaceFile(page, name);
+    await expect(workspace.getByText(extension === 'csv' ? '此文件较大，请切换源码分页查看完整内容。' : '此文件超过 10 MiB 预览上限，可用系统打开。', { exact: true })).toBeVisible();
+    expect(content).not.toContain(name);
+  }
+});

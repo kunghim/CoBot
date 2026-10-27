@@ -34,9 +34,57 @@ func TestValidateLoginURL(t *testing.T) {
 	}
 }
 
+func TestValidateProjectURL(t *testing.T) {
+	for _, rawURL := range []string{
+		"https://github.com/kunghim/CoBot",
+		"https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.2",
+		"https://github.com/kunghim/CoBot/issues/new",
+	} {
+		if err := validateProjectURL(rawURL); err != nil {
+			t.Errorf("project page %q rejected: %v", rawURL, err)
+		}
+	}
+	for _, rawURL := range []string{
+		"http://github.com/kunghim/CoBot",
+		"https://github.com/kunghim/CoBot-evil/releases",
+		"https://github.com/kunghim/Other",
+		"https://github.com.attacker.invalid/kunghim/CoBot",
+		"https://user@github.com/kunghim/CoBot",
+		"https://github.com:444/kunghim/CoBot",
+		"file:///C:/Windows/System32/cmd.exe",
+	} {
+		if err := validateProjectURL(rawURL); err == nil {
+			t.Errorf("foreign address %q accepted", rawURL)
+		}
+	}
+}
+
 func TestOpenLoginURLRequiresApplicationContext(t *testing.T) {
 	bridge := &Bridge{}
 	if err := bridge.OpenLoginURL("https://auth.openai.com/oauth/authorize"); err == nil {
 		t.Fatal("expected missing application context error")
+	}
+}
+
+func TestValidateExternalURL(t *testing.T) {
+	for _, rawURL := range []string{
+		"http://127.0.0.1:4173",
+		"https://example.com/page?with=state",
+	} {
+		if err := validateExternalURL(rawURL); err != nil {
+			t.Fatalf("%s rejected: %v", rawURL, err)
+		}
+	}
+	for _, rawURL := range []string{
+		"file:///C:/Windows/System32/cmd.exe",
+		"javascript:alert('test-only')",
+		"https://user@example.com/",
+		"ftp://example.com/file",
+		"https:///no-host",
+		"%test-only",
+	} {
+		if err := validateExternalURL(rawURL); err == nil {
+			t.Errorf("non-external URL accepted: %s", rawURL)
+		}
 	}
 }

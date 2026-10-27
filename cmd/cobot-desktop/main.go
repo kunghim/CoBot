@@ -7,9 +7,12 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"runtime"
 	"time"
@@ -58,6 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 	bridge := desktop.NewBridge(env, version, desktopOrigins)
+	var windowCtx context.Context
 
 	err = wails.Run(&options.App{
 		Title:  "CoBot",
@@ -65,15 +69,57 @@ func main() {
 		Height: 800,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
+			// WKWebView keeps scheme-handler responses across rebuilds and
+			// app upgrades: a cached index.html keeps loading the previous
+			// bundle's hashed assets (also cached, though no longer embedded),
+			// so the window shows the old UI after every update. Nothing here
+			// is worth caching — the assets are local.
+			Middleware: func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Cache-Control", "no-store")
+					next.ServeHTTP(w, r)
+				})
+			},
 		},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 250, A: 1},
-		// The page draws its own title bar in CoBot's theme (see the
-		// frontend's AppTitleBar): Windows drops the system frame, macOS keeps
-		// only the traffic lights over the page. Linux keeps its system bar.
+		// The page draws its own column headers in CoBot's theme: Windows
+		// drops the system frame, macOS keeps only the traffic lights over
+		// the page. Linux keeps its system bar. The mac title stays enabled
+		// (empty by default, set to the conversation name in fullscreen) so
+		// the hover-revealed titlebar shows the title beside the traffic
+		// lights instead of an empty strip.
 		Frameless: runtime.GOOS == "windows",
-		Mac:       &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
+		Mac: &mac.Options{TitleBar: &mac.TitleBar{
+			TitlebarAppearsTransparent: true,
+			HideTitleBar:               false,
+			FullSizeContent:            true,
+			// UseToolbar stays off: an attached toolbar turns the titlebar
+			// into toolbar height, and the fullscreen-hover strip that slides
+			// down under the menu bar reads as several times a normal
+			// toolbar. The standard-height titlebar keeps the strip slim.
+			UseToolbar:           false,
+			HideToolbarSeparator: true,
+		}},
+		// One window per profile: a second launch hands over to the first
+		// and exits. Without it the extra process adopts the running core
+		// as a guest, and closing the first window stops the core under it.
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: instanceID(env, *dataRoot),
+			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
+				if windowCtx == nil {
+					return
+				}
+				wailsruntime.WindowUnminimise(windowCtx)
+				wailsruntime.WindowShow(windowCtx)
+			},
+		},
 		OnStartup: func(ctx context.Context) {
+			windowCtx = ctx
 			bridge.SetContext(ctx)
+			// The window title is drawn next to the traffic lights whenever
+			// the titlebar shows (mac fullscreen hover); keep it empty except
+			// when the frontend names the conversation in fullscreen.
+			wailsruntime.WindowSetTitle(ctx, "")
 			if err := bridge.StartCore(ctx, *dataRoot); err != nil {
 				wailsruntime.MessageDialog(ctx, messageDialogError(err))
 				wailsruntime.Quit(ctx)
@@ -94,6 +140,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "wails:", err)
 		os.Exit(1)
 	}
+}
+
+// instanceID names the single-instance lock. It follows the data root, the
+// same thing the core's own instance lock follows, so a throwaway profile used
+// for testing does not collide with the installed app.
+func instanceID(env platform.Environment, dataRoot string) string {
+	sum := sha256.Sum256([]byte(string(env) + "\x00" + dataRoot))
+	return "cobot-desktop-" + hex.EncodeToString(sum[:8])
 }
 
 func messageDialogError(err error) wailsruntime.MessageDialogOptions {

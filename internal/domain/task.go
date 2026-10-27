@@ -63,6 +63,11 @@ type Evidence struct {
 	Outcome     string `json:"outcome,omitempty"`
 	Mode        string `json:"mode,omitempty"`
 	Suggestions string `json:"suggestions,omitempty"`
+	// Preview is a runnable result's start command (run in the team
+	// directory) and the address to open once it answers; the user starts it
+	// from the acceptance card, never the handoff itself.
+	PreviewCommand string `json:"previewCommand,omitempty"`
+	PreviewURL     string `json:"previewUrl,omitempty"`
 	// Execution is what the engine reported was run and changed, never the
 	// member's own account of it.
 	Execution *Execution `json:"execution,omitempty"`
@@ -78,17 +83,25 @@ const (
 
 // Question kinds. A plain question is ask_user; a confirm question is a
 // confirm stage of a route; an acceptance question hands the finished
-// requirement to the user.
+// requirement to the user; a recruitment question asks the user to add
+// members the project manager requested.
 const (
-	QuestionKindAsk        = ""
-	QuestionKindConfirm    = "confirm"
-	QuestionKindAcceptance = "acceptance"
+	QuestionKindAsk         = ""
+	QuestionKindConfirm     = "confirm"
+	QuestionKindAcceptance  = "acceptance"
+	QuestionKindRecruitment = "recruitment"
 )
 
 // Decisions on a confirm or acceptance question.
 const (
 	AcceptanceAccept = "accept"
 	AcceptanceRevise = "revise"
+)
+
+// Decisions on a recruitment question.
+const (
+	RecruitmentApprove = "approve"
+	RecruitmentReject  = "reject"
 )
 
 // Question is an ask_user request, a confirmation or a requirement's
@@ -104,12 +117,18 @@ type Question struct {
 	RunID           string    `json:"runId,omitempty"`
 	Question        string    `json:"question"`
 	Options         []string  `json:"options"`
+	RoleIDs         []string  `json:"roleIds,omitempty"`
 	Status          string    `json:"status"`
 	AnswerText      string    `json:"answerText,omitempty"`
 	AnswerMessageID string    `json:"answerMessageId,omitempty"`
 	Revision        int64     `json:"revision"`
 	CreatedAt       time.Time `json:"createdAt"`
 	AnsweredAt      time.Time `json:"answeredAt,omitempty"`
+	// CanSkipChecks is a confirm stage's projection: whether a revision can
+	// come straight back to it, which only offers a choice when the stages
+	// a straight return skips include one that checks the work. Not stored;
+	// filled where the question is served.
+	CanSkipChecks bool `json:"canSkipChecks"`
 }
 
 // Event types appended by the collaboration milestone; never renamed.

@@ -1,7 +1,13 @@
-// RunProcess shows what a member did in one turn, the way Codex does: while
-// it runs, a live status line ("正在执行命令 · 12秒") with the steps so far and
-// the reply as it streams; once finished, a collapsed "已处理 1分23秒" line that
-// expands into the same steps.
+// RunProcess shows one turn the way Codex does, in the order it happened:
+// what the member said stays in view between stretches of work, and each
+// stretch of consecutive same-kind steps folds to a line ("运行了 3 条命令")
+// that opens into its steps. While it runs, finished stretches fold away and
+// only the one in progress stays open, a live status line ("正在执行命令 ·
+// 12秒") sits at the very bottom under the newest content, and the reply
+// streams in; once finished, the whole process folds to one "用时 1分23秒"
+// line above the reply and opens on click. A failed turn stays open under
+// its own line, an interrupted one is marked. A team's turns and a chat's
+// both use it (see Scope).
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Minus, X } from 'lucide-react';
@@ -9,11 +15,22 @@ import { Badge, Button, cx, Icons, interactive } from '../../components/ui';
 import type { RunStep, RunWithSteps } from '../../api/types';
 import type { LiveRun } from '../../api/live';
 import { mergeSteps } from '../../api/live';
-import { api } from '../../api/client';
+import { openWorkspaceFile } from '../workspace/fileNavigation';
 import { apiErrorMessage } from '../../i18n/errors';
 import DiffView from '../../components/DiffView';
 import Markdown from './Markdown';
-import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, visibleSteps, type Phrase } from './steps';
+import { stripToolCallText } from './toolCallText';
+import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
+import { openModelPicker } from './modelPicker';
+
+/** Where the files a turn names live: a team's folder, or a chat's own. */
+export interface Scope {
+  teamId?: string;
+  chatId?: string;
+}
+
+/** What a turn needs of a run: its place in time, its state and its steps. */
+export type ProcessRun = Pick<RunWithSteps, 'id' | 'status' | 'startedAt' | 'endedAt' | 'steps' | 'botId'>;
 
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -25,20 +42,29 @@ function useNow(active: boolean): number {
   return now;
 }
 
+/** Whether a turn has anything to show above its reply: what is being done, what went wrong, or what was done. */
+export function runHasContent(run: ProcessRun, active: boolean, replyText: string): boolean {
+  if (active || run.status === 'failed' || run.status === 'interrupted') return true;
+  return visibleSteps(mergeSteps(run.steps, undefined), undefined, replyText).length > 0;
+}
+
 export default function RunProcess({
   run,
   active,
   live,
-  teamId,
+  scope,
   nameOf,
+  replyText = '',
   onRetry,
   retrying = false,
 }: {
-  run: RunWithSteps;
+  run: ProcessRun;
   active: boolean;
   live: LiveRun | undefined;
-  teamId: string;
+  scope: Scope;
   nameOf: (botId: string) => string;
+  /** The turn's reply, shown right under it: what it holds is not said twice. */
+  replyText?: string;
   /** Given for the member's latest failed turn while it is idle: run the work again. */
   onRetry?: () => void;
   retrying?: boolean;
@@ -51,11 +77,34 @@ export default function RunProcess({
   );
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const now = useNow(active);
+  // null: follow the default; true or false: the user opened or folded all the work.
   const [open, setOpen] = useState<boolean | null>(null);
   const steps = mergeSteps(run.steps, active ? live : undefined);
-  const shown = visibleSteps(steps, active ? live : undefined);
-  // A failed turn stays open so its reason is seen without a click.
+  const shown = visibleSteps(steps, active ? live : undefined, replyText);
+  const blocks = turnBlocks(shown);
+  // The work of a running or failed turn stays open so what is going on, or what went wrong, is seen without a click.
   const expanded = open ?? (active || run.status === 'failed');
+
+  const endedAt = run.endedAt ? Date.parse(run.endedAt) : NaN;
+  const seconds = elapsedSeconds(run.startedAt, active || Number.isNaN(endedAt) ? now : endedAt);
+  const duration = say(durationPhrase(seconds));
+  // The steps live on screen while the turn runs, while something is wrong,
+  // and when the user opens a finished turn's record; a finished turn folds
+  // them behind its duration line.
+  const showProcess = active || run.status === 'failed' || run.status === 'interrupted' || expanded;
+  // The stretch the member is working in now is the last one on the turn.
+  let lastWorkIndex = -1;
+  blocks.forEach((block, index) => {
+    if (block.kind === 'work') lastWorkIndex = index;
+  });
+  const phaseLine = active && (
+    <p role="status" className="-ml-1 flex items-center gap-1.5 px-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+      <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" />
+      <span>
+        {say(runPhase(run, steps, live, seconds))} · {duration}
+      </span>
+    </p>
+  );
 
   if (!active && shown.length === 0) {
     if (run.status === 'failed' || run.status === 'interrupted') {
@@ -69,38 +118,82 @@ export default function RunProcess({
     return null;
   }
 
-  const endedAt = run.endedAt ? Date.parse(run.endedAt) : NaN;
-  const seconds = elapsedSeconds(run.startedAt, active || Number.isNaN(endedAt) ? now : endedAt);
-  const duration = say(durationPhrase(seconds));
-  const header = active
-    ? `${say(runPhase(run, steps, live, seconds))} · ${duration}`
-    : t(run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done', { duration, count: shown.length });
+  const summary = t(
+    run.status === 'failed' ? 'conversation.process.failedAfter' : run.status === 'interrupted' ? 'conversation.process.interruptedAfter' : 'conversation.process.done',
+    { duration },
+  );
 
   return (
-    <div className="max-w-[85%] space-y-1.5" data-testid="run-process">
-      <button
-        type="button"
-        onClick={() => setOpen(!expanded)}
-        aria-expanded={expanded}
-        className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
-      >
-        {active ? <Loader2 size={13} className="animate-spin text-signal-500" aria-hidden="true" /> : expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
-        <span role={active ? 'status' : undefined}>{header}</span>
-      </button>
-      {expanded && shown.length > 0 && (
-        <ol className="ml-1.5 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
-          {shown.map((step) => (
-            <li key={step.id}>
-              <StepRow step={step} running={active && step.status === 'in_progress'} live={active ? live : undefined} teamId={teamId} nameOf={nameOf} />
-            </li>
-          ))}
-        </ol>
+    <div className="min-w-0 space-y-2" data-testid="run-process">
+      {!active && (
+        <button
+          type="button"
+          onClick={() => setOpen(!expanded)}
+          aria-expanded={expanded}
+          className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
+        >
+          {run.status !== 'failed' && run.status !== 'interrupted' && (expanded ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />)}
+          <span>{summary}</span>
+        </button>
       )}
+      {showProcess &&
+        blocks.map((block, index) =>
+          block.kind === 'text' ? (
+            <StepRow key={block.step.id} step={block.step} botId={run.botId} running={active && block.step.status === 'in_progress'} live={active ? live : undefined} scope={scope} nameOf={nameOf} />
+          ) : (
+            <WorkGroup
+              key={block.id}
+              steps={block.steps}
+              botId={run.botId}
+              // While the turn runs, the finished stretches fold away and only
+              // the one the member is working in now stays open; something
+              // that went wrong always opens, as does a failed turn's work.
+              expanded={expanded || (active && index === lastWorkIndex) || workNeedsAttention(block.steps)}
+              active={active}
+              live={active ? live : undefined}
+              scope={scope}
+              nameOf={nameOf}
+              say={say}
+            />
+          ),
+        )}
       {retry}
       {active && live?.reply && (
         <div className="text-sm leading-7 text-neutral-900 dark:text-neutral-100" data-testid="streaming-reply">
-          <Markdown text={live.reply} teamId={teamId} />
+          <Markdown text={stripToolCallText(live.reply)} teamId={scope.teamId} chatId={scope.chatId} />
         </div>
+      )}
+      {phaseLine}
+    </div>
+  );
+}
+
+/** A stretch of work between two things the member said: a line saying what it
+ * held, which opens into the steps. While the turn runs only the current
+ * stretch is open by default; the user can open any of them. */
+function WorkGroup({ steps, botId, expanded, active, live, scope, nameOf, say }: { steps: RunStep[]; botId: string; expanded: boolean; active: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string; say: (phrase: Phrase) => string }) {
+  const [own, setOwn] = useState<boolean | null>(null);
+  const open = own ?? expanded;
+  const summary = workSummary(steps).map(say).join('、');
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOwn(!open)}
+        className={cx('-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200', interactive.hover)}
+      >
+        {open ? <Icons.expand size={13} aria-hidden /> : <Icons.next size={13} aria-hidden />}
+        <span>{summary}</span>
+      </button>
+      {open && (
+        <ol className="ml-1.5 mt-1 space-y-1 border-l border-neutral-200 pl-3 dark:border-neutral-700">
+          {steps.map((step) => (
+            <li key={step.id}>
+              <StepRow step={step} botId={botId} running={active && step.status === 'in_progress'} live={live} scope={scope} nameOf={nameOf} />
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );
@@ -117,6 +210,7 @@ const kindIcon: Record<string, (typeof Icons)[keyof typeof Icons]> = {
   notice: Icons.warning,
   agent: Icons.subagent,
   diff: Icons.diff,
+  compaction: Icons.compaction,
 };
 
 function StatusMark({ status, running }: { status: string; running: boolean }) {
@@ -126,7 +220,7 @@ function StatusMark({ status, running }: { status: string; running: boolean }) {
   return <Check size={11} className="text-neutral-400" aria-hidden="true" />;
 }
 
-function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; running: boolean; live: LiveRun | undefined; teamId: string; nameOf: (botId: string) => string }) {
+function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep; botId: string; running: boolean; live: LiveRun | undefined; scope: Scope; nameOf: (botId: string) => string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const phrase = describeStep(step, nameOf);
@@ -142,7 +236,7 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
     const said = (typeof d.text === 'string' && d.text) || live?.commentary[step.id] || '';
     return (
       <div className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="run-commentary">
-        <Markdown text={said} teamId={teamId} />
+        <Markdown text={stripToolCallText(said)} teamId={scope.teamId} chatId={scope.chatId} />
       </div>
     );
   }
@@ -152,12 +246,12 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
     return (
       <div className="text-xs text-neutral-500 dark:text-neutral-400">
         <p className="flex items-center gap-1.5"><Icon size={12} aria-hidden="true" />{t(phrase.key, phrase.params)}</p>
-        <div className="mt-0.5 pl-[18px] italic"><Markdown text={thought} teamId={teamId} /></div>
+        <div className="mt-0.5 pl-[18px] italic"><Markdown text={thought} teamId={scope.teamId} chatId={scope.chatId} /></div>
       </div>
     );
   }
 
-  const body = stepBody(step, live, teamId, t);
+  const body = stepBody(step, live, scope, t);
   return (
     <div className={`text-xs ${tone}`}>
       <button
@@ -175,11 +269,22 @@ function StepRow({ step, running, live, teamId, nameOf }: { step: RunStep; runni
         <span className="ml-auto shrink-0"><StatusMark status={step.status} running={running} /></span>
       </button>
       {open && body && <div className="mt-1 pl-[18px]">{body}</div>}
+      {/* An exhausted account or a spent balance is what switching models
+          answers, so the failure row carries the entry to its picker. */}
+      {botId !== '' && step.status === 'failed' && step.kind === 'notice' && (d.code === 'usageLimitExceeded' || d.failureCode === 'quota') && (
+        <button
+          type="button"
+          onClick={() => openModelPicker(botId)}
+          className="ml-[18px] mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-signal-600 transition-colors hover:bg-signal-500/10 hover:text-signal-700 dark:text-signal-400 dark:hover:text-signal-300"
+        >
+          {t('conversation.step.switchModel')}
+        </button>
+      )}
     </div>
   );
 }
 
-function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (key: string, params?: Record<string, unknown>) => string) {
+function stepBody(step: RunStep, live: LiveRun | undefined, scope: Scope, t: (key: string, params?: Record<string, unknown>) => string) {
   const d = step.detail ?? {};
   switch (step.kind) {
     case 'command': {
@@ -195,7 +300,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       const changes = Array.isArray(d.changes) ? (d.changes as Array<Record<string, unknown>>) : [];
       return (
         <ul className="space-y-1">
-          {changes.map((change, index) => <FileChangeRow key={index} change={change} teamId={teamId} />)}
+          {changes.map((change, index) => <FileChangeRow key={index} change={change} scope={scope} />)}
         </ul>
       );
     }
@@ -207,7 +312,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       return (
         <div className="space-y-1">
           {message ? (
-            <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={teamId} /></div>
+            <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={scope.teamId} chatId={scope.chatId} /></div>
           ) : (
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-2xs dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
           )}
@@ -216,11 +321,11 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
       );
     }
     case 'plan':
-      return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={teamId} /> : null;
+      return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={scope.teamId} chatId={scope.chatId} /> : null;
     case 'diff':
       return typeof d.diff === 'string' && d.diff ? <DiffView diff={d.diff} /> : null;
     case 'agent':
-      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={teamId} /></div> : null;
+      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={scope.teamId} chatId={scope.chatId} /></div> : null;
     case 'retry':
     case 'notice':
       return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-500 dark:text-neutral-400">{d.message}</p> : null;
@@ -229,7 +334,7 @@ function stepBody(step: RunStep, live: LiveRun | undefined, teamId: string, t: (
   }
 }
 
-function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; teamId: string }) {
+function FileChangeRow({ change, scope }: { change: Record<string, unknown>; scope: Scope }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -251,7 +356,7 @@ function FileChangeRow({ change, teamId }: { change: Record<string, unknown>; te
             icon={Icons.openExternal}
             onClick={() => {
               setError('');
-              api.openTeamPath(teamId, path).catch((err) => setError(apiErrorMessage(t, err)));
+              openWorkspaceFile(scope.chatId ? { kind: 'chat', id: scope.chatId } : { kind: 'team', id: scope.teamId ?? '' }, path).catch((err) => setError(apiErrorMessage(t, err)));
             }}
           >
             {t('conversation.file.open')}

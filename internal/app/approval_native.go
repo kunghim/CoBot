@@ -10,7 +10,7 @@ import (
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
-func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, option, comment string, expected int64) (domain.Approval, error) {
+func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, option, comment string, expected int64, content map[string]any) (domain.Approval, error) {
 	cached, unlock, err := beginWrite[domain.Approval](ctx, a, p)
 	defer unlock()
 	if err != nil {
@@ -32,7 +32,7 @@ func (a *App) decideNativeApproval(ctx context.Context, p auth.Principal, id, op
 	if (option == domain.DecisionAcceptEngine || option == domain.DecisionAcceptSession) && approval.Method == "item/fileChange/requestApproval" && !hasFilePreview(approval) {
 		return domain.Approval{}, domain.Conflict("error.approval.file_preview_unavailable", nil)
 	}
-	response, err := engineResponseFor(approval, option)
+	response, err := engineResponseFor(approval, option, content)
 	if err != nil {
 		return domain.Approval{}, err
 	}

@@ -18,7 +18,7 @@ test('language setting switches the UI and persists', async ({ page }) => {
 
   // The page re-renders in English: the same labels change language.
   await expect(page.getByRole('navigation', { name: 'Settings' })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole('link', { name: 'Security' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'About' })).toBeVisible();
 
   // The choice persists across a reload.
   await page.reload();

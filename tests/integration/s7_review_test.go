@@ -160,6 +160,25 @@ func (f reviewFlow) openQuestion(teamID, kind string) domain.Question {
 	return found
 }
 
+// said is everything the member's conversation holds from the member itself, as
+// the user reads it: its replies and the documents it put there.
+func (f reviewFlow) said(ctx context.Context, bot domain.Bot) string {
+	f.t.Helper()
+	messages, err := sqlite.ListMessages(ctx, f.h.app.DB, bot.ID, "", 50)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	var out []string
+	for _, m := range messages {
+		// Replies and relay-posted documents both say something the
+		// conversation holds.
+		if m.Kind == domain.MessageKindAssistant || m.Kind == domain.MessageKindDocument {
+			out = append(out, m.RenderText())
+		}
+	}
+	return strings.Join(out, "\n\n")
+}
+
 func relayRoute(reviewer, dev domain.Bot) []map[string]any {
 	return []map[string]any{
 		{"name": "需求评审", "kind": "review", "ownerId": reviewer.ID, "reviewType": "requirements", "criteria": "需求可验证"},
@@ -213,8 +232,12 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	// The user asks for changes: the document goes back to the project
 	// manager, and the revised one is reviewed again.
 	confirm := f.openQuestion(team.ID, domain.QuestionKindConfirm)
-	if confirm.StageIndex != 1 || !strings.Contains(confirm.Question, "提供登录接口") {
+	// The document is read in the project manager's conversation; the question only asks.
+	if confirm.StageIndex != 1 || strings.Contains(confirm.Question, "提供登录接口") || !strings.Contains(confirm.Question, "请确认") {
 		t.Fatalf("confirm = %+v", confirm)
+	}
+	if !strings.Contains(f.said(ctx, pm), "提供登录接口") {
+		t.Fatalf("the requirement document was not put in the conversation: %q", f.said(ctx, pm))
 	}
 	if _, err := h.app.AnswerQuestion(ctx, h.user, confirm.ID, "随便答", confirm.Revision); err == nil {
 		t.Fatal("a confirmation answered as a plain question")
@@ -288,8 +311,11 @@ func TestRequirementRunsItsRouteToAcceptance(t *testing.T) {
 	f.finish(pm, accept, "")
 
 	acceptance := f.openQuestion(team.ID, domain.QuestionKindAcceptance)
-	if !strings.Contains(acceptance.Question, "登录接口已完成") || !strings.Contains(acceptance.Question, "以后补超时处理") {
+	if strings.Contains(acceptance.Question, "登录接口已完成") || !strings.Contains(acceptance.Question, "验收") {
 		t.Fatalf("acceptance = %+v", acceptance)
+	}
+	if report := f.said(ctx, pm); !strings.Contains(report, "登录接口已完成") || !strings.Contains(report, "以后补超时处理") || !strings.Contains(report, "验收汇报") {
+		t.Fatalf("the acceptance report was not put in the conversation: %q", report)
 	}
 	req, err := sqlite.GetRequirement(ctx, h.app.DB, acceptance.RequirementID)
 	if err != nil || req.Status != domain.RequirementAccepting || !strings.Contains(req.Document, "失败返回原因") {
@@ -420,7 +446,7 @@ func TestConfirmChangesCanComeStraightBack(t *testing.T) {
 	f.finish(pm, draft, "")
 
 	again := f.openQuestion(team.ID, domain.QuestionKindConfirm)
-	if again.ID == confirm.ID || !strings.Contains(again.Question, "导出 CSV 和 Excel") {
+	if again.ID == confirm.ID || !strings.Contains(f.said(ctx, pm), "导出 CSV 和 Excel") {
 		t.Fatalf("the revised document did not come back for confirmation: %+v", again)
 	}
 	time.Sleep(200 * time.Millisecond)

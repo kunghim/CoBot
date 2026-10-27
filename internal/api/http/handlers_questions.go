@@ -18,7 +18,8 @@ type answerQuestionRequest struct {
 	RequestID  string `json:"requestId"`
 	AnswerText string `json:"answerText"`
 	// Decision answers a confirmation or acceptance: accept, or revise with the
-	// changes in answerText.
+	// changes in answerText. A recruitment request takes approve or reject,
+	// with an optional comment in answerText.
 	Decision string `json:"decision,omitempty"`
 	// Mode is where a confirmation's changes go once made: rerun (through
 	// the stages in between again, the default) or return_to_me.
@@ -43,10 +44,19 @@ func (s *Server) handleAnswerQuestion(w http.ResponseWriter, r *http.Request) {
 		expected = *req.ExpectedRevision
 	}
 	answer := s.App.AnswerQuestion
-	if req.Decision != "" {
+	switch req.Decision {
+	case "":
+	case domain.AcceptanceAccept, domain.AcceptanceRevise:
 		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
 			return s.App.AnswerDecision(ctx, principal, id, req.Decision, req.Mode, text, expected)
 		}
+	case domain.RecruitmentApprove, domain.RecruitmentReject:
+		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
+			return s.App.AnswerRecruitment(ctx, principal, id, req.Decision, text, expected)
+		}
+	default:
+		writeError(w, r, domain.InvalidRequest("error.question.acceptance_decision", nil))
+		return
 	}
 	question, err := answer(r.Context(), principal, r.PathValue("id"), req.AnswerText, expected)
 	if err != nil {

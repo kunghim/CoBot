@@ -61,7 +61,7 @@ func (a *App) ApprovalHistory(ctx context.Context, principal auth.Principal, tea
 // DecideApproval records the user's decision with CAS and delivers the
 // engine response. The decision survives a failed delivery; the response
 // state truthfully reports queued/sent/unknown/expired.
-func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, approvalID, optionID, comment string, expectedRevision int64) (domain.Approval, error) {
+func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, approvalID, optionID, comment string, expectedRevision int64, content map[string]any) (domain.Approval, error) {
 	if principal.Kind != auth.KindUser {
 		return domain.Approval{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -71,9 +71,11 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	}
 	switch card.Type {
 	case domain.ApprovalNativeTool:
-		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision)
+		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision, content)
 	case domain.ApprovalChain, domain.ApprovalRecovery:
 		return a.decideControlApproval(ctx, principal, card, optionID, comment, expectedRevision)
+	case domain.ApprovalBudget:
+		return a.decideBudgetApproval(ctx, principal, card, optionID, comment, expectedRevision)
 	default:
 		return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", nil)
 	}
@@ -88,9 +90,18 @@ func (a *App) publishApprovalUpdated(ctx context.Context, approval domain.Approv
 }
 
 // engineResponseFor maps the stored option onto the exact native response.
-func engineResponseFor(approval domain.Approval, optionID string) (map[string]any, error) {
+// An elicitation's accepted reply carries the user's form content.
+func engineResponseFor(approval domain.Approval, optionID string, content map[string]any) (map[string]any, error) {
 	if approval.Type != domain.ApprovalNativeTool {
 		return nil, nil // non-engine cards have no protocol reply
+	}
+	if approval.Method == "mcpServer/elicitation/request" {
+		switch optionID {
+		case domain.DecisionAcceptEngine:
+			return map[string]any{"action": "accept", "content": content}, nil
+		default:
+			return map[string]any{"action": "decline"}, nil
+		}
 	}
 	switch approval.Method {
 	case "item/permissions/requestApproval":

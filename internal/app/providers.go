@@ -57,7 +57,7 @@ func (a *App) providerView(ctx context.Context, p domain.Provider) ProviderView 
 			has = true
 		}
 	}
-	return ProviderView{Provider: p, HasCredential: has}
+	return ProviderView{Provider: a.withSpecs(p), HasCredential: has}
 }
 
 // SaveProvider validates a provider, makes it reachable for the engine and
@@ -82,6 +82,8 @@ func (a *App) SaveProvider(ctx context.Context, p domain.Provider, expectedRevis
 	if err := p.Validate(); err != nil {
 		return ProviderView{}, err
 	}
+	// What the catalog answers for is not kept; the computed spec never is.
+	p.Models = a.clearedOfWhatTheCatalogGives(p.Models)
 	if err := a.bindProvider(ctx, p); err != nil {
 		return ProviderView{}, err
 	}
@@ -279,6 +281,13 @@ func (a *App) RebindProviders(ctx context.Context) {
 	}
 	for _, p := range providers {
 		if p.AuthMode != domain.ProviderAuthAPIKey {
+			continue
+		}
+		// A provider without an endpoint has nothing to hand over. That
+		// state only exists for a provider whose only dialect was removed
+		// (the migration marks it disabled); rebinding it would fail on
+		// every start-up for as long as the user keeps it around.
+		if len(p.Endpoints) == 0 {
 			continue
 		}
 		if err := a.bindProvider(ctx, p); err != nil && a.Logger != nil {

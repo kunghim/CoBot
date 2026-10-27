@@ -23,7 +23,30 @@
 | [验证流程](workflows/verify.md) | 跑测试、起服务、真实 Codex 验证、汇报结果 |
 | [交付与同步流程](workflows/deliver.md) | 做完汇报；提交、拉取、推送、开 PR（含私人笔记同步） |
 | [文档流程](workflows/docs.md) | 写方案和记录、整理或归档文档 |
+| [需求分析与提 Issue](workflows/issue.md) | 用户报问题或提需求，分析定位后提 Issue 交给编码智能体 |
 | [踩坑记录](pitfalls.md) | 每次都会碰到的环境与运行问题 |
+
+## 发布前实测（`testing/`）
+
+| 文档 | 触发 |
+| --- | --- |
+| [流程与重测集](testing/README.md) | 实测候选版本：这次要测什么、怎么记账 |
+| [操作指南](testing/guide.md) | 怎么装、启动、观察、记录；界面里东西在哪 |
+| [门禁](testing/cases/gates.md) | 每次必跑的自动化基线 |
+| [启动与首次使用](testing/cases/start.md) | 引擎检测、启动停止、重启 |
+| [Codex 引擎](testing/cases/engine.md) | 版本兼容、协议基线 |
+| [团队与成员](testing/cases/teams.md) | 建团队、归档、删成员 |
+| [会话与接力](testing/cases/relay.md) | 需求链路、审批、恢复（真实 Codex） |
+| [聊天与统一归档](testing/cases/chats.md) | 无项目聊天、模式切换、侧栏菜单与分区、归档 |
+| [每日预算](testing/cases/budget.md) | 团队与成员的每日 Token 上限、暂停与重置 |
+| [模型与供应商](testing/cases/models.md) | 供应商、成员换模型、跨厂商、模型目录 |
+| [团队浏览器与工作区](testing/cases/workspace.md) | 标签、视口、清理 |
+| [设置](testing/cases/settings.md) | 9 个分区、用量、记忆 |
+| [会话授权与访问控制](testing/cases/security.md) | 登录、来源校验、密钥不落盘 |
+| [头像库与头像](testing/cases/avatars.md) | 下载、缓存、覆盖、上传 |
+| [数据存储与升级](testing/cases/upgrade.md) | 从旧版本升级 |
+| [界面外观与国际化](testing/cases/ui.md) | 主题、中英文、窄屏 |
+| [打包产物与桌面壳](testing/cases/packaging.md) | ZIP、MSI、原生窗口、发布说明 |
 
 ## 产品（`product/`）
 
@@ -41,5 +64,5 @@
 | [升级与回滚](reference/upgrading.md) | 迁移对用户数据的影响、发行形态替换与回滚 |
 | [原生 hook 手动审查](reference/hook-review.md) | hook 自动授权被拒绝 |
 | [分支、审查与合并](reference/branching.md) | 维护者合并 PR、晋级 `main`、清理分支 |
-| [Issue 分诊与认领命令](reference/triage.md) | 分诊标签、`ai-discovered`、`/claim` |
-| [发布草稿](reference/release.md) | 打包并发布版本 |
+| [Issue 分诊与认领命令](reference/triage.md) | 分诊标签、`ai-discovered`、`/claim` 与直接指派 |
+| [自动发布](reference/release.md) | main 更新后检查、打包与发布，及手动草稿入口 |

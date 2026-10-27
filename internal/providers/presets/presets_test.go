@@ -10,10 +10,11 @@ import (
 
 // measuredVendors is the vendor table as it was probed on 2026-10-20. The
 // catalogue must match it exactly: a vendor that disappears, or one that
-// appears without a measured row, fails the test.
+// appears without a measured row, fails the test. Anthropic served only the
+// Anthropic Messages dialect, which CoBot no longer speaks, so it is not in
+// the catalogue and its key is not recognised.
 var measuredVendors = []string{
 	"openai",
-	"anthropic",
 	"deepseek",
 	"kimi",
 	"zhipu",
@@ -31,47 +32,35 @@ var measuredVendors = []string{
 // provider.
 var measuredBases = map[string]map[string]string{
 	"openai": {},
-	"anthropic": {
-		domain.DialectAnthropicMessages: "api.anthropic.com",
-	},
 	"deepseek": {
-		domain.DialectOpenAIResponses:   "api.deepseek.com/v1",
-		domain.DialectAnthropicMessages: "api.deepseek.com/anthropic",
+		domain.DialectOpenAIResponses: "api.deepseek.com/v1",
 	},
 	"kimi": {
-		domain.DialectOpenAIResponses:   "api.moonshot.cn/v1",
-		domain.DialectAnthropicMessages: "api.moonshot.cn/anthropic",
+		domain.DialectOpenAIResponses: "api.moonshot.cn/v1",
 	},
 	"zhipu": {
-		domain.DialectOpenAIResponses:   "open.bigmodel.cn/api/paas/v4",
-		domain.DialectAnthropicMessages: "open.bigmodel.cn/api/anthropic",
+		domain.DialectOpenAIResponses: "open.bigmodel.cn/api/paas/v4",
 	},
 	"zai": {
-		domain.DialectOpenAIResponses:   "api.z.ai/api/paas/v4",
-		domain.DialectAnthropicMessages: "api.z.ai/api/anthropic",
+		domain.DialectOpenAIResponses: "api.z.ai/api/paas/v4",
 	},
 	"minimax": {
-		domain.DialectOpenAIResponses:   "api.minimaxi.com/v1",
-		domain.DialectAnthropicMessages: "api.minimaxi.com/anthropic",
+		domain.DialectOpenAIResponses: "api.minimaxi.com/v1",
 	},
 	"dashscope": {
-		domain.DialectOpenAIResponses:   "dashscope.aliyuncs.com/compatible-mode/v1",
-		domain.DialectAnthropicMessages: "dashscope.aliyuncs.com/apps/anthropic",
+		domain.DialectOpenAIResponses: "dashscope.aliyuncs.com/compatible-mode/v1",
 	},
 	"mimo": {
-		domain.DialectOpenAIResponses:   "api.xiaomimimo.com/v1",
-		domain.DialectAnthropicMessages: "api.xiaomimimo.com/anthropic",
+		domain.DialectOpenAIResponses: "api.xiaomimimo.com/v1",
 	},
 	"xai": {
 		domain.DialectOpenAIResponses: "api.x.ai/v1",
 	},
 	"openrouter": {
-		domain.DialectOpenAIResponses:   "openrouter.ai/api/v1",
-		domain.DialectAnthropicMessages: "openrouter.ai/api",
+		domain.DialectOpenAIResponses: "openrouter.ai/api/v1",
 	},
 	"opencode-zen": {
-		domain.DialectOpenAIResponses:   "opencode.ai/zen/v1",
-		domain.DialectAnthropicMessages: "opencode.ai/zen/v1",
+		domain.DialectOpenAIResponses: "opencode.ai/zen/v1",
 	},
 }
 
@@ -170,7 +159,7 @@ func TestEndpointsMatchMeasuredTable(t *testing.T) {
 		got := make(map[string]string, len(p.Endpoints))
 		for _, ep := range p.Endpoints {
 			switch ep.Dialect {
-			case domain.DialectOpenAIResponses, domain.DialectAnthropicMessages:
+			case domain.DialectOpenAIResponses:
 			default:
 				t.Errorf("preset %q declares unknown dialect %q", p.ID, ep.Dialect)
 			}
@@ -199,21 +188,6 @@ func TestEndpointsMatchMeasuredTable(t *testing.T) {
 			if _, ok := want[dialect]; !ok {
 				t.Errorf("preset %q declares unmeasured dialect %q", p.ID, dialect)
 			}
-		}
-	}
-}
-
-func TestAnthropicHasNoResponsesEndpoint(t *testing.T) {
-	// Anthropic does not serve the Responses protocol: the surface answers
-	// 404. A preset that claimed it would send the engine to a path that
-	// does not exist.
-	preset, ok := ByID("anthropic")
-	if !ok {
-		t.Fatal("preset anthropic not found")
-	}
-	for _, ep := range preset.Endpoints {
-		if ep.Dialect == domain.DialectOpenAIResponses {
-			t.Errorf("anthropic preset declares a responses endpoint")
 		}
 	}
 }
@@ -295,11 +269,6 @@ func TestDetectVendorKnowsRealKeys(t *testing.T) {
 		want string
 	}{
 		{
-			name: "anthropic",
-			key:  "sk-ant-api03-" + strings.Repeat("a", 80),
-			want: "anthropic",
-		},
-		{
 			name: "openai",
 			key:  "sk-proj-" + strings.Repeat("A0b_", 10),
 			want: "openai",
@@ -344,7 +313,7 @@ func TestDetectVendorRefusesToGuess(t *testing.T) {
 		{name: "short", key: "sk-abc"},
 		{name: "plain", key: "not-a-key"},
 		{name: "other vendor", key: "gsk_test_0123456789abcdef"},
-		{name: "truncated anthropic", key: "sk-ant-api03-" + strings.Repeat("a", 79)},
+		{name: "anthropic key", key: "sk-ant-api03-" + strings.Repeat("a", 80)},
 		{name: "short deepseek", key: "sk-" + strings.Repeat("a1", 15)},
 		{name: "long deepseek", key: "sk-" + strings.Repeat("a1", 17)},
 		{
@@ -365,7 +334,6 @@ func TestDetectVendorRefusesToGuess(t *testing.T) {
 
 func TestDetectVendorResultIsInCatalogue(t *testing.T) {
 	keys := []string{
-		"sk-ant-api03-" + strings.Repeat("a", 80),
 		"sk-proj-" + strings.Repeat("A0b_", 10),
 		"xai-" + strings.Repeat("z", 60),
 		"sk-or-v1-" + strings.Repeat("a1b2", 8),

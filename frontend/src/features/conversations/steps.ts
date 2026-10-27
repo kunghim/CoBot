@@ -60,7 +60,7 @@ const providerFailureCodes = new Set([
 ]);
 
 /** One-line description of a step. */
-export function describeStep(step: RunStep, nameOf: (botId: string) => string): Phrase {
+export function describeStep(step: { kind: string; status: string; detail: RunStep['detail'] }, nameOf: (botId: string) => string): Phrase {
   const d = step.detail ?? {};
   switch (step.kind) {
     case 'reasoning':
@@ -87,6 +87,8 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
       return { key: 'conversation.step.webSearch', params: { query: text(d.query) } };
     case 'plan':
       return { key: 'conversation.step.plan' };
+    case 'compaction':
+      return { key: step.status === 'in_progress' ? 'conversation.step.compacting' : 'conversation.step.compacted' };
     case 'retry':
       return step.status === 'in_progress'
         ? { key: 'conversation.step.retrying', params: { attempt: Number(d.attempt) || 1 } }
@@ -137,15 +139,74 @@ export function describeStep(step: RunStep, nameOf: (botId: string) => string): 
   }
 }
 
-/** Steps worth listing: an empty thought would only add noise, and an
- * ongoing reconnect is already the status line itself. */
-export function visibleSteps(steps: RunStep[], live: LiveRun | undefined): RunStep[] {
+/** Whether a thing the member said is one of the pieces the reply was made of
+ * (the reply joins them with a blank line), not merely words the reply happens to contain. */
+export function isPartOfReply(said: string, reply: string): boolean {
+  const text = reply.trim();
+  return text === said || text.startsWith(said + '\n\n') || text.endsWith('\n\n' + said) || text.includes('\n\n' + said + '\n\n');
+}
+
+/** Steps worth listing: an empty thought would only add noise, an ongoing
+ * reconnect is already the status line itself, and what the member said that
+ * the reply already holds (the closing words of the turn) would be said twice. */
+export function visibleSteps(steps: RunStep[], live: LiveRun | undefined, replyText = ''): RunStep[] {
   return steps.filter((step) => {
     if (step.kind === 'reasoning') return text(step.detail?.text).trim() !== '' || (live?.reasoning[step.id] ?? '') !== '';
-    if (step.kind === 'message') return text(step.detail?.text).trim() !== '' || (live?.commentary[step.id] ?? '') !== '';
+    if (step.kind === 'message') {
+      const said = text(step.detail?.text).trim();
+      if (said !== '' && isPartOfReply(said, replyText)) return false;
+      return said !== '' || (live?.commentary[step.id] ?? '') !== '';
+    }
     if (step.kind === 'retry') return step.status !== 'in_progress';
     return true;
   });
+}
+
+/** A turn read as the member lived it: what it said, and the stretches of
+ * work between the sayings. A stretch holds consecutive steps of one kind;
+ * a step of another counted kind starts the next stretch, and steps that are
+ * not counted on their own (a thought, a notice) follow along inside the
+ * stretch they land in. */
+export type TurnBlock = { kind: 'text'; step: RunStep } | { kind: 'work'; id: string; steps: RunStep[]; of?: string };
+
+export function turnBlocks(steps: RunStep[]): TurnBlock[] {
+  const out: TurnBlock[] = [];
+  for (const step of steps) {
+    if (step.kind === 'message') {
+      out.push({ kind: 'text', step });
+      continue;
+    }
+    const of = (countedKinds as readonly string[]).includes(step.kind) ? step.kind : undefined;
+    const last = out[out.length - 1];
+    if (last?.kind === 'work' && (of === undefined || last.of === of)) {
+      last.steps.push(step);
+      continue;
+    }
+    out.push({ kind: 'work', id: step.id, steps: [step], of });
+  }
+  return out;
+}
+
+const countedKinds = ['command', 'file_change', 'tool', 'web_search', 'agent'] as const;
+
+/** One line for a stretch of work: how many of each it held. */
+export function workSummary(steps: RunStep[]): Phrase[] {
+  const out: Phrase[] = [];
+  for (const kind of countedKinds) {
+    const matching = steps.filter((step) => step.kind === kind);
+    const paths = kind === 'file_change' ? matching.flatMap((step) => Array.isArray(step.detail.changes) ? step.detail.changes.flatMap((change: unknown) => change && typeof change === 'object' && 'path' in change && typeof change.path === 'string' ? [change.path] : []) : []) : [];
+    const completePaths = matching.every((step) => Array.isArray(step.detail.changes) && step.detail.changes.length > 0 && step.detail.changes.every((change: unknown) => change && typeof change === 'object' && 'path' in change && typeof change.path === 'string'));
+    const count = kind === 'file_change' && completePaths ? new Set(paths).size : matching.length;
+    const label = kind === 'file_change' && !completePaths ? 'file_operation' : kind;
+    if (count > 0) out.push({ key: `conversation.process.group.${label}`, params: { count } });
+  }
+  if (out.length === 0) out.push({ key: 'conversation.process.group.other', params: { count: steps.length } });
+  return out;
+}
+
+/** Whether a stretch of work needs to be seen without a click: something went wrong in it. */
+export function workNeedsAttention(steps: RunStep[]): boolean {
+  return steps.some((step) => step.status === 'failed' || step.status === 'declined' || step.kind === 'notice');
 }
 
 /** The command a member ran, without the shell the engine wrapped it in:
@@ -189,6 +250,8 @@ export function runPhase(run: Pick<Run, 'status'>, steps: RunStep[], live: LiveR
       return { key: 'conversation.phase.searching' };
     case 'message':
       return { key: 'conversation.phase.replying' };
+    case 'compaction':
+      return { key: 'conversation.phase.compacting' };
   }
   if ((live?.reply ?? '') !== '') return { key: 'conversation.phase.replying' };
   if (run.status === 'starting' && steps.length === 0) return { key: 'conversation.phase.starting' };

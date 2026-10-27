@@ -11,10 +11,18 @@ Go 直接依赖表依据 `go.mod` 和对应版本的模块 LICENSE 核对；前�
 并核对了匹配版本的包内许可证。旧验收中的版本号、当次审计结果不能替代当前锁文件。
 
 完整发行包的第三方正文由 [third-party-notices.mjs](../../scripts/third-party-notices.mjs)
-在目标平台、安装锁定依赖后生成 `THIRD-PARTY-NOTICES.txt`。
+在目标平台、安装锁定依赖并构建前端后生成 `THIRD-PARTY-NOTICES.txt`。
 该脚本按桌面构建标签收集程序、助手及传递模块，并包含 Go 标准库/运行时声明；Windows 另收集 WiX UI 资源声明。
-前端遍历锁文件中的生产依赖，而非只收集第一层包。
-脚本发现缺失许可证时会失败，不能通过删减名单跳过。
+前端按构建生成的 `internal/webui/dist/third-party-inputs.json` 收集：覆盖主页面、Worker、DOCX 独立渲染器、CSS 输入、构建注入的运行时代码及明确复制的资源，包括实际使用的传递依赖和资源子目录声明。仅被 npm 安装、未进入产物的依赖不纳入发行声明，不使用包名豁免名单。
+记录包含锁文件、构建输入和输出文件的哈希；缺失或过期、输出变化、已使用的包缺少许可证时均失败。正式打包还要求每个二进制嵌入同一份记录，拒绝用新构建的声明配旧二进制。
+`fontkit`、`dfa`、`brotli` 属于 PPTX 预览库独立 Node 入口的依赖；当前 CoBot 使用浏览器入口，构建记录确认它们未进入产物。后续代码若引入这些包，会重新纳入检查。
+`isarray` 1.0.0 的完整 MIT 正文位于包内 README 的 License 小节，按精确版本和正文特征提取。
+`@napi-rs/canvas` 1.0.13 的平台包漏带正文，使用经同版本上游比对的[原文与来源记录](../../packaging/licenses/napi-rs-canvas-1.0.13/NOTICE.txt)；版本改变必须重新核对。
+
+## 随程序附带的数据
+
+- `internal/modelcatalog/bundled.json`：由 `go run ./internal/modelcatalog/gen` 从 [models.dev](https://models.dev)（MIT）的公开数据整理出的模型目录快照，只保留模型名、上下文长度、最大输出、输入类型和思考方式。
+  设置里“更新模型目录”会下载同一来源的最新数据，存到用户数据目录，不改动安装目录。
 
 ## Go 直接依赖
 
@@ -36,8 +44,15 @@ Go 标准库与运行时会进入二进制，不能因 Go 工具链是构建工�
 
 | 包 | 锁定版本 | 包内声明 |
 | --- | --- | --- |
-| `@dicebear/core` | 10.6.1 | MIT |
+| `@dicebear/core` | 10.7.0 | MIT |
 | `@tanstack/react-query` | 5.104.2 | MIT |
+| `mdast-util-from-markdown` | 2.1.0 | MIT |
+| `highlight.js` | 11.12.0 | BSD-3-Clause |
+| `@office-kit/pptx` | 0.28.0 | MIT |
+| `@office-kit/pptx-preview` | 0.21.0 | MIT；按实际浏览器构建范围收集传递依赖声明 |
+| `docx-preview` | 0.4.1 | Apache-2.0 |
+| `xlsx`（SheetJS 官方发布包） | 0.20.3 | Apache-2.0 |
+| `pdfjs-dist` | 6.4.299 | Apache-2.0 |
 | `i18next` | 24.2.3 | MIT |
 | `lucide-react` | 0.475.0 | ISC |
 | `react` / `react-dom` | 18.3.1 | MIT |
@@ -47,7 +62,9 @@ Go 标准库与运行时会进入二进制，不能因 Go 工具链是构建工�
 | `remark-gfm` | 4.0.1 | MIT |
 
 表格使用锁文件中的确切版本，不使用 `package.json` 的版本范围代替实际版本。
-`react-markdown`、`remark-gfm` 等会引入传递依赖，完整清单由声明脚本收集。
+`highlight.js` 在独立 worker 中处理有界源码页；`pdfjs-dist` 用于 PDF 预览，解析 worker、字体、CMap、ICC 与 WASM 资源随构建分发，不从 CDN 获取。
+`xlsx` 从 SheetJS 官方 CDN 锁定发布包，预览解析在可终止的 worker 中执行；只显示保存值，不执行宏、外部链接或公式重算。
+`react-markdown`、`remark-gfm`、`pdfjs-dist` 等会引入传递依赖，完整清单由声明脚本收集。
 Vite、TypeScript、Tailwind、Vitest、Playwright 和接口生成工具等开发依赖单独由各自锁文件维护。
 
 ## 头像素材与打包资源
@@ -69,8 +86,10 @@ Vite、TypeScript、Tailwind、Vitest、Playwright 和接口生成工具等开�
 
 ## 外部运行条件
 
-Codex CLI 由用户安装，CoBot 不将其放入发行包。当前兼容性下限按平台区分，见[引擎适配规则](../rules/engine.md)。
+用户需安装 ChatGPT 桌面端；CoBot 只复用其中的 Codex 程序，不将引擎放入发行包，也不使用独立 CLI。发现方式与私有环境边界见[引擎适配规则](../rules/engine.md)。
 Windows 桌面依赖已有 WebView2 Runtime；macOS 原生构建依赖平台工具链。
+LaTeX 当前可使用明确提供的 macOS Tectonic 离线资源：启动环境变量 `COBOT_LATEX_BINARY` 和 `COBOT_LATEX_CACHE` 均需为绝对路径，前者指向可执行文件，后者指向完整的既有 Tectonic 缓存。临时输出只写当前数据根的缓存目录，退出后删除；不继承编译器密钥，不自动安装或下载。按[现有决定](../product/decisions.md)，本轮保留这些条件，暂缓资源包正式分发及其他平台隔离编译，不作为文件系统交付的阻塞项；不宣称发行包内置编译资源或已支持其他平台。
+
 这些外部条件与内嵌依赖分开说明，不将“需要用户安装”写成“由 CoBot 分发”。
 
 ## 如何更新
@@ -81,10 +100,12 @@ Windows 桌面依赖已有 WebView2 Runtime；macOS 原生构建依赖平台工�
 4. 改动涉及头像等素材时，同步其来源和许可证文件。
 5. 在 PR 中说明范围和实际检查结果，不将历史 `npm audit` 结果写成当前无风险保证。
 
-在依赖齐备的目标平台可单独生成声明用于复核：
+在依赖齐备的目标平台构建前端后，可单独生成声明用于复核：
 
 ```sh
 node scripts/third-party-notices.mjs .tmp/THIRD-PARTY-NOTICES.txt
 ```
 
-本次仅核对源文件、锁文件与直接依赖许可证，未执行 Windows 或 macOS 原生打包。
+正式打包脚本会在输出路径后传入全部待分发的二进制路径，额外校验嵌入记录。`node_modules` 不随前端或桌面包分发。
+
+macOS 本地试打包已核对前端构建记录、嵌入二进制和随包声明。Windows 打包脚本使用同一校验，仍需在 Windows 实际构建验收。

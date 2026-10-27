@@ -3,6 +3,7 @@
 // component here and to the gallery before using it in a view.
 export * from './foundation';
 export * from './BrandMark';
+export * from './ChatComposer';
 export * from './Button';
 export * from './Field';
 export * from './Input';

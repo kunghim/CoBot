@@ -191,3 +191,44 @@ func (s *Server) handleBrowserViewport(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, r, http.StatusOK, map[string]any{"viewport": viewport})
 }
+
+func (s *Server) handleStartPreview(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+		Command   string `json:"command"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.App.StartPreview(r.Context(), principal, r.PathValue("id"), req.Command)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, result)
+}
+
+func (s *Server) handleStopPreview(w http.ResponseWriter, r *http.Request) {
+	principal, ok := requireUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+		Command   string `json:"command"`
+	}
+	if err := decodeBody(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	if err := s.App.StopPreview(r.Context(), principal, r.PathValue("id"), req.Command); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeData(w, r, http.StatusOK, map[string]any{"stopped": true})
+}

@@ -47,7 +47,7 @@ func TestNativeReplyCannotUndoNewerCompletionOrApproval(t *testing.T) {
 				t.Fatal(err)
 			}
 			for range 2 {
-				if _, err := h.app.DecideApproval(ctx, p, cards[0].ID, "accept", "", cards[0].Revision); err != nil {
+				if _, err := h.app.DecideApproval(ctx, p, cards[0].ID, "accept", "", cards[0].Revision, nil); err != nil {
 					t.Fatal(err)
 				}
 			}

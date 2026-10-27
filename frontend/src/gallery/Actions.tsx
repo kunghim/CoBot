@@ -118,11 +118,14 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="field" name="Field 字段" file="components/ui/Field.tsx" use="给每个输入控件配标签、提示和错误。里面的控件自动关联 id 和说明。" a11y="错误用 role=alert 读出，并通过 aria-describedby 关联到控件。" avoid="不要在字段旁边放“已保存”——保存成功用 Toast。">
+      <Doc id="field" name="Field 字段" file="components/ui/Field.tsx" use="给每个输入控件配标签、提示和错误。重要的提示直接显示在控件下方；次要的（单位、默认值）用 info 收进标签旁的图标，悬停或键盘聚焦显示。里面的控件自动关联 id 和说明。" a11y="错误用 role=alert 读出，并通过 aria-describedby 关联到控件。" avoid="不要在字段旁边放“已保存”——保存成功用 Toast。">
         <Demo surface="raised">
           <div className="grid max-w-xl gap-5">
             <Field label="团队名称" hint="成员会在团队列表里看到这个名字。" required>
               <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：待办应用" />
+            </Field>
+            <Field label="上下文长度" info="单位是 token；不填就用模型目录给的值，只能填更小的。">
+              <TextInput mono value="1048576" readOnly />
             </Field>
             <Field label="工作目录" error="这个目录已经被“设计预览”团队使用了，换一个目录，或先归档那个团队。">
               <TextInput mono value="E:\\work\\todo-app" readOnly />
@@ -182,7 +185,7 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="checkbox" name="Checkbox 复选 · Switch 开关" file="components/ui/Choice.tsx" use="Checkbox：表单里的独立是/否，点保存才生效（建团队时勾选成员）。Switch：一个设置，拨动立即生效。" avoid="不要用 Switch 表示需要再点保存的选择。">
+      <Doc id="checkbox" name="Checkbox 复选 · Switch 开关" file="components/ui/Choice.tsx" use="Checkbox：表单里的独立是/否，点保存才生效（建团队时勾选成员）。Switch：一个设置，拨动立即生效。列表行里开关的意思一目了然时传 hideLabel，名字只留给读屏。" avoid="不要用 Switch 表示需要再点保存的选择。">
         <Demo surface="raised">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-3">
@@ -264,7 +267,7 @@ export default function Actions() {
         </Demo>
       </Doc>
 
-      <Doc id="chip" name="Chip 小片" file="components/ui/Choice.tsx" use="从很多里挑几个，摆成一行（供应商的可用模型、筛选项）。选中的有勾，不只靠颜色区分；末尾可以挂一个 Badge 说明状态。ID、路径一类机器值用 mono。" avoid="只有一个选项时用 Toggle；一行里只点一下就走的用 Button。">
+      <Doc id="chip" name="Chip 小片" file="components/ui/Choice.tsx" use="从很多里挑几个，摆成一行（供应商的可用模型、筛选项）。选中的有勾，不只靠颜色区分；末尾可以挂一个 Badge 说明状态。需要对单个条目做点什么（重新检查、重试）又不想选中它时，传 action：悬停或聚焦时才出现，状态异常的可以一直显示。ID、路径一类机器值用 mono。选中本身有别的意思要表达时（如“已通过检查”的对勾），传 mark={false} 去掉开头的勾，只靠样式表示选中。" avoid="只有一个选项时用 Toggle；一行里只点一下就走的用 Button。">
         <Demo surface="raised">
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">

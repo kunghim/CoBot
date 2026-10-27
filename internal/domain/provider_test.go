@@ -78,18 +78,14 @@ func TestProviderOfficialNeedsNoCredentialAndNoEndpoint(t *testing.T) {
 
 func TestProviderEndpointLookup(t *testing.T) {
 	p := validProvider()
-	p.Endpoints = append(p.Endpoints, ProviderEndpoint{
-		Dialect: DialectAnthropicMessages,
-		BaseURL: "https://api.deepseek.com/anthropic",
-	})
-	if !p.SupportsDialect(DialectOpenAIResponses) || !p.SupportsDialect(DialectAnthropicMessages) {
-		t.Fatal("provider lost a dialect it declares")
+	if !p.SupportsDialect(DialectOpenAIResponses) {
+		t.Fatal("provider lost the dialect it declares")
 	}
 	if p.SupportsDialect("grpc") {
 		t.Fatal("provider claims a dialect it does not declare")
 	}
-	ep, ok := p.EndpointFor(DialectAnthropicMessages)
-	if !ok || ep.BaseURL != "https://api.deepseek.com/anthropic" {
+	ep, ok := p.EndpointFor(DialectOpenAIResponses)
+	if !ok || ep.Dialect != DialectOpenAIResponses || ep.BaseURL != "https://api.deepseek.com/v1" {
 		t.Fatalf("wrong endpoint: %+v", ep)
 	}
 	if _, ok := p.EndpointFor("grpc"); ok {
@@ -119,5 +115,45 @@ func TestProviderApplyLeavesUnmentionedFieldsAlone(t *testing.T) {
 	}
 	if updated.Models[0].ID != p.Models[0].ID {
 		t.Fatal("patch changed the models it did not mention")
+	}
+}
+
+func TestAModelMayDeclareOnlyValidThinkingLevels(t *testing.T) {
+	provider := func(model ProviderModel) Provider {
+		return Provider{
+			ID: "gw", Name: "Gateway", Kind: ProviderKindCustom, AuthMode: ProviderAuthAPIKey, CredentialRef: "ref",
+			Endpoints: []ProviderEndpoint{{Dialect: DialectOpenAIResponses, BaseURL: "https://gw.example/v1"}},
+			Models:    []ProviderModel{model},
+		}
+	}
+	good := []ProviderModel{
+		{ID: "m"},
+		{ID: "m", SupportedEfforts: []string{"low", "high", "xhigh"}, DefaultEffort: "high"},
+	}
+	for _, m := range good {
+		if err := provider(m).Validate(); err != nil {
+			t.Errorf("%+v rejected: %v", m, err)
+		}
+	}
+	bad := []ProviderModel{
+		{ID: "m", SupportedEfforts: []string{""}},
+		{ID: "m", SupportedEfforts: []string{"High!"}},
+		{ID: "m", SupportedEfforts: []string{"low", "low"}},
+		{ID: "m", SupportedEfforts: []string{"low"}, DefaultEffort: "high"},
+		{ID: "m", DefaultEffort: "low"},
+	}
+	for _, m := range bad {
+		if err := provider(m).Validate(); err == nil {
+			t.Errorf("%+v accepted", m)
+		}
+	}
+}
+
+func TestAModelThatListsNoThinkingLevelsHasTheDefaultThree(t *testing.T) {
+	if got := (ProviderModel{ID: "m"}).SupportedEffortsOf(); len(got) != 3 || got[0] != "low" || got[1] != "medium" || got[2] != "high" {
+		t.Fatalf("defaults = %v", got)
+	}
+	if got := (ProviderModel{ID: "m", SupportedEfforts: []string{"xhigh"}}).SupportedEffortsOf(); len(got) != 1 || got[0] != "xhigh" {
+		t.Fatalf("listed = %v", got)
 	}
 }

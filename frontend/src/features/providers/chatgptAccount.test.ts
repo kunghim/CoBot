@@ -13,6 +13,9 @@ const fixture = vi.hoisted(() => ({
   mutate: vi.fn(),
 }));
 vi.mock('../../api/queries', () => ({
+  useModelCatalog: () => ({ data: undefined }),
+  useUpdateModelCatalog: () => ({ mutate: vi.fn(), isPending: false, data: undefined }),
+  useApplyEngineCatalog: () => ({ mutate: vi.fn(), isPending: false }),
   useEngine: () => ({ data: fixture.info, refetch: fixture.refetch }),
   useEngineLogin: () => ({ mutate: fixture.mutate, isPending: false }),
   useEngineLoginCancel: () => ({ mutate: vi.fn(), isPending: false }),
@@ -28,6 +31,7 @@ vi.mock('../../api/queries', () => ({
   useSetProviderEnabled: () => ({ mutate: vi.fn() }),
   useReprobeProvider: () => ({ mutateAsync: vi.fn() }),
   useSaveProvider: () => ({ mutateAsync: vi.fn() }),
+  useEngineModels: () => ({ data: { models: [{ id: 'gpt-test', label: 'GPT Test', isDefault: true, contextWindow: 272000, supportedEfforts: ['low', 'medium', 'high'], inputModalities: ['text'] }] }, isPending: false }),
 }));
 vi.mock('../../components/ui/Toast', () => ({ useToast: () => ({ show: vi.fn(), dismiss: vi.fn() }) }));
 
@@ -37,7 +41,7 @@ describe('ChatGPT sign-in on the provider card', () => {
   let host: HTMLDivElement;
   let root: Root;
   const nativeOpen = vi.fn(async (_url: string) => {});
-  const render = () => act(() => root.render(h(ProviderSection)));
+  const render = () => act(() => root.render(h(ProviderSection, { settings: { defaultProvider: '', defaultModel: '' } as never, save: vi.fn(), errors: {} })));
   const clickLogin = async () => {
     const button = Array.from(host.querySelectorAll('button')).find((node) => node.textContent === i18n.t('engine.login'));
     expect(button).toBeDefined();

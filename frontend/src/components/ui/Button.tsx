@@ -15,8 +15,8 @@ const variantClass: Record<ButtonVariant, string> = {
   link: 'h-auto px-0 text-signal-600 underline-offset-4 hover:underline dark:text-signal-400',
 };
 
-const padding: Record<ControlSize, string> = { sm: 'px-2.5 gap-1.5', md: 'px-3.5 gap-2', lg: 'px-5 gap-2' };
-const iconSize: Record<ControlSize, number> = { sm: 14, md: 16, lg: 18 };
+const padding: Record<ControlSize, string> = { xs: 'px-2 gap-1', sm: 'px-2.5 gap-1.5', md: 'px-3.5 gap-2', lg: 'px-5 gap-2' };
+const iconSize: Record<ControlSize, number> = { xs: 13, sm: 14, md: 16, lg: 18 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -74,7 +74,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   shape?: 'square' | 'circle';
 }
 
-const square: Record<ControlSize, string> = { sm: 'h-7 w-7', md: 'h-9 w-9', lg: 'h-11 w-11' };
+const square: Record<ControlSize, string> = { xs: 'h-6 w-6', sm: 'h-7 w-7', md: 'h-9 w-9', lg: 'h-11 w-11' };
 
 /** A button that is only an icon. It always has a label and a tooltip. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(

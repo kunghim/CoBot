@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/bootstrap"
 	"github.com/kunghim/CoBot/internal/platform"
 )
 
@@ -108,6 +110,108 @@ func TestAnotherSiteCannotOpenASession(t *testing.T) {
 	}
 	if c.sessionName != "" {
 		t.Fatal("a refused request was issued a session")
+	}
+}
+
+// The desktop shell is served from another origin, where a SameSite=Strict
+// cookie is never stored. The core must not report it as authorized on sight,
+// or the shell skips redeeming its secret and every write fails CSRF. It
+// takes the bearer path instead, which needs no CSRF token.
+func TestDesktopShellAuthorizesWithBearerNotCookie(t *testing.T) {
+	const shell = "http://wails.localhost"
+	core, err := bootstrap.Start(context.Background(), bootstrap.Options{
+		Environment:  platform.EnvDevelopment,
+		DataRoot:     filepath.Join(t.TempDir(), "profile"),
+		Listen:       "127.0.0.1:0",
+		Version:      "test",
+		ExtraOrigins: []string{shell},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = core.Shutdown(ctx)
+	})
+	c := newClient(t, core.Endpoint)
+	origin := map[string]string{"Origin": shell}
+
+	_, status := c.do("GET", "/api/v1/status", nil, origin)
+	if status["data"].(map[string]any)["authorized"] != false {
+		t.Fatal("a page on another origin was authorized without a credential")
+	}
+	if c.sessionName != "" {
+		t.Fatal("a page on another origin was issued a cookie session")
+	}
+	resp, body := c.do("POST", "/api/v1/session/bootstrap", map[string]any{"requestId": "shell-boot", "secret": core.StartupBootstrap}, origin)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("bootstrap: %d %v", resp.StatusCode, body)
+	}
+	token, _ := body["data"].(map[string]any)["bearerToken"].(string)
+	if token == "" {
+		t.Fatal("no bearer token issued to the shell")
+	}
+	// The shell holds no cookie: only the bearer token travels.
+	c.cookies = map[string]string{}
+	bearer := map[string]string{"Origin": shell, "Authorization": "Bearer " + token}
+	resp, body = c.do("PATCH", "/api/v1/settings", map[string]any{"requestId": "shell-patch", "expectedRevision": 1, "patch": map[string]any{"memberLimit": 7}}, bearer)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("bearer write: %d %v", resp.StatusCode, body)
+	}
+}
+
+// A role avatar saved twice under one request id (a double click, a retry
+// after a lost answer) answers the second time as it did the first, instead of
+// failing on the record the first one left.
+func TestRoleAvatarReplayAnswersLikeTheFirstRequest(t *testing.T) {
+	core := startCore(t, platform.EnvDevelopment, filepath.Join(t.TempDir(), "profile"))
+	c := newClient(t, core.Endpoint)
+	authorize(t, core, c)
+	body := map[string]any{
+		"requestId": "avatar-replay",
+		"avatar":    map[string]any{"kind": "catalog", "series": "dango", "shape": "square", "eyes": "shine", "color": "#7d8c84"},
+	}
+	for attempt := 1; attempt <= 2; attempt++ {
+		resp, out := c.do("PUT", "/api/v1/roles/leader/avatar", body, map[string]string{"X-CSRF-Token": c.csrf})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("attempt %d: %d %v", attempt, resp.StatusCode, out)
+		}
+	}
+}
+
+// The desktop shell lives on another origin, so every write it makes is
+// preceded by a preflight, and a method the preflight does not list is blocked
+// by the browser before it is sent. PUT is used for role avatars, a provider's
+// switch and a member's model.
+func TestPreflightListsEveryMethodTheRoutesUse(t *testing.T) {
+	const shell = "http://wails.localhost"
+	core, err := bootstrap.Start(context.Background(), bootstrap.Options{
+		Environment:  platform.EnvDevelopment,
+		DataRoot:     filepath.Join(t.TempDir(), "profile"),
+		Listen:       "127.0.0.1:0",
+		Version:      "test",
+		ExtraOrigins: []string{shell},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = core.Shutdown(ctx)
+	})
+	c := newClient(t, core.Endpoint)
+	resp, _ := c.do("OPTIONS", "/api/v1/providers/x/enabled", nil, map[string]string{
+		"Origin":                         shell,
+		"Access-Control-Request-Method":  "PUT",
+		"Access-Control-Request-Headers": "authorization,content-type",
+	})
+	allowed := resp.Header.Get("Access-Control-Allow-Methods")
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		if !strings.Contains(allowed, method) {
+			t.Errorf("preflight does not allow %s: %q", method, allowed)
+		}
 	}
 }
 

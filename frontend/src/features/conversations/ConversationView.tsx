@@ -7,20 +7,25 @@
 import { ShellToggle } from '../../app/shell';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCancelMessage, useConversation, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
+import { useCancelMessage, useConversation, useEditMessage, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
-import { forgetLiveRuns, useLiveRuns } from '../../api/live';
+import { forgetLiveRuns, useLiveRuns, type LiveRun } from '../../api/live';
 import { api } from '../../api/client';
 import { apiErrorMessage } from '../../i18n/errors';
 import ApprovalCardStack from '../approvals/ApprovalCardStack';
+import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
+import { stripToolCallText } from './toolCallText';
 import Markdown from './Markdown';
+import MessageEditBox from './MessageEditBox';
+import ResourceStrip from './ResourceStrip';
+import DocumentCard from './DocumentCard';
 import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
-import RunProcess from './RunProcess';
+import RunProcess, { runHasContent } from './RunProcess';
 import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
-import { Alert, Composer, FloatingCard, IconButton, Icons, MessageBubble, Spinner, SystemNote } from '../../components/ui';
+import { Alert, Composer, FloatingCard, IconButton, Icons, MessageActions, MessageBubble, Spinner, SystemNote } from '../../components/ui';
 import WorkPanel from '../../components/WorkPanel';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 import Avatar from '../avatars/Avatar';
@@ -36,6 +41,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const conv = useConversation(bot.id);
   const send = useSendMessage(bot.id);
   const cancel = useCancelMessage(bot.id);
+  const editMessage = useEditMessage(bot.id);
   const interrupt = useInterruptRun(bot.id);
   const retryRun = useRetryRun(bot.id);
   const workspace = useWorkspace();
@@ -59,6 +65,29 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   useEffect(() => setExchange(null), [bot.id]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlder = useRef(false);
+  // Waiting cards float over the composer; whatever sticks out above it
+  // covers messages, so the scroll area gets that much room at its end and
+  // the covered content can scroll clear of the card.
+  const cardsRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const [cardScrollExtra, setCardScrollExtra] = useState(0);
+  useLayoutEffect(() => {
+    const cards = cardsRef.current;
+    const composer = composerRef.current;
+    if (!cards || !composer) return;
+    const measure = () => {
+      if (cards.offsetHeight === 0) {
+        setCardScrollExtra(0);
+        return;
+      }
+      setCardScrollExtra(Math.max(0, cards.offsetHeight - composer.offsetHeight) + 12);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(cards);
+    observer.observe(composer);
+    return () => observer.disconnect();
+  }, []);
   const loadEarlier = async () => {
     const element = scrollRef.current;
     const before = element ? { height: element.scrollHeight, top: element.scrollTop } : null;
@@ -83,6 +112,15 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
   const liveRuns = useLiveRuns();
   const runs = conv.data?.runs ?? [];
   const timeline = buildTimeline(messages, runs, activeRun, bot.id);
+  // A turn is one thing to read: what the member did and said, then its reply,
+  // under one name. The reply is given to its turn here and not listed again.
+  const runIds = new Set(timeline.flatMap((entry) => (entry.kind === 'run' ? [entry.run.id] : [])));
+  const repliesByRun = new Map<string, Message[]>();
+  for (const entry of timeline) {
+    if (entry.kind !== 'message' || entry.message.kind !== 'assistant' || !entry.message.runId || !runIds.has(entry.message.runId)) continue;
+    repliesByRun.set(entry.message.runId, [...(repliesByRun.get(entry.message.runId) ?? []), entry.message]);
+  }
+  const listed = timeline.filter((entry) => entry.kind === 'run' || !(entry.message.kind === 'assistant' && entry.message.runId && repliesByRun.has(entry.message.runId)));
   // Only the member's latest turn can be retried.
   const latestRunId = [...timeline].reverse().find((entry) => entry.kind === 'run')?.run.id;
   const activeLive = activeRun ? liveRuns[activeRun.id] : undefined;
@@ -184,7 +222,10 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           label={t('workspace.infoPanel')}
           closeLabel={t('common.close')}
           onClose={closeCard}
-          className="absolute bottom-3 right-3 top-3 z-10"
+          // Opens under the header's info button and grows downward from
+          // there; it overlays the conversation instead of squeezing it,
+          // and stops above the conversation's bottom edge.
+          className="animate-pop-in absolute -top-2 right-3 z-10 max-h-[calc(100%+0.5rem)] origin-top-right"
         >
           <WorkPanel />
         </FloatingCard>
@@ -206,7 +247,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           const element = event.currentTarget;
           stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
         }}
-        className={`min-h-0 flex-1 overflow-y-auto py-4 ${workspace.cardOpen ? 'pl-8 pr-[25rem]' : 'px-8'}`}
+        className="min-h-0 flex-1 overflow-y-auto px-8 py-4"
       >
         <LoadMore page={{ ...conv, fetchNextPage: loadEarlier }} />
         {conv.isError && (
@@ -225,14 +266,16 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </div>
         )}
         <ul className="mx-auto max-w-3xl space-y-6">
-          {timeline.map((entry) =>
+          {listed.map((entry) =>
             entry.kind === 'run' ? (
               <li key={`run-${entry.run.id}`}>
-                <RunProcess
+                <TurnRow
                   run={entry.run}
+                  replies={repliesByRun.get(entry.run.id) ?? []}
                   active={entry.run.id === activeRun?.id}
                   live={liveRuns[entry.run.id]}
                   teamId={team.id}
+                  directory={team.directory}
                   nameOf={nameOf}
                   onRetry={!activeRun && entry.run.id === latestRunId ? () => retryRun.mutate(entry.run.id) : undefined}
                   retrying={retryRun.isPending}
@@ -250,6 +293,11 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
                   isLastUser={lastUserMessage?.id === entry.message.id}
                   showCancel={lastQueuedMessage?.id === entry.message.id}
                   cancelPending={cancel.isPending}
+                  onEdit={
+                    lastUserMessage?.id === entry.message.id
+                      ? (text) => editMessage.mutateAsync({ messageId: entry.message.id, text })
+                      : undefined
+                  }
                   onCancelQueued={() => {
                     setActionError('');
                     cancel.mutate(entry.message.id, {
@@ -269,13 +317,16 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
             </li>
           )}
         </ul>
+        <div aria-hidden style={{ height: cardScrollExtra }} />
         </fieldset>
       </div>
       </div>
 
       {/* The exchange between two members is read-only: while it is open the
           composer and approval cards step aside (kept mounted, so nothing
-          typed or pending is lost). */}
+          typed or pending is lost). Waiting cards float over the composer
+          instead of stacking above it: the visible height stays, the draft
+          survives, and the messages behind fade into the card. */}
       <div className={`mx-auto w-full max-w-3xl space-y-2.5 px-8 pb-4 pt-2 ${exchange ? 'hidden' : ''}`}>
         {queuedCount > 0 && (
           <p className="px-1 text-xs text-neutral-500 dark:text-neutral-400" role="status">
@@ -283,43 +334,49 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           </p>
         )}
 
-        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-2 border-0 p-0">
-          <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
-
-          <Composer
-            value={draft}
-            onChange={(value) => setDraft(bot.id, value)}
-            onSend={sendNow}
-            placeholder={t('conversation.placeholder', { name: headerTitle })}
-            disabled={blockReasonKey !== null}
-            sending={send.isPending}
-            sendLabel={t('conversation.send')}
-            running={!!activeRun}
-            stopping={stopping || interrupt.isPending}
-            stopLabel={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
-            onStop={() => {
-              if (!activeRun?.id) return;
-              setStopping(true);
-              interrupt.mutate(activeRun.id, {
-                onSuccess: (result) => {
-                  if (result.responseState === 'unknown') {
+        <fieldset disabled={readOnly} className="relative m-0 min-w-0 border-0 p-0">
+          <div ref={composerRef}>
+            <Composer
+              value={draft}
+              onChange={(value) => setDraft(bot.id, value)}
+              onSend={sendNow}
+              placeholder={t('conversation.placeholder', { name: headerTitle })}
+              disabled={blockReasonKey !== null}
+              sending={send.isPending}
+              sendLabel={t('conversation.send')}
+              running={!!activeRun}
+              stopping={stopping || interrupt.isPending}
+              stopLabel={stopping ? t('conversation.interruptRequested') : t('conversation.interrupt')}
+              onStop={() => {
+                if (!activeRun?.id) return;
+                setStopping(true);
+                interrupt.mutate(activeRun.id, {
+                  onSuccess: (result) => {
+                    if (result.responseState === 'unknown') {
+                      setStopping(false);
+                      setActionError(t('errors.error.engine.interrupt_unconfirmed'));
+                    }
+                  },
+                  onError: (error) => {
                     setStopping(false);
-                    setActionError(t('errors.error.engine.interrupt_unconfirmed'));
-                  }
-                },
-                onError: (error) => {
-                  setStopping(false);
-                  setActionError(apiErrorMessage(t, error));
-                },
-              });
-            }}
-            options={
-              <>
-                <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
-                <ReasoningEffortSelect team={team} bot={bot} disabled={readOnly || blockReasonKey !== null} />
-              </>
-            }
-          />
+                    setActionError(apiErrorMessage(t, error));
+                  },
+                });
+              }}
+              options={
+                <>
+                  <PermissionModeSelect team={team} disabled={readOnly || blockReasonKey !== null} />
+                  <ReasoningEffortSelect team={team} bot={bot} bots={item.bots} disabled={readOnly || blockReasonKey !== null} />
+                </>
+              }
+            />
+          </div>
+          {/* The mist the card rises out of; clicks pass through, and with
+              no card waiting there is no mist to veil the composer. */}
+          <div ref={cardsRef} className="empty:before:hidden absolute inset-x-0 bottom-0 z-20 space-y-2 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-10 before:bg-gradient-to-t before:from-card before:to-transparent before:content-['']">
+            <ApprovalCardStack key={bot.id} teamId={team.id} viewBotId={bot.id} botNameById={botNameById} />
+            <QuestionCardStack key={`q-${bot.id}`} teamId={team.id} viewBotId={bot.id} />
+          </div>
         </fieldset>
 
         <SessionStatsBar botId={bot.id} />
@@ -390,6 +447,68 @@ export function buildTimeline(messages: Message[], runs: RunWithSteps[], activeR
   return entries.sort((a, b) => a.at - b.at || (a.kind === b.kind ? 0 : a.kind === 'message' ? -1 : 1));
 }
 
+/** One turn of a member: its name once, what it did and said as it went, and
+ * the reply that closes it. */
+function TurnRow({
+  run,
+  replies,
+  active,
+  live,
+  teamId,
+  directory,
+  nameOf,
+  onRetry,
+  retrying,
+}: {
+  run: RunWithSteps;
+  replies: Message[];
+  active: boolean;
+  live: LiveRun | undefined;
+  teamId: string;
+  directory: string;
+  nameOf: (botId: string) => string;
+  onRetry?: () => void;
+  retrying: boolean;
+}) {
+  const membersById = useContext(TeamMembersContext);
+  const { t, i18n } = useTranslation();
+  const author = membersById.get(run.botId);
+  const replyText = replies.map((reply) => stripToolCallText(messageText(reply))).filter((text) => text !== '').join('\n\n');
+  if (replies.length > 0 && replyText === '' && !runHasContent(run, active, '')) return null;
+  const process = runHasContent(run, active, replyText) ? (
+    <RunProcess run={run} active={active} live={live} scope={{ teamId }} nameOf={nameOf} replyText={replyText} onRetry={onRetry} retrying={retrying} />
+  ) : null;
+  if (!process && replyText === '') return null;
+  return (
+    <div className="group">
+      <MessageBubble
+        from="member"
+        avatar={author ? <Avatar bot={author} size="md" /> : undefined}
+        author={nameOf(run.botId)}
+        meta={
+          replyText !== '' && !active ? (
+            // The turn's words may be several messages; the copy takes them
+            // all, and the time is the last one's.
+            <MessageActions
+              value={replyText}
+              createdAt={replies[replies.length - 1]?.createdAt ?? ''}
+              language={i18n.language}
+              copyLabel={t('conversation.message.copy')}
+              copiedLabel={t('conversation.message.copied')}
+            />
+          ) : undefined
+        }
+      >
+        <div className="space-y-2">
+          {process}
+          {replyText !== '' && <Markdown text={replyText} teamId={teamId} />}
+          <ResourceStrip scope={{ kind: 'team', id: teamId }} run={run} text={replyText} directory={directory} />
+        </div>
+      </MessageBubble>
+    </div>
+  );
+}
+
 function MessageRow({
   message,
   recipients,
@@ -401,6 +520,7 @@ function MessageRow({
   showCancel,
   cancelPending,
   onCancelQueued,
+  onEdit,
 }: {
   message: Message;
   recipients?: string[];
@@ -412,8 +532,11 @@ function MessageRow({
   showCancel: boolean;
   cancelPending: boolean;
   onCancelQueued: () => void;
+  /** Given for the conversation's last user message: replace its words and send them again. */
+  onEdit?: (text: string) => Promise<unknown>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [editing, setEditing] = useState(false);
   const membersById = useContext(TeamMembersContext);
   const text = messageText(message);
 
@@ -433,25 +556,48 @@ function MessageRow({
   }
 
   if (message.kind === 'system') return <SystemNote>{text}</SystemNote>;
+  if (message.kind === 'document') return <DocumentCard text={text} teamId={teamId} />;
 
   const isUser = message.kind === 'user';
+  // A tool call the model wrote as text is not shown (see toolCallText.ts); a reply that was only that has nothing to show.
+  const shown = isUser ? text : stripToolCallText(text);
+  if (!isUser && text !== '' && shown === '') return null;
   const delivery = isLastUser && message.deliveryStatus ? t(deliveryLabelKey(message.deliveryStatus)) : '';
-  const meta =
-    delivery || showCancel ? (
-      <>
-        {delivery && <span>{delivery}</span>}
-        {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
-      </>
-    ) : undefined;
+  const meta = (
+    <>
+      {isUser && isLastUser && onEdit && (
+        <IconButton icon={Icons.edit} label={t('conversation.message.edit')} size="sm" onClick={() => setEditing(true)} />
+      )}
+      <MessageActions value={shown} createdAt={message.createdAt} language={i18n.language} copyLabel={t('conversation.message.copy')} copiedLabel={t('conversation.message.copied')} />
+      {delivery && <span>{delivery}</span>}
+      {showCancel && <IconButton icon={Icons.close} label={t('conversation.cancelQueued')} size="sm" shape="circle" onClick={onCancelQueued} disabled={cancelPending} />}
+    </>
+  );
   const author = membersById.get(message.botId);
+  if (editing) {
+    return (
+      <div className="rounded-xl bg-sunk p-3">
+        <MessageEditBox
+          initial={text}
+          onSave={async (next) => {
+            await onEdit?.(next);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
   return (
-    <MessageBubble
-      from={isUser ? 'user' : 'member'}
-      avatar={author ? <Avatar bot={author} size="md" /> : undefined}
-      author={isUser ? undefined : nameOf(message.botId)}
-      meta={meta}
-    >
-      {isUser ? text : <Markdown text={text} teamId={teamId} />}
-    </MessageBubble>
+    <div className="group">
+      <MessageBubble
+        from={isUser ? 'user' : 'member'}
+        avatar={author ? <Avatar bot={author} size="md" /> : undefined}
+        author={isUser ? undefined : nameOf(message.botId)}
+        meta={meta}
+      >
+        {isUser ? text : <Markdown text={shown} teamId={teamId} />}
+      </MessageBubble>
+    </div>
   );
 }
