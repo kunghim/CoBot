@@ -101,7 +101,7 @@ func (a *App) EditMessage(ctx context.Context, principal auth.Principal, message
 			return SendMessageResult{}, err
 		}
 		defer tx.Rollback()
-		if err := sqlite.UpdateMessageBlocks(ctx, tx, message.ID, blocks); err != nil {
+		if err := inboxEditTx(ctx, tx, message.ID, blocks); err != nil {
 			return SendMessageResult{}, err
 		}
 		queued, err := sqlite.CountQueuedDeliveries(ctx, tx, bot.ID)
@@ -172,10 +172,7 @@ func (a *App) EditMessage(ctx context.Context, principal auth.Principal, message
 	if err := sqlite.DeleteRun(ctx, tx, run.ID); err != nil {
 		return SendMessageResult{}, err
 	}
-	if err := sqlite.DeleteMessageDeliveries(ctx, tx, message.ID); err != nil {
-		return SendMessageResult{}, err
-	}
-	if err := sqlite.DeleteRunMessages(ctx, tx, team.ID, bot.ID, run.ID, message.ID); err != nil {
+	if err := inboxReplaceTurnTx(ctx, tx, team.ID, bot.ID, run.ID, message.ID); err != nil {
 		return SendMessageResult{}, err
 	}
 	if err := tx.Commit(); err != nil {

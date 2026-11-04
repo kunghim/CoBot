@@ -5,7 +5,7 @@
 // User text is shown verbatim; member replies render as Markdown without
 // raw HTML.
 import { ShellToggle } from '../../app/shell';
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelMessage, useConversation, useEditMessage, useInterruptRun, useRetryRun, useSendMessage } from '../../api/queries';
 import type { Bot, Message, Run, RunWithSteps, TeamWithBots } from '../../api/types';
@@ -16,7 +16,7 @@ import ApprovalCardStack from '../approvals/ApprovalCardStack';
 import QuestionCardStack from '../questions/QuestionCardStack';
 import { deliveryLabelKey, messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
-import Markdown from './Markdown';
+import Markdown from '../../components/content/Markdown';
 import MessageEditBox from './MessageEditBox';
 import ResourceStrip from './ResourceStrip';
 import DocumentCard from './DocumentCard';
@@ -24,9 +24,9 @@ import PermissionModeSelect from './PermissionModeSelect';
 import ReasoningEffortSelect from './ReasoningEffortSelect';
 import SessionStatsBar from './SessionStatsBar';
 import RunProcess, { runHasContent } from './RunProcess';
-import { ExchangeLine, TeamMembersContext, isExchange } from './ExchangeLine';
+import { TeamMembersContext } from '../../app/TeamMembersContext';
+import { ExchangeLine, isExchange } from './ExchangeLine';
 import { Alert, Composer, FloatingCard, IconButton, Icons, MessageActions, MessageBubble, Spinner, SystemNote } from '../../components/ui';
-import WorkPanel from '../../components/WorkPanel';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 import Avatar from '../avatars/Avatar';
 import { MemberAvatarButton } from '../avatars/AvatarEditors';
@@ -35,7 +35,7 @@ import { sendBlockReasonKey } from '../teams/teamUtils';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
 
-export default function ConversationView({ item, bot }: { item: TeamWithBots; bot: Bot }) {
+export default function ConversationView({ item, bot, infoPanel }: { item: TeamWithBots; bot: Bot; infoPanel: ReactNode }) {
   const { t } = useTranslation();
   const { team } = item;
   const conv = useConversation(bot.id);
@@ -227,7 +227,7 @@ export default function ConversationView({ item, bot }: { item: TeamWithBots; bo
           // and stops above the conversation's bottom edge.
           className="animate-pop-in absolute -top-2 right-3 z-10 max-h-[calc(100%+0.5rem)] origin-top-right"
         >
-          <WorkPanel />
+          {infoPanel}
         </FloatingCard>
       )}
       {exchange && (

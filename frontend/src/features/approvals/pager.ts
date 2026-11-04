@@ -1,13 +1,5 @@
-// Pure pager math for the one-card-at-a-time approval stack. Processing a
-// card shrinks the list, so the index must stay inside bounds without ever
-// auto-advancing (no autoplay by product rule).
+// What an approval card reads: its option buttons and its stored summary.
 import type { ApprovalOption } from '../../api/types';
-
-/** Clamps a pager index into [0, count-1]; empty lists report 0. */
-export function clampPagerIndex(index: number, count: number): number {
-  if (!Number.isFinite(index) || count <= 0) return 0;
-  return Math.min(Math.max(Math.trunc(index), 0), count - 1);
-}
 
 /** i18n key candidates for an option button label: the engine-provided
  * messageKey first, then the built-in approval.option.* key of the option

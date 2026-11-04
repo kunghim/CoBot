@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 // The engine knows a model's context window from its own model list. A model
@@ -37,18 +39,7 @@ const defaultContextWindow = 272000
 const catalogFileName = "cobot-model-catalog.json"
 
 // ClientModel is a third-party model the catalog describes.
-type ClientModel struct {
-	Slug          string
-	Name          string
-	ContextWindow int
-	// Input lists what the model takes besides text; the engine knows image only.
-	Input []string
-	// Toggle says thinking can be switched off; Efforts are its levels.
-	Toggle  bool
-	Efforts []string
-	// DefaultEffort is the level used when none is chosen.
-	DefaultEffort string
-}
+type ClientModel = engine.ClientModel
 
 // ClientCatalog is a generated catalog file.
 type ClientCatalog struct {

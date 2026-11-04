@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useCancelRequirement, useRequirements, useTasks } from '../../api/queries';
 import type { Bot, Requirement, Task } from '../../api/types';
 import { apiErrorMessage } from '../../i18n/errors';
-import Markdown from '../conversations/Markdown';
+import Markdown from '../../components/content/Markdown';
 import { Alert, AlertDialog, Badge, Button, cx, EmptyState, Icons, interactive, Skeleton } from '../../components/ui';
 import TaskDetail from './TaskDetail';
 import { canCancel, cardsOf, currentStage, ownerLabel, requirementOrder, requirementTone, statusTone } from './taskFlow';

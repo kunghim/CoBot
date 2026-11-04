@@ -245,34 +245,8 @@ func describe(path string, stat fs.FileInfo) File {
 }
 
 func kind(name string, sample []byte) string {
-	ext := strings.ToLower(filepath.Ext(name))
-	switch ext {
-	case ".md", ".markdown", ".mdown", ".mkd", ".mdx":
-		return "markdown"
-	case ".html", ".htm":
-		return "html"
-	case ".svg":
-		return "svg"
-	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".webp":
-		return "image"
-	case ".pdf":
-		return "pdf"
-	case ".aac", ".flac", ".m4a", ".mp3", ".mp4a", ".oga", ".ogg", ".opus", ".wav":
-		return "audio"
-	case ".mp4", ".ogv", ".webm":
-		return "video"
-	case ".docx":
-		return "document"
-	case ".xlsx", ".xlsm", ".csv", ".tsv":
-		return "spreadsheet"
-	case ".pptx":
-		return "presentation"
-	case ".ipynb":
-		return "notebook"
-	case ".tex":
-		return "latex"
-	case ".doc", ".xls", ".ppt", ".rtf", ".pages", ".numbers", ".key", ".odt", ".ods", ".odp", ".tif", ".tiff":
-		return "binary"
+	if known, ok := kindByExtension[strings.ToLower(filepath.Ext(name))]; ok {
+		return known
 	}
 	if strings.IndexByte(string(sample), 0) >= 0 {
 		return "binary"

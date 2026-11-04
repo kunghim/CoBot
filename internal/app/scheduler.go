@@ -14,7 +14,6 @@ import (
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
-	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -62,11 +61,6 @@ type runBuffer struct {
 	// commentary is the last thing the model said while working; it stands
 	// in as the reply only when a turn ends without an answer.
 	commentary string
-}
-
-type loosePiece struct {
-	text string
-	work int
 }
 
 // Scheduler wakes per bot, claims queued deliveries serially and drives the
@@ -298,8 +292,33 @@ func (s *Scheduler) dispatchSafely(botID string) {
 	}
 }
 
+// turnAttempt is one dispatch on its way through the phases of a turn. Each
+// phase fills in what the later ones read.
+type turnAttempt struct {
+	bot       domain.Bot
+	team      domain.Team
+	directory string
+	head      sqlite.DeliveryRecord // the oldest delivery the member may take
+	choice    ModelChoice
+	model     string
+
+	run         domain.Run
+	delivery    sqlite.DeliveryRecord
+	message     domain.Message
+	batch       []domain.Message
+	chainEvents []domain.Event
+
+	server     engine.Server
+	threadID   string
+	input      string
+	told       contextDigest
+	handedOver bool
+	turnID     string
+}
+
 // dispatch claims the oldest queued delivery of an idle bot and starts a
-// turn. Busy bots keep their queue; nothing interrupts implicitly.
+// turn. Busy bots keep their queue; nothing interrupts implicitly. A phase that
+// returns false ends the dispatch, with or without an error.
 func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	bot, err := sqlite.GetBot(ctx, s.app.DB, botID)
 	if err != nil {
@@ -315,149 +334,195 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 		}
 	}
 	defer unlock()
-	team, directory, err := sqlite.GetTeam(ctx, s.app.DB, bot.TeamID)
-	if err != nil {
+	t := &turnAttempt{bot: bot}
+	if ok, err := s.turnPrecheck(ctx, t); !ok {
 		return err
+	}
+	if ok, err := s.turnAdmit(ctx, t); !ok {
+		return err
+	}
+	if ok, err := s.turnClaim(ctx, t); !ok {
+		return err
+	}
+	unlock()
+	// The counted wake committed with the claim: emit its events now, before
+	// any engine interaction can fail, so the fact is never persisted without
+	// its trail.
+	for _, ev := range t.chainEvents {
+		s.app.recordEvent(ctx, ev)
+	}
+
+	// Engine interaction happens outside any SQL transaction.
+	if ok, err := s.turnEnsureEngine(ctx, t); !ok {
+		return err
+	}
+	s.turnInput(ctx, t)
+	if ok, err := s.turnStart(ctx, t); !ok {
+		return err
+	}
+	if err := s.turnAcknowledge(ctx, t); err != nil {
+		return err
+	}
+	s.turnStarted(ctx, t)
+	return nil
+}
+
+// turnPrecheck finds the delivery to take, if the team and the member can
+// take one at all.
+func (s *Scheduler) turnPrecheck(ctx context.Context, t *turnAttempt) (bool, error) {
+	team, directory, err := sqlite.GetTeam(ctx, s.app.DB, t.bot.TeamID)
+	if err != nil {
+		return false, err
 	}
 	// The folder is checked before every turn: a team whose folder is gone
 	// becomes directory_missing here instead of failing inside the engine.
 	team = s.app.checkTeamDirectory(ctx, team)
 	if team.Status != domain.TeamStatusActive {
-		return nil // archived/missing/error teams pause dispatch
+		return false, nil // archived/missing/error teams pause dispatch
 	}
-	if _, err := sqlite.FindActiveRun(ctx, s.app.DB, botID); err == nil {
-		return nil // one active run per bot; queue stays
+	if _, err := sqlite.FindActiveRun(ctx, s.app.DB, t.bot.ID); err == nil {
+		return false, nil // one active run per bot; queue stays
 	} else if !errors.Is(err, sqlite.ErrNotFound) {
-		return err
+		return false, err
 	}
 
-	queue, err := sqlite.ListDispatchableDeliveries(ctx, s.app.DB, botID, 1)
-	if err != nil || len(queue) == 0 {
-		if err == nil {
-			var questions int
-			// An open ask_user or recruitment question means the member is
-			// waiting on the user's decision, not idle.
-			if e := s.app.DB.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind IN ('', 'recruitment')`, botID).Scan(&questions); e != nil {
-				return e
-			}
-			queued, e := sqlite.CountQueuedDeliveries(ctx, s.app.DB, botID)
-			if e != nil {
-				return e
-			}
-			state := domain.BotStatusIdle
-			if questions > 0 || queued > 0 {
-				state = domain.BotStatusWaitingInput
-			}
-			if bot.Status != state {
-				tx, e := s.app.DB.BeginTx(ctx, nil)
-				if e != nil {
-					return e
-				}
-				defer tx.Rollback()
-				if e := sqlite.SetBotRunState(ctx, tx, botID, state, ""); e != nil {
-					return e
-				}
-				return tx.Commit()
-			}
-		}
-		return err
+	queue, err := sqlite.ListDispatchableDeliveries(ctx, s.app.DB, t.bot.ID, 1)
+	if err != nil {
+		return false, err
 	}
-	record := queue[0]
+	if len(queue) == 0 {
+		return false, s.restWithoutTurn(ctx, t.bot)
+	}
+	t.team, t.directory, t.head = team, directory, queue[0]
+	return true, nil
+}
 
-	settings, err := s.app.GetSettings(ctx)
+// restWithoutTurn brings the state of a member with nothing to take up to date.
+func (s *Scheduler) restWithoutTurn(ctx context.Context, bot domain.Bot) error {
+	questions, err := sqlite.CountOpenUserDecisionQuestions(ctx, s.app.DB, bot.ID)
 	if err != nil {
 		return err
 	}
-	// The model is the one this member runs with, not the engine's own
-	// default: that default names a model of a vendor the member may not
-	// be talking to.
-	choice, err := s.app.MemberModel(ctx, team.ID, bot.ID)
+	queued, err := sqlite.CountQueuedDeliveries(ctx, s.app.DB, bot.ID)
 	if err != nil {
 		return err
 	}
-	model := choice.Model
-	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
-	// product cannot judge, holds the queue and asks the user through
-	// settings; it never interrupts work that already started.
-	if pause, perr := s.app.budgetPaused(ctx, team.ID, bot.ID, settings); perr != nil {
-		return perr
-	} else if pause != nil {
-		return s.holdForBudget(ctx, team.ID, bot.ID, pause)
+	state := domain.BotStatusIdle
+	if questions > 0 || queued > 0 {
+		state = domain.BotStatusWaitingInput
 	}
-
-	// Claim: delivery -> dispatching, run row created, bot -> working.
-	run := domain.Run{
-		ID: domain.NewID(), TeamID: team.ID, BotID: bot.ID,
-		Status: domain.RunStarting, StartedAt: time.Now().UTC(),
+	if bot.Status == state {
+		return nil
 	}
 	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	delivery, err := sqlite.GetDelivery(ctx, tx, record.ID)
+	defer tx.Rollback()
+	if err := setMemberStateTx(ctx, tx, bot.ID, state, ""); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// turnAdmit reads the settings and the model, and holds the queue when the
+// budget does not allow a new turn.
+func (s *Scheduler) turnAdmit(ctx context.Context, t *turnAttempt) (bool, error) {
+	settings, err := s.app.GetSettings(ctx)
+	if err != nil {
+		return false, err
+	}
+	// The model is the one this member runs with, not the engine's own
+	// default: that default names a model of a vendor the member may not
+	// be talking to.
+	choice, err := s.app.MemberModel(ctx, t.team.ID, t.bot.ID)
+	if err != nil {
+		return false, err
+	}
+	t.choice, t.model = choice, choice.Model
+	// Budget gate: only NEW turns stop. An exhausted budget, or spend the
+	// product cannot judge, holds the queue and asks the user through
+	// settings; it never interrupts work that already started.
+	if pause, perr := s.app.budgetPaused(ctx, t.team.ID, t.bot.ID, settings); perr != nil {
+		return false, perr
+	} else if pause != nil {
+		return false, s.holdForBudget(ctx, t.team.ID, t.bot.ID, pause)
+	}
+	return true, nil
+}
+
+// turnClaim is the claim: delivery -> dispatching, run row created, bot ->
+// working. It commits as one transaction, or leaves the delivery queued.
+func (s *Scheduler) turnClaim(ctx context.Context, t *turnAttempt) (bool, error) {
+	botID := t.bot.ID
+	t.run = domain.Run{
+		ID: domain.NewID(), TeamID: t.team.ID, BotID: botID,
+		Status: domain.RunStarting, StartedAt: time.Now().UTC(),
+	}
+	tx, err := s.app.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	delivery, err := sqlite.GetDelivery(ctx, tx, t.head.ID)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
 	if delivery.Status != domain.DeliveryQueued {
 		tx.Rollback()
-		return nil // cancelled meanwhile
+		return false, nil // cancelled meanwhile
 	}
-	currentTeam, _, err := sqlite.GetTeam(ctx, tx, team.ID)
+	currentTeam, _, err := sqlite.GetTeam(ctx, tx, t.team.ID)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
 	if currentTeam.Status != domain.TeamStatusActive {
 		tx.Rollback()
-		return nil
+		return false, nil
 	}
 	if _, err := sqlite.GetBot(ctx, tx, botID); err != nil {
 		tx.Rollback()
 		if errors.Is(err, sqlite.ErrNotFound) {
-			return nil
+			return false, nil
 		}
-		return err
+		return false, err
 	}
-	message, err := sqlite.GetMessage(ctx, tx, record.MessageID)
+	message, err := sqlite.GetMessage(ctx, tx, t.head.MessageID)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
 	if delivery.TaskID != "" {
 		task, err := sqlite.GetTask(ctx, tx, delivery.TaskID)
 		if err != nil && !errors.Is(err, sqlite.ErrNotFound) {
 			tx.Rollback()
-			return err
+			return false, err
 		}
 		// A card is stale once it was handed off in another turn (the member
 		// saw it among its cards and did it) or its requirement was
 		// cancelled: the turn it would cost would hear nothing new.
 		if errors.Is(err, sqlite.ErrNotFound) || task.IsTerminal() {
-			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
+			if err := inboxCancelTx(ctx, tx, delivery.ID, message.ID); err != nil {
 				tx.Rollback()
-				return err
-			}
-			if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryCancelled); err != nil {
-				tx.Rollback()
-				return err
+				return false, err
 			}
 			if err := tx.Commit(); err != nil {
-				return err
+				return false, err
 			}
 			s.Wake(botID)
-			return nil
+			return false, nil
 		}
 	}
 	if message.Kind != domain.MessageKindUser {
 		blocked, err := sqlite.HasBlockingQuestion(ctx, tx, botID, delivery.TaskID)
 		if err != nil {
 			tx.Rollback()
-			return err
+			return false, err
 		}
 		if blocked {
 			tx.Rollback()
-			return nil
+			return false, nil
 		}
 	}
 	// The chain budget is evaluated in the same transaction as the claim:
@@ -466,151 +531,166 @@ func (s *Scheduler) dispatch(ctx context.Context, botID string) error {
 	gate, action, chainEvents, err := s.app.EvaluateChainGate(ctx, tx, delivery)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
 	if gate != ChainGateAllowed {
-		// The claim is abandoned, so anything the gate decided must survive
-		// (the confirmation card, the stopped-chain sweep) is written in its
-		// own transaction — inside the claim it would be rolled back along
-		// with the claim, and the gate would ask again on every wake.
 		tx.Rollback()
-		if action != ChainActionNone {
-			wtx, werr := s.app.DB.BeginTx(ctx, nil)
-			if werr != nil {
-				return werr
-			}
-			evs, perr := s.app.PersistChainAction(ctx, wtx, action, delivery)
-			if perr != nil {
-				wtx.Rollback()
-				return perr
-			}
-			if cerr := wtx.Commit(); cerr != nil {
-				return cerr
-			}
-			chainEvents = append(chainEvents, evs...)
-		}
-		for _, ev := range chainEvents {
-			s.app.recordEvent(ctx, ev)
-		}
-		s.app.Hub.Publish()
-		s.wakeAfterSkippedDelivery(ctx, botID, record.ID)
-		return nil // waiting on a user decision, or cancelled by the gate
+		return false, s.turnClaimRefused(ctx, t, delivery, action, chainEvents)
 	}
-	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryDispatching); err != nil {
+	if err := sqlite.InsertRun(ctx, tx, t.run); err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
-	if err := sqlite.InsertRun(ctx, tx, run); err != nil {
+	if err := inboxClaimTx(ctx, tx, t.head.ID, message.ID, t.run.ID); err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
-	if err := sqlite.ClaimDeliveryRun(ctx, tx, record.ID, run.ID); err != nil {
-		tx.Rollback()
-		return err
-	}
-	batch, err := s.claimBatchLocked(ctx, tx, botID, delivery, message, run.ID)
+	batch, err := s.claimBatchLocked(ctx, tx, botID, delivery, message, t.run.ID)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusWorking, run.ID); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, domain.BotStatusWorking, t.run.ID); err != nil {
 		tx.Rollback()
-		return err
+		return false, err
 	}
 	if err := tx.Commit(); err != nil {
-		return err
+		return false, err
 	}
-	unlock()
-	// The counted wake committed with the claim: emit its events now, before
-	// any engine interaction can fail, so the fact is never persisted without
-	// its trail.
+	t.delivery, t.message, t.batch, t.chainEvents = delivery, message, batch, chainEvents
+	return true, nil
+}
+
+// turnClaimRefused follows a claim the chain gate stopped and rolled back. The
+// claim is abandoned, so anything the gate decided must survive (the
+// confirmation card, the stopped-chain sweep) is written in its own transaction
+// — inside the claim it would be rolled back along with the claim, and the gate
+// would ask again on every wake.
+func (s *Scheduler) turnClaimRefused(ctx context.Context, t *turnAttempt, delivery sqlite.DeliveryRecord, action ChainGateAction, chainEvents []domain.Event) error {
+	if action != ChainActionNone {
+		wtx, werr := s.app.DB.BeginTx(ctx, nil)
+		if werr != nil {
+			return werr
+		}
+		evs, perr := s.app.PersistChainAction(ctx, wtx, action, delivery)
+		if perr != nil {
+			wtx.Rollback()
+			return perr
+		}
+		if cerr := wtx.Commit(); cerr != nil {
+			return cerr
+		}
+		chainEvents = append(chainEvents, evs...)
+	}
 	for _, ev := range chainEvents {
 		s.app.recordEvent(ctx, ev)
 	}
+	s.app.Hub.Publish()
+	s.wakeAfterSkippedDelivery(ctx, t.bot.ID, t.head.ID)
+	return nil // waiting on a user decision, or cancelled by the gate
+}
 
-	// Engine interaction happens outside any SQL transaction.
-	server, err := s.EnsureTeamServer(ctx, team.ID, directory)
+// turnEnsureEngine brings up the team's engine and the member's thread.
+func (s *Scheduler) turnEnsureEngine(ctx context.Context, t *turnAttempt) (bool, error) {
+	server, err := s.EnsureTeamServer(ctx, t.team.ID, t.directory)
 	if err != nil {
-		return s.failStart(ctx, run.ID, bot.ID, "error.engine.unavailable")
+		return false, s.failStart(ctx, t.run.ID, t.bot.ID, "error.engine.unavailable")
 	}
 	// Publish the host execution binding before the bridge can call back,
 	// including while turn/start has not yet returned a provider turn id.
-	if _, err := s.app.DB.ExecContext(ctx, `UPDATE runs SET engine_epoch = ? WHERE id = ? AND status = ?`, server.Epoch(), run.ID, domain.RunStarting); err != nil {
-		return err
+	if err := sqlite.BindStartingRunEpoch(ctx, s.app.DB, t.run.ID, server.Epoch()); err != nil {
+		return false, err
 	}
-	threadID, err := s.ensureThread(ctx, team, bot, directory, server, run.ID)
+	threadID, err := s.ensureThread(ctx, t.team, t.bot, t.directory, server, t.run.ID)
 	if err != nil {
-		return s.failStart(ctx, run.ID, bot.ID, "error.engine.thread_failed")
+		return false, s.failStart(ctx, t.run.ID, t.bot.ID, "error.engine.thread_failed")
 	}
-	// The thread keeps everything it was told; a turn adds only what changed
-	// since (see turnContext), then the incoming messages.
-	text := message.RenderText()
-	if len(batch) > 0 {
-		text = s.batchInput(ctx, delivery.Kind, append([]domain.Message{message}, batch...))
+	t.server, t.threadID = server, threadID
+	return true, nil
+}
+
+// turnInput composes what the turn tells the thread. The thread keeps
+// everything it was told; a turn adds only what changed since (see
+// turnContext), then the incoming messages.
+func (s *Scheduler) turnInput(ctx context.Context, t *turnAttempt) {
+	text := t.message.RenderText()
+	if len(t.batch) > 0 {
+		text = s.batchInput(ctx, t.delivery.Kind, append([]domain.Message{t.message}, t.batch...))
 	}
-	update, told := s.app.turnContext(ctx, bot, run.ID, parseDigest(sqlite.SessionContextDigest(ctx, s.app.DB, bot.ID)))
-	input := text
+	update, told := s.app.turnContext(ctx, t.bot, t.run.ID, parseDigest(sqlite.SessionContextDigest(ctx, s.app.DB, t.bot.ID)))
+	t.told = told
+	t.input = text
 	if update != "" {
-		input = update + "\n\n" + text
+		t.input = update + "\n\n" + text
 	}
 	// A thread that took over from another hears about it first, once.
-	handedOver := false
-	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID); err == nil && session.Handover != nil && session.ProviderThreadID == threadID {
-		input = s.app.handoverText(ctx, bot, run.ID, *session.Handover, session) + "\n\n" + input
-		handedOver = true
+	if session, err := sqlite.GetProviderSession(ctx, s.app.DB, t.bot.ID); err == nil && session.Handover != nil && session.ProviderThreadID == t.threadID {
+		t.input = s.app.handoverText(ctx, t.bot, t.run.ID, *session.Handover, session) + "\n\n" + t.input
+		t.handedOver = true
 	}
-	s.app.TouchLease(ctx, bot.ID)
+}
+
+// turnStart asks the engine for the turn.
+func (s *Scheduler) turnStart(ctx context.Context, t *turnAttempt) (bool, error) {
+	s.app.TouchLease(ctx, t.bot.ID)
 	turnCtx, cancelTurn := context.WithTimeout(ctx, turnStartTimeout)
+	model := t.model
 	if model == "" {
-		model = turnModel(turnCtx, choice, server)
+		model = turnModel(turnCtx, t.choice, t.server)
 	}
-	turnID, err := server.StartTurn(turnCtx, threadID, input, engine.TurnOptions{Model: model, Permission: permissionMode(team), Effort: s.app.effortFor(turnCtx, choice, model, team.ReasoningEffort)})
+	turnID, err := t.server.StartTurn(turnCtx, t.threadID, t.input, engine.TurnOptions{Model: model, Permission: permissionMode(t.team), Effort: s.app.effortFor(turnCtx, t.choice, model, t.team.ReasoningEffort)})
 	cancelTurn()
 	if errors.Is(err, engine.ErrRejected) {
 		// The engine answered with a refusal, so no turn exists: the run
 		// failed, and there is nothing to verify or recover.
-		s.logger.Warn("turn/start rejected", "botId", bot.ID, "runId", run.ID, "error", err)
-		return s.failStart(ctx, run.ID, bot.ID, "error.engine.turn_rejected")
+		s.logger.Warn("turn/start rejected", "botId", t.bot.ID, "runId", t.run.ID, "error", err)
+		return false, s.failStart(ctx, t.run.ID, t.bot.ID, "error.engine.turn_rejected")
 	}
 	if err != nil {
 		// The engine may or may not have accepted the turn: the run stays
 		// unknown until verified, never silently retried.
-		return s.unknownStart(ctx, run.ID, delivery.ID, bot.ID)
+		return false, s.unknownStart(ctx, t.run.ID, t.delivery.ID, t.bot.ID)
 	}
+	t.turnID = turnID
+	return true, nil
+}
 
-	tx, err = s.app.DB.BeginTx(ctx, nil)
+// turnAcknowledge records that the engine took the turn.
+func (s *Scheduler) turnAcknowledge(ctx context.Context, t *turnAttempt) error {
+	tx, err := s.app.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.AcknowledgeRunStart(ctx, tx, run.ID, turnID, server.Epoch()); err != nil {
+	if err := sqlite.AcknowledgeRunStart(ctx, tx, t.run.ID, t.turnID, t.server.Epoch()); err != nil {
 		return err
 	}
-	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, run.ID, domain.DeliveryAccepted, domain.DeliveryDispatching); err != nil {
+	if _, err := inboxMarkRunTx(ctx, tx, t.run.ID, domain.DeliveryAccepted, domain.DeliveryDispatching); err != nil {
 		return err
 	}
 	// The thread has now heard this turn's update.
-	if err := sqlite.SetSessionContextDigest(ctx, tx, bot.ID, told.String()); err != nil {
+	if err := sqlite.SetSessionContextDigest(ctx, tx, t.bot.ID, t.told.String()); err != nil {
 		return err
 	}
-	if handedOver {
-		if err := sqlite.SetSessionHandover(ctx, tx, bot.ID, nil); err != nil {
+	if t.handedOver {
+		if err := sqlite.SetSessionHandover(ctx, tx, t.bot.ID, nil); err != nil {
 			return err
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: run.ID})
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: team.ID, BotID: bot.ID, ResourceID: message.ID})
+	return tx.Commit()
+}
+
+// turnStarted is what a started turn leaves until it has committed.
+func (s *Scheduler) turnStarted(ctx context.Context, t *turnAttempt) {
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: t.team.ID, BotID: t.bot.ID, ResourceID: t.run.ID})
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: t.team.ID, BotID: t.bot.ID, ResourceID: t.message.ID})
 	s.app.Hub.Publish()
-	s.logger.Info("run started", "botId", bot.ID, "runId", run.ID, "threadId", threadID)
-	s.app.startAssignedTasks(ctx, run.ID, bot.ID)
+	s.logger.Info("run started", "botId", t.bot.ID, "runId", t.run.ID, "threadId", t.threadID)
+	s.app.startAssignedTasks(ctx, t.run.ID, t.bot.ID)
 
 	// The engine may spawn this bot's MCP bridge at any moment inside the
 	// turn; the lease must already be fresh when it asks to act.
-	s.app.TouchLease(ctx, bot.ID)
-	return nil
+	s.app.TouchLease(ctx, t.bot.ID)
 }
 
 // A gate may have parked the previous head after all earlier wake signals
@@ -632,10 +712,10 @@ func (s *Scheduler) failStart(ctx context.Context, runID, botID, errorKey string
 	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunFailed, "", "", errorKey, true); err != nil {
 		return err
 	}
-	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
+	if _, err := inboxMarkRunTx(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
 		return err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusIdle, ""); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, domain.BotStatusIdle, ""); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -669,10 +749,10 @@ func (s *Scheduler) unknownStart(ctx context.Context, runID, deliveryID, botID s
 	if err := sqlite.UpdateRunStatus(ctx, tx, runID, domain.RunUnknown, run.ProviderTurnID, run.EngineEpoch, "error.engine.turn_unknown", false); err != nil {
 		return err
 	}
-	if _, err := sqlite.SetRunDeliveriesStatus(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
+	if _, err := inboxMarkRunTx(ctx, tx, runID, domain.DeliveryUnknown, domain.DeliveryDispatching); err != nil {
 		return err
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusUnknown, runID); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, domain.BotStatusUnknown, runID); err != nil {
 		return err
 	}
 	cardID, err := ensureRecoveryCardLocked(ctx, tx, run, deliveryID)
@@ -701,7 +781,7 @@ func (s *Scheduler) holdForBudget(ctx context.Context, teamID, botID string, pau
 		return err
 	}
 	defer tx.Rollback()
-	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusWaitingInput, ""); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, domain.BotStatusWaitingInput, ""); err != nil {
 		return err
 	}
 	// The user is asked once whether to start the count again.
@@ -967,22 +1047,11 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		return "", err
 	}
 	providerID, model := choice.EngineProvider, choice.Model
-	config, err := s.threadConfig(ctx, team, bot, server.Epoch(), runID)
+	bridge, err := s.toolBridge(team, bot, server.Epoch(), runID)
 	if err != nil {
 		return "", err
 	}
-	if providerID != officialEngineProvider && !s.app.webSearchAllowed(ctx, choice) {
-		// Web search is a tool OpenAI runs on its own side. The engine
-		// offers it with every request, and a provider that does not run
-		// it may refuse the whole turn over it (Xiaomi MiMo does, with
-		// responses_feature_not_supported), so a member on any provider
-		// but the ChatGPT account goes without it, unless the user has said
-		// the model can use it (its advanced settings).
-		if config == nil {
-			config = map[string]any{}
-		}
-		config["web_search"] = "disabled"
-	}
+	contextWindow, disableWebSearch := s.app.modelThreadOptions(ctx, choice, "")
 	// A thread is started for one vendor (see needsFreshThread), so the way
 	// it is told to call the tools is fixed with it.
 	instructions, told := s.app.threadInstructions(ctx, team, bot, role, providerID == officialEngineProvider)
@@ -993,7 +1062,9 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 		Model:                 model,
 		ModelProvider:         providerID,
 		DeveloperInstructions: instructions,
-		Config:                config,
+		ContextWindow:         contextWindow,
+		DisableWebSearch:      disableWebSearch,
+		ToolBridge:            bridge,
 	}
 	var handover *domain.ThreadHandover
 	session, sessionErr := sqlite.GetProviderSession(ctx, s.app.DB, bot.ID)
@@ -1077,55 +1148,45 @@ func (s *Scheduler) ensureThread(ctx context.Context, team domain.Team, bot doma
 	return info.ThreadID, nil
 }
 
-// threadConfig is the per-thread engine configuration. It merges the
-// platform defaults with this bot's collaboration bridge.
+// toolBridge is the collaboration bridge of this member's thread.
 //
 // The bridge is spawned by the engine as `cobot mcp` with the bot token in
 // its environment. That token is minted per bot and bound to this engine
 // epoch, so a bridge left behind by a restarted connection can no longer act:
 // the core refuses it rather than trusting a stale credential.
-func (s *Scheduler) threadConfig(ctx context.Context, team domain.Team, bot domain.Bot, engineEpoch, runID string) (map[string]any, error) {
-	extra := map[string]any{}
-	// A model of another vendor has the context window the catalog (or the user)
-	// says; the engine compacts before reaching it, which it cannot do for a
-	// model it knows nothing about.
-	if choice, err := s.app.MemberModel(ctx, team.ID, bot.ID); err == nil {
-		if spec, ok := s.app.specOfChoice(ctx, choice, ""); ok && spec.ContextWindow > 0 {
-			extra["model_context_window"] = spec.ContextWindow
-		}
-	}
+func (s *Scheduler) toolBridge(team domain.Team, bot domain.Bot, engineEpoch, runID string) (*engine.ToolBridge, error) {
 	if s.app.MCPBinary == "" || s.app.MCPEndpoint == "" || s.app.CollaborationTokens == nil {
 		// No bridge available (for example a test factory); the tools simply
 		// are not offered rather than being offered and always failing.
-		return codex.ThreadConfig(extra), nil
+		return nil, nil
 	}
 	token, err := s.app.CollaborationTokens.ActivateBridgeRun(bot.ID, team.ID, engineEpoch, runID)
 	if err != nil {
 		s.logger.Error("mint bot token failed; collaboration tools disabled", "botId", bot.ID, "error", err)
 		return nil, err
 	}
-	prefix := "mcp_servers.cobot"
-	extra[prefix+".enabled"] = true
-	extra[prefix+".command"] = s.app.MCPBinary
-	// The data root only tells the bridge where a developer recording
-	// (`cobot trace on`) would go.
-	extra[prefix+".args"] = []string{"mcp", "--data-root", s.app.Paths.Root}
-	extra[prefix+".env"] = map[string]string{
-		auth.BridgeEnvEndpoint: s.app.MCPEndpoint,
-		auth.BridgeEnvToken:    token,
-		// The bridge needs to know which member it acts for and where the
-		// local leases live, so a stale executor refuses side effects even
-		// without HTTP.
-		auth.BridgeEnvBotID:    bot.ID,
-		auth.BridgeEnvLeaseDir: s.app.LeaseDir(),
-		// The bridge offers only the tools of this member's role.
-		auth.BridgeEnvRole: bridgeRole(team, bot),
-	}
-	// The tools are CoBot's own structured collaboration surface, so they
-	// never need a user approval round trip; the core enforces permissions.
-	extra[prefix+".required"] = true
-	extra[prefix+".default_tools_approval_mode"] = "approve"
-	return codex.ThreadConfig(extra), nil
+	return &engine.ToolBridge{
+		Name:    "cobot",
+		Command: s.app.MCPBinary,
+		// The data root only tells the bridge where a developer recording
+		// (`cobot trace on`) would go.
+		Args: []string{"mcp", "--data-root", s.app.Paths.Root},
+		Env: map[string]string{
+			auth.BridgeEnvEndpoint: s.app.MCPEndpoint,
+			auth.BridgeEnvToken:    token,
+			// The bridge needs to know which member it acts for and where the
+			// local leases live, so a stale executor refuses side effects even
+			// without HTTP.
+			auth.BridgeEnvBotID:    bot.ID,
+			auth.BridgeEnvLeaseDir: s.app.LeaseDir(),
+			// The bridge offers only the tools of this member's role.
+			auth.BridgeEnvRole: bridgeRole(team, bot),
+		},
+		Required: true,
+		// The tools are CoBot's own structured collaboration surface, so they
+		// never need a user approval round trip; the core enforces permissions.
+		AutoApprove: true,
+	}, nil
 }
 
 // permissionMode is the team's mode, the default for a row that predates it.
@@ -1150,14 +1211,4 @@ func (s *Scheduler) Warm(teamID, cwd string) {
 			s.logger.Info("engine warm-up failed", "teamId", teamID, "error", err)
 		}
 	}()
-}
-
-// bridgeRole is the tool set a member's bridge offers: "leader" for the
-// team's leader, "member" for everyone else. A reviewer is a member like
-// any other: what it reviews comes to it on cards.
-func bridgeRole(team domain.Team, bot domain.Bot) string {
-	if bot.IsLeader || team.LeaderID == bot.ID {
-		return "leader"
-	}
-	return "member"
 }

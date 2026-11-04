@@ -108,11 +108,3 @@ func configValidationFailed(err error) bool {
 	}
 	return data.ConfigWriteErrorCode == "configValidationError"
 }
-
-// IsConfigValidationError reports whether the engine refused a configuration
-// value because it does not understand it.
-func IsConfigValidationError(err error) bool { return configValidationFailed(err) }
-
-// ConfigErrorMessage returns the engine's own explanation of a rejected
-// configuration, so the user reads what Codex would have said.
-func ConfigErrorMessage(err error) string { return configErrorMessage(err) }

@@ -1907,7 +1907,7 @@ export interface components {
         };
         ProviderModel: {
             id: string;
-            /** @description The user's own name for the model */
+            /** @description The user's own name for the model, shown in its place. */
             displayName?: string;
             contextWindow?: number;
             maxOutput?: number;
@@ -1929,7 +1929,7 @@ export interface components {
             name?: string;
             alias?: string;
             displayName: string;
-            /** @description In use. The user's own number when it is below the limit */
+            /** @description In use. The user's own number when it is below the limit, else the catalog's. */
             contextWindow: number;
             maxOutput: number;
             /** @description The most the catalog says the model reads; 0 when it does not know the model. */
@@ -2015,7 +2015,7 @@ export interface components {
         };
         ProviderProbeResult: {
             ok: boolean;
-            /** @description Stable machine code */
+            /** @description Stable machine code, e.g. quota or auth_invalid. */
             code?: string;
             message?: string;
         };
@@ -2067,7 +2067,7 @@ export interface components {
             /** @enum {string} */
             mode?: "rerun" | "return_to_me";
             suggestions?: string;
-            /** @description With a runnable result */
+            /** @description With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it. */
             previewCommand?: string;
             /** @description The address to open once the preview answers. */
             previewUrl?: string;
@@ -2144,7 +2144,7 @@ export interface components {
             teamId: string;
             botId: string;
             /**
-             * @description document is a relay-posted document (the requirement to confirm
+             * @description document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card.
              * @enum {string}
              */
             kind: "user" | "assistant" | "collaboration" | "system" | "document";
@@ -2213,7 +2213,7 @@ export interface components {
         AnswerQuestionRequest: {
             /** Format: uuid */
             requestId: string;
-            /** @description The answer; for a confirmation or acceptance */
+            /** @description The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager. */
             answerText: string;
             /**
              * @description Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
@@ -2232,7 +2232,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "browser";
+            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "request_member" | "browser";
             arguments?: {
                 [key: string]: unknown;
             };
@@ -2524,7 +2524,7 @@ export interface components {
             text: string;
             /** Format: date-time */
             createdAt: string;
-            /** @description Who sent it */
+            /** @description Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user. */
             senderBotId?: string;
         };
         TeamWithBots: {
@@ -3643,7 +3643,7 @@ export interface operations {
                     requestId: string;
                     /**
                      * Format: byte
-                     * @description Base64 PNG
+                     * @description Base64 PNG, at most 512 KB
                      */
                     data: string;
                 };
@@ -5018,7 +5018,7 @@ export interface operations {
                                  * @enum {string}
                                  */
                                 owner: "member" | "user";
-                                /** @description The bot id */
+                                /** @description The bot id, present for a member's tab only. */
                                 memberId?: string;
                                 url: string;
                                 title: string;
@@ -6271,7 +6271,7 @@ export interface operations {
     searchConversations: {
         parameters: {
             query: {
-                /** @description Plain text matched against chat titles */
+                /** @description Plain text matched against chat titles, chat message text, and team member message text. */
                 q: string;
             };
             header?: never;

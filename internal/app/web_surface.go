@@ -120,6 +120,9 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 		result["teamId"] = conflict.ID
 		result["teamName"] = conflict.Name
 	}
+	// markerClaim touches the database itself, and the pool is one connection:
+	// inside the open transaction it would wait on itself.
+	tx.Rollback()
 	// A marker of a team this instance cannot see (another CoBot, a copied
 	// folder) still claims the folder; creation refuses it the same way.
 	if result["ok"] == true {

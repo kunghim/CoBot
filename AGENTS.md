@@ -23,6 +23,7 @@ CoBot 是本地运行的多智能体协作壳：管团队、需求接力、消�
 | 接力、卡片、协作工具、角色：`internal/app/relay*`、`chains.go`、`internal/collaboration/**`、`internal/roles/**` | [rules/relay.md](docs/rules/relay.md) |
 | 重启、审批、租约：`recovery.go`、`approval*.go`、`lease.go` | [rules/recovery.md](docs/rules/recovery.md) |
 | `frontend/**` | [rules/frontend.md](docs/rules/frontend.md) |
+| `internal/app/**`、`frontend/src/**` 的模块边界、事务；增删这些目录下的文件 | [rules/architecture.md](docs/rules/architecture.md) |
 | `assets/**` | [rules/assets.md](docs/rules/assets.md) |
 
 ## 做到哪一步，读哪份流程

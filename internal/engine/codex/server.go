@@ -615,7 +615,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		Model:                 spec.Model,
 		ModelProvider:         spec.ModelProvider,
 		DeveloperInstructions: spec.DeveloperInstructions,
-		Config:                spec.Config,
+		Config:                ThreadConfigOf(spec),
 	}, &res)
 	if err != nil {
 		return engine.ThreadInfo{}, fmt.Errorf("thread/start: %w", err)
@@ -640,7 +640,7 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
 		Model: spec.Model, ModelProvider: spec.ModelProvider,
-		DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
+		DeveloperInstructions: spec.DeveloperInstructions, Config: ThreadConfigOf(spec),
 		ExcludeTurns: true,
 	}, &res); err != nil {
 		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
@@ -1157,8 +1157,13 @@ func (s *Server) Ping(ctx context.Context) error {
 	}
 }
 
+// AccountLogout ends the engine's session for this profile.
+func (s *Server) AccountLogout(ctx context.Context) error {
+	return s.Call(ctx, "account/logout", map[string]any{}, nil)
+}
+
 // Call exposes a generic RPC for protocol surfaces CoBot does not wrap yet
-// (for example account/logout).
+// (protocol checks and tests).
 func (s *Server) Call(ctx context.Context, method string, params any, out any) error {
 	return s.client.Call(ctx, method, params, out)
 }

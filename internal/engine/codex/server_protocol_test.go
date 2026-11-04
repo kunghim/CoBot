@@ -280,7 +280,7 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	if p := (<-requests)["params"].(map[string]any); p["threadId"] != "th-1" || p["turnId"] != "turn-9" {
 		t.Fatal("wrong turn identity", p)
 	}
-	resumed, err := s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", ModelProvider: "gateway", DeveloperInstructions: "current-role", Sandbox: "workspace-write", Config: map[string]any{"mcp_servers.cobot.enabled": true}})
+	resumed, err := s.ResumeThread(ctx, "th-1", engine.ThreadSpec{Cwd: "new-cwd", Model: "new-model", ModelProvider: "gateway", DeveloperInstructions: "current-role", Sandbox: "workspace-write", DisableWebSearch: true})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -166,7 +166,7 @@ func (a *App) AnswerRecruitment(ctx context.Context, principal auth.Principal, q
 		return domain.Question{}, err
 	}
 	defer tx.Rollback()
-	var effect relayEffect
+	var effect effects
 	var answerText, resultText string
 	if decision == domain.RecruitmentApprove {
 		names := make([]string, 0, len(question.RoleIDs))
@@ -221,6 +221,6 @@ func (a *App) AnswerRecruitment(ctx context.Context, principal auth.Principal, q
 		return domain.Question{}, err
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventQuestionAnswered, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: question.ID})
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	return answered, nil
 }

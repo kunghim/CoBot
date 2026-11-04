@@ -283,3 +283,35 @@ func DeleteChatRun(ctx context.Context, q Queryer, runID string) error {
 func GetChatMessage(ctx context.Context, q Queryer, id string) (domain.ChatMessage, error) {
 	return readChatJSON[domain.ChatMessage](q.QueryRowContext(ctx, `SELECT data FROM chat_messages WHERE id=?`, id))
 }
+
+// DeleteChat removes a chat's row.
+func DeleteChat(ctx context.Context, q Queryer, id string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM chats WHERE id=?`, id)
+	return err
+}
+
+// ClearChatSection takes every chat out of a deleted section.
+func ClearChatSection(ctx context.Context, q Queryer, sectionID string) error {
+	_, err := q.ExecContext(ctx, `UPDATE chats SET data=json_set(data,'$.sectionId','','$.revision',json_extract(data,'$.revision')+1) WHERE json_extract(data,'$.sectionId')=?`, sectionID)
+	return err
+}
+
+// MoveChatStepStatus moves one step of a run from one status to another.
+func MoveChatStepStatus(ctx context.Context, q Queryer, runID, itemID, from, to string) error {
+	_, err := q.ExecContext(ctx, `UPDATE chat_run_steps SET data=json_set(data,'$.status',?) WHERE run_id=? AND item_id=? AND json_extract(data,'$.status')=?`,
+		to, runID, itemID, from)
+	return err
+}
+
+// SettleOpenChatSteps gives a run's steps still in progress their final status.
+func SettleOpenChatSteps(ctx context.Context, q Queryer, runID, status string) error {
+	_, err := q.ExecContext(ctx, `UPDATE chat_run_steps SET data=json_set(data,'$.status',?) WHERE run_id=? AND json_extract(data,'$.status')='in_progress'`, status, runID)
+	return err
+}
+
+// SaveChatUsage keeps a turn's cumulative usage snapshot; a duplicate replaces
+// the same evidence.
+func SaveChatUsage(ctx context.Context, q Queryer, chatID, epoch, threadID, turnID, data string) error {
+	_, err := q.ExecContext(ctx, `INSERT INTO chat_usage(chat_id,epoch,thread_id,turn_id,data) VALUES(?,?,?,?,?) ON CONFLICT(epoch,thread_id,turn_id) DO UPDATE SET data=excluded.data`, chatID, epoch, threadID, turnID, data)
+	return err
+}

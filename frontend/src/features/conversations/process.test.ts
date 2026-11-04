@@ -4,7 +4,7 @@ import type { Message, Run, RunStep, RunWithSteps } from '../../api/types';
 import { buildTimeline } from './ConversationView';
 import { messageText } from './delivery';
 import { isExchange, taskCardOf } from './ExchangeLine';
-import { linkTarget } from './links';
+import { linkTarget } from '../../components/content/links';
 import { describeStep, displayCommand, durationPhrase, runPhase, isPartOfReply, turnBlocks, visibleSteps, workNeedsAttention, workSummary } from './steps';
 
 const step = (overrides: Partial<RunStep>): RunStep => ({

@@ -5,10 +5,10 @@
 - 业务只靠卡片推进：成员用 `handoff` 交接，下一环由系统按用户确认过的链路决定。不给模型加“选下一个人”的能力。
 - `send_message` 只留言，不唤醒成员、不推进业务。不要把它改成派活手段。
 - 机器人互相唤醒消耗同一条因果链的预算；用户消息开启新链。模型不能延长预算，超限后等用户确认。
-- 子智能体不能调用 `handoff`、`start_requirement`、`ask_user`（`internal/collaboration/tools.go` 的 `handoffOnly`）；
+- 子智能体不能调用 `handoff`、`start_requirement`、`ask_user`（每个工具文件 `internal/collaboration/tool_*.go` 的 `SubAgentOK`）；
   它的步骤、审批和用量归到所属成员。
 - 新增或修改协作工具时写清：对哪些身份开放、子智能体能否调用、参数里的身份字段一律不信任（身份来自宿主绑定）。
-- 旧的任务模型和工具（`create_task`、`review_task`、`deliver_task` 等）已删除，见到旧资料提到它们不要恢复；以 `tools.go` 为准。
+- 旧的任务模型和工具（`create_task`、`review_task`、`deliver_task` 等）已删除，见到旧资料提到它们不要恢复；以 `internal/collaboration/tools.go` 的 `toolTable` 为准。
 - `internal/roles/` 是产品内置的角色指令和检查清单，给 CoBot 里的成员看，不是开发文档；改它等于改产品行为。
 - 角色（ID 和名称）一经发布就不再修改，迁移也不得改写已有成员的 `role_id` 和名字：那是用户认识成员、历史引用成员的依据，就地改名会让用户分不清谁是谁（前后端合并就地改名产生过「全栈工程师 2」这种无语义的名字）。职责或名称要变，就新增一个角色（新 ID、新名称），同时下架旧的：下架的角色不再出现在场景和加成员菜单里，定义保留，已有成员原样继续用它，直到用户自己调整。
 

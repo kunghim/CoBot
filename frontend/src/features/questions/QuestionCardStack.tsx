@@ -8,29 +8,28 @@
 // where it was read; the card only asks and takes the answer. An answer is
 // ordinary input delivered to the asking member; it is never a security
 // authorization, and the card says so.
-import { useContext, useState } from 'react';
+import { useContext, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAnswerQuestion, useCancelQuestion, useCancelRequirement, useOpenBrowserTab, useQuestions, useRoles, useStartPreview, useStopPreview, useTaskDetail } from '../../api/queries';
 import type { Question } from '../../api/types';
 import { Alert, Button, Checkbox, Icons, Spinner, TextInput, WaitingCard } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
 import Avatar from '../avatars/Avatar';
-import { clampPagerIndex } from '../approvals/pager';
-import { TeamMembersContext } from '../conversations/ExchangeLine';
+import { useCardPager } from '../../components/useCardPager';
+import { TeamMembersContext } from '../../app/TeamMembersContext';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
-import Markdown from '../conversations/Markdown';
+import Markdown from '../../components/content/Markdown';
 
 export default function QuestionCardStack({ teamId, viewBotId }: { teamId: string; viewBotId?: string }) {
   const { t } = useTranslation();
   const questions = useQuestions(teamId, 'open', true, viewBotId);
-  const [index, setIndex] = useState(0);
   // An acceptance dismissed from its card comes back from this entry; a
   // cancelled confirmation never does.
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   const items = questions.data?.items ?? [];
   const visible = items.filter((question) => !dismissed.has(question.id));
-  const current = clampPagerIndex(index, visible.length);
+  const { current, onPrevious, onNext } = useCardPager(visible.length, questions);
   const question = visible[current];
   if (questions.isError && !questions.data) return <Alert tone="danger">{t('questions.loadFailed')}</Alert>;
   const reopen = dismissed.size > 0 && (
@@ -47,38 +46,30 @@ export default function QuestionCardStack({ teamId, viewBotId }: { teamId: strin
 
   const frame = {
     position: { index: current + 1, total },
-    onPrevious: () => setIndex(current - 1),
-    onNext: () => {
-      if (current < visible.length - 1) setIndex(current + 1);
-      else if (questions.hasNextPage) void questions.fetchNextPage().then((result) => { if (!result.isError) setIndex(current + 1); });
-    },
+    onPrevious,
+    onNext,
     previousLabel: t('questions.prev'),
     nextLabel: t('questions.next'),
   };
   // A card starts from nothing when the question changes. A dismissed
   // acceptance keeps its reopen entry beside whatever else still waits.
-  return question.kind === 'acceptance' || question.kind === 'confirm' ? (
+  const Card = questionCards[question.kind] ?? AskCard;
+  return (
     <>
-      <DecisionCard
-        key={question.id}
-        question={question}
-        frame={frame}
-        onDismiss={question.kind === 'acceptance' ? () => setDismissed((prev) => new Set(prev).add(question.id)) : undefined}
-      />
-      {reopen}
-    </>
-  ) : question.kind === 'recruitment' ? (
-    <>
-      <RecruitmentCard key={question.id} question={question} frame={frame} />
-      {reopen}
-    </>
-  ) : (
-    <>
-      <AskCard key={question.id} question={question} frame={frame} />
+      <Card key={question.id} question={question} frame={frame} onDismiss={() => setDismissed((prev) => new Set(prev).add(question.id))} />
       {reopen}
     </>
   );
 }
+
+// The card for each kind of question. Keyed by the interface's own list, so a
+// kind added there does not compile until it is here.
+const questionCards: Record<Question['kind'], ComponentType<CardProps>> = {
+  '': AskCard,
+  confirm: DecisionCard,
+  acceptance: DecisionCard,
+  recruitment: RecruitmentCard,
+};
 
 interface Frame {
   position: { index: number; total: number };
@@ -86,6 +77,13 @@ interface Frame {
   onNext: () => void;
   previousLabel: string;
   nextLabel: string;
+}
+
+interface CardProps {
+  question: Question;
+  frame: Frame;
+  // Steps the card aside until the user asks for it back; only an acceptance does.
+  onDismiss: () => void;
 }
 
 // Asker renders the member that asked, for the card header's left side.
@@ -102,7 +100,7 @@ function Asker({ question }: { question: Question }) {
 }
 
 // AskCard is an ask_user question: the options are answers, and so is the text.
-function AskCard({ question, frame }: { question: Question; frame: Frame }) {
+function AskCard({ question, frame }: CardProps) {
   const { t } = useTranslation();
   const answer = useAnswerQuestion();
   const cancel = useCancelQuestion(question.teamId);
@@ -171,7 +169,7 @@ function AskCard({ question, frame }: { question: Question; frame: Frame }) {
 // first, the project manager submits anew), a finished requirement only
 // waits, reopenable from the composer. What it is about is read in the
 // conversation above.
-function DecisionCard({ question, frame, onDismiss }: { question: Question; frame: Frame; onDismiss?: () => void }) {
+function DecisionCard({ question, frame, onDismiss }: CardProps) {
   const { t } = useTranslation();
   const answer = useAnswerQuestion();
   const cancelRequirement = useCancelRequirement();
@@ -205,7 +203,7 @@ function DecisionCard({ question, frame, onDismiss }: { question: Question; fram
       cancelRequirement.mutate(question.requirementId, { onError: (error) => setErrorText(apiErrorMessage(t, error)) });
       return;
     }
-    onDismiss?.();
+    onDismiss();
   };
 
   return (
@@ -317,7 +315,7 @@ function PreviewRow({ taskId, teamId, onError }: { taskId: string; teamId: strin
 // roles it asked for and why. Approving adds the members; rejecting passes
 // the comment back as the reason. There is no ignore: the request has
 // exactly two outcomes, and the project manager is told whichever it is.
-function RecruitmentCard({ question, frame }: { question: Question; frame: Frame }) {
+function RecruitmentCard({ question, frame }: CardProps) {
   const { t } = useTranslation();
   const decide = useAnswerQuestion();
   const roles = useRoles();

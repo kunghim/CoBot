@@ -11,6 +11,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
+	"github.com/kunghim/CoBot/internal/engine/codex"
 )
 
 // Server is a scriptable fake app-server.
@@ -43,7 +44,8 @@ type Server struct {
 	reverted          []string
 	steers            []Steer
 	replied           []Reply
-	ShutdownCalls     int
+	shutdownCalls     int
+	deletedThreads    []string
 	// ThreadProviders records the provider each thread was started or
 	// resumed with, so a test can see which one CoBot asked for.
 	ThreadProviders []string
@@ -157,7 +159,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.loaded[id] = true
 	s.instructions = append(s.instructions, spec.DeveloperInstructions)
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
-	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
+	s.ThreadConfigs = append(s.ThreadConfigs, codex.ThreadConfigOf(spec))
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: answeredModel(spec.Model), ModelProvider: answeredProvider(spec.ModelProvider), Path: TranscriptPath(id)}, nil
 }
 
@@ -173,7 +175,7 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	}
 	s.loaded[threadID] = true
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
-	s.ThreadConfigs = append(s.ThreadConfigs, spec.Config)
+	s.ThreadConfigs = append(s.ThreadConfigs, codex.ThreadConfigOf(spec))
 	return engine.ThreadInfo{ThreadID: threadID, Model: answeredModel(spec.Model), ModelProvider: answeredProvider(spec.ModelProvider), Path: TranscriptPath(threadID)}, nil
 }
 
@@ -342,7 +344,7 @@ func (s *Server) ModelList(ctx context.Context) (json.RawMessage, error) {
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ShutdownCalls++
+	s.shutdownCalls++
 	s.closed = true
 	return nil
 }
@@ -365,6 +367,58 @@ func (s *Server) Replies() []Reply {
 	out := make([]Reply, len(s.replied))
 	copy(out, s.replied)
 	return out
+}
+
+var _ engine.Control = (*Server)(nil)
+
+// Ping reports the fake is alive.
+func (s *Server) Ping(ctx context.Context) error { return nil }
+
+// AccountLogout ends the fake's session.
+func (s *Server) AccountLogout(ctx context.Context) error { return nil }
+
+// NativeHookStatus says the guard is trusted.
+func (s *Server) NativeHookStatus(ctx context.Context, cwd, sourcePath, command string) string {
+	return "trusted"
+}
+
+// TrustNativeHook records nothing: the fake already trusts the guard.
+func (s *Server) TrustNativeHook(ctx context.Context, cwd, sourcePath, command string) (string, error) {
+	return "trusted", nil
+}
+
+// WatchDirectory never reports a change.
+func (s *Server) WatchDirectory(ctx context.Context, path string) (<-chan struct{}, error) {
+	return make(chan struct{}), nil
+}
+
+// DeleteThread records a thread the host deleted.
+func (s *Server) DeleteThread(ctx context.Context, threadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deletedThreads = append(s.deletedThreads, threadID)
+	return nil
+}
+
+// DeletedThreads returns the threads the host deleted.
+func (s *Server) DeletedThreads() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.deletedThreads...)
+}
+
+// StartedConfigs returns the config of every thread so far.
+func (s *Server) StartedConfigs() []map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]map[string]any(nil), s.ThreadConfigs...)
+}
+
+// ShutdownCalls returns how many times the server was shut down.
+func (s *Server) ShutdownCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.shutdownCalls
 }
 
 // Interrupts returns the interrupted thread ids.

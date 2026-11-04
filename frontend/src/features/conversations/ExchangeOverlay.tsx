@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useExchanges } from '../../api/queries';
 import { messageText } from './delivery';
 import { stripToolCallText } from './toolCallText';
-import Markdown from './Markdown';
+import Markdown from '../../components/content/Markdown';
 import { usePerson } from './ExchangeLine';
 import { Alert, Button, IconButton, Icons, Spinner } from '../../components/ui';
 import type { PersonRef } from '../../components/ui';

@@ -10,8 +10,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+// fileURLPath is an absolute path as a file URL writes it: a Windows path needs
+// its own leading slash (file:///C:/...), or the drive would read as the host.
+func fileURLPath(path string) string {
+	slashed := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashed, "/") {
+		return "/" + slashed
+	}
+	return slashed
+}
 
 func fixture(t *testing.T, root, name, content string) string {
 	t.Helper()
@@ -72,7 +83,7 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 	}
 	for _, name := range names {
 		absolute := fixture(t, root, name, "literal file")
-		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String()} {
+		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: fileURLPath(absolute)}).String()} {
 			file, err := Open(root, target)
 			if err != nil {
 				t.Fatal(target, err)
@@ -84,7 +95,9 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 			}
 		}
 	}
-	file, err := Open(root, " note.txt   ")
+	// Two leading spaces: Windows drops trailing ones, so " note.txt   " would
+	// name the literal file above.
+	file, err := Open(root, "  note.txt   ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +110,7 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 func TestOpenPositionsAndCanonicalPaths(t *testing.T) {
 	root := t.TempDir()
 	path := fixture(t, root, "src/hello world.go", "package hello\n")
-	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + filepath.ToSlash(path) + "#L4-L7"} {
+	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + fileURLPath(path) + "#L4-L7"} {
 		f, err := Open(root, target)
 		if err != nil {
 			t.Fatal(target, err)

@@ -351,23 +351,6 @@ func SetDeliveryStatus(ctx context.Context, tx *sql.Tx, id, status string) error
 		status, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
 		return fmt.Errorf("update delivery: %w", err)
 	}
-	response := ""
-	switch status {
-	case domain.DeliveryQueued:
-		response = domain.ResponseQueued
-	case domain.DeliveryAccepted:
-		response = domain.ResponseSent
-	case domain.DeliveryUnknown:
-		response = domain.ResponseUnknown
-	case domain.DeliveryCancelled:
-		response = domain.ResponseExpired
-	}
-	if response != "" {
-		_, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, updated_at = ? WHERE delivery_id = ? AND NOT (state = ? AND ? = ?)`, response, time.Now().UTC().Format(time.RFC3339Nano), id, domain.ResponseSent, response, domain.ResponseUnknown)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -385,6 +368,24 @@ func ClaimDeliveryRun(ctx context.Context, tx *sql.Tx, deliveryID, runID string)
 		return fmt.Errorf("claim delivery: %w", err)
 	}
 	return nil
+}
+
+// CountOpenUserDecisionQuestions counts the member's open ask_user and
+// recruitment questions: what dispatch treats as the member waiting on the
+// user. Settling a turn looks only at ask_user (CountOpenAskUserQuestions), so
+// a member with only a recruitment question ends its turn idle.
+func CountOpenUserDecisionQuestions(ctx context.Context, q Queryer, botID string) (int, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind IN ('', 'recruitment')`, botID).Scan(&n)
+	return n, err
+}
+
+// CountOpenAskUserQuestions counts the member's open ask_user questions. See
+// CountOpenUserDecisionQuestions for how it differs from what dispatch counts.
+func CountOpenAskUserQuestions(ctx context.Context, q Queryer, botID string) (int, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&n)
+	return n, err
 }
 
 // CountQueuedDeliveries counts a bot's queued items (busy indicator).
@@ -929,7 +930,6 @@ func SetRunDeliveriesStatus(ctx context.Context, tx *sql.Tx, runID, status strin
 		return nil, err
 	}
 	for i := range ids {
-		// SetDeliveryStatus also moves an approval result's response state.
 		if err := SetDeliveryStatus(ctx, tx, ids[i], status); err != nil {
 			return nil, err
 		}
@@ -986,5 +986,86 @@ func ListDeliveryRunsByMessage(ctx context.Context, q Queryer, messageID string)
 // message the user edited before it was dispatched.
 func UpdateMessageBlocks(ctx context.Context, q Queryer, messageID string, blocks []byte) error {
 	_, err := q.ExecContext(ctx, `UPDATE messages SET blocks = ? WHERE id = ?`, blocks, messageID)
+	return err
+}
+
+// CancelQueuedForTask cancels what a cancelled card still has in line: its
+// queued deliveries and the messages about it that wait with them.
+func CancelQueuedForTask(ctx context.Context, tx *sql.Tx, taskID string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE task_id = ? AND status = ?`,
+		domain.DeliveryCancelled, time.Now().UTC().Format(time.RFC3339Nano), taskID, domain.DeliveryQueued); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE run_id = ? AND delivery_status = ?`,
+		domain.DeliveryCancelled, taskID, domain.DeliveryQueued)
+	return err
+}
+
+// WithdrawDelivery puts a claimed delivery back in line, tied to no run.
+func WithdrawDelivery(ctx context.Context, tx *sql.Tx, id string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, run_id = '', updated_at = ? WHERE id = ?`,
+		domain.DeliveryQueued, time.Now().UTC().Format(time.RFC3339Nano), id)
+	return err
+}
+
+// CancelRequirementQuestions cancels a requirement's open questions.
+func CancelRequirementQuestions(ctx context.Context, q Queryer, requirementID string) error {
+	_, err := q.ExecContext(ctx, `UPDATE questions SET status = ?, revision = revision + 1 WHERE requirement_id = ? AND status = ?`,
+		domain.QuestionCancelled, requirementID, domain.QuestionOpen)
+	return err
+}
+
+// AdoptRunTurn records the engine's turn id on a run that has none yet.
+func AdoptRunTurn(ctx context.Context, q Queryer, runID, turnID string) error {
+	_, err := q.ExecContext(ctx, `UPDATE runs SET provider_turn_id = ? WHERE id = ? AND provider_turn_id = ''`, turnID, runID)
+	return err
+}
+
+// BindStartingRunEpoch records which engine process a starting run belongs to.
+func BindStartingRunEpoch(ctx context.Context, q Queryer, runID, epoch string) error {
+	_, err := q.ExecContext(ctx, `UPDATE runs SET engine_epoch = ? WHERE id = ? AND status = ?`, epoch, runID, domain.RunStarting)
+	return err
+}
+
+// InvalidatePendingEngineRequest ends the pending card of one engine request
+// and reports how many changed.
+func InvalidatePendingEngineRequest(ctx context.Context, q Queryer, teamID, epoch, requestID string) (int64, error) {
+	result, err := q.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1
+		WHERE team_id = ? AND engine_epoch = ? AND engine_request_id = ? AND request_state = ?`,
+		domain.ApprovalStateInvalidated, teamID, epoch, requestID, domain.ApprovalStatePending)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// InvalidateRunNativeApprovals ends a finished run's pending native approvals.
+func InvalidateRunNativeApprovals(ctx context.Context, q Queryer, runID string) error {
+	_, err := q.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE run_id = ? AND type = ? AND request_state = ?`,
+		domain.ApprovalStateInvalidated, runID, domain.ApprovalNativeTool, domain.ApprovalStatePending)
+	return err
+}
+
+// ExpireUnsentNativeResponses marks the native replies a previous connection
+// never sent: a new connection cannot deliver them.
+func ExpireUnsentNativeResponses(ctx context.Context, q Queryer) error {
+	_, err := q.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = 'engine_epoch_changed' WHERE state = ? AND delivery_id = '' AND approval_id IN (SELECT id FROM approvals WHERE type = ?)`,
+		domain.ResponseUnknown, domain.ResponseQueued, domain.ApprovalNativeTool)
+	return err
+}
+
+// UpdateIdempotencyResponse replaces a saved write's response and reports how
+// many rows it reached.
+func UpdateIdempotencyResponse(ctx context.Context, q Queryer, scope, principal, key, requestHash, response string) (int64, error) {
+	result, err := q.ExecContext(ctx, `UPDATE idempotency SET response = ? WHERE scope = ? AND principal = ? AND key = ? AND request_hash = ?`, response, scope, principal, key, requestHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// PruneIdempotency forgets saved writes older than a moment.
+func PruneIdempotency(ctx context.Context, q Queryer, before time.Time) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM idempotency WHERE created_at < ?`, before.Format(time.RFC3339Nano))
 	return err
 }

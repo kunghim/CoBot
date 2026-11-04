@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -133,7 +132,7 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
 	}
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+	if err := inboxPostTx(ctx, tx, message); err != nil {
 		return domain.Question{}, err
 	}
 	// The user's answer is fresh input, so it opens a new causal chain
@@ -142,7 +141,7 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	if chainErr != nil {
 		return domain.Question{}, chainErr
 	}
-	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+	if err := inboxQueueTx(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: question.TeamID,
 		TargetBotID: question.RequesterBotID, Status: domain.DeliveryQueued, ChainID: chain.ID,
 		TaskID: question.TaskID, Kind: "question_answer",
@@ -153,19 +152,14 @@ func (a *App) AnswerQuestion(ctx context.Context, principal auth.Principal, ques
 	// project manager reads the answer with its next turn, without a wake.
 	if team, _, terr := sqlite.GetTeam(ctx, tx, question.TeamID); terr == nil && team.LeaderID != "" && team.LeaderID != question.RequesterBotID {
 		note := fmt.Sprintf("用户回答了成员的提问。问：%s\n答：%s", question.Question, answerText)
-		if err := noteLocked(ctx, tx, question.TeamID, team.LeaderID, question.RequesterBotID, question.ID, note); err != nil {
+		if err := inboxNoteTx(ctx, tx, question.TeamID, team.LeaderID, question.RequesterBotID, question.ID, note); err != nil {
 			return domain.Question{}, err
 		}
 	}
 	// The asking member keeps its working projection if it is mid-run:
 	// answering enqueues, it never clears a live run.
-	if _, ferr := sqlite.FindActiveRun(ctx, tx, question.RequesterBotID); ferr != nil {
-		if !errors.Is(ferr, sqlite.ErrNotFound) {
-			return domain.Question{}, ferr // a real DB error, never "assume idle"
-		}
-		if err := sqlite.SetBotRunState(ctx, tx, question.RequesterBotID, domain.BotStatusQueued, ""); err != nil {
-			return domain.Question{}, err
-		}
+	if err := markQueuedIfIdleTx(ctx, tx, question.RequesterBotID); err != nil {
+		return domain.Question{}, err
 	}
 	if err := a.saveWriteResult(ctx, tx, principal, answered); err != nil {
 		return domain.Question{}, err
@@ -237,7 +231,7 @@ func (a *App) CancelQuestion(ctx context.Context, principal auth.Principal, ques
 	// acceptance question is cancelled through its requirement instead,
 	// which leaves its own record.
 	if principal.Kind == auth.KindUser && question.Kind == domain.QuestionKindAsk {
-		if err := systemNoteLocked(ctx, tx, question.TeamID, question.RequesterBotID, "你忽略了提问："+summarizeLine(question.Question)); err != nil {
+		if err := inboxRecordTx(ctx, tx, question.TeamID, question.RequesterBotID, "你忽略了提问："+summarizeLine(question.Question)); err != nil {
 			return domain.Question{}, err
 		}
 	}

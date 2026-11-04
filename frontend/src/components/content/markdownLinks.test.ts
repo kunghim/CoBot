@@ -5,24 +5,23 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../../i18n';
+import { ContentActionsContext } from './ContentActions';
 import Markdown from './Markdown';
 
 const state = vi.hoisted(() => ({
   open: vi.fn(),
-  openTab: vi.fn(),
+  showBrowserTab: vi.fn(),
+  openFile: vi.fn(),
   openExternal: vi.fn(),
 }));
 
 vi.mock('../../api/queries', () => ({
   useOpenBrowserTab: () => ({ mutate: state.open, isPending: false }),
 }));
-vi.mock('../workspace/WorkspaceProvider', () => ({
-  useWorkspace: () => ({ openTab: state.openTab }),
-}));
 vi.mock('../../platform/native-bridge', () => ({
   openExternal: state.openExternal,
 }));
-vi.mock('../../components/ui', async (importOriginal) => ({
+vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useToast: () => ({ show: vi.fn() }),
 }));
@@ -37,7 +36,8 @@ describe('web links in replies', () => {
     document.body.append(host);
     root = createRoot(host);
     state.open.mockReset();
-    state.openTab.mockReset();
+    state.showBrowserTab.mockReset();
+    state.openFile.mockReset();
     state.openExternal.mockReset();
   });
   afterEach(() => {
@@ -46,13 +46,16 @@ describe('web links in replies', () => {
   });
 
   const render = (text: string, teamId?: string) =>
-    act(() => root.render(h(Markdown, { text, teamId })));
+    act(() => root.render(h(ContentActionsContext.Provider, { value: { openFile: state.openFile, showBrowserTab: state.showBrowserTab } }, h(Markdown, { text, teamId }))));
+  const renderAlone = (text: string, teamId?: string) => act(() => root.render(h(Markdown, { text, teamId })));
   const link = () => host.querySelector('a') as HTMLAnchorElement;
 
   it('opens a team conversation link in the built-in browser', () => {
     render('[示例](https://example.com/page)', 't1');
     act(() => link().click());
     expect(state.open).toHaveBeenCalledWith('https://example.com/page', expect.anything());
+    state.open.mock.calls[0][1].onSuccess({ tab: { id: 'tab1', title: '' } });
+    expect(state.showBrowserTab).toHaveBeenCalledWith({ id: 'tab1', title: 'example.com' });
   });
 
   it('names the domain and offers the system browser beside the link', () => {
@@ -70,5 +73,24 @@ describe('web links in replies', () => {
     render('[示例](https://example.com/page)');
     act(() => link().click());
     expect(state.open).not.toHaveBeenCalled();
+  });
+
+  it('asks the place around it to open a file', async () => {
+    state.openFile.mockResolvedValue(undefined);
+    render('[文件](src/a.ts)', 't1');
+    await act(async () => link().click());
+    expect(state.openFile).toHaveBeenCalledWith({ kind: 'team', id: 't1' }, 'src/a.ts');
+  });
+
+  it('without a workspace around, a web link leaves for a new tab and a file says it cannot open', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderAlone('[示例](https://example.com/page)', 't1');
+    act(() => link().click());
+    expect(open).toHaveBeenCalledWith('https://example.com/page', '_blank', 'noopener,noreferrer');
+    expect(state.open).not.toHaveBeenCalled();
+    open.mockRestore();
+    renderAlone('[文件](src/a.ts)', 't1');
+    await act(async () => link().click());
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
   });
 });

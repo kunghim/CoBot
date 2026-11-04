@@ -14,6 +14,7 @@
 | [重启、审批与租约](rules/recovery.md) | `recovery.go`、`approval*.go`、`lease.go` |
 | [前端](rules/frontend.md) | `frontend/**` |
 | [资源](rules/assets.md) | `assets/**` |
+| [模块边界](rules/architecture.md) | `internal/app/**`、`frontend/src/**` 的模块边界和事务 |
 
 ## 按任务（`workflows/`）
 

@@ -3,9 +3,9 @@ package codex
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 // builtinProvider is the provider the engine uses when no other one is
@@ -18,26 +18,8 @@ const builtinProvider = "openai"
 // endpoint, which would send a user's third-party key to the wrong host.
 func (s *Server) Dialects() []string { return []string{domain.DialectOpenAIResponses} }
 
-// ProviderEnvKey is the environment variable that carries a provider's API
-// key into the engine. The name is stable per provider so a key can be
-// rotated without renaming the configuration, and the secret itself never
-// reaches config.toml — only this variable name does.
-func ProviderEnvKey(providerID string) string {
-	return "COBOT_PROVIDER_" + sanitizeEnvName(providerID) + "_KEY"
-}
-
-func sanitizeEnvName(id string) string {
-	var b strings.Builder
-	for _, r := range strings.ToUpper(id) {
-		switch {
-		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('_')
-		}
-	}
-	return b.String()
-}
+// ProviderEnvKey is the variable that carries a provider's key into Codex.
+func ProviderEnvKey(providerID string) string { return engine.ProviderEnvKey(providerID) }
 
 // BindProvider makes a provider reachable for this engine.
 //

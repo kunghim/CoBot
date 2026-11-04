@@ -239,6 +239,21 @@ func (a *App) UpdateModelCatalog(ctx context.Context, principal auth.Principal) 
 	return ModelCatalogUpdate{State: "updated", Status: status, Engine: a.engineCatalogState(ctx)}, nil
 }
 
+// modelThreadOptions is the part of a thread's configuration that depends only
+// on the model; a team member and a chat take it the same way. The window is
+// what the engine cannot know of a model it has no entry for. Web search is a
+// tool OpenAI runs on its own side: the engine offers it with every request,
+// and a provider that does not run it may refuse the whole turn over it (Xiaomi
+// MiMo does, with responses_feature_not_supported), so any provider but the
+// ChatGPT account goes without it unless the user has said the model can use
+// it (its advanced settings). An empty model means the one chosen.
+func (a *App) modelThreadOptions(ctx context.Context, choice ModelChoice, model string) (contextWindow int, disableWebSearch bool) {
+	if spec, ok := a.specOfChoice(ctx, choice, model); ok && spec.ContextWindow > 0 {
+		contextWindow = spec.ContextWindow
+	}
+	return contextWindow, choice.EngineProvider != officialEngineProvider && !a.webSearchAllowed(ctx, choice)
+}
+
 // webSearchAllowed says whether the user has switched web search on for the
 // model a member runs with.
 func (a *App) webSearchAllowed(ctx context.Context, choice ModelChoice) bool {

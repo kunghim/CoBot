@@ -187,3 +187,7 @@ func (a *App) ResumeBudgetPausedBots(ctx context.Context) {
 		a.Scheduler.Wake(botID)
 	}
 }
+
+func (a *App) botByThread(ctx context.Context, epoch, threadID string) (string, error) {
+	return sqlite.FindBotByThread(ctx, a.DB, epoch, threadID)
+}

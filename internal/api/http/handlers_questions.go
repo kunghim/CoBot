@@ -1,12 +1,6 @@
 package http
 
-import (
-	"context"
-	"net/http"
-
-	"github.com/kunghim/CoBot/internal/auth"
-	"github.com/kunghim/CoBot/internal/domain"
-)
+import "net/http"
 
 // handleListQuestions pages a team's questions. An open question is user input
 // the user still owes; a decided one keeps its answer in the record.
@@ -43,22 +37,7 @@ func (s *Server) handleAnswerQuestion(w http.ResponseWriter, r *http.Request) {
 	if req.ExpectedRevision != nil {
 		expected = *req.ExpectedRevision
 	}
-	answer := s.App.AnswerQuestion
-	switch req.Decision {
-	case "":
-	case domain.AcceptanceAccept, domain.AcceptanceRevise:
-		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
-			return s.App.AnswerDecision(ctx, principal, id, req.Decision, req.Mode, text, expected)
-		}
-	case domain.RecruitmentApprove, domain.RecruitmentReject:
-		answer = func(ctx context.Context, principal auth.Principal, id, text string, expected int64) (domain.Question, error) {
-			return s.App.AnswerRecruitment(ctx, principal, id, req.Decision, text, expected)
-		}
-	default:
-		writeError(w, r, domain.InvalidRequest("error.question.acceptance_decision", nil))
-		return
-	}
-	question, err := answer(r.Context(), principal, r.PathValue("id"), req.AnswerText, expected)
+	question, err := s.App.AnswerCard(r.Context(), principal, r.PathValue("id"), req.Decision, req.Mode, req.AnswerText, expected)
 	if err != nil {
 		writeError(w, r, err)
 		return

@@ -113,8 +113,8 @@ func TestRecruitmentApproveAddsMemberAndWakesLeader(t *testing.T) {
 	if !hasMessageText(messages, "你同意了招募申请") || !hasMessageText(messages, added.ID) {
 		t.Fatal("the project manager was not told the approval with the new member id")
 	}
-	if h.queuedForBot(t, pm.ID) != 1 {
-		t.Fatal("the result is not queued for the project manager's next turn")
+	if h.deliveriesForBot(t, pm.ID) != 1 {
+		t.Fatal("the result was not delivered to the project manager")
 	}
 }
 

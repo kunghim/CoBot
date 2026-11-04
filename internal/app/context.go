@@ -263,3 +263,13 @@ func (a *App) unseenNotes(ctx context.Context, bot domain.Bot, runID string) str
 	}
 	return b.String()
 }
+
+// bridgeRole is the tool set a member's bridge offers: "leader" for the
+// team's leader, "member" for everyone else. A reviewer is a member like
+// any other: what it reviews comes to it on cards.
+func bridgeRole(team domain.Team, bot domain.Bot) string {
+	if bot.IsLeader || team.LeaderID == bot.ID {
+		return "leader"
+	}
+	return "member"
+}

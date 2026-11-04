@@ -8,7 +8,6 @@ import (
 
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
-	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/provider"
 	"github.com/kunghim/CoBot/internal/providers/presets"
 	"github.com/kunghim/CoBot/internal/secrets"
@@ -153,7 +152,7 @@ func (a *App) ProviderEnv(ctx context.Context) (map[string]string, error) {
 			}
 			return nil, domain.Internal(err)
 		}
-		env[codex.ProviderEnvKey(p.ID)] = string(secret)
+		env[engine.ProviderEnvKey(p.ID)] = string(secret)
 	}
 	return env, nil
 }
@@ -361,9 +360,9 @@ func (a *App) providerBinder(ctx context.Context) (engine.ProviderBinder, error)
 // error: the user supplied something the engine cannot use, which is not our
 // fault and must not be reported as a server failure.
 func providerEngineError(err error) error {
-	if codex.IsConfigValidationError(err) {
+	if reason, rejected := engine.RejectedConfig(err); rejected {
 		return domain.InvalidRequest("error.provider.engine_rejected", map[string]any{
-			"reason": codex.ConfigErrorMessage(err),
+			"reason": reason,
 		})
 	}
 	return domain.EngineUnavailable("error.provider.bind_failed", nil, err)

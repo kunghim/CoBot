@@ -226,7 +226,7 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 	if err != nil || archived.Status != domain.TeamStatusArchived || archived.ArchivedAt == "" {
 		t.Fatalf("archive = %+v (err %v), want archived with a time", archived, err)
 	}
-	if fake.ShutdownCalls < 1 {
+	if fake.ShutdownCalls() < 1 {
 		t.Fatal("archiving must shut the team engine down")
 	}
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "归档后不该派发"}); err == nil {
@@ -345,6 +345,44 @@ func TestClaimedFolderIsRefused(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(stale, ".cobot", "team.json"))
 	if err := json.Unmarshal(data, &written); err != nil || written.TeamID != team.ID || written.TeamName != "旧标记" {
 		t.Fatalf("marker after create = %s (%v)", data, err)
+	}
+}
+
+// TestCheckDirectoryAnswersForMarkedFolders pins the check before creating a
+// team: a marker naming a team of this instance makes it look the team up, which
+// must not wait on its own transaction, or the whole product stalls on the one
+// database connection until the request ends.
+func TestCheckDirectoryAnswersForMarkedFolders(t *testing.T) {
+	h := newM2Harness(t)
+	team, _ := h.createTeam(t, nil)
+	check := func(name, marker string) map[string]any {
+		t.Helper()
+		dir := filepath.Join(filepath.Dir(h.teamDir), name)
+		if err := os.MkdirAll(filepath.Join(dir, ".cobot"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".cobot", "team.json"), []byte(marker), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		result, err := h.app.CheckDirectory(ctx, h.user, dir)
+		if err != nil {
+			t.Fatalf("checking %s: %v", name, err)
+		}
+		return result
+	}
+
+	// A copy of a live team's folder carries that team's marker.
+	copied := check("copied-team", `{"instanceId":"`+h.app.InstanceID+`","teamId":"`+team.ID+`","teamName":"`+team.Name+`"}`)
+	if copied["ok"] != false || copied["claimed"] != true || copied["teamName"] != team.Name {
+		t.Fatalf("copied folder = %+v, want claimed by %s", copied, team.Name)
+	}
+	if stale := check("deleted-team", `{"instanceId":"`+h.app.InstanceID+`","teamId":"deleted-long-ago"}`); stale["ok"] != true || stale["claimed"] != false {
+		t.Fatalf("stale marker = %+v, want free", stale)
+	}
+	if foreign := check("other-instance", `{"instanceId":"other-instance","teamId":"t1","teamName":"别处的团队"}`); foreign["ok"] != false || foreign["claimed"] != true {
+		t.Fatalf("foreign marker = %+v, want claimed", foreign)
 	}
 }
 

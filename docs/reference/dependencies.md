@@ -1,7 +1,7 @@
 # 依赖与第三方声明
 
-- 核对日期：2026-10-20。
-- 对照代码：`6b7530c`。版本以当前 `go.mod`、`go.sum` 和 `frontend/package-lock.json` 为准。
+- 核对日期：2026-11-03。
+- 对照代码：`727ea51`。版本以当前 `go.mod`、`go.sum` 和 `frontend/package-lock.json` 为准。
 - 本文是依赖范围和直接依赖的维护说明，不是完整、机器可读的 SBOM。
 - CoBot 自身采用 [Apache-2.0](../../LICENSE)。
 
@@ -32,9 +32,11 @@ Go 直接依赖表依据 `go.mod` 和对应版本的模块 LICENSE 核对；前�
 | `github.com/modelcontextprotocol/go-sdk` | v1.8.0 | MIT 向 Apache-2.0 迁移；新代码 Apache-2.0，尚未完成再许可的贡献保留 MIT，以包内 LICENSE 为准 |
 | `github.com/oapi-codegen/runtime` | v1.0.0 | Apache-2.0 |
 | `github.com/pressly/goose/v3` | v3.24.1 | MIT |
-| `github.com/wailsapp/wails/v2` | v2.15.0 | MIT |
-| `golang.org/x/sys` | v0.46.0 | BSD-3-Clause |
+| `github.com/wailsapp/wails/v2` | v2.17.0 | MIT |
+| `golang.org/x/sys` | v0.48.0 | BSD-3-Clause |
 | `modernc.org/sqlite` | v1.46.2 | BSD-3-Clause |
+
+只在测试里用、不进任何产物的 Go 模块：`github.com/getkin/kin-openapi` v0.152.0（MIT，接口对照）、`golang.org/x/tools` v0.49.0（BSD-3-Clause，模块边界检查）。只在开发时用的前端工具 `dependency-cruiser` 见 `frontend/package.json`。
 
 此表列出直接模块，不能据此推断某个 server 或 desktop 产物包含全部这些模块。
 实际编译闭包包含传递依赖，且随目标平台和构建标签变化；以该次构建生成的声明为准。

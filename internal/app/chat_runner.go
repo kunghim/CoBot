@@ -15,7 +15,6 @@ import (
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
-	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/platform"
@@ -248,21 +247,13 @@ func (r *ChatRunner) thread(rt *chatRuntime, chat domain.Chat, mayStartFresh boo
 	if err != nil {
 		return domain.ChatSession{}, "", err
 	}
-	config := map[string]any{}
-	if choice.EngineProvider != officialEngineProvider && !r.a.webSearchAllowed(r.ctx, choice) {
-		config["web_search"] = "disabled"
-	}
-	// The window the model has, which the engine cannot know of a model it
-	// has no entry for (see the engine's model catalog).
-	if spec, ok := r.a.specOfChoice(r.ctx, choice, chat.Model); ok && spec.ContextWindow > 0 {
-		config["model_context_window"] = spec.ContextWindow
-	}
+	contextWindow, disableWebSearch := r.a.modelThreadOptions(r.ctx, choice, chat.Model)
 	instructions := ""
 	if choice.EngineProvider != officialEngineProvider {
 		// What a model without the engine's own tools is told (see threadInstructions).
 		instructions = strings.TrimSpace(fileEditGuide(runtime.GOOS) + toolCallGuide)
 	}
-	spec := engine.ThreadSpec{Cwd: chat.Workspace, Permission: chat.PermissionMode, ApprovalsReviewer: "user", Model: chat.Model, ModelProvider: choice.EngineProvider, DeveloperInstructions: instructions, Config: codex.ThreadConfig(config)}
+	spec := engine.ThreadSpec{Cwd: chat.Workspace, Permission: chat.PermissionMode, ApprovalsReviewer: "user", Model: chat.Model, ModelProvider: choice.EngineProvider, DeveloperInstructions: instructions, ContextWindow: contextWindow, DisableWebSearch: disableWebSearch}
 	session, err := sqlite.GetChatSession(r.ctx, r.a.DB, chat.ID)
 	var info engine.ThreadInfo
 	note := ""
@@ -520,7 +511,7 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 		}
 		r.report(sqlite.SaveChatStep(ctx, r.a.DB, rt.run.ID, s))
 		r.a.chatChanged(ctx, rt.id, "chat.run.updated")
-		if !sub && isWorkStep(n.Step.Kind) {
+		if !sub && engine.IsWorkStep(n.Step.Kind) {
 			if rt.workSeen == nil {
 				rt.workSeen = map[string]bool{}
 			}
@@ -559,7 +550,7 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 	} else if n.Problem != nil {
 		// Vendor bodies can echo credentials. Keep only stable discriminators.
 		b, _ := json.Marshal(map[string]string{"level": n.Problem.Level, "code": n.Problem.Code, "failureCode": n.Problem.FailureCode})
-		r.report(sqlite.SaveChatStep(ctx, r.a.DB, rt.run.ID, domain.ChatStep{ID: domain.NewID(), Kind: "notice", Status: engine.StepCompleted, Detail: b}))
+		r.report(sqlite.SaveChatStep(ctx, r.a.DB, rt.run.ID, domain.ChatStep{ID: domain.NewID(), Kind: domain.StepKindNotice, Status: engine.StepCompleted, Detail: b}))
 	}
 	if n.Method == "serverRequest/resolved" {
 		r.resolveNativeRequest(rt, n.RequestID)
@@ -584,9 +575,7 @@ func (r *ChatRunner) notification(rt *chatRuntime, n engine.Notification) {
 
 // settleRetry closes the open "reconnecting" step of the running turn.
 func (r *ChatRunner) settleRetry(ctx context.Context, rt *chatRuntime) error {
-	_, err := r.a.DB.ExecContext(ctx, `UPDATE chat_run_steps SET data=json_set(data,'$.status',?) WHERE run_id=? AND item_id=? AND json_extract(data,'$.status')=?`,
-		engine.StepCompleted, rt.run.ID, retryStepID, engine.StepInProgress)
-	return err
+	return sqlite.MoveChatStepStatus(ctx, r.a.DB, rt.run.ID, retryStepID, engine.StepInProgress, engine.StepCompleted)
 }
 
 func (r *ChatRunner) finish(rt *chatRuntime, status string) error {
@@ -616,7 +605,7 @@ func (r *ChatRunner) finish(rt *chatRuntime, status string) error {
 	}
 	defer tx.Rollback()
 	stepStatus := status
-	if _, err = tx.ExecContext(ctx, `UPDATE chat_run_steps SET data=json_set(data,'$.status',?) WHERE run_id=? AND json_extract(data,'$.status')='in_progress'`, stepStatus, run.ID); err != nil {
+	if err = sqlite.SettleOpenChatSteps(ctx, tx, run.ID, stepStatus); err != nil {
 		return err
 	}
 	if text != "" {
@@ -820,6 +809,9 @@ func (r *ChatRunner) approval(rt *chatRuntime, req engine.ApprovalRequest) {
 		err = tx.Commit()
 	}
 	r.report(err)
+	// After a failed save the transaction is still open, and the event below
+	// needs the pool's one connection.
+	tx.Rollback()
 	r.a.chatChanged(r.ctx, rt.id, "chat.request.updated")
 }
 func (r *ChatRunner) resolveNativeRequest(rt *chatRuntime, id json.RawMessage) {
@@ -846,8 +838,7 @@ func (r *ChatRunner) recordUsage(rt *chatRuntime, n engine.Notification) error {
 	}
 	// Keep cumulative thread snapshots per turn. Duplicate notifications replace
 	// the same evidence; they never add the same model call twice.
-	_, err := r.a.DB.ExecContext(r.ctx, `INSERT INTO chat_usage(chat_id,epoch,thread_id,turn_id,data) VALUES(?,?,?,?,?) ON CONFLICT(epoch,thread_id,turn_id) DO UPDATE SET data=excluded.data`, rt.id, rt.run.Epoch, p.ThreadID, p.TurnID, string(n.TokenUsage))
-	return err
+	return sqlite.SaveChatUsage(r.ctx, r.a.DB, rt.id, rt.run.Epoch, p.ThreadID, p.TurnID, string(n.TokenUsage))
 }
 
 func (r *ChatRunner) runAction(ctx context.Context, p auth.Principal, id, runID, action string, in ChatActionInput) (domain.ChatRun, error) {

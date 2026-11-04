@@ -143,6 +143,7 @@ const (
 	AskUser          CollaborationRequestTool = "ask_user"
 	Browser          CollaborationRequestTool = "browser"
 	Handoff          CollaborationRequestTool = "handoff"
+	RequestMember    CollaborationRequestTool = "request_member"
 	SendMessage      CollaborationRequestTool = "send_message"
 	StartRequirement CollaborationRequestTool = "start_requirement"
 	ViewTasks        CollaborationRequestTool = "view_tasks"
@@ -701,7 +702,7 @@ const (
 
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
-	// AnswerText The answer; for a confirmation or acceptance
+	// AnswerText The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager.
 	AnswerText string `json:"answerText"`
 
 	// Decision Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
@@ -1175,7 +1176,7 @@ type Evidence struct {
 	Mode      *EvidenceMode    `json:"mode,omitempty"`
 	Outcome   *EvidenceOutcome `json:"outcome,omitempty"`
 
-	// PreviewCommand With a runnable result
+	// PreviewCommand With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it.
 	PreviewCommand *string `json:"previewCommand,omitempty"`
 
 	// PreviewUrl The address to open once the preview answers.
@@ -1249,7 +1250,7 @@ type Message struct {
 	DeliveryStatus *MessageDeliveryStatus `json:"deliveryStatus,omitempty"`
 	Id             string                 `json:"id"`
 
-	// Kind document is a relay-posted document (the requirement to confirm
+	// Kind document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card.
 	Kind        MessageKind `json:"kind"`
 	RequestId   *string     `json:"requestId,omitempty"`
 	RunId       *string     `json:"runId,omitempty"`
@@ -1260,7 +1261,7 @@ type Message struct {
 // MessageDeliveryStatus defines model for Message.DeliveryStatus.
 type MessageDeliveryStatus string
 
-// MessageKind document is a relay-posted document (the requirement to confirm
+// MessageKind document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card.
 type MessageKind string
 
 // MessagePreview The start of the latest message a member took part in — its exchange with the user, or a card or note from another member — for the team list.
@@ -1268,7 +1269,7 @@ type MessagePreview struct {
 	CreatedAt time.Time          `json:"createdAt"`
 	Kind      MessagePreviewKind `json:"kind"`
 
-	// SenderBotId Who sent it
+	// SenderBotId Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user.
 	SenderBotId *string `json:"senderBotId,omitempty"`
 	Text        string  `json:"text"`
 }
@@ -1330,7 +1331,7 @@ type ModelSpec struct {
 	// ContextLimit The most the catalog says the model reads; 0 when it does not know the model.
 	ContextLimit int `json:"contextLimit"`
 
-	// ContextWindow In use. The user's own number when it is below the limit
+	// ContextWindow In use. The user's own number when it is below the limit, else the catalog's.
 	ContextWindow   int      `json:"contextWindow"`
 	DisplayName     string   `json:"displayName"`
 	InputModalities []string `json:"inputModalities"`
@@ -1405,7 +1406,7 @@ type ProviderModel struct {
 	ContextWindow *int    `json:"contextWindow,omitempty"`
 	DefaultEffort *string `json:"defaultEffort,omitempty"`
 
-	// DisplayName The user's own name for the model
+	// DisplayName The user's own name for the model, shown in its place.
 	DisplayName *string `json:"displayName,omitempty"`
 
 	// Failure Stable machine code of the last check.
@@ -1449,7 +1450,7 @@ type ProviderPresetAuthMode string
 
 // ProviderProbeResult defines model for ProviderProbeResult.
 type ProviderProbeResult struct {
-	// Code Stable machine code
+	// Code Stable machine code, e.g. quota or auth_invalid.
 	Code    *string `json:"code,omitempty"`
 	Message *string `json:"message,omitempty"`
 	Ok      bool    `json:"ok"`
@@ -2035,7 +2036,7 @@ type SyncAvatarCatalogJSONBody struct {
 
 // SaveAvatarUploadJSONBody defines parameters for SaveAvatarUpload.
 type SaveAvatarUploadJSONBody struct {
-	// Data Base64 PNG
+	// Data Base64 PNG, at most 512 KB
 	Data      []byte             `json:"data"`
 	RequestId openapi_types.UUID `json:"requestId"`
 }
@@ -2287,7 +2288,7 @@ type RetryRunJSONBody struct {
 
 // SearchConversationsParams defines parameters for SearchConversations.
 type SearchConversationsParams struct {
-	// Q Plain text matched against chat titles
+	// Q Plain text matched against chat titles, chat message text, and team member message text.
 	Q string `form:"q" json:"q"`
 }
 

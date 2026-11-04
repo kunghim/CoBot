@@ -310,14 +310,19 @@ func TestStopInterruptsInFlightRuns(t *testing.T) {
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: member.ID, Text: "关闭前的消息"}); err != nil {
 		t.Fatalf("msg: %v", err)
 	}
-	waitUntil(t, 5*time.Second, "in-flight turn", func() bool { return len(fake.Turns()) == 1 })
+	// The fake sees the turn before the run stores its turn id, and a run
+	// without one has nothing to interrupt: wait for the id.
+	waitUntil(t, 5*time.Second, "in-flight turn", func() bool {
+		run, err := sqlite.FindActiveRun(ctx, h.app.DB, member.ID)
+		return err == nil && run.ProviderTurnID != ""
+	})
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := h.app.Scheduler.Stop(shutdownCtx); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
-	if fake.ShutdownCalls < 1 {
+	if fake.ShutdownCalls() < 1 {
 		t.Fatal("stop must shut the team's engine down")
 	}
 	if len(fake.Interrupts()) == 0 {
