@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -256,8 +257,10 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 	if err := roles.EnsureProfileCopy(a.Paths.RolesDir()); err != nil {
 		return err
 	}
+	// Mkdir, not MkdirAll, here and below: the folder may have been deleted
+	// since it was checked, and that must fail instead of bringing it back.
 	cobotDir := filepath.Join(canon.Display, ".cobot")
-	if err := os.MkdirAll(cobotDir, 0o755); err != nil {
+	if err := os.Mkdir(cobotDir, 0o755); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("create .cobot: %w", err)
 	}
 	marker := TeamMarker{
@@ -277,7 +280,7 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 		return fmt.Errorf("write team marker: %w", err)
 	}
 	for _, sub := range []string{"context", "resources"} {
-		if err := os.MkdirAll(filepath.Join(cobotDir, sub), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(cobotDir, sub), 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("create .cobot/%s: %w", sub, err)
 		}
 	}
@@ -517,7 +520,8 @@ func (a *App) CheckTeamDirectories(ctx context.Context) {
 // makes an active team directory_missing: it stays visible read-only and
 // receives no work. Once the folder is back at the same path the team is
 // active again by itself. A lost marker in a folder the team owns is
-// rewritten; a marker naming another team is never overwritten.
+// rewritten once the folder has settled; a marker naming another team is
+// never overwritten.
 func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.Team {
 	if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusDirectoryMissing {
 		return team
@@ -527,7 +531,7 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 	if present {
 		marker, has, err := readTeamMarker(team.Directory)
 		ours := err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID))
-		if ours && (!has || marker.TeamName != team.Name) {
+		if ours && (!has || marker.TeamName != team.Name) && !teamMarkerSettling(team.Directory) {
 			if canon, err := platform.CanonicalDirFrom(team.Directory); err == nil {
 				if err := a.prepareTeamResources(ctx, team, canon); err != nil && a.Logger != nil {
 					a.Logger.Warn("rewrite team marker", "teamId", team.ID, "error", err)
@@ -558,6 +562,30 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 	}
 	a.Hub.Publish()
 	return updated
+}
+
+// teamMarkerSettle is how long a folder must have been quiet before its lost
+// marker counts as lost rather than as part of a deletion still running.
+const teamMarkerSettle = 5 * time.Second
+
+// teamMarkerSettling reports that the marker is missing and the folder that
+// held it changed just now. Deleting a folder removes its contents first, so
+// this may be a deletion in progress: writing the marker back would make that
+// deletion fail and leave the team working in what remains of the folder.
+func teamMarkerSettling(directory string) bool {
+	if _, has, err := readTeamMarker(directory); has || err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(directory, ".cobot"))
+	if os.IsNotExist(err) {
+		info, err = os.Stat(directory)
+	}
+	if err != nil {
+		return false
+	}
+	// A time ahead of this clock says nothing about a change just now.
+	age := time.Since(info.ModTime())
+	return age >= 0 && age < teamMarkerSettle
 }
 
 // OpenTeamInput names the folder the user wants to open.

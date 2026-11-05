@@ -380,6 +380,12 @@ func (s *Scheduler) turnPrecheck(ctx context.Context, t *turnAttempt) (bool, err
 	if team.Status != domain.TeamStatusActive {
 		return false, nil // archived/missing/error teams pause dispatch
 	}
+	// The folder may be in the middle of being deleted: look again later.
+	if teamMarkerSettling(team.Directory) {
+		botID := t.bot.ID
+		time.AfterFunc(teamMarkerSettle, func() { s.Wake(botID) })
+		return false, nil
+	}
 	if _, err := sqlite.FindActiveRun(ctx, s.app.DB, t.bot.ID); err == nil {
 		return false, nil // one active run per bot; queue stays
 	} else if !errors.Is(err, sqlite.ErrNotFound) {

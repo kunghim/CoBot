@@ -420,6 +420,11 @@ func TestTeamFollowsItsFolder(t *testing.T) {
 	if err := os.Remove(filepath.Join(h.teamDir, ".cobot", "team.json")); err != nil {
 		t.Fatal(err)
 	}
+	// The marker is repaired once the folder has been quiet for a while.
+	longAgo := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(h.teamDir, ".cobot"), longAgo, longAgo); err != nil {
+		t.Fatal(err)
+	}
 	h.app.CheckTeamDirectories(ctx)
 	if got := status(); got != domain.TeamStatusActive {
 		t.Fatalf("status with the folder back = %s", got)

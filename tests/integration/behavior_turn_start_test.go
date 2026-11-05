@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -98,6 +99,8 @@ func TestAFolderGoneHoldsTheQueue(t *testing.T) {
 	pm, dev := bots[0], bots[1]
 	turn := startTurn(t, h, fake, dev, "第一件")
 	h.handCard(t, team, pm, dev, "做页面", "能打开")
+	// Deleted, not moved: a dispatch still running from the card can find the
+	// folder half deleted, and must not write the marker back into it.
 	if err := os.RemoveAll(h.teamDir); err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +112,41 @@ func TestAFolderGoneHoldsTheQueue(t *testing.T) {
 	settlesAt(t, h, dev.ID, domain.BotStatusQueued)
 	if got := len(fake.Turns()); got != 1 {
 		t.Fatalf("turns = %d, want 1", got)
+	}
+}
+
+// A folder that has just lost its .cobot may be in the middle of being deleted.
+// Nothing is written into it and no turn starts until it has been quiet for a
+// while; a folder that stays is then repaired and its queue runs by itself.
+func TestAFolderLosingItsMarkerWaitsBeforeRepair(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	dev := bots[1]
+	cobot := filepath.Join(h.teamDir, ".cobot")
+	if err := os.RemoveAll(cobot); err != nil {
+		t.Fatal(err)
+	}
+
+	h.app.CheckTeamDirectories(context.Background())
+	if _, err := h.app.SendMessage(context.Background(), h.user, app.SendMessageInput{BotID: dev.ID, Text: "做点事"}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if _, err := os.Stat(cobot); !os.IsNotExist(err) {
+		t.Fatalf(".cobot came back while the folder was still changing: %v", err)
+	}
+	if got := len(fake.Turns()); got != 0 {
+		t.Fatalf("turns = %d, want 0", got)
+	}
+
+	longAgo := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(h.teamDir, longAgo, longAgo); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "the held turn", func() bool { return len(fake.Turns()) == 1 })
+	if _, err := os.Stat(filepath.Join(cobot, "team.json")); err != nil {
+		t.Fatalf("marker not repaired: %v", err)
 	}
 }
 
