@@ -97,7 +97,12 @@ func SaveChatRun(ctx context.Context, q Queryer, r domain.ChatRun) error {
 	return err
 }
 func GetChatRun(ctx context.Context, q Queryer, id string) (domain.ChatRun, error) {
-	return readChatJSON[domain.ChatRun](q.QueryRowContext(ctx, `SELECT data FROM chat_runs WHERE id=?`, id))
+	run, err := readChatJSON[domain.ChatRun](q.QueryRowContext(ctx, `SELECT data FROM chat_runs WHERE id=?`, id))
+	if err == nil && run.Steps == nil {
+		// Steps are kept in their own table and read with the page, never here.
+		run.Steps = []domain.ChatStep{}
+	}
+	return run, err
 }
 func ListChatRuns(ctx context.Context, q Queryer, chatID string) ([]domain.ChatRun, error) {
 	rows, err := q.QueryContext(ctx, `SELECT data FROM chat_runs WHERE (?='' OR chat_id=?) ORDER BY rowid`, chatID, chatID)

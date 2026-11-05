@@ -700,6 +700,23 @@ const (
 	WatchWorkspaceParamsScopeTeam WatchWorkspaceParamsScope = "team"
 )
 
+// ActivityItem defines model for ActivityItem.
+type ActivityItem struct {
+	BotId     string    `json:"botId"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Detail Best effort; a record deleted since reads as the bare event.
+	Detail     *map[string]interface{} `json:"detail,omitempty"`
+	Id         string                  `json:"id"`
+	InstanceId string                  `json:"instanceId"`
+	Payload    map[string]interface{}  `json:"payload"`
+	ResourceId string                  `json:"resourceId"`
+	Revision   int64                   `json:"revision"`
+	Seq        int64                   `json:"seq"`
+	TeamId     string                  `json:"teamId"`
+	Type       string                  `json:"type"`
+}
+
 // AnswerQuestionRequest defines model for AnswerQuestionRequest.
 type AnswerQuestionRequest struct {
 	// AnswerText The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager.
@@ -1121,6 +1138,7 @@ type EngineLoginType string
 type EngineStatus struct {
 	BinaryPath   *string            `json:"binaryPath,omitempty"`
 	Capabilities *[]string          `json:"capabilities,omitempty"`
+	CheckedAt    *time.Time         `json:"checkedAt,omitempty"`
 	ErrorKey     *string            `json:"errorKey,omitempty"`
 	LoggedIn     bool               `json:"loggedIn"`
 	Protocol     *string            `json:"protocol,omitempty"`
@@ -1983,6 +2001,16 @@ type WorkspaceLatexResult struct {
 // Error defines model for Error.
 type Error = ErrorEnvelope
 
+// ToolTransportError defines model for ToolTransportError.
+type ToolTransportError struct {
+	Error struct {
+		Code       string                  `json:"code"`
+		MessageKey string                  `json:"messageKey"`
+		Params     *map[string]interface{} `json:"params,omitempty"`
+	} `json:"error"`
+	RequestId string `json:"requestId"`
+}
+
 // ListApprovalsParams defines parameters for ListApprovals.
 type ListApprovalsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -2129,6 +2157,12 @@ type ListChatsParamsPinned string
 // ListChatsParamsSort defines parameters for ListChats.
 type ListChatsParamsSort string
 
+// DeleteChatParams defines parameters for DeleteChat.
+type DeleteChatParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+	IfMatch        int64  `json:"If-Match"`
+}
+
 // GetChatParams defines parameters for GetChat.
 type GetChatParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -2160,8 +2194,8 @@ type ListDirectoriesParams struct {
 
 // CheckDirectoryJSONBody defines parameters for CheckDirectory.
 type CheckDirectoryJSONBody struct {
-	Path      string             `json:"path"`
-	RequestId openapi_types.UUID `json:"requestId"`
+	Path      string              `json:"path"`
+	RequestId *openapi_types.UUID `json:"requestId,omitempty"`
 }
 
 // PickDirectoryJSONBody defines parameters for PickDirectory.
@@ -2636,9 +2670,6 @@ type ChangeChatNavigationJSONRequestBody = ChatNavigationInput
 
 // CreateChatJSONRequestBody defines body for CreateChat for application/json ContentType.
 type CreateChatJSONRequestBody = ChatSendInput
-
-// DeleteChatJSONRequestBody defines body for DeleteChat for application/json ContentType.
-type DeleteChatJSONRequestBody = ChatActionInput
 
 // RenameChatJSONRequestBody defines body for RenameChat for application/json ContentType.
 type RenameChatJSONRequestBody = ChatActionInput

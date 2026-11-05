@@ -58,51 +58,7 @@ func setup() {
 		return
 	}
 	doc.Servers = nil
-	seen := map[*openapi3.Schema]bool{}
-	for _, schema := range doc.Components.Schemas {
-		closeObjects(schema, seen)
-	}
-	for _, path := range doc.Paths.Map() {
-		for _, op := range path.Operations() {
-			if op.RequestBody != nil && op.RequestBody.Value != nil {
-				for _, media := range op.RequestBody.Value.Content {
-					closeObjects(media.Schema, seen)
-				}
-			}
-			for _, response := range op.Responses.Map() {
-				if response.Value != nil {
-					for _, media := range response.Value.Content {
-						closeObjects(media.Schema, seen)
-					}
-				}
-			}
-		}
-	}
 	router, setupErr = legacy.NewRouter(doc)
-}
-
-// closeObjects makes an object schema refuse fields it does not name, unless
-// the specification says what extra fields look like.
-func closeObjects(ref *openapi3.SchemaRef, seen map[*openapi3.Schema]bool) {
-	if ref == nil || ref.Value == nil || seen[ref.Value] {
-		return
-	}
-	s := ref.Value
-	seen[s] = true
-	if len(s.Properties) > 0 && s.AdditionalProperties.Has == nil && s.AdditionalProperties.Schema == nil {
-		closed := false
-		s.AdditionalProperties.Has = &closed
-	}
-	for _, p := range s.Properties {
-		closeObjects(p, seen)
-	}
-	closeObjects(s.Items, seen)
-	closeObjects(s.AdditionalProperties.Schema, seen)
-	for _, list := range []openapi3.SchemaRefs{s.AllOf, s.OneOf, s.AnyOf} {
-		for _, sub := range list {
-			closeObjects(sub, seen)
-		}
-	}
 }
 
 // Wrap checks everything the handler serves under the API's paths.
@@ -183,6 +139,9 @@ func verify(r *http.Request, body []byte, c *capturing) {
 		if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {
 			record(op, "request", c.status, err)
 		}
+		if bodySpec := route.Operation.RequestBody; bodySpec != nil && bodySpec.Value != nil {
+			noteUndeclared(op, "request", c.status, bodySpec.Value.Content, body)
+		}
 	}
 	contentType := c.Header().Get("Content-Type")
 	responseInput := &openapi3filter.ResponseValidationInput{
@@ -193,6 +152,99 @@ func verify(r *http.Request, body []byte, c *capturing) {
 	if err := openapi3filter.ValidateResponse(context.Background(), responseInput); err != nil {
 		record(op, "response", c.status, err)
 	}
+	response := route.Operation.Responses.Status(c.status)
+	if response == nil {
+		response = route.Operation.Responses.Default()
+	}
+	if response != nil && response.Value != nil {
+		noteUndeclared(op, "response", c.status, response.Value.Content, c.body.Bytes())
+	}
+}
+
+func noteUndeclared(op, kind string, status int, content openapi3.Content, body []byte) {
+	media := content.Get("application/json")
+	if media == nil || media.Schema == nil {
+		return
+	}
+	var value any
+	if json.Unmarshal(body, &value) != nil {
+		return // not JSON: the validator has its own say about that
+	}
+	for _, leaf := range undeclared([]*openapi3.SchemaRef{media.Schema}, value, "") {
+		note(fmt.Sprintf("%s|%s|%d|%s", op, kind, status, leaf))
+	}
+}
+
+// undeclared finds the fields of value that no schema names, unless the
+// specification says what extra fields look like. It looks at the parts of a
+// composed schema together: a field named by one part of an allOf is declared,
+// even though the other parts do not mention it. Setting additionalProperties
+// on the parts would judge each alone, and would change the shared schemas
+// they refer to. The parts of a oneOf or anyOf count together too, so a field
+// of the branch that did not match goes unnoticed.
+func undeclared(schemas []*openapi3.SchemaRef, value any, pointer string) []string {
+	parts := flatten(schemas)
+	var found []string
+	switch typed := value.(type) {
+	case []any:
+		var items []*openapi3.SchemaRef
+		for _, part := range parts {
+			if part.Items != nil {
+				items = append(items, part.Items)
+			}
+		}
+		for _, element := range typed {
+			found = append(found, undeclared(items, element, pointer+"/*")...)
+		}
+	case map[string]any:
+		named, open := false, false
+		var extra []*openapi3.SchemaRef
+		for _, part := range parts {
+			named = named || len(part.Properties) > 0
+			open = open || part.AdditionalProperties.Has != nil && *part.AdditionalProperties.Has
+			if part.AdditionalProperties.Schema != nil {
+				open = true
+				extra = append(extra, part.AdditionalProperties.Schema)
+			}
+		}
+		for key, field := range typed {
+			var fieldSchemas []*openapi3.SchemaRef
+			for _, part := range parts {
+				if schema, ok := part.Properties[key]; ok {
+					fieldSchemas = append(fieldSchemas, schema)
+				}
+			}
+			if len(fieldSchemas) == 0 {
+				if named && !open {
+					at := pointer
+					if at == "" {
+						at = "/"
+					}
+					found = append(found, fmt.Sprintf("%s properties: property %q is unsupported", at, key))
+					continue
+				}
+				fieldSchemas = extra
+			}
+			found = append(found, undeclared(fieldSchemas, field, pointer+"/"+key)...)
+		}
+	}
+	return found
+}
+
+// flatten returns the schemas and every part they are composed of.
+func flatten(schemas []*openapi3.SchemaRef) []*openapi3.Schema {
+	var parts []*openapi3.Schema
+	for _, ref := range schemas {
+		if ref == nil || ref.Value == nil {
+			continue
+		}
+		s := ref.Value
+		parts = append(parts, s)
+		parts = append(parts, flatten(s.AllOf)...)
+		parts = append(parts, flatten(s.OneOf)...)
+		parts = append(parts, flatten(s.AnyOf)...)
+	}
+	return parts
 }
 
 func note(key string) {

@@ -382,6 +382,10 @@ func ProviderPresets() []PresetView {
 	all := presets.All()
 	out := make([]PresetView, 0, len(all))
 	for _, p := range all {
+		models := p.Models
+		if models == nil {
+			models = []domain.ProviderModel{}
+		}
 		out = append(out, PresetView{
 			ID:          p.ID,
 			Name:        p.Name,
@@ -391,7 +395,7 @@ func ProviderPresets() []PresetView {
 			Official:    p.Official,
 			AuthMode:    p.AuthMode,
 			Endpoints:   presetEndpoints(p),
-			Models:      p.Models,
+			Models:      models,
 			KeyPatterns: p.KeyPatterns,
 		})
 	}

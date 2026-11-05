@@ -201,9 +201,13 @@ type ModelCatalogView struct {
 	Engine EngineCatalogState `json:"engine"`
 }
 
+// noModelCatalog is the status when the bundled catalog could not be read:
+// nothing was downloaded, and it knows no models.
+var noModelCatalog = modelcatalog.Status{Source: "bundled"}
+
 // ModelCatalogStatus says which model catalog is in use.
 func (a *App) ModelCatalogStatus(ctx context.Context) ModelCatalogView {
-	view := ModelCatalogView{Engine: a.engineCatalogState(ctx)}
+	view := ModelCatalogView{Status: noModelCatalog, Engine: a.engineCatalogState(ctx)}
 	if a.ModelCatalog != nil {
 		view.Status = a.ModelCatalog.Status()
 	}
@@ -226,7 +230,7 @@ func (a *App) UpdateModelCatalog(ctx context.Context, principal auth.Principal) 
 		return ModelCatalogUpdate{}, domain.Forbidden("error.forbidden.user_only", nil)
 	}
 	if a.ModelCatalog == nil {
-		return ModelCatalogUpdate{State: string(modelcatalog.Unreachable)}, nil
+		return ModelCatalogUpdate{State: string(modelcatalog.Unreachable), Status: noModelCatalog}, nil
 	}
 	status, err := a.ModelCatalog.Update(ctx, time.Now())
 	if kind, failed := modelcatalog.IsUpdateError(err); failed {

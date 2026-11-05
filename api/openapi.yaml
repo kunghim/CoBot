@@ -527,6 +527,14 @@ paths:
           SessionCookie: []
           CSRFToken: []
       parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
         -
           name: "chatId"
           in: "path"
@@ -551,12 +559,6 @@ paths:
                         $ref: "#/components/schemas/Chat"
         default:
           $ref: "#/components/responses/Error"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ChatActionInput"
   /api/v1/chats/{chatId}/messages:
     post:
       operationId: "sendChatMessage"
@@ -915,7 +917,11 @@ paths:
                         required: [roleId]
                         properties:
                           roleId: { type: string }
-                          avatar: { $ref: "#/components/schemas/AvatarRef" }
+                          avatar:
+                            description: The avatar now set; null when it follows the default again.
+                            nullable: true
+                            allOf:
+                              - $ref: "#/components/schemas/AvatarRef"
         "400":
           $ref: "#/components/responses/Error"
         "404":
@@ -1850,6 +1856,7 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items:
@@ -1911,6 +1918,7 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items:
@@ -2333,28 +2341,30 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    required: [available, running, tabs]
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
                     properties:
-                      available: { type: boolean, description: A Chromium-based browser is installed on this computer. }
-                      running: { type: boolean }
-                      tabs:
-                        type: array
-                        items:
-                          type: object
-                          required: [id, owner, url, title]
-                          properties:
-                            id: { type: string }
-                            owner: { type: string, enum: [member, user], description: "member: a member's tab; user: a tab the user opened themselves." }
-                            memberId: { type: string, description: "The bot id, present for a member's tab only." }
-                            url: { type: string }
-                            title: { type: string }
-                            busy: { type: boolean, description: A member's call is working in this tab right now. }
-                            viewport:
-                              $ref: "#/components/schemas/BrowserViewport"
+                      data:
+                        type: object
+                        required: [available, running, tabs]
+                        properties:
+                          available: { type: boolean, description: A Chromium-based browser is installed on this computer. }
+                          running: { type: boolean }
+                          tabs:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, owner, url, title]
+                              properties:
+                                id: { type: string }
+                                owner: { type: string, enum: [member, user], description: "member: a member's tab; user: a tab the user opened themselves." }
+                                memberId: { type: string, description: "The bot id, present for a member's tab only." }
+                                url: { type: string }
+                                title: { type: string }
+                                busy: { type: boolean, description: A member's call is working in this tab right now. }
+                                viewport:
+                                  $ref: "#/components/schemas/BrowserViewport"
         "404":
           $ref: "#/components/responses/Error"
   /api/v1/teams/{id}/browser/tabs:
@@ -2386,23 +2396,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    required: [tab]
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
                     properties:
-                      tab:
+                      data:
                         type: object
-                        required: [id, owner, url, title]
+                        required: [tab]
                         properties:
-                          id: { type: string }
-                          owner: { type: string, enum: [member, user] }
-                          memberId: { type: string }
-                          url: { type: string }
-                          title: { type: string }
-                          viewport:
-                            $ref: "#/components/schemas/BrowserViewport"
+                          tab:
+                            type: object
+                            required: [id, owner, url, title]
+                            properties:
+                              id: { type: string }
+                              owner: { type: string, enum: [member, user] }
+                              memberId: { type: string }
+                              url: { type: string }
+                              title: { type: string }
+                              busy: { type: boolean, description: "A member's call is working in this tab." }
+                              viewport:
+                                $ref: "#/components/schemas/BrowserViewport"
         "400":
           $ref: "#/components/responses/Error"
         "404":
@@ -2433,13 +2446,15 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    required: [ok]
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
                     properties:
-                      ok: { type: boolean }
+                      data:
+                        type: object
+                        required: [ok]
+                        properties:
+                          ok: { type: boolean }
         "400":
           $ref: "#/components/responses/Error"
         "404":
@@ -2481,17 +2496,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    required: [viewport]
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
                     properties:
-                      viewport:
-                        description: The window size now applied; null after clear.
-                        nullable: true
-                        allOf:
-                          - $ref: "#/components/schemas/BrowserViewport"
+                      data:
+                        type: object
+                        required: [viewport]
+                        properties:
+                          viewport:
+                            description: The window size now applied; null after clear.
+                            nullable: true
+                            allOf:
+                              - $ref: "#/components/schemas/BrowserViewport"
         "400":
           $ref: "#/components/responses/Error"
         "404":
@@ -2891,6 +2908,8 @@ paths:
                       data:
                         type: object
                         properties:
+                          total: { type: integer, description: How many approvals are pending; absent from the history view. }
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items: { $ref: "#/components/schemas/Approval" }
@@ -3112,6 +3131,7 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items: { $ref: "#/components/schemas/Question" }
@@ -3252,6 +3272,7 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items: { $ref: "#/components/schemas/Message" }
@@ -3292,9 +3313,10 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
-                            items: { $ref: "#/components/schemas/Event" }
+                            items: { $ref: "#/components/schemas/ActivityItem" }
         "404":
           $ref: "#/components/responses/Error"
   /api/v1/bots/{id}/memories:
@@ -3332,6 +3354,7 @@ paths:
                       data:
                         type: object
                         properties:
+                          nextCursor: { type: string, description: Empty on the last page. }
                           items:
                             type: array
                             items: { $ref: "#/components/schemas/Memory" }
@@ -3455,7 +3478,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, path]
+              required: [path]
               properties:
                 requestId: { type: string, format: uuid }
                 path: { type: string }
@@ -3473,6 +3496,7 @@ paths:
                         type: object
                         properties:
                           canonical: { type: string }
+                          key: { type: string, description: The form folders are compared by. }
                           ok: { type: boolean }
                           duplicate: { type: boolean }
                           nested: { type: boolean }
@@ -3757,9 +3781,9 @@ paths:
                     properties:
                       data: { $ref: "#/components/schemas/ToolResult" }
         "401":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/ToolTransportError"
         "503":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/ToolTransportError"
 components:
   securitySchemes:
     InstanceSecret:
@@ -3783,6 +3807,24 @@ components:
       name: X-Bot-Token
       description: Bot bridge credential minted by the core; bound to one bot and engine epoch.
   responses:
+    ToolTransportError:
+      description: A member's tool call refused before it ran; the code comes from the tool's own vocabulary
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, requestId]
+            properties:
+              error:
+                type: object
+                required: [code, messageKey]
+                properties:
+                  code: { type: string }
+                  messageKey: { type: string }
+                  params:
+                    type: object
+                    additionalProperties: true
+              requestId: { type: string }
     Error:
       description: Structured error
       content:
@@ -4493,6 +4535,15 @@ components:
             code: { type: string }
             messageKey: { type: string }
             params: { type: object, additionalProperties: true }
+    ActivityItem:
+      allOf:
+        - $ref: "#/components/schemas/Event"
+        - type: object
+          properties:
+            detail:
+              type: object
+              additionalProperties: true
+              description: Best effort; a record deleted since reads as the bare event.
     Envelope:
       type: object
       required: [data, requestId]
@@ -4547,6 +4598,7 @@ components:
           type: array
           items: { type: string }
         errorKey: { type: string }
+        checkedAt: { type: string, format: date-time }
     Status:
       type: object
       required:

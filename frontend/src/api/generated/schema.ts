@@ -2258,6 +2258,12 @@ export interface components {
                 };
             };
         };
+        ActivityItem: components["schemas"]["Event"] & {
+            /** @description Best effort; a record deleted since reads as the bare event. */
+            detail?: {
+                [key: string]: unknown;
+            };
+        };
         Envelope: {
             data: unknown;
             requestId: string;
@@ -2289,6 +2295,8 @@ export interface components {
             loggedIn: boolean;
             capabilities?: string[];
             errorKey?: string;
+            /** Format: date-time */
+            checkedAt?: string;
         };
         Status: {
             sessionCookieName: string;
@@ -2742,6 +2750,24 @@ export interface components {
         };
     };
     responses: {
+        /** @description A member's tool call refused before it ran; the code comes from the tool's own vocabulary */
+        ToolTransportError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    error: {
+                        code: string;
+                        messageKey: string;
+                        params?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                    requestId: string;
+                };
+            };
+        };
         /** @description Structured error */
         Error: {
             headers: {
@@ -3262,17 +3288,16 @@ export interface operations {
     deleteChat: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                "If-Match": number;
+            };
             path: {
                 chatId: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatActionInput"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Success */
             200: {
@@ -3620,7 +3645,8 @@ export interface operations {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             roleId: string;
-                            avatar?: components["schemas"]["AvatarRef"];
+                            /** @description The avatar now set; null when it follows the default again. */
+                            avatar?: components["schemas"]["AvatarRef"] | null;
                         };
                     };
                 };
@@ -4553,6 +4579,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: {
                                 id?: string;
                                 nameKey?: string;
@@ -4598,6 +4626,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["TeamWithBots"][];
                         };
                     };
@@ -5006,7 +5036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             /** @description A Chromium-based browser is installed on this computer. */
                             available: boolean;
@@ -5059,7 +5089,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             tab: {
                                 id: string;
@@ -5068,6 +5098,8 @@ export interface operations {
                                 memberId?: string;
                                 url: string;
                                 title: string;
+                                /** @description A member's call is working in this tab. */
+                                busy?: boolean;
                                 viewport?: components["schemas"]["BrowserViewport"];
                             };
                         };
@@ -5098,7 +5130,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             ok: boolean;
                         };
@@ -5142,7 +5174,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             /** @description The window size now applied; null after clear. */
                             viewport: components["schemas"]["BrowserViewport"] | null;
@@ -5531,6 +5563,10 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description How many approvals are pending; absent from the history view. */
+                            total?: number;
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Approval"][];
                         };
                     };
@@ -5723,6 +5759,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Question"][];
                         };
                     };
@@ -5847,6 +5885,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Message"][];
                         };
                     };
@@ -5879,7 +5919,9 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
-                            items?: components["schemas"]["Event"][];
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
+                            items?: components["schemas"]["ActivityItem"][];
                         };
                     };
                 };
@@ -5911,6 +5953,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Memory"][];
                         };
                     };
@@ -6022,7 +6066,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: uuid */
-                    requestId: string;
+                    requestId?: string;
                     path: string;
                 };
             };
@@ -6037,6 +6081,8 @@ export interface operations {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             canonical?: string;
+                            /** @description The form folders are compared by. */
+                            key?: string;
                             ok?: boolean;
                             duplicate?: boolean;
                             nested?: boolean;
@@ -6318,8 +6364,8 @@ export interface operations {
                     };
                 };
             };
-            401: components["responses"]["Error"];
-            503: components["responses"]["Error"];
+            401: components["responses"]["ToolTransportError"];
+            503: components["responses"]["ToolTransportError"];
         };
     };
 }
