@@ -435,7 +435,7 @@ func settledMemberStatusTx(ctx context.Context, tx *sql.Tx, botID string) string
 		}
 		return domain.BotStatusQueued
 	}
-	if questions, err := sqlite.CountOpenAskUserQuestions(ctx, tx, botID); err == nil && questions > 0 {
+	if questions, err := sqlite.CountOpenUserDecisionQuestions(ctx, tx, botID); err == nil && questions > 0 {
 		return domain.BotStatusWaitingInput
 	}
 	return domain.BotStatusIdle

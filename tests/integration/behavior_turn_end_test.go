@@ -134,6 +134,19 @@ func TestTurnEndWithBlockedWorkWaitsForTheUser(t *testing.T) {
 	}
 }
 
+// A recruitment card waits for the user just as a question does, and the member
+// says so from the moment its turn ends, not only after the next dispatch.
+func TestTurnEndWithAnOpenRecruitmentCardWaitsForTheUser(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	pm := bots[0]
+	turn := startTurn(t, h, fake, pm, "加个人")
+	requestMember(t, h, pm, []string{"qa-engineer"}, "需要测试")
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, domain.RunCompleted, "等你决定")
+	settlesAt(t, h, pm.ID, domain.BotStatusWaitingInput)
+}
+
 // Only a turn that completed is reminded about its card: a failed or stopped
 // one has its own reason for not handing it on.
 func TestOnlyACompletedTurnIsRemindedAboutItsCard(t *testing.T) {

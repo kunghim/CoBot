@@ -371,20 +371,10 @@ func ClaimDeliveryRun(ctx context.Context, tx *sql.Tx, deliveryID, runID string)
 }
 
 // CountOpenUserDecisionQuestions counts the member's open ask_user and
-// recruitment questions: what dispatch treats as the member waiting on the
-// user. Settling a turn looks only at ask_user (CountOpenAskUserQuestions), so
-// a member with only a recruitment question ends its turn idle.
+// recruitment questions: what the member is waiting on the user for.
 func CountOpenUserDecisionQuestions(ctx context.Context, q Queryer, botID string) (int, error) {
 	var n int
 	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind IN ('', 'recruitment')`, botID).Scan(&n)
-	return n, err
-}
-
-// CountOpenAskUserQuestions counts the member's open ask_user questions. See
-// CountOpenUserDecisionQuestions for how it differs from what dispatch counts.
-func CountOpenAskUserQuestions(ctx context.Context, q Queryer, botID string) (int, error) {
-	var n int
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&n)
 	return n, err
 }
 
