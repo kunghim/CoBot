@@ -9,6 +9,7 @@
 - 协议有变化时先运行 `cobot trace protocol`，对照 `internal/engine/codex/protocol_baseline.json`（已处理的方法见 `handled.go`），
   确认差异后再改适配代码；更新基线用 `cobot trace protocol --write-baseline <文件>`。
 - 需要看真实流量时用 `cobot trace on|view|off --data-root <路径>`。录制未脱敏，留在数据根，不提交、不贴进 Issue/PR。
+- Codex 只在默认供应商（顶层 `model_provider`）和线程的供应商一致时才接受开始一轮、转向和恢复线程。这几个调用都走 `asThreadProvider`：调用期间切到线程的供应商，结束后切回引擎自己的账号。假引擎测不到这一点，改这里要跑 `COBOT_R_SMOKE=1 go test ./internal/engine/codex/`。
 - Codex 客户端的读循环同时负责接收回应，不在读循环里同步处理需要回应的请求。
 - 原生 hook 只注册在私有环境的 `PreToolUse`，匹配 `Bash|apply_patch`；只自动信任 CoBot 自己生成且内容逐字匹配的定义，
   不为通过测试放宽沙箱、审批或 hook 信任。授权被拒绝时的手动审查见 [hook 排障](../reference/hook-review.md)。

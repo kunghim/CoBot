@@ -284,9 +284,11 @@ func TestAdapterUsesRequiredProtocolFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	<-requests // the default provider follows the thread for the call
 	if p := (<-requests)["params"].(map[string]any); p["cwd"] != "new-cwd" || p["model"] != "new-model" || p["modelProvider"] != "gateway" || p["developerInstructions"] != "current-role" || p["config"] == nil || p["excludeTurns"] != true {
 		t.Fatal("resume lost activation config", p)
 	}
+	<-requests // and goes back
 	if resumed.ThreadID != "th-1" {
 		t.Fatalf("resume reported thread %q", resumed.ThreadID)
 	}
