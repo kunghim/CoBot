@@ -127,13 +127,6 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	} else if !errors.Is(err, sqlite.ErrNotFound) {
 		return domain.Team{}, nil, err
 	}
-	if conflict, err := a.findNestedBinding(ctx, tx, canon); err != nil {
-		return domain.Team{}, nil, err
-	} else if conflict != nil {
-		return domain.Team{}, nil, domain.Conflict("error.team.directory_nested", map[string]any{
-			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
-		})
-	}
 
 	defaults, err := roles.Defaults()
 	if err != nil {
@@ -229,26 +222,6 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	}
 	a.Hub.Publish()
 	return team, botsOut, nil
-}
-
-// findNestedBinding returns a team whose bound directory contains or is
-// contained by the candidate, comparing component-wise on canonical keys.
-func (a *App) findNestedBinding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir) (*domain.Team, error) {
-	bindings, err := sqlite.ListDirectoryBindings(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	for _, binding := range bindings {
-		other := platform.CanonicalDir{Key: binding.DirectoryKey, Display: binding.Directory}
-		if other.Contains(candidate) || candidate.Contains(other) {
-			team, _, err := sqlite.GetTeam(ctx, tx, binding.TeamID)
-			if err != nil {
-				return nil, err
-			}
-			return &team, nil
-		}
-	}
-	return nil, nil
 }
 
 // prepareTeamResources writes the .cobot marker and ensures the Git local
@@ -728,7 +701,7 @@ func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptT
 	if err := a.refuseForeignOnly(ctx, canon.Display); err != nil {
 		return domain.Team{}, nil, err
 	}
-	// Creation carries the rest: name, roles, limits, the nested check, and
+	// Creation carries the rest: name, roles, limits, and
 	// the marker rewrite, which lands with the new team's own .cobot. The
 	// foreign marker is the one thing creation may not re-refuse: adoption
 	// just verified it is the very state this call exists for, so the marker

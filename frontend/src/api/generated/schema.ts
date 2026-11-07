@@ -6085,7 +6085,6 @@ export interface operations {
                             key?: string;
                             ok?: boolean;
                             duplicate?: boolean;
-                            nested?: boolean;
                             /** @description Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it. */
                             claimed?: boolean;
                             teamId?: string;

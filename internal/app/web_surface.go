@@ -80,9 +80,11 @@ func (a *App) RevokeAuthorization(ctx context.Context, principal auth.Principal,
 }
 
 // CheckDirectory validates a directory for team creation without
-// touching anything: canonical form, existence, reserved paths, duplicate
-// and nested bindings, and a marker of a team this instance cannot see,
-// which creation refuses the same way.
+// touching anything: canonical form, existence, reserved paths, a team
+// already bound to this very folder, and a marker of a team this instance
+// cannot see, which creation refuses the same way. A folder inside another
+// team's folder, or around it, is fine: the user decides how the teams
+// share the files.
 func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw string) (map[string]any, error) {
 	if principal.Kind != auth.KindUser {
 		return nil, domain.Forbidden("error.forbidden.user_only", nil)
@@ -96,7 +98,7 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 	}
 	result := map[string]any{
 		"canonical": canon.Display, "key": canon.Key, "ok": true,
-		"duplicate": false, "nested": false, "claimed": false, "archived": false,
+		"duplicate": false, "claimed": false, "archived": false,
 	}
 	tx, err := a.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -111,14 +113,6 @@ func (a *App) CheckDirectory(ctx context.Context, principal auth.Principal, raw 
 		result["archived"] = existing.Status == domain.TeamStatusArchived
 	} else if !errors.Is(err, sqlite.ErrNotFound) {
 		return nil, err
-	}
-	if conflict, err := a.findNestedBinding(ctx, tx, canon); err != nil {
-		return nil, err
-	} else if conflict != nil {
-		result["nested"] = true
-		result["ok"] = false
-		result["teamId"] = conflict.ID
-		result["teamName"] = conflict.Name
 	}
 	// markerClaim touches the database itself, and the pool is one connection:
 	// inside the open transaction it would wait on itself.
