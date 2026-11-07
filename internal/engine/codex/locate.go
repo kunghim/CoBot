@@ -107,19 +107,3 @@ func EngineEnv(paths platform.Paths, secrets map[string]string) []string {
 	}
 	return out
 }
-
-// ThreadConfig merges global engine config overrides (for example the
-// Windows MXC sandbox selection) with per-thread settings.
-func ThreadConfig(extra map[string]any) map[string]any {
-	merged := map[string]any{}
-	for k, v := range WindowsSandboxConfig() {
-		merged[k] = v
-	}
-	for k, v := range extra {
-		merged[k] = v
-	}
-	if len(merged) == 0 {
-		return nil
-	}
-	return merged
-}

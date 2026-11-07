@@ -13,13 +13,13 @@ func TestEveryToolAdvertisesItsArguments(t *testing.T) {
 			Required             []string       `json:"required"`
 			AdditionalProperties bool           `json:"additionalProperties"`
 		}
-		if err := json.Unmarshal(toolSchema(name), &shape); err != nil {
+		if err := json.Unmarshal(toolByName[name].Schema(), &shape); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		if shape.Properties == nil || shape.AdditionalProperties {
 			t.Fatalf("%s missing parameter contract", name)
 		}
-		if toolDescriptions[name] == "" {
+		if toolByName[name].Description == "" {
 			t.Fatalf("%s has no description", name)
 		}
 		// Writes take their idempotency key from the engine's call id.
@@ -72,5 +72,16 @@ func TestWritesDeriveTheirKeyFromTheCallID(t *testing.T) {
 	}
 	if keyOf(withDerivedKey(ToolCall{Name: "send_message", Arguments: json.RawMessage(`{}`)})) != "" {
 		t.Fatal("key derived without a call id")
+	}
+}
+
+func TestEveryToolIsListedOnce(t *testing.T) {
+	if len(toolByName) != len(toolTable) {
+		t.Fatalf("%d tools under %d names", len(toolTable), len(toolByName))
+	}
+	for _, tool := range toolTable {
+		if len(tool.Roles) == 0 || tool.Schema == nil || tool.Call == nil {
+			t.Fatalf("%s is not complete", tool.Name)
+		}
 	}
 }

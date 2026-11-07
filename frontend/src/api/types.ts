@@ -195,7 +195,8 @@ export type PermissionMode = 'read_only' | 'default' | 'full';
 
 /** One visible step of a run (thinking, a command, a file change, a tool
  * call, a reconnect, an engine notice). `detail` is kind-specific. */
-export type RunStepKind = 'reasoning' | 'message' | 'agent' | 'diff' | 'command' | 'file_change' | 'tool' | 'web_search' | 'plan' | 'retry' | 'notice';
+// The interface's own list. A step in hand may still be of a kind this build does not know.
+export type RunStepKind = components['schemas']['RunStep']['kind'];
 export type RunStepStatus = 'in_progress' | 'completed' | 'failed' | 'declined' | 'interrupted';
 export interface RunStep {
   id: string;
@@ -302,7 +303,6 @@ export interface DirectoryCheckResult {
   canonical: string;
   ok: boolean;
   duplicate: boolean;
-  nested: boolean;
   /** Another team, possibly in another CoBot instance, claims the folder. */
   claimed: boolean;
   /** The folder belongs to an archived team; restore it to use the folder. */

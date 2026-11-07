@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -26,7 +27,7 @@ func (s *Scheduler) onNotification(teamID string, source *teamRuntime, n engine.
 	if n.Method == "item/completed" && n.ItemType == "agentMessage" {
 		s.bufferReply(ctx, source, n)
 	}
-	if n.Step != nil && isWorkStep(n.Step.Kind) {
+	if n.Step != nil && engine.IsWorkStep(n.Step.Kind) {
 		s.noteWork(ctx, source, n)
 	}
 	if s.onProgress(ctx, teamID, source, n) {
@@ -234,7 +235,7 @@ func (s *Scheduler) findRunByTurn(ctx context.Context, epoch, threadID, turnID s
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE bot_id = ? AND engine_epoch = ? AND provider_turn_id = ? AND id != ?`, botID, epoch, turnID, run.ID).Scan(&previous); err != nil || previous != 0 {
 			return ""
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE runs SET provider_turn_id = ? WHERE id = ? AND provider_turn_id = ''`, turnID, run.ID); err != nil {
+		if err := sqlite.AdoptRunTurn(ctx, tx, run.ID, turnID); err != nil {
 			return ""
 		}
 	}
@@ -326,36 +327,6 @@ func takeReply(rt *teamRuntime, runID string) string {
 	return buf.commentary
 }
 
-// looseReply is what a model that marks no phase said as its answer: the
-// messages after the last work step. A turn that ended on a work step (the
-// answer, then a hand-off call) answers with the last thing said.
-func looseReply(pieces []loosePiece, work int) []string {
-	var tail []string
-	for _, piece := range pieces {
-		if piece.work == work && strings.TrimSpace(piece.text) != "" {
-			tail = append(tail, piece.text)
-		}
-	}
-	if len(tail) == 0 {
-		for i := len(pieces) - 1; i >= 0; i-- {
-			if strings.TrimSpace(pieces[i].text) != "" {
-				return []string{pieces[i].text}
-			}
-		}
-	}
-	return tail
-}
-
-// isWorkStep says whether a step is the member doing something, as against
-// thinking, reporting or saying something.
-func isWorkStep(kind string) bool {
-	switch kind {
-	case engine.StepCommand, engine.StepFileChange, engine.StepTool, engine.StepWebSearch, engine.StepAgent:
-		return true
-	}
-	return false
-}
-
 // settleRetryDelays space the retries of a settlement whose write failed.
 var settleRetryDelays = []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second}
 
@@ -389,18 +360,16 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 		return err
 	}
 	defer tx.Rollback()
-	fresh, err := sqlite.FindActiveRun(ctx, tx, botID)
-	if errors.Is(err, sqlite.ErrNotFound) || (err == nil && fresh.ID != run.ID) {
-		return nil
-	}
-	if err != nil {
+	active, err := settleRunStatusTx(ctx, tx, st)
+	if err != nil || !active {
 		return err
 	}
-	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, st.status, st.turnID, st.epoch, "", true); err != nil {
+	if err := sqlite.InvalidateRunNativeApprovals(ctx, tx, run.ID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1 WHERE run_id = ? AND type = ? AND request_state = ?`, domain.ApprovalStateInvalidated, run.ID, domain.ApprovalNativeTool, domain.ApprovalStatePending); err != nil {
-		return err
+	turnID := st.turnID
+	if turnID == "" {
+		turnID = run.ProviderTurnID
 	}
 	// A finished turn that never reported tokens is an unknown spend, not a
 	// zero one: a budget must pause rather than trust it. A usage row
@@ -409,38 +378,17 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 	if epoch == "" {
 		epoch = st.epoch
 	}
-	turnID := st.turnID
-	if turnID == "" {
-		turnID = run.ProviderTurnID
-	}
 	if err := s.app.MarkUsageUnknownIfMissing(ctx, tx, teamID, botID, epoch, st.threadID, turnID); err != nil {
 		return err
 	}
 	assistantID := ""
 	if st.text != "" {
-		blocks, _ := json.Marshal([]domain.TextBlock{{Type: "text", Text: st.text}})
-		assistant := domain.Message{
-			ID: domain.NewID(), TeamID: teamID, BotID: botID,
-			Kind: domain.MessageKindAssistant, Blocks: blocks, RunID: run.ID,
-			CreatedAt: time.Now().UTC(),
-		}
-		if err := sqlite.InsertMessage(ctx, tx, assistant); err != nil {
+		var err error
+		if assistantID, err = inboxAssistantReplyTx(ctx, tx, teamID, botID, run.ID, st.text); err != nil {
 			return err
 		}
-		assistantID = assistant.ID
 	}
-	nextStatus := domain.BotStatusIdle
-	if queued, err := sqlite.CountQueuedDeliveries(ctx, tx, botID); err == nil && queued > 0 {
-		nextStatus = domain.BotStatusQueued
-		if eligible, err := sqlite.ListDispatchableDeliveries(ctx, tx, botID, 1); err == nil && len(eligible) == 0 {
-			nextStatus = domain.BotStatusWaitingInput
-		}
-	} else {
-		var questions int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM questions WHERE requester_bot_id = ? AND status = 'open' AND kind = ''`, botID).Scan(&questions); err == nil && questions > 0 {
-			nextStatus = domain.BotStatusWaitingInput
-		}
-	}
+	nextStatus := settledMemberStatusTx(ctx, tx, botID)
 	// A turn that ended with the member's card still open, and nothing else
 	// coming, gets one reminder to hand it on.
 	if st.status == domain.RunCompleted && nextStatus == domain.BotStatusIdle {
@@ -452,33 +400,63 @@ func (s *Scheduler) settleRun(ctx context.Context, st runSettlement) error {
 			nextStatus = domain.BotStatusQueued
 		}
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, botID, nextStatus, ""); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, nextStatus, ""); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	s.afterSettled(ctx, st, turnID, assistantID)
+	return nil
+}
+
+// settleRunStatusTx writes the run's final status, and reports false when the
+// run is no longer the member's active one.
+func settleRunStatusTx(ctx context.Context, tx *sql.Tx, st runSettlement) (bool, error) {
+	fresh, err := sqlite.FindActiveRun(ctx, tx, st.botID)
+	if errors.Is(err, sqlite.ErrNotFound) || (err == nil && fresh.ID != st.run.ID) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := sqlite.UpdateRunStatus(ctx, tx, st.run.ID, st.status, st.turnID, st.epoch, "", true); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// settledMemberStatusTx is what a member does next by what is left for it.
+// A failed read counts as nothing left: the settlement must still go through.
+func settledMemberStatusTx(ctx context.Context, tx *sql.Tx, botID string) string {
+	if queued, err := sqlite.CountQueuedDeliveries(ctx, tx, botID); err == nil && queued > 0 {
+		if eligible, err := sqlite.ListDispatchableDeliveries(ctx, tx, botID, 1); err == nil && len(eligible) == 0 {
+			return domain.BotStatusWaitingInput
+		}
+		return domain.BotStatusQueued
+	}
+	if questions, err := sqlite.CountOpenUserDecisionQuestions(ctx, tx, botID); err == nil && questions > 0 {
+		return domain.BotStatusWaitingInput
+	}
+	return domain.BotStatusIdle
+}
+
+// afterSettled is what a settlement leaves until it has committed.
+func (s *Scheduler) afterSettled(ctx context.Context, st runSettlement, turnID, assistantID string) {
 	if s.app.CollaborationTokens != nil {
-		s.app.CollaborationTokens.RevokeRun(run.ID)
+		s.app.CollaborationTokens.RevokeRun(st.run.ID)
 	}
 	if s.app.Paths.Root != "" {
 		hookrun.RemoveNativeBinding(s.app.Paths.Root, st.threadID, turnID)
 	}
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: teamID, BotID: botID, ResourceID: run.ID})
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventRunUpdated, TeamID: st.teamID, BotID: st.botID, ResourceID: st.run.ID})
 	messageResource := assistantID
 	if messageResource == "" {
-		messageResource = botID
+		messageResource = st.botID
 	}
-	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: teamID, BotID: botID, ResourceID: messageResource})
+	s.app.recordEvent(ctx, domain.Event{Type: domain.EventMessageUpdated, TeamID: st.teamID, BotID: st.botID, ResourceID: messageResource})
 	s.app.Hub.Publish()
-	s.Wake(botID) // pick up the next queued delivery without model help
-	return nil
-}
-
-// joinTexts keeps each reply segment of a turn (a note before the work, the
-// final answer) its own paragraph.
-func joinTexts(parts []string) string {
-	return strings.Join(parts, "\n\n")
+	s.Wake(st.botID) // pick up the next queued delivery without model help
 }
 
 // onApproval persists a native tool approval and projects it to the member
@@ -561,7 +539,7 @@ func (s *Scheduler) storeApproval(ctx context.Context, botID string, run domain.
 			return false, err
 		}
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, botID, domain.BotStatusWaitingApproval, runIDOrEmpty(run)); err != nil {
+	if err := setMemberStateTx(ctx, tx, botID, domain.BotStatusWaitingApproval, runIDOrEmpty(run)); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()
@@ -572,82 +550,6 @@ func runIDOrEmpty(run domain.Run) string {
 		return ""
 	}
 	return run.ID
-}
-
-func approvalSummary(req engine.ApprovalRequest) string {
-	// The complete requested operation is needed for a meaningful decision.
-	// Keep only relevant public fields; never persist the transport envelope.
-	if req.Method == "mcpServer/elicitation/request" {
-		// What the MCP server asks, verbatim: its words, and the form or the
-		// address it wants acted on.
-		var payload struct {
-			ServerName      string          `json:"serverName"`
-			Message         string          `json:"message"`
-			Mode            string          `json:"mode"`
-			RequestedSchema json.RawMessage `json:"requestedSchema"`
-			URL             string          `json:"url"`
-		}
-		if json.Unmarshal(req.RawParams, &payload) == nil {
-			details := map[string]any{"server": payload.ServerName, "mode": payload.Mode, "message": payload.Message}
-			if len(payload.RequestedSchema) > 0 && string(payload.RequestedSchema) != "null" {
-				details["requestedSchema"] = payload.RequestedSchema
-			}
-			if payload.URL != "" {
-				details["url"] = payload.URL
-			}
-			value, _ := json.MarshalIndent(details, "", "  ")
-			return string(value)
-		}
-	}
-	details := map[string]any{}
-	if req.Command != "" {
-		details["command"] = req.Command
-	}
-	if req.Cwd != "" {
-		details["cwd"] = req.Cwd
-	}
-	if len(req.Paths) > 0 {
-		details["paths"] = req.Paths
-	}
-	if len(req.Changes) > 0 {
-		details["changes"] = req.Changes
-	}
-	if len(req.Permissions) > 0 {
-		details["permissions"] = req.Permissions
-	}
-	if req.Network {
-		details["network"] = true
-	}
-	if len(details) == 0 {
-		return req.Method
-	}
-	value, _ := json.MarshalIndent(details, "", "  ")
-	return string(value)
-}
-
-// nativeToolOptions are the choices Codex itself offers. "For this session"
-// lasts for the member's engine session: Codex keeps the grant until its
-// thread is restarted, and nothing in CoBot can widen it further.
-func nativeToolOptions(method string) []domain.ApprovalOption {
-	if method == "mcpServer/elicitation/request" {
-		return []domain.ApprovalOption{
-			{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.elicit_submit"},
-			{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.elicit_decline"},
-		}
-	}
-	if method == "item/permissions/requestApproval" {
-		return []domain.ApprovalOption{
-			{ID: domain.DecisionGrantTurn, MessageKey: "approval.option.grant_turn"},
-			{ID: domain.DecisionGrantSession, MessageKey: "approval.option.grant_session"},
-			{ID: "deny", MessageKey: "approval.option.permissions.deny"},
-		}
-	}
-	return []domain.ApprovalOption{
-		{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.allow_once"},
-		{ID: domain.DecisionAcceptSession, MessageKey: "approval.option.allow_session"},
-		{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.decline"},
-		{ID: domain.DecisionCancelEngine, MessageKey: "approval.option.decline_stop"},
-	}
 }
 
 // onServerExitRuntime marks the team degraded when THIS runtime dies: pending
@@ -691,11 +593,11 @@ func (s *Scheduler) onServerExitRuntime(teamID string, rt *teamRuntime, err erro
 			tx.Rollback()
 			continue
 		}
-		if uerr := sqlite.SetBotRunState(ctx, tx, run.BotID, domain.BotStatusUnknown, run.ID); uerr != nil {
+		if uerr := setMemberStateTx(ctx, tx, run.BotID, domain.BotStatusUnknown, run.ID); uerr != nil {
 			tx.Rollback()
 			continue
 		}
-		deliveryID, uerr := sqlite.MarkDeliveryUnknownByRun(ctx, tx, run.ID)
+		deliveryID, uerr := inboxMarkRunUnknownTx(ctx, tx, run.ID)
 		if uerr != nil {
 			tx.Rollback()
 			continue
@@ -825,19 +727,6 @@ func (s *Scheduler) settleEndedTurn(ctx context.Context, rt *teamRuntime, run do
 	}
 	s.logger.Info("settled a turn the engine had already ended", "runId", run.ID, "status", status)
 	return true
-}
-
-func (a *App) botByThread(ctx context.Context, epoch, threadID string) (string, error) {
-	return sqlite.FindBotByThread(ctx, a.DB, epoch, threadID)
-}
-
-// EngineStatusInvalidated drops the cached engine projection (login changes).
-func (a *App) EngineStatusInvalidated() { a.invalidateEngineStatus() }
-
-func (a *App) invalidateEngineStatus() {
-	a.engineStatusMu.Lock()
-	a.engineStatusCache = nil
-	a.engineStatusMu.Unlock()
 }
 
 // bufferReply keeps a turn's answer as it arrives: final-answer text becomes

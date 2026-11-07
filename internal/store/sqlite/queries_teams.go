@@ -300,33 +300,6 @@ func SetBotRunState(ctx context.Context, tx *sql.Tx, botID, status, runID string
 	return nil
 }
 
-// DirectoryBinding is one bound working directory.
-type DirectoryBinding struct {
-	TeamID       string
-	DirectoryKey string
-	Directory    string
-}
-
-// ListDirectoryBindings returns every live binding (deleted teams excluded).
-func ListDirectoryBindings(ctx context.Context, q Queryer) ([]DirectoryBinding, error) {
-	rows, err := q.QueryContext(ctx, `SELECT b.team_id, b.directory_key, b.directory
-		FROM directory_bindings b JOIN teams t ON t.id = b.team_id
-		WHERE t.status != ?`, domain.TeamStatusDeleted)
-	if err != nil {
-		return nil, fmt.Errorf("list directory bindings: %w", err)
-	}
-	defer rows.Close()
-	var out []DirectoryBinding
-	for rows.Next() {
-		var b DirectoryBinding
-		if err := rows.Scan(&b.TeamID, &b.DirectoryKey, &b.Directory); err != nil {
-			return nil, err
-		}
-		out = append(out, b)
-	}
-	return out, rows.Err()
-}
-
 // SetTeamStatusTx is SetTeamStatus inside the caller's transaction, so a
 // lifecycle change commits with the rest of its writes (the pool is a single
 // connection; a nested tx here would deadlock).

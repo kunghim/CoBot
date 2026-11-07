@@ -226,7 +226,7 @@ func TestArchiveOnlyIdleTeam(t *testing.T) {
 	if err != nil || archived.Status != domain.TeamStatusArchived || archived.ArchivedAt == "" {
 		t.Fatalf("archive = %+v (err %v), want archived with a time", archived, err)
 	}
-	if fake.ShutdownCalls < 1 {
+	if fake.ShutdownCalls() < 1 {
 		t.Fatal("archiving must shut the team engine down")
 	}
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "归档后不该派发"}); err == nil {
@@ -348,6 +348,44 @@ func TestClaimedFolderIsRefused(t *testing.T) {
 	}
 }
 
+// TestCheckDirectoryAnswersForMarkedFolders pins the check before creating a
+// team: a marker naming a team of this instance makes it look the team up, which
+// must not wait on its own transaction, or the whole product stalls on the one
+// database connection until the request ends.
+func TestCheckDirectoryAnswersForMarkedFolders(t *testing.T) {
+	h := newM2Harness(t)
+	team, _ := h.createTeam(t, nil)
+	check := func(name, marker string) map[string]any {
+		t.Helper()
+		dir := filepath.Join(filepath.Dir(h.teamDir), name)
+		if err := os.MkdirAll(filepath.Join(dir, ".cobot"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".cobot", "team.json"), []byte(marker), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		result, err := h.app.CheckDirectory(ctx, h.user, dir)
+		if err != nil {
+			t.Fatalf("checking %s: %v", name, err)
+		}
+		return result
+	}
+
+	// A copy of a live team's folder carries that team's marker.
+	copied := check("copied-team", `{"instanceId":"`+h.app.InstanceID+`","teamId":"`+team.ID+`","teamName":"`+team.Name+`"}`)
+	if copied["ok"] != false || copied["claimed"] != true || copied["teamName"] != team.Name {
+		t.Fatalf("copied folder = %+v, want claimed by %s", copied, team.Name)
+	}
+	if stale := check("deleted-team", `{"instanceId":"`+h.app.InstanceID+`","teamId":"deleted-long-ago"}`); stale["ok"] != true || stale["claimed"] != false {
+		t.Fatalf("stale marker = %+v, want free", stale)
+	}
+	if foreign := check("other-instance", `{"instanceId":"other-instance","teamId":"t1","teamName":"别处的团队"}`); foreign["ok"] != false || foreign["claimed"] != true {
+		t.Fatalf("foreign marker = %+v, want claimed", foreign)
+	}
+}
+
 // TestTeamFollowsItsFolder pins the lifelong binding: a team whose folder is
 // gone becomes directory_missing and refuses work; once the folder is back
 // at the same path it resumes by itself, and a lost marker is rewritten.
@@ -380,6 +418,11 @@ func TestTeamFollowsItsFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Remove(filepath.Join(h.teamDir, ".cobot", "team.json")); err != nil {
+		t.Fatal(err)
+	}
+	// The marker is repaired once the folder has been quiet for a while.
+	longAgo := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(h.teamDir, ".cobot"), longAgo, longAgo); err != nil {
 		t.Fatal(err)
 	}
 	h.app.CheckTeamDirectories(ctx)
@@ -437,4 +480,81 @@ func TestCreateTeamIsAtomic(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".cobot", "team.json")); err != nil {
 		t.Fatalf("marker after create: %v", err)
 	}
+}
+
+// An open page has to show a folder going and coming back without the user
+// doing anything: an idle team is not dispatched, and a team without its
+// folder takes no messages, so nothing else would look at it again.
+func TestTeamComesBackWhenItsFolderIsPutBack(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
+	status := func() string {
+		current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return current.Status
+	}
+	away := h.teamDir + "-away"
+	if err := os.Rename(h.teamDir, away); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "team marked missing", func() bool { return status() == domain.TeamStatusDirectoryMissing })
+	if _, err := os.Stat(h.teamDir); !os.IsNotExist(err) {
+		t.Fatalf("the folder was made again: %v", err)
+	}
+	if err := os.Rename(away, h.teamDir); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "team active again", func() bool { return status() == domain.TeamStatusActive })
+}
+
+// Moving a project away can leave its folder behind, empty, when a process
+// still works in it. That shell is not the project: the team counts it as
+// gone and does not fill it with a new marker.
+func TestAnEmptiedFolderCountsAsGone(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
+	entries, err := os.ReadDir(h.teamDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if err := os.RemoveAll(filepath.Join(h.teamDir, e.Name())); err != nil {
+			t.Fatal(err)
+		}
+	}
+	longAgo := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(h.teamDir, longAgo, longAgo); err != nil {
+		t.Fatal(err)
+	}
+	h.app.CheckTeamDirectories(ctx)
+	current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Status != domain.TeamStatusDirectoryMissing {
+		t.Fatalf("status with an emptied folder = %s", current.Status)
+	}
+	if left, _ := os.ReadDir(h.teamDir); len(left) != 0 {
+		t.Fatalf("the emptied folder was filled again: %d entries", len(left))
+	}
+}
+
+// The engine works in the team folder, and Windows keeps a folder a process
+// works in: once the folder is gone the idle engine is let go, so a project
+// moved away does not leave an empty shell of itself behind.
+func TestAFolderGoneLetsTheIdleEngineGo(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	turn := startTurn(t, h, fake, bots[1], "做点事")
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, domain.RunCompleted, "好")
+	settlesAt(t, h, bots[1].ID, domain.BotStatusIdle)
+	if err := os.Rename(h.teamDir, h.teamDir+"-away"); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "engine stopped", func() bool { return fake.ShutdownCalls() > 0 })
 }

@@ -6,7 +6,7 @@
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",
-    "close": "Close"
+    "close": "Quit CoBot"
   },
   "common": {
     "close": "Close",
@@ -79,7 +79,6 @@
     "deleteMember": "Delete member",
     "directoryOk": "Directory usable: {{path}}",
     "directoryDuplicate": "Already bound to team {{teamName}}",
-    "directoryNested": "Nested with the directory of team {{teamName}}",
     "deleteConfirmTitle": "Delete team “{{name}}”?",
     "archiveConfirmTitle": "Archive team “{{name}}”?",
     "archiveConfirmBody": "The team moves from the team list to Settings › Archived, its Codex process stops, and it keeps its folder. Conversations and data stay; you can restore it at any time.",
@@ -1315,7 +1314,6 @@
     "error.team.directory_archived": "This folder belongs to the archived team “{{teamName}}”; restore it under Settings › Archived teams first",
     "error.team.directory_claimed_external": "This folder is already used by team “{{teamName}}” in another CoBot environment; a new team cannot be created here",
     "error.team.directory_claimed_unknown": "This folder is already used by a team in another CoBot environment; a new team cannot be created here",
-    "error.team.directory_nested": "Directory overlaps the directory of team “{{teamName}}”",
     "error.team.member_limit": "Requested {{requested}} members, limit is {{limit}}",
     "error.team.unknown_role": "Unknown role: {{roleId}}",
     "error.team.archived": "Team is archived; messages cannot be sent",

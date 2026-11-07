@@ -2,14 +2,12 @@
 // "发给 [avatar] 前端开发" or "来自 [avatar] 测试工程师". Clicking a member
 // opens the whole exchange with it above the conversation. Task assignments
 // and review notices are such messages too.
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Bot, Message } from '../../api/types';
+import type { Message } from '../../api/types';
+import { TeamMembersContext } from '../../app/TeamMembersContext';
 import { ExchangeLine as Line, type PersonRef } from '../../components/ui';
 import Avatar from '../avatars/Avatar';
-
-/** The team's members by id, so a mention can show its member's avatar. */
-export const TeamMembersContext = createContext<ReadonlyMap<string, Bot>>(new Map());
 
 /** A member named in the conversation: its avatar and its name. */
 export function usePerson(): (botId: string, fallbackName?: string) => PersonRef {

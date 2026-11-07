@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -428,7 +427,7 @@ func (tb *teamBrowser) ensureDownloadDir(ctx context.Context, teamDir string) {
 	if same || conn == nil {
 		return
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if _, err := ensureCobotDir(teamDir, "downloads"); err != nil {
 		return
 	}
 	if err := conn.call(ctx, "", "Browser.setDownloadBehavior", map[string]any{"behavior": "allow", "downloadPath": dir, "eventsEnabled": true}, nil); err == nil {

@@ -26,6 +26,7 @@ import (
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/tests/contract"
 	"github.com/kunghim/CoBot/tests/integration/fakeengine"
 )
 
@@ -306,7 +307,7 @@ func newM2Harness(t *testing.T) *m2Harness {
 		Dispatcher:          collaboration.NewDispatcher(a, tokens),
 		EngineEpochOfTeam:   a.EngineEpochOfTeam,
 	}
-	h.api = httptest.NewServer(apiServer.Handler())
+	h.api = httptest.NewServer(contract.Wrap(apiServer.Handler()))
 	t.Cleanup(h.api.Close)
 	sched := app.NewScheduler(a, func(spec app.ServerSpec) (engine.Server, error) {
 		fake := fakeengine.New(spec.Callbacks, h.epochFor(spec.TeamID))
@@ -361,6 +362,18 @@ func (h *m2Harness) queuedForBot(t *testing.T, botID string) int {
 	t.Helper()
 	n, err := sqlite.CountQueuedDeliveries(context.Background(), h.app.DB, botID)
 	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// deliveriesForBot counts what was ever delivered to a bot, in any state. A
+// delivery wakes the scheduler, which may claim it at any moment, so "still
+// queued" is not something a test can assert right after delivering.
+func (h *m2Harness) deliveriesForBot(t *testing.T, botID string) int {
+	t.Helper()
+	var n int
+	if err := h.app.DB.QueryRow(`SELECT count(*) FROM deliveries WHERE target_bot_id = ?`, botID).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
 	return n
@@ -460,15 +473,22 @@ func TestTeamCreationValidation(t *testing.T) {
 		t.Fatal("duplicate directory must be refused")
 	}
 
-	// Nesting is refused in both directions.
-	nested := filepath.Join(h.teamDir, "nested")
-	if err := os.MkdirAll(nested, 0o755); err != nil {
+	// A folder inside a team's folder, or around it, can have a team of its
+	// own: one team on a whole project and another on one of its parts is
+	// the user's call. Only the very same folder belongs to one team.
+	inner := filepath.Join(h.teamDir, "inner")
+	if err := os.MkdirAll(inner, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "嵌套", Directory: nested})
-	var de *domain.Error
-	if !errors.As(err, &de) || de.Code != domain.CodeConflict {
-		t.Fatalf("nested directory must conflict, got %v", err)
+	if verdict, err := h.app.CheckDirectory(ctx, h.user, inner); err != nil || verdict["ok"] != true {
+		t.Fatalf("check of a folder inside a team's = %v, %v", verdict, err)
+	}
+	if _, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "里层", Directory: inner, RequestID: "inner-team"}); err != nil {
+		t.Fatalf("a team inside another team's folder: %v", err)
+	}
+	outer := filepath.Dir(h.teamDir)
+	if _, _, err := h.app.CreateTeam(ctx, h.user, app.CreateTeamInput{Name: "外层", Directory: outer, RequestID: "outer-team"}); err != nil {
+		t.Fatalf("a team around another team's folder: %v", err)
 	}
 
 	// Reserved profile directories are refused.

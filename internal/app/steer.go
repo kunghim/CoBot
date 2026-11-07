@@ -46,24 +46,20 @@ func (s *Scheduler) trySteer(ctx context.Context, botID, deliveryID string, mess
 			if delivery.Status != domain.DeliveryQueued {
 				return false
 			}
-			if err := sqlite.ClaimDeliveryRun(ctx, tx, deliveryID, runID); err != nil {
+			if err := inboxClaimTx(ctx, tx, deliveryID, message.ID, runID); err != nil {
 				return false
 			}
 		case domain.DeliveryQueued:
 			if delivery.Status != domain.DeliveryDispatching {
 				return false
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, run_id = '', updated_at = ? WHERE id = ?`,
-				domain.DeliveryQueued, time.Now().UTC().Format(time.RFC3339Nano), deliveryID); err != nil {
+			if err := inboxWithdrawForSteerTx(ctx, tx, deliveryID, message.ID); err != nil {
 				return false
 			}
 		default:
-			if err := sqlite.SetDeliveryStatus(ctx, tx, deliveryID, status); err != nil {
+			if err := inboxAcceptTx(ctx, tx, deliveryID, message.ID); err != nil {
 				return false
 			}
-		}
-		if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, status); err != nil {
-			return false
 		}
 		return tx.Commit() == nil
 	}

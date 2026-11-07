@@ -12,7 +12,7 @@
 | `scripts/` 下的仓库策略、Issue 命令、发布脚本 | `node --test scripts/repository-policy.test.mjs scripts/issue-commands.test.mjs scripts/release.test.mjs scripts/frontend-bundle.test.mjs scripts/check-docs.test.mjs scripts/live-test-plan.test.mjs` |
 | 只改文档 | `node scripts/check-docs.mjs`（命名、索引、链接）和 `node scripts/check-public-files.mjs`；命令和说法自己核对 |
 
-改代码后、交付前运行完整检查 `./scripts/check.ps1` 或 `./scripts/check.sh`（Windows 加 `-Desktop` 会额外编译桌面壳）。
+改代码后、交付前运行完整检查 `./scripts/check.ps1` 或 `./scripts/check.sh`（Windows 加 `-Desktop` 会额外编译桌面壳；加 `-Race` 或 `--race` 会用竞争检测再跑一遍 Go 测试，需要 C 编译器）。改事务、锁或并发相关的代码时要加。
 通过后没有新原因就不重复跑无关检查。重要的状态变化补针对行为的回归测试，不写只复述实现的测试。
 
 ## 浏览器失败证据

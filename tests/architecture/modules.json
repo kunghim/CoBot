@@ -1,0 +1,26 @@
+{
+  "layers": ["foundation", "data", "business", "orchestration"],
+  "modules": {
+    "foundation": { "layer": "foundation", "files": ["app.go", "effects.go", "turn_reply.go", "write_request.go", "idempotency.go", "events_import.go", "tool_run.go"] },
+    "inbox": { "layer": "data", "files": ["inbox.go"] },
+    "member-state": { "layer": "data", "files": ["member_state.go"] },
+    "decisions": { "layer": "data", "files": ["approvals.go", "approval_control.go", "approval_native.go", "approval_resolved.go", "questions.go"] },
+    "chains": { "layer": "data", "files": ["chains.go"] },
+    "turns": { "layer": "orchestration", "files": ["scheduler.go", "engine_events.go", "run_progress.go", "batch.go", "steer.go", "interrupt_request.go", "subagents.go", "recovery.go", "lease.go"] },
+    "conversation": { "layer": "business", "files": ["conversations.go", "message_edit.go", "run_retry.go", "collaboration.go"] },
+    "relay": { "layer": "business", "files": ["relay.go", "relay_context.go", "card_reminder.go", "recruitment.go", "question_answers.go"] },
+    "context": { "layer": "business", "files": ["context.go", "handover.go"] },
+    "teams": { "layer": "business", "files": ["teams.go", "team_lifecycle.go", "web_surface.go"] },
+    "models": { "layer": "business", "files": ["providers.go", "model_selection.go", "model_spec.go"] },
+    "engine-control": { "layer": "business", "files": ["engine_status.go", "engine_catalog.go"] },
+    "chat": { "layer": "business", "files": ["chats.go", "chat_runner.go", "chat_requests.go", "chat_navigation.go"] },
+    "budget": { "layer": "business", "files": ["budget.go", "budget_card.go", "usage.go"] },
+    "memories": { "layer": "business", "files": ["memories.go"] },
+    "avatars": { "layer": "business", "files": ["avatars.go"] },
+    "browser": { "layer": "business", "files": ["browser.go", "browser_panel.go"] },
+    "preview": { "layer": "business", "files": ["preview.go"] },
+    "workspace": { "layer": "business", "files": ["workspace_changes.go", "workspace_files.go", "workspace_watch.go", "open_path.go"] },
+    "updates": { "layer": "business", "files": ["update_check.go"] },
+    "records": { "layer": "business", "files": ["activity.go", "pages.go", "search.go", "stats.go"] }
+  }
+}

@@ -3,9 +3,10 @@ package codex
 import (
 	"context"
 	"fmt"
-	"strings"
+	"sync"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 // builtinProvider is the provider the engine uses when no other one is
@@ -18,26 +19,8 @@ const builtinProvider = "openai"
 // endpoint, which would send a user's third-party key to the wrong host.
 func (s *Server) Dialects() []string { return []string{domain.DialectOpenAIResponses} }
 
-// ProviderEnvKey is the environment variable that carries a provider's API
-// key into the engine. The name is stable per provider so a key can be
-// rotated without renaming the configuration, and the secret itself never
-// reaches config.toml — only this variable name does.
-func ProviderEnvKey(providerID string) string {
-	return "COBOT_PROVIDER_" + sanitizeEnvName(providerID) + "_KEY"
-}
-
-func sanitizeEnvName(id string) string {
-	var b strings.Builder
-	for _, r := range strings.ToUpper(id) {
-		switch {
-		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('_')
-		}
-	}
-	return b.String()
-}
+// ProviderEnvKey is the variable that carries a provider's key into Codex.
+func ProviderEnvKey(providerID string) string { return engine.ProviderEnvKey(providerID) }
 
 // BindProvider makes a provider reachable for this engine.
 //
@@ -87,6 +70,8 @@ func (s *Server) BindProvider(ctx context.Context, p domain.Provider) error {
 // protocol has no delete for one table, so the whole table is rewritten
 // without that entry; CoBot owns this file, so nothing else is in it.
 func (s *Server) UnbindProvider(ctx context.Context, providerID string) error {
+	engineDefault.Lock()
+	defer engineDefault.Unlock()
 	cfg, err := s.readConfig(ctx)
 	if err != nil {
 		return err
@@ -102,6 +87,52 @@ func (s *Server) UnbindProvider(ctx context.Context, providerID string) error {
 	return nil
 }
 
+// engineDefault guards the engine's default provider. Every engine of a profile
+// shares one configuration file, so this is one lock and not one per server.
+var engineDefault sync.Mutex
+
+// asThreadProvider runs a call the engine answers only when its default
+// provider is the one the thread runs with: starting or steering a turn,
+// resuming a thread. It refuses the others with "This chat uses x, but your
+// current provider is y", though a thread names its provider and one engine
+// serves threads on several. So the default follows the thread for the length
+// of the call and goes back after it; a turn that has started keeps its
+// provider. The default stays on the engine's own account in between, because
+// the model list and every other call without a thread read it.
+func (s *Server) asThreadProvider(ctx context.Context, providerID string, call func() error) error {
+	engineDefault.Lock()
+	defer engineDefault.Unlock()
+	if providerID == "" || providerID == builtinProvider {
+		return call()
+	}
+	if _, err := s.writeConfigValue(ctx, "model_provider", providerID, "upsert"); err != nil {
+		return fmt.Errorf("%w: %w", engine.ErrRejected, err)
+	}
+	defer func() {
+		// The caller's deadline may be what ended the call; this has to happen anyway.
+		if _, err := s.writeConfigValue(context.WithoutCancel(ctx), "model_provider", builtinProvider, "upsert"); err != nil && s.logger != nil {
+			s.logger.Warn("engine default provider not put back", "error", err)
+		}
+	}()
+	return call()
+}
+
+// threadProvider is the provider the engine said a thread runs with.
+func (s *Server) threadProvider(threadID string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.providers[threadID]
+}
+
+func (s *Server) setThreadProvider(threadID, providerID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.providers == nil {
+		s.providers = map[string]string{}
+	}
+	s.providers[threadID] = providerID
+}
+
 // SelectProvider makes the engine use the named provider.
 //
 // Codex keeps the choice in one place: the top level "model_provider" key.
@@ -110,6 +141,8 @@ func (s *Server) UnbindProvider(ctx context.Context, providerID string) error {
 // key ends up not being used at all. The empty id means the engine's own
 // provider, which is what it uses by default.
 func (s *Server) SelectProvider(ctx context.Context, providerID string) error {
+	engineDefault.Lock()
+	defer engineDefault.Unlock()
 	if providerID == "" {
 		providerID = builtinProvider
 	}

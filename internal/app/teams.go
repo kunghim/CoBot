@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
@@ -126,13 +127,6 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	} else if !errors.Is(err, sqlite.ErrNotFound) {
 		return domain.Team{}, nil, err
 	}
-	if conflict, err := a.findNestedBinding(ctx, tx, canon); err != nil {
-		return domain.Team{}, nil, err
-	} else if conflict != nil {
-		return domain.Team{}, nil, domain.Conflict("error.team.directory_nested", map[string]any{
-			"teamId": conflict.ID, "teamName": conflict.Name, "directory": conflict.Directory,
-		})
-	}
 
 	defaults, err := roles.Defaults()
 	if err != nil {
@@ -230,34 +224,16 @@ func (a *App) CreateTeam(ctx context.Context, principal auth.Principal, in Creat
 	return team, botsOut, nil
 }
 
-// findNestedBinding returns a team whose bound directory contains or is
-// contained by the candidate, comparing component-wise on canonical keys.
-func (a *App) findNestedBinding(ctx context.Context, tx *sql.Tx, candidate platform.CanonicalDir) (*domain.Team, error) {
-	bindings, err := sqlite.ListDirectoryBindings(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	for _, binding := range bindings {
-		other := platform.CanonicalDir{Key: binding.DirectoryKey, Display: binding.Directory}
-		if other.Contains(candidate) || candidate.Contains(other) {
-			team, _, err := sqlite.GetTeam(ctx, tx, binding.TeamID)
-			if err != nil {
-				return nil, err
-			}
-			return &team, nil
-		}
-	}
-	return nil, nil
-}
-
 // prepareTeamResources writes the .cobot marker and ensures the Git local
 // exclude entry without touching shared ignores or initialising Git.
 func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon platform.CanonicalDir) error {
 	if err := roles.EnsureProfileCopy(a.Paths.RolesDir()); err != nil {
 		return err
 	}
+	// Mkdir, not MkdirAll, here and below: the folder may have been deleted
+	// since it was checked, and that must fail instead of bringing it back.
 	cobotDir := filepath.Join(canon.Display, ".cobot")
-	if err := os.MkdirAll(cobotDir, 0o755); err != nil {
+	if err := os.Mkdir(cobotDir, 0o755); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("create .cobot: %w", err)
 	}
 	marker := TeamMarker{
@@ -277,7 +253,7 @@ func (a *App) prepareTeamResources(ctx context.Context, team domain.Team, canon 
 		return fmt.Errorf("write team marker: %w", err)
 	}
 	for _, sub := range []string{"context", "resources"} {
-		if err := os.MkdirAll(filepath.Join(cobotDir, sub), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(cobotDir, sub), 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("create .cobot/%s: %w", sub, err)
 		}
 	}
@@ -499,9 +475,13 @@ func (a *App) refuseClaimedDirectory(ctx context.Context, dir string) error {
 	return domain.Conflict(key, map[string]any{"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir})
 }
 
-// CheckTeamDirectories checks every live team's folder. It runs at startup
-// and whenever the team list is loaded, so the list a user looks at is
-// always honest; dispatch checks its own team before every turn.
+// CheckTeamDirectories checks every live team's folder. It runs at startup,
+// whenever the team list is loaded and on the scheduler's tick, and dispatch
+// checks its own team before every turn. The tick is what keeps an open page
+// honest: an idle team whose folder goes shows as missing without the user
+// trying to send, and a missing team takes no messages, so without the tick
+// a folder put back would not bring it back. Each check is a stat and a read
+// of the small marker file.
 func (a *App) CheckTeamDirectories(ctx context.Context) {
 	teams, err := sqlite.ListTeams(ctx, a.DB)
 	if err != nil {
@@ -517,17 +497,18 @@ func (a *App) CheckTeamDirectories(ctx context.Context) {
 // makes an active team directory_missing: it stays visible read-only and
 // receives no work. Once the folder is back at the same path the team is
 // active again by itself. A lost marker in a folder the team owns is
-// rewritten; a marker naming another team is never overwritten.
+// rewritten once the folder has settled; a marker naming another team is
+// never overwritten.
 func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.Team {
 	if team.Status != domain.TeamStatusActive && team.Status != domain.TeamStatusDirectoryMissing {
 		return team
 	}
 	info, statErr := os.Stat(team.Directory)
-	present := team.Directory != "" && statErr == nil && info.IsDir()
+	present := team.Directory != "" && statErr == nil && info.IsDir() && !folderEmptied(team.Directory)
 	if present {
 		marker, has, err := readTeamMarker(team.Directory)
 		ours := err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID))
-		if ours && (!has || marker.TeamName != team.Name) {
+		if ours && (!has || marker.TeamName != team.Name) && !teamMarkerSettling(team.Directory) {
 			if canon, err := platform.CanonicalDirFrom(team.Directory); err == nil {
 				if err := a.prepareTeamResources(ctx, team, canon); err != nil && a.Logger != nil {
 					a.Logger.Warn("rewrite team marker", "teamId", team.ID, "error", err)
@@ -558,6 +539,39 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 	}
 	a.Hub.Publish()
 	return updated
+}
+
+// folderEmptied reports a team folder with nothing left in it, not even the
+// marker CoBot wrote when the team was made. That is what a project moved or
+// deleted away leaves when the folder itself could not go: the team counts it
+// as gone instead of filling the shell again.
+func folderEmptied(directory string) bool {
+	entries, err := os.ReadDir(directory)
+	return err == nil && len(entries) == 0
+}
+
+// teamMarkerSettle is how long a folder must have been quiet before its lost
+// marker counts as lost rather than as part of a deletion still running.
+const teamMarkerSettle = 5 * time.Second
+
+// teamMarkerSettling reports that the marker is missing and the folder that
+// held it changed just now. Deleting a folder removes its contents first, so
+// this may be a deletion in progress: writing the marker back would make that
+// deletion fail and leave the team working in what remains of the folder.
+func teamMarkerSettling(directory string) bool {
+	if _, has, err := readTeamMarker(directory); has || err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(directory, ".cobot"))
+	if os.IsNotExist(err) {
+		info, err = os.Stat(directory)
+	}
+	if err != nil {
+		return false
+	}
+	// A time ahead of this clock says nothing about a change just now.
+	age := time.Since(info.ModTime())
+	return age >= 0 && age < teamMarkerSettle
 }
 
 // OpenTeamInput names the folder the user wants to open.
@@ -687,7 +701,7 @@ func (a *App) AdoptTeam(ctx context.Context, principal auth.Principal, in AdoptT
 	if err := a.refuseForeignOnly(ctx, canon.Display); err != nil {
 		return domain.Team{}, nil, err
 	}
-	// Creation carries the rest: name, roles, limits, the nested check, and
+	// Creation carries the rest: name, roles, limits, and
 	// the marker rewrite, which lands with the new team's own .cobot. The
 	// foreign marker is the one thing creation may not re-refuse: adoption
 	// just verified it is the very state this call exists for, so the marker

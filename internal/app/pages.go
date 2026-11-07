@@ -26,7 +26,7 @@ func (a *App) ListPage(ctx context.Context, p auth.Principal, in PageRequest) (m
 	}
 	// Loading the team list re-checks every team folder first (outside the
 	// read transaction: the pool is one connection), so the list is honest
-	// about moved or returned projects without a background timer.
+	// about moved or returned projects; the scheduler's tick re-checks them too.
 	if in.Kind == "teams" && in.Cursor == "" {
 		a.CheckTeamDirectories(ctx)
 	}

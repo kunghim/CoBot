@@ -111,7 +111,11 @@ func (a *App) checkRecruitment(ctx context.Context, q sqlite.Queryer, teamID str
 	for _, id := range requested {
 		role, err := roles.Default(id)
 		if err != nil || role.ID == roles.LeaderRoleID {
-			return nil, domain.InvalidRequest("error.team.unknown_role", map[string]any{"roleId": id})
+			available := []string{}
+			for _, r := range a.recruitableRoles(ctx, teamID) {
+				available = append(available, r.ID+"（"+r.Name+"）")
+			}
+			return nil, domain.InvalidRequest("error.team.unknown_role", map[string]any{"roleId": id, "available": available})
 		}
 		if present[id] {
 			return nil, domain.InvalidRequest("error.team.role_present", map[string]any{"roleId": id})
@@ -166,7 +170,7 @@ func (a *App) AnswerRecruitment(ctx context.Context, principal auth.Principal, q
 		return domain.Question{}, err
 	}
 	defer tx.Rollback()
-	var effect relayEffect
+	var effect effects
 	var answerText, resultText string
 	if decision == domain.RecruitmentApprove {
 		names := make([]string, 0, len(question.RoleIDs))
@@ -221,6 +225,6 @@ func (a *App) AnswerRecruitment(ctx context.Context, principal auth.Principal, q
 		return domain.Question{}, err
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventQuestionAnswered, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: question.ID})
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	return answered, nil
 }

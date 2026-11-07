@@ -56,12 +56,8 @@ type WaitResult struct {
 // outside the core — the spawned bridge, a hook process — an executor whose
 // local lease is stale must not run these; read tools always pass.
 func IsSideEffectTool(name string) bool {
-	switch name {
-	case "handoff", "start_requirement", "send_message", "ask_user", "browser", "request_member":
-		return true
-	default:
-		return false
-	}
+	tool := toolByName[name]
+	return tool != nil && tool.SideEffect
 }
 
 // Bridge env aliases for the lease gate (the bridge reads them from its own

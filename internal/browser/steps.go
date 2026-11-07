@@ -659,8 +659,8 @@ func (r *callRun) screenshot(ctx context.Context, fullPage bool) (string, error)
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(r.env.TeamDir, ".cobot", "browser")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	dir, err := ensureCobotDir(r.env.TeamDir, "browser")
+	if err != nil {
 		return "", err
 	}
 	r.shots++
@@ -674,6 +674,20 @@ func (r *callRun) screenshot(ctx context.Context, fullPage bool) (string, error)
 	}
 	pruneShots(dir, 100)
 	return path, nil
+}
+
+// ensureCobotDir creates a folder under the team's .cobot. It never creates the
+// team's folder itself: one deleted while a member is working stays deleted, and
+// the call fails instead.
+func ensureCobotDir(teamDir, name string) (string, error) {
+	cobot := filepath.Join(teamDir, ".cobot")
+	dir := filepath.Join(cobot, name)
+	for _, path := range []string{cobot, dir} {
+		if err := os.Mkdir(path, 0o755); err != nil && !os.IsExist(err) {
+			return "", err
+		}
+	}
+	return dir, nil
 }
 
 // pruneShots keeps the newest screenshots of a team.

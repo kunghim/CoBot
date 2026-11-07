@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icons } from '../../components/ui';
 import DiffView from '../../components/DiffView';
-import { displayCommand } from '../conversations/steps';
+import { displayCommand } from '../../components/content/displayCommand';
 import { parseNativeRequest, type NativeRequest } from './nativeRequest';
 
 export default function NativeApprovalBody({ summary, fallback }: { summary: string; fallback: string }) {

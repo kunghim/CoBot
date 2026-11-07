@@ -22,6 +22,15 @@ type RPCError struct {
 	Data    json.RawMessage `json:"data,omitempty"`
 }
 
+// RejectedConfig reports the engine refusing a configuration value it does not
+// understand, in its own words.
+func (e *RPCError) RejectedConfig() (string, bool) {
+	if !configValidationFailed(e) {
+		return "", false
+	}
+	return configErrorMessage(e), true
+}
+
 func (e *RPCError) Error() string {
 	return fmt.Sprintf("codex rpc %d: %s", e.Code, e.Message)
 }
@@ -54,7 +63,6 @@ type Client struct {
 	mu        sync.Mutex
 	writeGate chan struct{} // serializes frames, without holding the state mutex
 	closeOnce sync.Once
-	closeErr  error
 	failOnce  sync.Once
 	pending   map[string]*pendingCall
 	closed    chan struct{}
@@ -302,10 +310,13 @@ func (c *Client) writeContext(ctx context.Context, data []byte) error {
 	}
 }
 
-// Close ends the stdin stream; the caller still owns process termination.
+// Close ends the stdin stream; the caller still owns process termination. It
+// does not wait for that: closing a pipe waits for a write in progress, which
+// lasts until the process reads or dies, and killing it is what the caller does
+// next.
 func (c *Client) Close() error {
-	c.closeOnce.Do(func() { c.closeErr = c.stdin.Close() })
-	return c.closeErr
+	c.closeOnce.Do(func() { go c.stdin.Close() })
+	return nil
 }
 
 // Wait blocks until the read loop observed process exit.

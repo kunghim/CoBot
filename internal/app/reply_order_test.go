@@ -3,6 +3,8 @@ package app
 import (
 	"reflect"
 	"testing"
+
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 // A model that marks no phase: the reply is what it said after its last piece
@@ -38,7 +40,7 @@ func TestTheReplyIsWhatIsSaidAfterTheLastWork(t *testing.T) {
 
 func TestOnlyDoingSomethingCountsAsWork(t *testing.T) {
 	for kind, want := range map[string]bool{"command": true, "file_change": true, "tool": true, "web_search": true, "agent": true, "reasoning": false, "message": false, "diff": false, "plan": false, "compaction": false} {
-		if isWorkStep(kind) != want {
+		if engine.IsWorkStep(kind) != want {
 			t.Errorf("%s: work = %v", kind, !want)
 		}
 	}

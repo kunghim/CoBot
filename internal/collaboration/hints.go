@@ -23,6 +23,7 @@ var hints = map[string]string{
 	"error.recruitment.roles_required":    "请在 roleIds 里写明要招募的角色 ID。",
 	"error.recruitment.reason_required":   "申请要写明理由：当前的工作为什么需要这些成员。",
 	"error.recruitment.member_limit":      "这次申请会超过成员上限。先招募当前最急需的角色，或请用户在设置里调高上限。",
+	"error.team.unknown_role":             "角色库里没有这个角色 ID。roleIds 要填 available 里列出的 roleId（括号里是角色名），不要按名字自己拼。",
 	"error.team.role_present":             "团队里已经有这个角色的成员了。换一个角色，或把工作安排给现有成员。",
 	"error.team.member_limit":             "团队已到成员上限，加不了新成员。请用户在设置里调高上限。",
 	"error.browser.not_installed":         "这台电脑上没有可用的 Chrome 系浏览器（Chrome、Edge、Brave、Chromium 或 Vivaldi），浏览器工具用不了。在交接里如实写明没能打开页面，不要假装验证过。",

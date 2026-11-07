@@ -19,14 +19,18 @@ import { useLocation } from 'react-router-dom';
 /** Names the window while fullscreen: macOS reveals the transparent titlebar
  * under the hover menu bar and draws this title beside the traffic lights
  * (Codex-style), so the strip reads as a title bar instead of dead space.
- * Windowed keeps the title empty — the columns carry their own headers. */
+ * Windowed keeps the title empty — the columns carry their own headers.
+ * Only macOS: on Windows the title names the app in the taskbar and the
+ * window switcher, and it stays "CoBot". */
 export function useNativeTitle(title: string | undefined) {
   const desktop = useWindowFrame();
+  const mac = desktop?.platform === 'mac';
   const fullscreen = desktop?.fullscreen ?? false;
   useEffect(() => {
+    if (!mac) return;
     desktop?.setNativeTitle(fullscreen ? title ?? '' : '');
     return () => desktop?.setNativeTitle('');
-  }, [desktop, fullscreen, title]);
+  }, [desktop, mac, fullscreen, title]);
 }
 
 /** True on the macOS desktop: the head rows use the titlebar's 28px metrics

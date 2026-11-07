@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../../i18n';
 import DocumentCard from './DocumentCard';
 
-vi.mock('./Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
+vi.mock('../../components/content/Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
 
 const doc = '# 每日待办任务静态页面 · 用户确认\n\n### 链路\n\n1. 用户确认（用户）\n\n2. 实现（全栈工程师）';
 

@@ -237,9 +237,11 @@ func TestRealEngineThreadReachesItsProvider(t *testing.T) {
 	}
 }
 
-// A thread that has to run with another provider lets go of the one it was
-// started with: the engine ignores a provider for a thread it already holds.
-func TestRealEngineMovesAThreadToAnotherProvider(t *testing.T) {
+// A thread stays with the provider it started on: the engine refuses to load it
+// for another, which is why CoBot starts a new thread and hands over to it. The
+// new thread reaches the other provider while the first keeps its own, in one
+// engine.
+func TestRealEngineServesThreadsOnTwoProviders(t *testing.T) {
 	if os.Getenv("COBOT_R_SMOKE") != "1" {
 		t.Skip("set COBOT_R_SMOKE=1 to run the real engine provider check")
 	}
@@ -262,26 +264,20 @@ func TestRealEngineMovesAThreadToAnotherProvider(t *testing.T) {
 	}
 	alpha.waitForRequest(t, 45*time.Second)
 
-	// The team now runs with the other provider. The thread has to let go
-	// of the one it was started with before it can be loaded again.
-	if err := server.ArchiveThread(ctx, info.ThreadID); err != nil {
-		t.Fatalf("archive the thread: %v", err)
+	if _, err := server.ResumeThread(ctx, info.ThreadID, engine.ThreadSpec{
+		Cwd: "", Permission: "full", Model: "gpt-5-codex", ModelProvider: "beta",
+	}); err == nil {
+		t.Fatal("the engine moved a thread to another provider; CoBot's new thread and handover may no longer be needed")
 	}
-	if err := server.UnarchiveThread(ctx, info.ThreadID); err != nil {
-		t.Fatalf("unarchive the thread: %v", err)
-	}
-	resumed, err := server.ResumeThread(ctx, info.ThreadID, engine.ThreadSpec{
+	moved, err := server.StartThread(ctx, engine.ThreadSpec{
 		Cwd: "", Permission: "full", Model: "gpt-5-codex", ModelProvider: "beta",
 	})
 	if err != nil {
-		t.Fatalf("resume the thread with the other provider: %v", err)
-	}
-	if resumed.ModelProvider != "beta" {
-		t.Fatalf("the engine reported the provider %q, want beta", resumed.ModelProvider)
+		t.Fatalf("start a thread on the other provider: %v", err)
 	}
 	before := beta.hits
-	if _, err := server.StartTurn(ctx, info.ThreadID, "ping", engine.TurnOptions{Model: "gpt-5-codex"}); err != nil {
-		t.Fatalf("start a turn on the moved thread: %v", err)
+	if _, err := server.StartTurn(ctx, moved.ThreadID, "ping", engine.TurnOptions{Model: "gpt-5-codex"}); err != nil {
+		t.Fatalf("start a turn on the other provider: %v", err)
 	}
 	deadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(deadline) {

@@ -26,7 +26,7 @@ vi.mock('../../api/queries', () => ({
   useCancelRequirement: () => ({ mutate: state.cancelRequirement, isPending: false }),
   useRoles: () => ({ data: { items: state.roles } }),
 }));
-vi.mock('../conversations/Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
+vi.mock('../../components/content/Markdown', () => ({ default: ({ text }: { text: string }) => h('div', null, text) }));
 
 const confirm = {
   id: 'q1',

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -113,8 +114,8 @@ func TestRecruitmentApproveAddsMemberAndWakesLeader(t *testing.T) {
 	if !hasMessageText(messages, "你同意了招募申请") || !hasMessageText(messages, added.ID) {
 		t.Fatal("the project manager was not told the approval with the new member id")
 	}
-	if h.queuedForBot(t, pm.ID) != 1 {
-		t.Fatal("the result is not queued for the project manager's next turn")
+	if h.deliveriesForBot(t, pm.ID) != 1 {
+		t.Fatal("the result was not delivered to the project manager")
 	}
 }
 
@@ -170,6 +171,13 @@ func TestRecruitmentRefusesInvalidRoles(t *testing.T) {
 	refused(pm, []string{"fullstack-engineer"}, "error.team.role_present")
 	refused(pm, []string{"leader"}, "error.team.unknown_role")
 	refused(pm, []string{"no-such-role"}, "error.team.unknown_role")
+	// A guessed id is refused with the ids that would have worked.
+	guess := requestMember(t, h, pm, []string{"test-engineer"}, "需要测试")
+	errObj, _ := guess["error"].(map[string]any)
+	params, _ := errObj["params"].(map[string]any)
+	if got := fmt.Sprint(params["available"]); !strings.Contains(got, "qa-engineer") || strings.Contains(got, "fullstack-engineer") || strings.Contains(got, "leader") {
+		t.Fatalf("available = %s, want the roles the team can still recruit", got)
+	}
 	refused(dev, []string{"qa-engineer"}, "error.recruitment.leader_only")
 
 	// Two roles fit the default limit of six, but not a limit of two.
@@ -402,5 +410,25 @@ func TestPreviewRunsAndStopsInTheTeamDirectory(t *testing.T) {
 	}
 	if err := h.app.StopPreview(ctx, h.user, team.ID, command); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The project manager is told which roles it can still recruit, by the id
+// request_member takes, so it never has to guess one from a role's name.
+func TestLeaderIsToldTheRolesItCanRecruit(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	startTurn(t, h, fake, bots[0], "你好")
+	text := fake.Instructions()[0]
+	for _, want := range []string{"request_member({roleIds, reason})", "roleId=qa-engineer", "roleId=code-reviewer", "roleId=product-manager"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("leader instructions lack %q", want)
+		}
+	}
+	for _, unwanted := range []string{"roleId=fullstack-engineer", "roleId=leader"} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("leader instructions offer %q, which the team cannot recruit", unwanted)
+		}
 	}
 }

@@ -6,7 +6,7 @@
     "minimize": "最小化",
     "maximize": "最大化",
     "restore": "还原",
-    "close": "关闭"
+    "close": "退出 CoBot"
   },
   "common": {
     "close": "关闭",
@@ -79,7 +79,6 @@
     "deleteMember": "删除成员",
     "directoryOk": "目录可用：{{path}}",
     "directoryDuplicate": "该目录已被团队「{{teamName}}」绑定",
-    "directoryNested": "该目录与团队「{{teamName}}」的目录存在包含关系",
     "deleteConfirmTitle": "删除团队「{{name}}」？",
     "archiveConfirmTitle": "归档团队「{{name}}」？",
     "archiveConfirmBody": "归档后，团队会从团队列表移到“设置 › 已归档”，它的 Codex 进程会关闭，目录仍归它所有。会话和数据都保留，随时可以恢复。",
@@ -1305,7 +1304,6 @@
     "error.team.directory_archived": "该目录属于已归档的团队「{{teamName}}」，请先在“设置 › 已归档团队”中恢复它",
     "error.team.directory_claimed_external": "该目录已被另一个 CoBot 环境中的团队「{{teamName}}」使用，不能再创建新团队",
     "error.team.directory_claimed_unknown": "该目录已被另一个 CoBot 环境中的团队使用，不能再创建新团队",
-    "error.team.directory_nested": "该目录与团队「{{teamName}}」的目录存在包含关系",
     "error.team.member_limit": "请求 {{requested}} 名成员，超过上限 {{limit}}",
     "error.team.unknown_role": "未知角色：{{roleId}}",
     "error.team.archived": "团队已归档，无法发送消息",

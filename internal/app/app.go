@@ -7,18 +7,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
 	"errors"
+	"github.com/kunghim/CoBot/internal/app/core"
+	"github.com/kunghim/CoBot/internal/app/preview"
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/avatars"
 	"github.com/kunghim/CoBot/internal/browser"
 	"github.com/kunghim/CoBot/internal/domain"
 	"github.com/kunghim/CoBot/internal/engine"
-	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/events"
 	"github.com/kunghim/CoBot/internal/eventsink"
 	"github.com/kunghim/CoBot/internal/modelcatalog"
@@ -53,11 +53,11 @@ type App struct {
 	Updates *updates.Checker
 	// ModelCatalog knows models by id: their context, input and thinking.
 	ModelCatalog *modelcatalog.Store
-	// ClientCatalogs builds the catalog an engine is started with so it knows
-	// the third-party models' context windows.
-	ClientCatalogs *codex.CatalogBuilder
-	writeLocksMu   sync.Mutex
-	writeLocks     map[string]*writeLock
+	// Install finds this machine's engine and builds the catalog it is started
+	// with, so it knows the third-party models' context windows. Nil means there
+	// is no engine to find.
+	Install    engine.Installation
+	writeLocks core.WriteLocks
 
 	// Scheduler dispatches queued deliveries to team app-servers; it is
 	// assigned during composition so tests can inject a fake factory.
@@ -103,7 +103,7 @@ type App struct {
 	providerSyncMu sync.Mutex
 	// ControlFactory starts the profile-wide account/model app-server; it is
 	// injected during composition so tests can substitute a fake.
-	ControlFactory func(ctx context.Context, cwd string) (*codex.Server, error)
+	ControlFactory func(ctx context.Context, cwd string) (engine.Control, error)
 	// ProviderBinderFactory returns the engine that accepts model providers.
 	// It is separate from ControlFactory because the provider surface is
 	// optional: an engine that cannot take providers simply does not
@@ -119,11 +119,18 @@ type App struct {
 	Browser *browser.Manager
 	// browserGuideRead remembers the runs that have read the browser guide.
 	browserGuideRead sync.Map
-	// previewOnce builds the preview process table on first use; previews
-	// holds the "start and open" processes the user launched from acceptance
-	// cards, keyed by team and command.
-	previewOnce sync.Once
-	previews    *previewTable
+	// previews holds the "start and open" processes the user launched from
+	// acceptance cards.
+	previews preview.Table
+}
+
+// core is what the modules outside this package use to change data.
+func (a *App) core() core.Core {
+	return core.Core{
+		DB: a.DB, InstanceID: a.InstanceID, Hub: a.Hub, Events: a.Events, Logger: a.Logger,
+		Locks: &a.writeLocks, GapNoted: &a.eventGapNoted,
+		ValidateToolRun: a.ValidateToolRun, ValidateToolRunOn: a.validateToolRunOn,
+	}
 }
 
 // EngineStatusInfo is the cached non-secret engine projection.
@@ -268,59 +275,14 @@ func (a *App) ListEvents(ctx context.Context, principal auth.Principal, scope do
 	return evs, sqlite.NormalizeError(err)
 }
 
-// recordEvent appends a durable event in its own short transaction, then
-// mirrors it into the local ledger file. Subscribers never observe
-// uncommitted state; a saturated ledger records one gap event instead of
-// deleting un-imported evidence.
+// recordEvent appends a durable event; see core.Core.Record.
 func (a *App) recordEvent(ctx context.Context, ev domain.Event) error {
-	stored, err := a.insertEvent(ctx, ev)
-	if err != nil {
-		return err
-	}
-	if a.Events == nil {
-		return nil
-	}
-	if appendErr := a.Events.Append(stored); appendErr != nil {
-		if errors.Is(appendErr, eventsink.ErrOverCapacity) && a.eventGapNoted.CompareAndSwap(false, true) {
-			// The file budget is spent on un-imported evidence: the gap is
-			// recorded in the database (the durable store), never by
-			// deleting the evidence that is still only on disk.
-			if _, gapErr := a.insertEvent(ctx, domain.Event{
-				ID: domain.NewID(), Type: domain.EventLogGap, ResourceID: "events",
-				Payload: mustJSON(map[string]any{"reason": "over_capacity"}),
-			}); gapErr == nil {
-				a.Hub.Publish()
-			}
-		}
-		if a.Logger != nil {
-			a.Logger.Warn("append event to local ledger", "error", appendErr)
-		}
-	}
-	return nil
+	return a.core().Record(ctx, ev)
 }
 
-// insertEvent is recordEvent without the ledger mirror; it exists so the gap
-// event itself never recurses into appending.
+// insertEvent is recordEvent without the ledger mirror.
 func (a *App) insertEvent(ctx context.Context, ev domain.Event) (domain.Event, error) {
-	tx, err := a.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Event{}, fmt.Errorf("begin event tx: %w", err)
-	}
-	defer tx.Rollback()
-	stored, err := sqlite.InsertEvent(ctx, tx, a.InstanceID, ev)
-	if err != nil {
-		return domain.Event{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return domain.Event{}, fmt.Errorf("commit event: %w", err)
-	}
-	return stored, nil
+	return a.core().Insert(ctx, ev)
 }
 
-func mustJSON(v any) json.RawMessage {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return json.RawMessage(`{}`)
-	}
-	return data
-}
+func mustJSON(v any) json.RawMessage { return core.MustJSON(v) }

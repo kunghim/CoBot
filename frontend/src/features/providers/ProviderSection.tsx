@@ -20,8 +20,7 @@ import { desktopBridge } from '../../platform/native-bridge';
 import AddProviderDialog, { CODEX_DIALECT, engineOf, presetName, providerMark } from './AddProviderDialog';
 import { isOfficial } from './providerModels';
 import { useChatGPTAccount } from './useChatGPTAccount';
-import type { SectionProps } from '../settings/SettingsSections';
-import { DefaultModelCard } from '../settings/SettingsSections';
+import { DefaultModelCard, type ModelSettingsProps } from './DefaultModelCard';
 
 /** The ChatGPT account's own sign-in controls. */
 function AccountControls({ t }: { t: TFunction }) {
@@ -214,7 +213,7 @@ function ModelCatalogCard() {
   );
 }
 
-export default function ProviderSection({ settings, save, errors }: SectionProps) {
+export default function ProviderSection({ settings, save, errors }: ModelSettingsProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const providers = useProviders();

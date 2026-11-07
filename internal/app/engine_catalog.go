@@ -6,19 +6,19 @@ import (
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
-	"github.com/kunghim/CoBot/internal/engine/codex"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // clientModels are the third-party models the engine has to know: every model
 // of every provider the user configured, as the model catalog and the user's
 // entries describe it.
-func (a *App) clientModels(ctx context.Context) []codex.ClientModel {
+func (a *App) clientModels(ctx context.Context) []engine.ClientModel {
 	providers, err := sqlite.ListProviders(ctx, a.DB)
 	if err != nil {
 		return nil
 	}
-	best := map[string]codex.ClientModel{}
+	best := map[string]engine.ClientModel{}
 	for _, p := range providers {
 		if p.AuthMode == domain.ProviderAuthChatGPT {
 			continue
@@ -28,7 +28,7 @@ func (a *App) clientModels(ctx context.Context) []codex.ClientModel {
 			if spec.ContextWindow <= 0 {
 				continue
 			}
-			entry := codex.ClientModel{
+			entry := engine.ClientModel{
 				Slug:          model.ID,
 				Name:          spec.DisplayName,
 				ContextWindow: spec.ContextWindow,
@@ -44,7 +44,7 @@ func (a *App) clientModels(ctx context.Context) []codex.ClientModel {
 			}
 		}
 	}
-	out := make([]codex.ClientModel, 0, len(best))
+	out := make([]engine.ClientModel, 0, len(best))
 	for _, entry := range best {
 		out = append(out, entry)
 	}
@@ -56,20 +56,19 @@ func (a *App) clientModels(ctx context.Context) []codex.ClientModel {
 // one means none is needed; an error means it could not be made, and the
 // engine then starts without it (the models keep the engine's own fallback
 // window).
-func (a *App) EngineCatalog(ctx context.Context) (codex.ClientCatalog, error) {
-	if a.ClientCatalogs == nil {
-		return codex.ClientCatalog{}, nil
+func (a *App) EngineCatalog(ctx context.Context) (engine.Catalog, error) {
+	if a.Install == nil {
+		return engine.Catalog{}, nil
 	}
 	settings, err := a.GetSettings(ctx)
 	if err != nil {
-		return codex.ClientCatalog{}, err
+		return engine.Catalog{}, err
 	}
-	binary, err := codex.Locate(settings.EnginePath)
+	binary, err := a.Install.Locate(settings.EnginePath)
 	if err != nil {
-		return codex.ClientCatalog{}, err
+		return engine.Catalog{}, err
 	}
-	catalog, _, err := a.ClientCatalogs.Build(ctx, binary, codex.EngineEnv(a.Paths, nil), a.clientModels(ctx))
-	return catalog, err
+	return a.Install.BuildCatalog(ctx, binary, a.clientModels(ctx))
 }
 
 // EngineCatalogState says how the running engines stand against the catalog now wanted.
@@ -113,7 +112,7 @@ func (a *App) ApplyEngineCatalog(ctx context.Context, principal auth.Principal) 
 	}
 	catalog, err := a.EngineCatalog(ctx)
 	if err != nil {
-		catalog = codex.ClientCatalog{}
+		catalog = engine.Catalog{}
 	}
 	stopped, busy := a.Scheduler.RestartStaleEngines(ctx, catalog.Fingerprint)
 	return ApplyEngineCatalogResult{Restarted: stopped, Busy: busy}, nil

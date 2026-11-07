@@ -36,14 +36,16 @@ func TestTransportFailureReapsOwnedProcessBeforeHostCallback(t *testing.T) {
 	host := make(chan struct{})
 	server := &Server{cmd: cmd, callbacks: engine.Callbacks{OnExit: func(error) { close(host) }}}
 	server.client = NewClient(in, out, ClientHooks{OnExit: server.transportExited})
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	// Long enough for the write to begin on a loaded machine: a call whose time
+	// runs out before that leaves the stream intact and fails nothing.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if err := server.client.Call(ctx, "large", strings.Repeat("x", 1<<20), nil); err == nil {
 		t.Fatal("blocked write succeeded")
 	}
 	select {
 	case <-host:
-	case <-time.After(3 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("host never observed reaped transport failure")
 	}
 	if cmd.ProcessState == nil {

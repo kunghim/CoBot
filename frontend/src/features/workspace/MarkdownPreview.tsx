@@ -4,7 +4,7 @@ import { api } from '../../api/client';
 import type { WorkspaceFile, WorkspaceScope } from '../../api/types';
 import { EmptyState, Spinner } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
-import Markdown from '../conversations/Markdown';
+import Markdown from '../../components/content/Markdown';
 import { scopeKey } from './fileNavigation';
 
 export default function MarkdownPreview({ scope, file }: { scope: WorkspaceScope; file: WorkspaceFile }) {

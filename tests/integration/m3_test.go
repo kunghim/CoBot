@@ -37,10 +37,9 @@ func TestAskUserDeliversAnswerToAsker(t *testing.T) {
 		t.Fatal("answer must be linked to the user message it delivered")
 	}
 
-	// The asking bot has a queued user message carrying the answer.
-	queued := h.queuedForBot(t, asker.ID)
-	if queued != 1 {
-		t.Fatalf("asking bot queued deliveries = %d, want 1", queued)
+	// The asking bot was delivered a user message carrying the answer.
+	if delivered := h.deliveriesForBot(t, asker.ID); delivered != 1 {
+		t.Fatalf("asking bot deliveries = %d, want 1", delivered)
 	}
 
 	// A second answer is refused; the question is decided exactly once.
