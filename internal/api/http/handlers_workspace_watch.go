@@ -83,3 +83,24 @@ func (s *Server) handleWorkspaceWatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// Ephemeral workspace work must stop before HTTP shutdown waits for handlers.
+func (s *Server) workspaceTaskContext(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	select {
+	case <-s.StreamStop:
+		cancel()
+		return ctx, cancel
+	default:
+	}
+	if s.StreamStop != nil {
+		go func() {
+			select {
+			case <-s.StreamStop:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+	return ctx, cancel
+}

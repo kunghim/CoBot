@@ -269,8 +269,6 @@ func kind(name string, sample []byte) string {
 		return "presentation"
 	case ".ipynb":
 		return "notebook"
-	case ".tex":
-		return "latex"
 	case ".doc", ".xls", ".ppt", ".rtf", ".pages", ".numbers", ".key", ".odt", ".ods", ".odp", ".tif", ".tiff":
 		return "binary"
 	}

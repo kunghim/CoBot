@@ -726,17 +726,6 @@
       "cancelSearch": "取消查找",
       "pdfFindAction": "查找",
       "directoryCycle": "此目录指向已显示的上级目录。",
-      "latexCandidates": "主文件候选",
-      "latexChoose": "请选择或输入项目内的主文件路径",
-      "latexMain": "主文件",
-      "latexCompile": "编译 PDF",
-      "latexCancel": "取消编译",
-      "latexTruncated": "已达到候选扫描上限；可直接输入其他主文件路径。",
-      "latexPrevious": "保留上次成功的 PDF。",
-      "latexCompiled": "上次编译：{{main}}",
-      "latexStale": "文件或主文件已变化，请重新编译",
-      "latexLog": "编译日志",
-      "latexLogTruncated": "日志已截断",
       "officeTooLarge": "此文件超过 10 MiB 预览上限，可用系统打开。"
     },
     "tablist": "工作区",
@@ -1456,13 +1445,7 @@
     "error.question.not_recruitment": "这张卡不是招募申请",
     "error.question.recruitment_decision": "招募申请需要选择「同意加入」或「拒绝」",
     "error.question.recruitment_decide": "招募申请不能忽略，请选择同意或拒绝",
-    "error.workspace.watch_unavailable": "自动文件更新暂不可用，请手动刷新。",
-    "error.workspace.latex_unavailable": "LaTeX 预览需要可用的隔离编译器和离线资源；仍可查看源码。",
-    "error.workspace.latex_busy": "其他文档正在编译，请稍后重试。",
-    "error.workspace.latex_failed": "编译失败，请查看日志并检查主文件。",
-    "error.workspace.latex_timeout": "编译超时，请检查文档或缩小编译范围。",
-    "error.workspace.latex_output_limit": "编译输出超过预览上限。",
-    "error.workspace.latex_too_large": "LaTeX 主文件超过 10 MiB 编译上限；仍可查看源码。"
+    "error.workspace.watch_unavailable": "自动文件更新暂不可用，请手动刷新。"
   },
   "paging": {
     "more": "继续加载",

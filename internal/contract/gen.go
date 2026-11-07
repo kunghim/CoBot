@@ -559,7 +559,6 @@ const (
 	WorkspaceFileKindDocument     WorkspaceFileKind = "document"
 	WorkspaceFileKindHtml         WorkspaceFileKind = "html"
 	WorkspaceFileKindImage        WorkspaceFileKind = "image"
-	WorkspaceFileKindLatex        WorkspaceFileKind = "latex"
 	WorkspaceFileKindMarkdown     WorkspaceFileKind = "markdown"
 	WorkspaceFileKindNotebook     WorkspaceFileKind = "notebook"
 	WorkspaceFileKindPdf          WorkspaceFileKind = "pdf"
@@ -679,18 +678,6 @@ const (
 const (
 	GetWorkspaceFileParamsScopeChat GetWorkspaceFileParamsScope = "chat"
 	GetWorkspaceFileParamsScopeTeam GetWorkspaceFileParamsScope = "team"
-)
-
-// Defines values for GetWorkspaceLatexProjectParamsScope.
-const (
-	GetWorkspaceLatexProjectParamsScopeChat GetWorkspaceLatexProjectParamsScope = "chat"
-	GetWorkspaceLatexProjectParamsScopeTeam GetWorkspaceLatexProjectParamsScope = "team"
-)
-
-// Defines values for CompileWorkspaceLatexParamsScope.
-const (
-	CompileWorkspaceLatexParamsScopeChat CompileWorkspaceLatexParamsScope = "chat"
-	CompileWorkspaceLatexParamsScopeTeam CompileWorkspaceLatexParamsScope = "team"
 )
 
 // Defines values for WatchWorkspaceParamsScope.
@@ -1961,24 +1948,6 @@ type WorkspaceFile struct {
 // WorkspaceFileKind defines model for WorkspaceFile.Kind.
 type WorkspaceFileKind string
 
-// WorkspaceLatexProject defines model for WorkspaceLatexProject.
-type WorkspaceLatexProject struct {
-	Available  bool            `json:"available"`
-	Candidates []WorkspaceFile `json:"candidates"`
-	Suggested  string          `json:"suggested"`
-	Truncated  bool            `json:"truncated"`
-}
-
-// WorkspaceLatexResult defines model for WorkspaceLatexResult.
-type WorkspaceLatexResult struct {
-	ErrorKey     *string `json:"errorKey,omitempty"`
-	Log          string  `json:"log"`
-	LogTruncated bool    `json:"logTruncated"`
-	Main         string  `json:"main"`
-	Pdf          *[]byte `json:"pdf,omitempty"`
-	Success      bool    `json:"success"`
-}
-
 // Error defines model for Error.
 type Error = ErrorEnvelope
 
@@ -2558,23 +2527,6 @@ type GetWorkspaceFileParams struct {
 // GetWorkspaceFileParamsScope defines parameters for GetWorkspaceFile.
 type GetWorkspaceFileParamsScope string
 
-// GetWorkspaceLatexProjectParams defines parameters for GetWorkspaceLatexProject.
-type GetWorkspaceLatexProjectParams struct {
-	Path string `form:"path" json:"path"`
-}
-
-// GetWorkspaceLatexProjectParamsScope defines parameters for GetWorkspaceLatexProject.
-type GetWorkspaceLatexProjectParamsScope string
-
-// CompileWorkspaceLatexJSONBody defines parameters for CompileWorkspaceLatex.
-type CompileWorkspaceLatexJSONBody struct {
-	Main      string `json:"main"`
-	RequestId string `json:"requestId"`
-}
-
-// CompileWorkspaceLatexParamsScope defines parameters for CompileWorkspaceLatex.
-type CompileWorkspaceLatexParamsScope string
-
 // WatchWorkspaceJSONBody defines parameters for WatchWorkspace.
 type WatchWorkspaceJSONBody struct {
 	Paths     []string `json:"paths"`
@@ -2776,9 +2728,6 @@ type WarmTeamJSONRequestBody WarmTeamJSONBody
 
 // CheckForUpdateJSONRequestBody defines body for CheckForUpdate for application/json ContentType.
 type CheckForUpdateJSONRequestBody CheckForUpdateJSONBody
-
-// CompileWorkspaceLatexJSONRequestBody defines body for CompileWorkspaceLatex for application/json ContentType.
-type CompileWorkspaceLatexJSONRequestBody CompileWorkspaceLatexJSONBody
 
 // WatchWorkspaceJSONRequestBody defines body for WatchWorkspace for application/json ContentType.
 type WatchWorkspaceJSONRequestBody WatchWorkspaceJSONBody

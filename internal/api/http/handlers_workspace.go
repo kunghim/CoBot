@@ -67,7 +67,7 @@ func (s *Server) handleWorkspaceContent(w http.ResponseWriter, r *http.Request) 
 
 func workspaceContentType(kind, name string) string {
 	switch kind {
-	case "text", "markdown", "html", "latex", "notebook":
+	case "text", "markdown", "html", "notebook":
 		return "text/plain; charset=utf-8"
 	case "pdf":
 		return "application/pdf"

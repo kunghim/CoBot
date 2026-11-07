@@ -2,7 +2,6 @@ import { Database, Gauge, Timer } from 'lucide-react';
 import { ReplyFileRow } from '../features/conversations/ResourceStrip';
 import { TableContents } from '../features/workspace/TablePreview';
 import { WorkbookContents } from '../features/workspace/WorkbookPreview';
-import { LatexToolbar } from '../features/workspace/LatexToolbar';
 import { DocumentToolbar } from '../features/workspace/DocumentToolbar';
 import { PresentationToolbar } from '../features/workspace/PresentationToolbar';
 import { PDFSearchBar } from '../features/workspace/PDFSearchBar';
@@ -76,10 +75,6 @@ export default function ChatPatterns() {
     </Doc>
     <Doc id="reply-resources" name="回复文件资源" file="features/conversations/ResourceStrip.tsx" use="回复结束后显示经服务端确认的文件；打开时复用工作区标签页。">
       <Demo><List><ReplyFileRow item={{ target: 'docs/readme.md', file: { path: 'docs/readme.md', name: 'readme.md', kind: 'text', size: 120, version: 'demo', modifiedAt: '2026-10-26T00:00:00Z' } }} onOpen={() => setChangeFile('docs/readme.md')} /></List><p className="mt-2 text-xs text-neutral-500">已选择：{changeFile}</p></Demo>
-    </Doc>
-    <Doc id="latex-preview" name="LaTeX 编译与主文件" file="features/workspace/LatexToolbar.tsx" use="明确选择主文件、编译或取消，并在源码与上次成功的 PDF 之间切换。">
-      <Demo><LatexToolbar main="main.tex" candidates={['main.tex', 'appendix.tex']} available pending={false} source hasPDF onMain={() => undefined} onCompile={() => undefined} onCancel={() => undefined} onSource={() => undefined} /></Demo>
-      <Demo title="编译中"><LatexToolbar main="main.tex" candidates={[]} available pending source hasPDF={false} onMain={() => undefined} onCompile={() => undefined} onCancel={() => undefined} onSource={() => undefined} /></Demo>
     </Doc>
     <Doc id="pptx-preview" name="幻灯片导航" file="features/workspace/PresentationToolbar.tsx" use="从幻灯片列表选择或逐页查看，支持缩放与适应窗口。">
       <Demo><PresentationToolbar slides={['Overview', 'Details', 'Summary']} page={slidePage} zoom={pdfZoom} onPage={setSlidePage} onZoom={(value) => setPDFZoom(value ?? 1)} /></Demo>

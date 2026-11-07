@@ -364,5 +364,3 @@ export interface QuestionListResult {
 }
 
 
-export type WorkspaceLatexProject = components['schemas']['WorkspaceLatexProject'];
-export type WorkspaceLatexResult = components['schemas']['WorkspaceLatexResult'];

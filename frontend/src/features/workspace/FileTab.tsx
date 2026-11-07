@@ -13,7 +13,6 @@ import type { WorkspaceTab } from './state';
 import { useWorkspaceWatch } from './useWorkspaceWatch';
 import { useWorkspace } from './WorkspaceProvider';
 
-const LatexPreview = lazy(() => import('./LatexPreview'));
 const PPTXPreview = lazy(() => import('./PPTXPreview'));
 const DOCXPreview = lazy(() => import('./DOCXPreview'));
 const WorkbookPreview = lazy(() => import('./WorkbookPreview'));
@@ -107,7 +106,7 @@ function FilePreview({ scope, file, view, onView }: { scope: WorkspaceScope; fil
   const [source, setSource] = useState(!!view.line);
   useEffect(() => { if (view.line) setSource(true); }, [view.positionId]);
   const delimited = file.kind === 'spreadsheet' && /\.(csv|tsv)$/i.test(file.name);
-  const canSource = delimited || ['text', 'markdown', 'html', 'svg', 'latex', 'notebook'].includes(file.kind);
+  const canSource = delimited || ['text', 'markdown', 'html', 'svg', 'notebook'].includes(file.kind);
   if (file.size > 256 * 1024 * 1024) return <EmptyState title={t('workspace.files.tooLarge')} />;
   const image = file.kind === 'image' || file.kind === 'svg' && !source;
   return <div className="flex h-full min-h-0 flex-col">
@@ -115,7 +114,7 @@ function FilePreview({ scope, file, view, onView }: { scope: WorkspaceScope; fil
       <span>{t('workspace.files.readOnly')} · {new Intl.NumberFormat().format(file.size)} B</span>
       {(delimited || file.kind === 'svg' || file.kind === 'markdown' || file.kind === 'notebook' || file.kind === 'html') && <Button size="sm" variant="ghost" onClick={() => setSource(!source)}>{t(source ? 'workspace.files.preview' : 'workspace.files.source')}</Button>}
     </div>
-    <div className="min-h-0 flex-1"><Suspense fallback={<Spinner label={t('common.loading')} />}>{file.kind === 'latex' ? <LatexPreview scope={scope} file={file} view={view} onView={onView} /> : file.kind === 'presentation' ? <PPTXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'document' ? <DOCXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'spreadsheet' && !delimited ? <WorkbookPreview scope={scope} file={file} /> : delimited && !source ? <TablePreview scope={scope} file={file} /> : file.kind === 'pdf' ? <PDFPreview scope={scope} file={file} /> : file.kind === 'html' && !source ? <HTMLPreview scope={scope} file={file} /> : file.kind === 'notebook' && !source ? <NotebookPreview scope={scope} file={file} /> : file.kind === 'audio' || file.kind === 'video' ? <MediaPreview scope={scope} file={file} /> : image ? <ImagePreview scope={scope} file={file} /> : file.kind === 'markdown' && !source ? <MarkdownPreview scope={scope} file={file} /> : canSource ? <SourcePreview scope={scope} file={file} view={view} onView={onView} /> : <EmptyState title={t('workspace.files.unsupported')} />}</Suspense></div>
+    <div className="min-h-0 flex-1"><Suspense fallback={<Spinner label={t('common.loading')} />}>{file.kind === 'presentation' ? <PPTXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'document' ? <DOCXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'spreadsheet' && !delimited ? <WorkbookPreview scope={scope} file={file} /> : delimited && !source ? <TablePreview scope={scope} file={file} /> : file.kind === 'pdf' ? <PDFPreview scope={scope} file={file} /> : file.kind === 'html' && !source ? <HTMLPreview scope={scope} file={file} /> : file.kind === 'notebook' && !source ? <NotebookPreview scope={scope} file={file} /> : file.kind === 'audio' || file.kind === 'video' ? <MediaPreview scope={scope} file={file} /> : image ? <ImagePreview scope={scope} file={file} /> : file.kind === 'markdown' && !source ? <MarkdownPreview scope={scope} file={file} /> : canSource ? <SourcePreview scope={scope} file={file} view={view} onView={onView} /> : <EmptyState title={t('workspace.files.unsupported')} />}</Suspense></div>
   </div>;
 }
 

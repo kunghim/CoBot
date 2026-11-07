@@ -11,65 +11,6 @@ info:
 servers:
   - url: http://127.0.0.1:0
 paths:
-  /api/v1/workspaces/{scope}/{id}/latex:
-    get:
-      operationId: getWorkspaceLatexProject
-      description: Bounded read-only discovery of TeX main files for the selected file.
-      security:
-        - SessionCookie: []
-      parameters:
-        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
-        - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: path, in: query, required: true, schema: { type: string, maxLength: 4096 } }
-      responses:
-        "200":
-          description: Canonical main-file candidates and compiler availability.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - { $ref: "#/components/schemas/Envelope" }
-                  - type: object
-                    required: [data]
-                    properties:
-                      data: { $ref: "#/components/schemas/WorkspaceLatexProject" }
-        default:
-          $ref: "#/components/responses/Error"
-    post:
-      operationId: compileWorkspaceLatex
-      description: >
-        Ephemeral isolated compilation, not a durable business command. Only one
-        compilation runs per core; disconnect cancels it. No automatic downloads.
-        TeX failures return success=false with bounded diagnostics and no PDF.
-      security:
-        - SessionCookie: []
-      parameters:
-        - { name: scope, in: path, required: true, schema: { type: string, enum: [team, chat] } }
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [requestId, main]
-              properties:
-                requestId: { type: string }
-                main: { type: string, minLength: 1, maxLength: 4096 }
-      responses:
-        "200":
-          description: Compilation result; PDF bytes are base64 and limited to 32 MiB decoded.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - { $ref: "#/components/schemas/Envelope" }
-                  - type: object
-                    required: [data]
-                    properties:
-                      data: { $ref: "#/components/schemas/WorkspaceLatexResult" }
-        default:
-          $ref: "#/components/responses/Error"
   /api/v1/workspaces/{scope}/{id}/watch:
     post:
       operationId: watchWorkspace
@@ -5023,33 +4964,13 @@ components:
         file: { $ref: "#/components/schemas/WorkspaceChangeFile" }
         diff: { type: string }
         diffTruncated: { type: boolean }
-    WorkspaceLatexProject:
-      type: object
-      required: [candidates, suggested, truncated, available]
-      properties:
-        candidates:
-          type: array
-          items: { $ref: "#/components/schemas/WorkspaceFile" }
-        suggested: { type: string }
-        truncated: { type: boolean }
-        available: { type: boolean }
-    WorkspaceLatexResult:
-      type: object
-      required: [success, log, logTruncated, main]
-      properties:
-        success: { type: boolean }
-        log: { type: string, maxLength: 131072 }
-        logTruncated: { type: boolean }
-        main: { type: string }
-        pdf: { type: string, format: byte }
-        errorKey: { type: string }
     WorkspaceFile:
       type: object
       required: [path, name, kind, size, modifiedAt, version]
       properties:
         path: { type: string, description: Canonical path relative to the workspace root. }
         name: { type: string }
-        kind: { type: string, enum: [directory, text, markdown, html, svg, image, pdf, audio, video, document, spreadsheet, presentation, notebook, latex, binary, blocked] }
+        kind: { type: string, enum: [directory, text, markdown, html, svg, image, pdf, audio, video, document, spreadsheet, presentation, notebook, binary, blocked] }
         size: { type: integer, format: int64 }
         modifiedAt: { type: string, format: date-time }
         version: { type: string }

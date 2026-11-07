@@ -4,24 +4,6 @@
  */
 
 export interface paths {
-    "/api/v1/workspaces/{scope}/{id}/latex": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Bounded read-only discovery of TeX main files for the selected file. */
-        get: operations["getWorkspaceLatexProject"];
-        put?: never;
-        /** @description Ephemeral isolated compilation, not a durable business command. Only one compilation runs per core; disconnect cancels it. No automatic downloads. TeX failures return success=false with bounded diagnostics and no PDF. */
-        post: operations["compileWorkspaceLatex"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/workspaces/{scope}/{id}/watch": {
         parameters: {
             query?: never;
@@ -2705,27 +2687,12 @@ export interface components {
             diff: string;
             diffTruncated: boolean;
         };
-        WorkspaceLatexProject: {
-            candidates: components["schemas"]["WorkspaceFile"][];
-            suggested: string;
-            truncated: boolean;
-            available: boolean;
-        };
-        WorkspaceLatexResult: {
-            success: boolean;
-            log: string;
-            logTruncated: boolean;
-            main: string;
-            /** Format: byte */
-            pdf?: string;
-            errorKey?: string;
-        };
         WorkspaceFile: {
             /** @description Canonical path relative to the workspace root. */
             path: string;
             name: string;
             /** @enum {string} */
-            kind: "directory" | "text" | "markdown" | "html" | "svg" | "image" | "pdf" | "audio" | "video" | "document" | "spreadsheet" | "presentation" | "notebook" | "latex" | "binary" | "blocked";
+            kind: "directory" | "text" | "markdown" | "html" | "svg" | "image" | "pdf" | "audio" | "video" | "document" | "spreadsheet" | "presentation" | "notebook" | "binary" | "blocked";
             /** Format: int64 */
             size: number;
             /** Format: date-time */
@@ -2759,67 +2726,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getWorkspaceLatexProject: {
-        parameters: {
-            query: {
-                path: string;
-            };
-            header?: never;
-            path: {
-                scope: "team" | "chat";
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Canonical main-file candidates and compiler availability. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data: components["schemas"]["WorkspaceLatexProject"];
-                    };
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    compileWorkspaceLatex: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scope: "team" | "chat";
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    requestId: string;
-                    main: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Compilation result; PDF bytes are base64 and limited to 32 MiB decoded. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Envelope"] & {
-                        data: components["schemas"]["WorkspaceLatexResult"];
-                    };
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     watchWorkspace: {
         parameters: {
             query?: never;

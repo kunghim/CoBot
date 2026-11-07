@@ -252,7 +252,7 @@ func TestDirectoryPaginationAndHiddenFiles(t *testing.T) {
 
 func TestClassificationAndSize(t *testing.T) {
 	root := t.TempDir()
-	for name, want := range map[string]string{"README": "text", "script.sh": "text", "file.unknown": "text", "a.md": "markdown", "a.svg": "svg", "a.docx": "document", "a.xlsm": "spreadsheet", "a.pptx": "presentation", "a.ipynb": "notebook", "a.tex": "latex", "a.pdf": "pdf", "a.tiff": "binary", "a.mp4": "video", "a.opus": "audio"} {
+	for name, want := range map[string]string{"README": "text", "script.sh": "text", "file.unknown": "text", "a.md": "markdown", "a.svg": "svg", "a.docx": "document", "a.xlsm": "spreadsheet", "a.pptx": "presentation", "a.ipynb": "notebook", "a.tex": "text", "a.pdf": "pdf", "a.tiff": "binary", "a.mp4": "video", "a.opus": "audio"} {
 		fixture(t, root, name, "sample")
 		f, err := Open(root, name)
 		if err != nil {
