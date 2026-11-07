@@ -113,6 +113,14 @@ var recordingLogFilter = []string{
 	"codex_core_plugins=warn",
 }
 
+// engineOverrides are settings every CoBot engine runs with.
+//
+// features.apps: with a ChatGPT sign-in, Codex hands every thread the apps
+// connected to that account (codex_apps), its own web search among them. A
+// member would then reach the user's mail or drive, and turning web search
+// off for a model would not stop it searching.
+var engineOverrides = []string{"-c", "features.apps=false"}
+
 // Start spawns the app-server, performs the handshake and returns a ready
 // server. The process cwd is the team directory by design: workspace-write
 // covers the startup cwd, so the boundary is set here, not per request.
@@ -126,7 +134,8 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
+	args := append([]string{"app-server", "--stdio"}, engineOverrides...)
+	args = append(args, opts.ExtraArgs...)
 	args = append(args, opts.Catalog.CatalogArgs()...)
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second

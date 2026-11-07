@@ -142,6 +142,8 @@ func (s *Scheduler) Start() {
 			case <-leaseTicker.C:
 				s.app.RefreshLeases(s.ctx)
 				s.stopIdleEngines(s.ctx)
+				s.app.CheckTeamDirectories(s.ctx)
+				s.releaseMissingFolders(s.ctx)
 			}
 		}
 	}()
@@ -883,6 +885,25 @@ func (s *Scheduler) stopIdleEngines(ctx context.Context) {
 	s.mu.Unlock()
 	for _, teamID := range idle {
 		s.stopIfIdle(ctx, teamID, cutoff)
+	}
+}
+
+// releaseMissingFolders stops the idle engines of teams whose folder is gone.
+// The engine runs in the team folder, and Windows will not remove a folder a
+// process works in: moving a project away would otherwise leave an empty
+// shell of it behind for as long as the engine lives.
+func (s *Scheduler) releaseMissingFolders(ctx context.Context) {
+	s.mu.Lock()
+	running := make([]string, 0, len(s.teams))
+	for teamID := range s.teams {
+		running = append(running, teamID)
+	}
+	s.mu.Unlock()
+	for _, teamID := range running {
+		team, _, err := sqlite.GetTeam(ctx, s.app.DB, teamID)
+		if err == nil && team.Status == domain.TeamStatusDirectoryMissing {
+			s.stopIfIdle(ctx, teamID, math.MaxInt64)
+		}
 	}
 }
 

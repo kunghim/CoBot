@@ -502,9 +502,13 @@ func (a *App) refuseClaimedDirectory(ctx context.Context, dir string) error {
 	return domain.Conflict(key, map[string]any{"teamId": claim["teamId"], "teamName": claim["teamName"], "directory": dir})
 }
 
-// CheckTeamDirectories checks every live team's folder. It runs at startup
-// and whenever the team list is loaded, so the list a user looks at is
-// always honest; dispatch checks its own team before every turn.
+// CheckTeamDirectories checks every live team's folder. It runs at startup,
+// whenever the team list is loaded and on the scheduler's tick, and dispatch
+// checks its own team before every turn. The tick is what keeps an open page
+// honest: an idle team whose folder goes shows as missing without the user
+// trying to send, and a missing team takes no messages, so without the tick
+// a folder put back would not bring it back. Each check is a stat and a read
+// of the small marker file.
 func (a *App) CheckTeamDirectories(ctx context.Context) {
 	teams, err := sqlite.ListTeams(ctx, a.DB)
 	if err != nil {
@@ -527,7 +531,7 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 		return team
 	}
 	info, statErr := os.Stat(team.Directory)
-	present := team.Directory != "" && statErr == nil && info.IsDir()
+	present := team.Directory != "" && statErr == nil && info.IsDir() && !folderEmptied(team.Directory)
 	if present {
 		marker, has, err := readTeamMarker(team.Directory)
 		ours := err == nil && (!has || (marker.InstanceID == a.InstanceID && marker.TeamID == team.ID))
@@ -562,6 +566,15 @@ func (a *App) checkTeamDirectory(ctx context.Context, team domain.Team) domain.T
 	}
 	a.Hub.Publish()
 	return updated
+}
+
+// folderEmptied reports a team folder with nothing left in it, not even the
+// marker CoBot wrote when the team was made. That is what a project moved or
+// deleted away leaves when the folder itself could not go: the team counts it
+// as gone instead of filling the shell again.
+func folderEmptied(directory string) bool {
+	entries, err := os.ReadDir(directory)
+	return err == nil && len(entries) == 0
 }
 
 // teamMarkerSettle is how long a folder must have been quiet before its lost

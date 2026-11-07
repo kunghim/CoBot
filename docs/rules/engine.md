@@ -4,6 +4,8 @@
 
 - CoBot 只管理自己的私有 Codex 环境（数据根下的 `CODEX_HOME`）。启动引擎时不继承用户已有的 `CODEX_HOME` 或供应商密钥，
   不读写用户日常的 Codex 状态。
+- 引擎启动时固定带 `-c features.apps=false`。Codex 默认开启这个功能：登录 ChatGPT 后，每个线程都能用到这个账号接入的应用，
+  包括 Codex 自带的搜索。不关掉的话，成员能碰到用户的邮箱、云盘，给模型关了联网搜索也拦不住它搜索。
 - 只运行 ChatGPT 桌面端内置的 Codex，不从 PATH、standalone、npm、Cargo 或 Homebrew 回退。macOS 按应用包身份发现，Windows 按已安装 Store 包元数据发现；其他平台暂不自动发现。手动路径也必须属于桌面端应用包，符号链接解析后仍须在包内。找不到时提示安装或更新桌面端，不自动安装、不改用户的 shell 或 PATH。
 - Windows 桌面端仍使用 `OpenAI.Codex` 包身份，见[官方部署文档](https://learn.chatgpt.com/docs/enterprise/windows-deployment)；应用显示名称与安装包身份不能混用。
 - 协议有变化时先运行 `cobot trace protocol`，对照 `internal/engine/codex/protocol_baseline.json`（已处理的方法见 `handled.go`），

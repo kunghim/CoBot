@@ -481,3 +481,80 @@ func TestCreateTeamIsAtomic(t *testing.T) {
 		t.Fatalf("marker after create: %v", err)
 	}
 }
+
+// An open page has to show a folder going and coming back without the user
+// doing anything: an idle team is not dispatched, and a team without its
+// folder takes no messages, so nothing else would look at it again.
+func TestTeamComesBackWhenItsFolderIsPutBack(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
+	status := func() string {
+		current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return current.Status
+	}
+	away := h.teamDir + "-away"
+	if err := os.Rename(h.teamDir, away); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "team marked missing", func() bool { return status() == domain.TeamStatusDirectoryMissing })
+	if _, err := os.Stat(h.teamDir); !os.IsNotExist(err) {
+		t.Fatalf("the folder was made again: %v", err)
+	}
+	if err := os.Rename(away, h.teamDir); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "team active again", func() bool { return status() == domain.TeamStatusActive })
+}
+
+// Moving a project away can leave its folder behind, empty, when a process
+// still works in it. That shell is not the project: the team counts it as
+// gone and does not fill it with a new marker.
+func TestAnEmptiedFolderCountsAsGone(t *testing.T) {
+	h := newM2Harness(t)
+	ctx := context.Background()
+	team, _ := h.createTeam(t, []string{"fullstack-engineer"})
+	entries, err := os.ReadDir(h.teamDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if err := os.RemoveAll(filepath.Join(h.teamDir, e.Name())); err != nil {
+			t.Fatal(err)
+		}
+	}
+	longAgo := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(h.teamDir, longAgo, longAgo); err != nil {
+		t.Fatal(err)
+	}
+	h.app.CheckTeamDirectories(ctx)
+	current, _, err := sqlite.GetTeam(ctx, h.app.DB, team.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Status != domain.TeamStatusDirectoryMissing {
+		t.Fatalf("status with an emptied folder = %s", current.Status)
+	}
+	if left, _ := os.ReadDir(h.teamDir); len(left) != 0 {
+		t.Fatalf("the emptied folder was filled again: %d entries", len(left))
+	}
+}
+
+// The engine works in the team folder, and Windows keeps a folder a process
+// works in: once the folder is gone the idle engine is let go, so a project
+// moved away does not leave an empty shell of itself behind.
+func TestAFolderGoneLetsTheIdleEngineGo(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	fake := h.ensureFake(t, team.ID)
+	turn := startTurn(t, h, fake, bots[1], "做点事")
+	fake.EmitTurnCompleted(turn.ThreadID, turn.TurnID, domain.RunCompleted, "好")
+	settlesAt(t, h, bots[1].ID, domain.BotStatusIdle)
+	if err := os.Rename(h.teamDir, h.teamDir+"-away"); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, 10*time.Second, "engine stopped", func() bool { return fake.ShutdownCalls() > 0 })
+}

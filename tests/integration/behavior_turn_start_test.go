@@ -123,6 +123,11 @@ func TestAFolderLosingItsMarkerWaitsBeforeRepair(t *testing.T) {
 	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
 	fake := h.ensureFake(t, team.ID)
 	dev := bots[1]
+	// The project's own files stay; only the marker goes. (A folder left with
+	// nothing at all counts as gone: TestAnEmptiedFolderCountsAsGone.)
+	if err := os.WriteFile(filepath.Join(h.teamDir, "README.md"), []byte("# project\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cobot := filepath.Join(h.teamDir, ".cobot")
 	if err := os.RemoveAll(cobot); err != nil {
 		t.Fatal(err)

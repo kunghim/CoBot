@@ -111,7 +111,11 @@ func (a *App) checkRecruitment(ctx context.Context, q sqlite.Queryer, teamID str
 	for _, id := range requested {
 		role, err := roles.Default(id)
 		if err != nil || role.ID == roles.LeaderRoleID {
-			return nil, domain.InvalidRequest("error.team.unknown_role", map[string]any{"roleId": id})
+			available := []string{}
+			for _, r := range a.recruitableRoles(ctx, teamID) {
+				available = append(available, r.ID+"（"+r.Name+"）")
+			}
+			return nil, domain.InvalidRequest("error.team.unknown_role", map[string]any{"roleId": id, "available": available})
 		}
 		if present[id] {
 			return nil, domain.InvalidRequest("error.team.role_present", map[string]any{"roleId": id})

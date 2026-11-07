@@ -6,7 +6,7 @@
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",
-    "close": "Close"
+    "close": "Quit CoBot"
   },
   "common": {
     "close": "Close",
