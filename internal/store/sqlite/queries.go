@@ -15,6 +15,9 @@ import (
 // ErrNotFound is returned when a singleton row is missing (corrupt database).
 var ErrNotFound = errors.New("row not found")
 
+// ErrTeamGone is an event of a team that no longer exists; nothing is stored.
+var ErrTeamGone = errors.New("event names a deleted team")
+
 // ---- meta ----
 
 // GetMeta reads a profile metadata value.
@@ -142,12 +145,21 @@ func InsertEvent(ctx context.Context, tx *sql.Tx, instanceID string, ev domain.E
 	if createdAt.IsZero() {
 		createdAt = time.Now().UTC()
 	}
+	// Work that finishes after its team was deleted (a settlement's events go
+	// out after its commit) must not leave a row naming the team behind.
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO events (id, instance_id, type, team_id, bot_id, resource_id, revision, payload, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		ev.ID, ev.InstanceID, ev.Type, ev.TeamID, ev.BotID, ev.ResourceID, ev.Revision, string(payload), createdAt.Format(time.RFC3339Nano))
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+		WHERE ? = '' OR EXISTS (SELECT 1 FROM teams WHERE id = ?)`,
+		ev.ID, ev.InstanceID, ev.Type, ev.TeamID, ev.BotID, ev.ResourceID, ev.Revision, string(payload), createdAt.Format(time.RFC3339Nano),
+		ev.TeamID, ev.TeamID)
 	if err != nil {
 		return domain.Event{}, fmt.Errorf("insert event: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return domain.Event{}, fmt.Errorf("insert event: %w", err)
+	} else if n == 0 {
+		return domain.Event{}, ErrTeamGone
 	}
 	seq, err := res.LastInsertId()
 	if err != nil {
