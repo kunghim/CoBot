@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -23,6 +24,12 @@ func fixture(t *testing.T, root, name, content string) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// fileURL is the standard file URL for an absolute path: three slashes before
+// a Windows drive ("file:///C:/x"), as on Unix ("file:///tmp/x").
+func fileURL(path string) string {
+	return "file:///" + strings.TrimPrefix(filepath.ToSlash(path), "/")
 }
 
 func TestLiteralProbeUsesTheWorkspaceBoundary(t *testing.T) {
@@ -72,7 +79,7 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 	}
 	for _, name := range names {
 		absolute := fixture(t, root, name, "literal file")
-		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String()} {
+		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String(), (&url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(filepath.ToSlash(absolute), "/")}).String()} {
 			file, err := Open(root, target)
 			if err != nil {
 				t.Fatal(target, err)
@@ -84,20 +91,28 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 			}
 		}
 	}
-	file, err := Open(root, " note.txt   ")
-	if err != nil {
-		t.Fatal(err)
+	// Windows drops trailing spaces, so " note.txt   " literally names the
+	// existing " note.txt" there; a leading tab cannot be a Windows filename.
+	pasted := []string{"\tnote.txt   "}
+	if runtime.GOOS != "windows" {
+		pasted = append(pasted, " note.txt   ")
 	}
-	defer file.Close()
-	if file.Info.Path != "note.txt" {
-		t.Fatal("nonexistent pasted path should still be cleaned", file.Info.Path)
+	for _, target := range pasted {
+		file, err := Open(root, target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file.Close()
+		if file.Info.Path != "note.txt" {
+			t.Fatalf("nonexistent pasted path %q should still be cleaned: %q", target, file.Info.Path)
+		}
 	}
 }
 
 func TestOpenPositionsAndCanonicalPaths(t *testing.T) {
 	root := t.TempDir()
 	path := fixture(t, root, "src/hello world.go", "package hello\n")
-	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + filepath.ToSlash(path) + "#L4-L7"} {
+	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + filepath.ToSlash(path) + "#L4-L7", fileURL(path) + "#L4-L7"} {
 		f, err := Open(root, target)
 		if err != nil {
 			t.Fatal(target, err)
@@ -184,6 +199,68 @@ func TestOpenRejectsTraversalAndSymlinkEscape(t *testing.T) {
 	}
 	if !foundAlias {
 		t.Fatal("directory entry lost symlink name")
+	}
+}
+
+// Windows members write drive file URLs with two or three slashes; both name a
+// local path. A drive letter in the authority must not widen the boundary.
+func TestOpenDriveFileURLs(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "project")
+	path := fixture(t, root, "src/hello world.go", "package hello\n")
+	outside := fixture(t, parent, "private.txt", "private")
+	slash := filepath.ToSlash(path)
+	if runtime.GOOS == "windows" {
+		lower := strings.ToLower(slash[:1]) + slash[1:]
+		escaped := strings.ReplaceAll(slash, " ", "%20")
+		for _, target := range []string{
+			"file://" + slash,
+			"file://" + escaped + "#L4-L7",
+			"file://" + lower,
+			"file:///" + slash,
+			"file:///" + escaped + "#L4-L7",
+			"file://localhost/" + slash,
+			"FILE://" + slash,
+		} {
+			f, err := Open(root, target)
+			if err != nil {
+				t.Fatal(target, err)
+			}
+			f.Close()
+			if f.Info.Path != "src/hello world.go" {
+				t.Fatalf("%s: %+v", target, f.Info)
+			}
+			if strings.HasSuffix(target, "-L7") && (f.Info.Line != 4 || f.Info.EndLine != 7) {
+				t.Fatalf("%s: %+v", target, f.Info)
+			}
+		}
+	}
+	other := filepath.ToSlash(outside)
+	for _, target := range []string{
+		"file://" + other,
+		"file:///" + strings.TrimPrefix(other, "/"),
+		"file://C:",
+		"file://C:5/x",
+		"file://CC:/x",
+		"file://1:/x",
+		"file://C:x",
+		"file://remote/private.txt",
+		"file://remote/C:/x",
+		"file:////remote/share/x",
+		"//remote/path",
+	} {
+		f, err := Open(root, target)
+		if f != nil {
+			f.Close()
+		}
+		if err == nil {
+			t.Fatalf("opened %q", target)
+		}
+	}
+	for _, target := range []string{"file://" + other, "file://remote/private.txt", "file://CC:/x", "file://C:5/x"} {
+		if _, err := Open(root, target); !errors.Is(err, ErrOutside) {
+			t.Fatalf("%q: %v", target, err)
+		}
 	}
 }
 

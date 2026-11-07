@@ -83,6 +83,11 @@ func literalExists(boundary *os.Root, rootPath, target string) bool {
 	return err == nil
 }
 
+// driveHost reports whether a file URL authority is a lone drive letter.
+func driveHost(host string) bool {
+	return len(host) == 2 && host[1] == ':' && ('a' <= host[0] && host[0] <= 'z' || 'A' <= host[0] && host[0] <= 'Z')
+}
+
 func relative(boundary *os.Root, root, raw string) (string, error) {
 	target := raw
 	if trimmed := strings.TrimSpace(raw); trimmed != raw {
@@ -100,10 +105,19 @@ func relative(boundary *os.Root, root, raw string) (string, error) {
 	}
 	if strings.HasPrefix(strings.ToLower(target), "file:") {
 		u, err := url.Parse(target)
-		if err != nil || u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		if err != nil {
 			return "", ErrOutside
 		}
-		target = u.Path
+		switch {
+		case u.Host == "" || strings.EqualFold(u.Host, "localhost"):
+			target = u.Path
+		case driveHost(u.Host) && strings.HasPrefix(u.Path, "/"):
+			// "file://C:/x" is a common Windows spelling; the URL Standard (and
+			// the web UI) reads the drive letter as path, not as a remote host.
+			target = u.Host + u.Path
+		default:
+			return "", ErrOutside
+		}
 		if u.Fragment != "" {
 			target += "#" + u.Fragment
 		}
