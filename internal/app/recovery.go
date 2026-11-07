@@ -75,10 +75,10 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 			run.ProviderTurnID, run.EngineEpoch, "error.run.unknown_after_restart", false); err != nil {
 			return err
 		}
-		if err := sqlite.SetBotRunState(ctx, tx, run.BotID, domain.BotStatusUnknown, run.ID); err != nil {
+		if err := setMemberStateTx(ctx, tx, run.BotID, domain.BotStatusUnknown, run.ID); err != nil {
 			return err
 		}
-		deliveryID, err := sqlite.MarkDeliveryUnknownByRun(ctx, tx, run.ID)
+		deliveryID, err := inboxMarkRunUnknownTx(ctx, tx, run.ID)
 		if err != nil {
 			return err
 		}
@@ -103,10 +103,7 @@ func (a *App) ReconcileAfterRestart(ctx context.Context) error {
 	}
 	// Decisions survive restart; an unsent native reply cannot be delivered
 	// on a different connection. Product feedback keeps its durable outbox.
-	if _, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = 'engine_epoch_changed' WHERE state = ? AND delivery_id = '' AND approval_id IN (SELECT id FROM approvals WHERE type = ?)`, domain.ResponseUnknown, domain.ResponseQueued, domain.ApprovalNativeTool); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE approval_responses SET state = ?, detail = 'execution_outcome_unknown' WHERE state = ? AND delivery_id IN (SELECT id FROM deliveries WHERE status = ?)`, domain.ResponseUnknown, domain.ResponseQueued, domain.DeliveryUnknown); err != nil {
+	if err := sqlite.ExpireUnsentNativeResponses(ctx, tx); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -338,18 +335,12 @@ func (a *App) applyVerifiedRecoveryDecisionLocked(ctx context.Context, tx *sql.T
 				delivery.Status != domain.DeliveryAccepted {
 				return domain.Run{}, domain.Conflict("error.recovery.delivery_not_rerunnable", map[string]any{"status": delivery.Status})
 			}
-			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryQueued); err != nil {
-				return domain.Run{}, err
-			}
-			if err := sqlite.SetMessageDeliveryStatus(ctx, tx, delivery.MessageID, domain.DeliveryQueued); err != nil {
+			if err := inboxRequeueTx(ctx, tx, delivery.ID, delivery.MessageID); err != nil {
 				return domain.Run{}, err
 			}
 		case domain.RecoveryOptionAbandon:
 			if delivery.Status == domain.DeliveryUnknown || delivery.Status == domain.DeliveryDispatching || delivery.Status == domain.DeliveryQueued || delivery.Status == domain.DeliveryAccepted {
-				if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
-					return domain.Run{}, err
-				}
-				if err := sqlite.SetMessageDeliveryStatus(ctx, tx, delivery.MessageID, domain.DeliveryCancelled); err != nil {
+				if err := inboxCancelTx(ctx, tx, delivery.ID, delivery.MessageID); err != nil {
 					return domain.Run{}, err
 				}
 			}
@@ -363,7 +354,7 @@ func (a *App) applyVerifiedRecoveryDecisionLocked(ctx context.Context, tx *sql.T
 	if queued, err := sqlite.CountQueuedDeliveries(ctx, tx, run.BotID); err == nil && queued > 0 {
 		nextStatus = domain.BotStatusQueued
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, run.BotID, nextStatus, ""); err != nil {
+	if err := setMemberStateTx(ctx, tx, run.BotID, nextStatus, ""); err != nil {
 		return domain.Run{}, err
 	}
 	return run, nil

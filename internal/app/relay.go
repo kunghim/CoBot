@@ -23,33 +23,6 @@ import (
 // member may escalate to the project manager, and the route always ends with
 // the project manager's acceptance and then the user's.
 
-// relayEffect is what a relay step leaves to do once its transaction commits.
-type relayEffect struct {
-	wake   []string
-	events []domain.Event
-}
-
-func (e *relayEffect) add(other relayEffect) {
-	e.wake = append(e.wake, other.wake...)
-	e.events = append(e.events, other.events...)
-}
-
-// publish records the events and wakes the members a step reached.
-func (a *App) publishRelay(ctx context.Context, effect relayEffect) {
-	for _, ev := range effect.events {
-		_ = a.recordEvent(ctx, ev)
-	}
-	a.Hub.Publish()
-	if a.Scheduler == nil {
-		return
-	}
-	for _, id := range effect.wake {
-		if id != "" {
-			a.Scheduler.Wake(id)
-		}
-	}
-}
-
 // relayEntry says who moved the work on and why, for the card it creates.
 type relayEntry struct {
 	from      string // bot id, "" for the user
@@ -199,14 +172,14 @@ func (a *App) StartRequirement(ctx context.Context, principal auth.Principal, in
 	if err := tx.Commit(); err != nil {
 		return domain.Requirement{}, err
 	}
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	return req, nil
 }
 
 // enterStageLocked hands out one stage: a confirmation for the user, or a
 // card for its owner.
-func (a *App) enterStageLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, idx int, e relayEntry) (relayEffect, error) {
-	var effect relayEffect
+func (a *App) enterStageLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, idx int, e relayEntry) (effects, error) {
+	var effect effects
 	if idx < 0 || idx >= len(req.Stages) {
 		return effect, fmt.Errorf("stage %d outside the route of %s", idx, req.ID)
 	}
@@ -252,8 +225,8 @@ func (a *App) enterStageLocked(ctx context.Context, tx *sql.Tx, req domain.Requi
 }
 
 // handOutCardLocked stores a card and delivers it to its owner.
-func (a *App) handOutCardLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, card domain.Task, e relayEntry) (relayEffect, error) {
-	var effect relayEffect
+func (a *App) handOutCardLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, card domain.Task, e relayEntry) (effects, error) {
+	var effect effects
 	card.CreatedBy = e.from
 	if card.CreatedBy == "" {
 		card.CreatedBy = domain.TaskAuthorUser
@@ -280,10 +253,10 @@ func (a *App) handOutCardLocked(ctx context.Context, tx *sql.Tx, req domain.Requ
 
 // leaderCardLocked hands the project manager a card outside the route: the
 // requirement document to rework, or an escalation to handle.
-func (a *App) leaderCardLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, kind string, stageIndex int, title string, e relayEntry) (relayEffect, error) {
+func (a *App) leaderCardLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, kind string, stageIndex int, title string, e relayEntry) (effects, error) {
 	team, _, err := sqlite.GetTeam(ctx, tx, req.TeamID)
 	if err != nil {
-		return relayEffect{}, err
+		return effects{}, err
 	}
 	card := domain.Task{
 		ID: domain.NewID(), TeamID: req.TeamID, OwnerID: team.LeaderID, Title: title, Status: domain.TaskTodo,
@@ -320,7 +293,7 @@ func routeCanSkipChecks(req domain.Requirement, idx int) bool {
 // reworkLocked sends work back to a stage (or to the requirement document)
 // with the reason; returnTo is where the fixed work goes next, -1 for the
 // route's own order.
-func (a *App) reworkLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, target int, e relayEntry) (relayEffect, error) {
+func (a *App) reworkLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, target int, e relayEntry) (effects, error) {
 	if target < 0 {
 		return a.leaderCardLocked(ctx, tx, req, domain.CardDraft, -1, "修改需求文档", e)
 	}
@@ -412,7 +385,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	from := stageLabel(req, card)
 	// The outcome is checked and its route chosen first; the handoff is
 	// then recorded, so the card it hands out already sees it.
-	var route func() (relayEffect, error)
+	var route func() (effects, error)
 	switch in.Outcome {
 	case domain.HandoffDone:
 		switch card.StageKind {
@@ -428,7 +401,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			}
 		}
 		if card.StageKind == domain.StageAccept {
-			route = func() (relayEffect, error) { return a.finishRouteLocked(ctx, tx, req, team, summary) }
+			route = func() (effects, error) { return a.finishRouteLocked(ctx, tx, req, team, summary) }
 			break
 		}
 		next := card.StageIndex + 1
@@ -438,7 +411,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 		if record.Suggestions != "" {
 			e.note = fmt.Sprintf("%s通过了，附带建议：%s", from, record.Suggestions)
 		}
-		route = func() (relayEffect, error) { return a.enterStageLocked(ctx, tx, req, next, e) }
+		route = func() (effects, error) { return a.enterStageLocked(ctx, tx, req, next, e) }
 	case domain.HandoffBack:
 		if card.StageIndex < 0 || card.StageKind == domain.CardEscalation || !req.Stages[card.StageIndex].ChecksWork() {
 			return domain.Task{}, domain.InvalidRequest("error.card.back_not_allowed", nil)
@@ -470,7 +443,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			e.note = b.String()
 			e.returnTo = card.ReturnTo
 			title := "处理上报：" + req.Stages[card.StageIndex].Name
-			route = func() (relayEffect, error) {
+			route = func() (effects, error) {
 				return a.leaderCardLocked(ctx, tx, req, domain.CardEscalation, card.StageIndex, title, e)
 			}
 			break
@@ -482,7 +455,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 			after = "改完后直接回到" + from
 		}
 		e.note = fmt.Sprintf("%s退回（第 %d 次，%s）：%s", from, backs+1, after, summary)
-		route = func() (relayEffect, error) { return a.reworkLocked(ctx, tx, req, target, e) }
+		route = func() (effects, error) { return a.reworkLocked(ctx, tx, req, target, e) }
 	case domain.HandoffEscalate:
 		if principal.BotID == team.LeaderID {
 			return domain.Task{}, domain.InvalidRequest("error.card.leader_cannot_escalate", nil)
@@ -491,7 +464,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 		// A rework card escalated mid-way still goes back where it was
 		// sent from once it is resumed and done.
 		e.returnTo = card.ReturnTo
-		route = func() (relayEffect, error) {
+		route = func() (effects, error) {
 			return a.leaderCardLocked(ctx, tx, req, domain.CardEscalation, card.StageIndex, "处理上报："+card.Title, e)
 		}
 	case domain.HandoffResume:
@@ -500,7 +473,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 		}
 		e.note = "项目经理的处理意见：" + summary
 		e.returnTo = card.ReturnTo
-		route = func() (relayEffect, error) { return a.enterStageLocked(ctx, tx, req, card.StageIndex, e) }
+		route = func() (effects, error) { return a.enterStageLocked(ctx, tx, req, card.StageIndex, e) }
 	default:
 		return domain.Task{}, domain.InvalidRequest("error.card.outcome", nil)
 	}
@@ -523,7 +496,7 @@ func (a *App) Handoff(ctx context.Context, principal auth.Principal, in HandoffI
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventTaskUpdated, TeamID: card.TeamID, BotID: principal.BotID, ResourceID: card.ID, Revision: updated.Revision,
 		Payload: mustJSON(map[string]any{"change": "handoff", "outcome": in.Outcome})})
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	return updated, nil
 }
 
@@ -549,8 +522,8 @@ func sendBackReasons(ctx context.Context, q sqlite.Queryer, requirementID string
 
 // finishRouteLocked ends the route: the project manager's report becomes
 // the user's acceptance question, with every suggestion passed on.
-func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, team domain.Team, report string) (relayEffect, error) {
-	var effect relayEffect
+func (a *App) finishRouteLocked(ctx context.Context, tx *sql.Tx, req domain.Requirement, team domain.Team, report string) (effects, error) {
+	var effect effects
 	text := report
 	if suggestions, err := requirementSuggestions(ctx, tx, req.ID); err != nil {
 		return effect, err
@@ -592,7 +565,7 @@ func postDocumentLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text str
 		ID: domain.NewID(), TeamID: teamID, BotID: botID,
 		Kind: domain.MessageKindDocument, Blocks: blocks, CreatedAt: time.Now().UTC(),
 	}
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+	if err := inboxPostTx(ctx, tx, message); err != nil {
 		return domain.Event{}, err
 	}
 	return domain.Event{Type: domain.EventMessageCreated, TeamID: teamID, BotID: botID, ResourceID: message.ID}, nil
@@ -672,7 +645,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 	if err != nil {
 		return domain.Question{}, sqlite.NormalizeError(err)
 	}
-	var effect relayEffect
+	var effect effects
 	messageID := ""
 	if question.Kind == domain.QuestionKindConfirm {
 		if req.Status != domain.RequirementActive {
@@ -703,7 +676,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 				return domain.Question{}, err
 			}
 			names := memberNames(ctx, tx, req.TeamID)
-			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmAcceptedNote(req, next, names)); err != nil {
+			if err := inboxRecordTx(ctx, tx, req.TeamID, team.LeaderID, confirmAcceptedNote(req, next, names)); err != nil {
 				return domain.Question{}, err
 			}
 		} else {
@@ -725,7 +698,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 				return domain.Question{}, err
 			}
 			names := memberNames(ctx, tx, req.TeamID)
-			if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID, confirmRevisedNote(req, question.StageIndex, producer, mode, comment, names)); err != nil {
+			if err := inboxRecordTx(ctx, tx, req.TeamID, team.LeaderID, confirmRevisedNote(req, question.StageIndex, producer, mode, comment, names)); err != nil {
 				return domain.Question{}, err
 			}
 		}
@@ -735,7 +708,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		}
 		effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
 		if decision == domain.AcceptanceAccept {
-			if err := systemNoteLocked(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
+			if err := inboxRecordTx(ctx, tx, req.TeamID, question.RequesterBotID, "你验收通过了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
 				return domain.Question{}, err
 			}
 		} else {
@@ -757,7 +730,7 @@ func (a *App) AnswerDecision(ctx context.Context, principal auth.Principal, ques
 		return domain.Question{}, err
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventQuestionAnswered, TeamID: question.TeamID, BotID: question.RequesterBotID, ResourceID: question.ID})
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	return answered, nil
 }
 
@@ -781,26 +754,21 @@ func (a *App) deliverDecisionInputLocked(ctx context.Context, tx *sql.Tx, questi
 		Kind: domain.MessageKindUser, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: question.ID,
 		CreatedAt: time.Now().UTC(),
 	}
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+	if err := inboxPostTx(ctx, tx, message); err != nil {
 		return "", err
 	}
 	chain, err := a.openChainLocked(ctx, tx, question.TeamID, message.ID, "")
 	if err != nil {
 		return "", err
 	}
-	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+	if err := inboxQueueTx(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: question.TeamID,
 		TargetBotID: question.RequesterBotID, Status: domain.DeliveryQueued, ChainID: chain.ID, Kind: "question_answer",
 	}); err != nil {
 		return "", err
 	}
-	if _, ferr := sqlite.FindActiveRun(ctx, tx, question.RequesterBotID); ferr != nil {
-		if !errors.Is(ferr, sqlite.ErrNotFound) {
-			return "", ferr
-		}
-		if err := sqlite.SetBotRunState(ctx, tx, question.RequesterBotID, domain.BotStatusQueued, ""); err != nil {
-			return "", err
-		}
+	if err := markQueuedIfIdleTx(ctx, tx, question.RequesterBotID); err != nil {
+		return "", err
 	}
 	return message.ID, nil
 }
@@ -840,9 +808,8 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	if err != nil {
 		return domain.Requirement{}, err
 	}
-	var effect relayEffect
+	var effect effects
 	var cancelled []string
-	now := time.Now().UTC().Format(time.RFC3339Nano)
 	for _, card := range cards {
 		if card.IsTerminal() {
 			continue
@@ -851,19 +818,13 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		if _, err := sqlite.UpdateTaskStatusTx(ctx, tx, card.ID, domain.TaskCancelled, 0); err != nil {
 			return domain.Requirement{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE deliveries SET status = ?, updated_at = ? WHERE task_id = ? AND status = ?`,
-			domain.DeliveryCancelled, now, card.ID, domain.DeliveryQueued); err != nil {
-			return domain.Requirement{}, err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE messages SET delivery_status = ? WHERE run_id = ? AND delivery_status = ?`,
-			domain.DeliveryCancelled, card.ID, domain.DeliveryQueued); err != nil {
+		if err := inboxCancelForCardTx(ctx, tx, card.ID); err != nil {
 			return domain.Requirement{}, err
 		}
 		effect.wake = append(effect.wake, card.OwnerID)
 		effect.events = append(effect.events, domain.Event{Type: domain.EventTaskUpdated, TeamID: req.TeamID, ResourceID: card.ID})
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE questions SET status = ?, revision = revision + 1 WHERE requirement_id = ? AND status = ?`,
-		domain.QuestionCancelled, req.ID, domain.QuestionOpen); err != nil {
+	if err := sqlite.CancelRequirementQuestions(ctx, tx, req.ID); err != nil {
 		return domain.Requirement{}, err
 	}
 	// A confirmation ignored from its card cancels the requirement so the
@@ -874,11 +835,11 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 	if err != nil {
 		return domain.Requirement{}, err
 	}
-	if err := noteLocked(ctx, tx, req.TeamID, team.LeaderID, team.LeaderID, req.ID,
+	if err := inboxNoteTx(ctx, tx, req.TeamID, team.LeaderID, team.LeaderID, req.ID,
 		"用户取消了需求「"+summarizeLine(req.Title)+"」；方向谈清楚后请重新提交需求。"); err != nil {
 		return domain.Requirement{}, err
 	}
-	if err := systemNoteLocked(ctx, tx, req.TeamID, team.LeaderID,
+	if err := inboxRecordTx(ctx, tx, req.TeamID, team.LeaderID,
 		"你取消了需求「"+summarizeLine(req.Title)+"」。"); err != nil {
 		return domain.Requirement{}, err
 	}
@@ -892,7 +853,7 @@ func (a *App) CancelRequirement(ctx context.Context, principal auth.Principal, r
 		return domain.Requirement{}, err
 	}
 	effect.events = append(effect.events, domain.Event{Type: domain.EventRequirementUpdated, TeamID: req.TeamID, ResourceID: req.ID})
-	a.publishRelay(ctx, effect)
+	a.publish(ctx, effect)
 	a.interruptCancelledWork(ctx, cancelled)
 	// The project manager's turn that submitted the requirement may still
 	// be running: without this, a user message arriving mid-turn is steered
@@ -1095,40 +1056,10 @@ func enqueueSystemMessageLocked(ctx context.Context, tx *sql.Tx, m systemMessage
 		Kind: domain.MessageKindSystem, Blocks: blocks, DeliveryStatus: domain.DeliveryQueued, RunID: m.about,
 		SourceBotID: m.source,
 	}
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
-		return err
-	}
-	return sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+	return inboxEnqueueTx(ctx, tx, message, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: m.teamID, TargetBotID: m.target,
 		Status: domain.DeliveryQueued, ChainID: m.chainID, TaskID: m.taskID,
 		SourceRunID: m.sourceRun, Kind: m.kind,
-	})
-}
-
-// noteLocked leaves a member a note it reads with its next turn; it wakes
-// nobody.
-func noteLocked(ctx context.Context, tx *sql.Tx, teamID, target, source, about, text string) error {
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
-	if err != nil {
-		return err
-	}
-	return sqlite.InsertMessage(ctx, tx, domain.Message{
-		ID: domain.NewID(), TeamID: teamID, BotID: target,
-		Kind: domain.MessageKindCollaboration, Blocks: blocks, SourceBotID: source, RunID: about,
-	})
-}
-
-// systemNoteLocked leaves the user a note in a member's conversation, about a
-// decision made from a card there. It wakes nobody and the engine never reads
-// it: it is a record of what happened, not an instruction.
-func systemNoteLocked(ctx context.Context, tx *sql.Tx, teamID, botID, text string) error {
-	blocks, err := json.Marshal([]domain.TextBlock{{Type: "text", Text: text}})
-	if err != nil {
-		return err
-	}
-	return sqlite.InsertMessage(ctx, tx, domain.Message{
-		ID: domain.NewID(), TeamID: teamID, BotID: botID,
-		Kind: domain.MessageKindSystem, Blocks: blocks, CreatedAt: time.Now().UTC(),
 	})
 }
 

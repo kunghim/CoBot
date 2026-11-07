@@ -15,19 +15,13 @@ import { Badge, Button, cx, Icons, interactive } from '../../components/ui';
 import type { RunStep, RunWithSteps } from '../../api/types';
 import type { LiveRun } from '../../api/live';
 import { mergeSteps } from '../../api/live';
-import { openWorkspaceFile } from '../workspace/fileNavigation';
-import { apiErrorMessage } from '../../i18n/errors';
-import DiffView from '../../components/DiffView';
-import Markdown from './Markdown';
+import Markdown from '../../components/content/Markdown';
 import { stripToolCallText } from './toolCallText';
-import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, toolArguments, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
+import { stepKindOf, type Scope } from './stepKinds';
+import { describeStep, displayCommand, durationPhrase, elapsedSeconds, runPhase, turnBlocks, visibleSteps, workNeedsAttention, workSummary, type Phrase } from './steps';
 import { openModelPicker } from './modelPicker';
 
-/** Where the files a turn names live: a team's folder, or a chat's own. */
-export interface Scope {
-  teamId?: string;
-  chatId?: string;
-}
+export type { Scope };
 
 /** What a turn needs of a run: its place in time, its state and its steps. */
 export type ProcessRun = Pick<RunWithSteps, 'id' | 'status' | 'startedAt' | 'endedAt' | 'steps' | 'botId'>;
@@ -199,20 +193,6 @@ function WorkGroup({ steps, botId, expanded, active, live, scope, nameOf, say }:
   );
 }
 
-const kindIcon: Record<string, (typeof Icons)[keyof typeof Icons]> = {
-  reasoning: Icons.thinking,
-  command: Icons.command,
-  file_change: Icons.fileChange,
-  tool: Icons.tool,
-  web_search: Icons.webSearch,
-  plan: Icons.plan,
-  retry: Icons.retry,
-  notice: Icons.warning,
-  agent: Icons.subagent,
-  diff: Icons.diff,
-  compaction: Icons.compaction,
-};
-
 function StatusMark({ status, running }: { status: string; running: boolean }) {
   if (running) return <Loader2 size={11} className="animate-spin text-neutral-400" aria-hidden="true" />;
   if (status === 'failed' || status === 'declined') return <X size={11} className="text-red-500" aria-hidden="true" />;
@@ -224,34 +204,17 @@ function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep;
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const phrase = describeStep(step, nameOf);
-  const Icon = kindIcon[step.kind] ?? Icons.tool;
+  const row = stepKindOf(step.kind);
+  const Icon = row?.icon ?? Icons.tool;
   const d = step.detail ?? {};
   const tone =
     step.kind === 'notice'
       ? d.level === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-red-600 dark:text-red-400'
       : 'text-neutral-600 dark:text-neutral-300';
 
-  // What the model says while it works reads as plain text in its place.
-  if (step.kind === 'message') {
-    const said = (typeof d.text === 'string' && d.text) || live?.commentary[step.id] || '';
-    return (
-      <div className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="run-commentary">
-        <Markdown text={stripToolCallText(said)} teamId={scope.teamId} chatId={scope.chatId} />
-      </div>
-    );
-  }
+  if (row?.inline) return row.inline(step, { live, scope, t }, t(phrase.key, phrase.params));
 
-  if (step.kind === 'reasoning') {
-    const thought = (typeof d.text === 'string' && d.text) || live?.reasoning[step.id] || '';
-    return (
-      <div className="text-xs text-neutral-500 dark:text-neutral-400">
-        <p className="flex items-center gap-1.5"><Icon size={12} aria-hidden="true" />{t(phrase.key, phrase.params)}</p>
-        <div className="mt-0.5 pl-[18px] italic"><Markdown text={thought} teamId={scope.teamId} chatId={scope.chatId} /></div>
-      </div>
-    );
-  }
-
-  const body = stepBody(step, live, scope, t);
+  const body = row?.body?.(step, { live, scope, t }) ?? null;
   return (
     <div className={`text-xs ${tone}`}>
       <button
@@ -259,7 +222,7 @@ function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep;
         disabled={!body}
         onClick={() => setOpen(!open)}
         aria-expanded={body ? open : undefined}
-        className={cx('-mx-1.5 flex w-[calc(100%+0.75rem)] min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100', body && interactive.hover)}
+        className={cx('-mx-1.5 flex w-[calc(100%+0.75rem)] min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors enabled:hover:text-neutral-900 dark:enabled:hover:text-neutral-100', body ? interactive.hover : false)}
       >
         <Icon size={12} className="shrink-0" aria-hidden="true" />
         {typeof d.subAgentThread === 'string' && <Badge tone="info">{t('conversation.step.agent.badge')}</Badge>}
@@ -281,90 +244,5 @@ function StepRow({ step, botId, running, live, scope, nameOf }: { step: RunStep;
         </button>
       )}
     </div>
-  );
-}
-
-function stepBody(step: RunStep, live: LiveRun | undefined, scope: Scope, t: (key: string, params?: Record<string, unknown>) => string) {
-  const d = step.detail ?? {};
-  switch (step.kind) {
-    case 'command': {
-      const output = (typeof d.output === 'string' ? d.output : '') || live?.output[step.id] || '';
-      return (
-        <div className="space-y-1">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-800 dark:bg-black/30 dark:text-neutral-100">$ {displayCommand(String(d.command ?? ''))}</pre>
-          {output ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-neutral-900/[0.04] p-2 font-mono text-2xs leading-4 text-neutral-700 dark:bg-black/30 dark:text-neutral-300">{output}</pre> : <p className="text-neutral-500 dark:text-neutral-400">{t('conversation.step.noOutput')}</p>}
-        </div>
-      );
-    }
-    case 'file_change': {
-      const changes = Array.isArray(d.changes) ? (d.changes as Array<Record<string, unknown>>) : [];
-      return (
-        <ul className="space-y-1">
-          {changes.map((change, index) => <FileChangeRow key={index} change={change} scope={scope} />)}
-        </ul>
-      );
-    }
-    case 'tool': {
-      const args = toolArguments(d);
-      const message = typeof args.text === 'string' ? args.text : typeof args.question === 'string' ? args.question : typeof args.description === 'string' ? args.description : '';
-      const extra = typeof d.error === 'string' ? d.error : '';
-      if (!message && !extra && Object.keys(args).length === 0) return null;
-      return (
-        <div className="space-y-1">
-          {message ? (
-            <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={message} teamId={scope.teamId} chatId={scope.chatId} /></div>
-          ) : (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 font-mono text-2xs dark:bg-neutral-800">{JSON.stringify(args, null, 2)}</pre>
-          )}
-          {extra && <p className="text-red-600">{extra}</p>}
-        </div>
-      );
-    }
-    case 'plan':
-      return typeof d.text === 'string' && d.text ? <Markdown text={d.text} teamId={scope.teamId} chatId={scope.chatId} /> : null;
-    case 'diff':
-      return typeof d.diff === 'string' && d.diff ? <DiffView diff={d.diff} /> : null;
-    case 'agent':
-      return typeof d.prompt === 'string' && d.prompt ? <div className="rounded bg-neutral-100 px-2 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"><Markdown text={d.prompt} teamId={scope.teamId} chatId={scope.chatId} /></div> : null;
-    case 'retry':
-    case 'notice':
-      return typeof d.message === 'string' && d.message ? <p className="break-all text-neutral-500 dark:text-neutral-400">{d.message}</p> : null;
-    default:
-      return null;
-  }
-}
-
-function FileChangeRow({ change, scope }: { change: Record<string, unknown>; scope: Scope }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState('');
-  const path = typeof change.path === 'string' ? change.path : '';
-  const kind = typeof change.kind === 'string' ? change.kind : 'update';
-  const diff = typeof change.diff === 'string' ? change.diff : '';
-  return (
-    <li>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={cx('-mx-1 flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:text-neutral-900 dark:hover:text-neutral-100', interactive.hover)}>
-        {open ? <Icons.expand size={11} aria-hidden /> : <Icons.next size={11} aria-hidden />}
-        <span className="shrink-0 rounded bg-neutral-900/[0.06] px-1 text-2xs dark:bg-white/[0.08]">{t(`conversation.fileKind.${kind}`, { defaultValue: kind })}</span>
-        <span className="min-w-0 truncate font-mono text-2xs">{path}</span>
-      </button>
-      {open && (
-        <div className="mt-1 space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={Icons.openExternal}
-            onClick={() => {
-              setError('');
-              openWorkspaceFile(scope.chatId ? { kind: 'chat', id: scope.chatId } : { kind: 'team', id: scope.teamId ?? '' }, path).catch((err) => setError(apiErrorMessage(t, err)));
-            }}
-          >
-            {t('conversation.file.open')}
-          </Button>
-          {error && <span role="alert" className="ml-2 text-red-600 dark:text-red-400">{error}</span>}
-          {diff && <DiffView diff={diff} />}
-        </div>
-      )}
-    </li>
   );
 }

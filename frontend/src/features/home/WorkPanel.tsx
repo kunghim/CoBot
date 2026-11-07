@@ -5,15 +5,15 @@
 // conversation as the info card; the browser lives in the workspace.
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Icons, TabPanel, Tabs } from './ui';
-import { useTeams } from '../api/queries';
-import { useSelectedBot } from '../app/SelectedBotContext';
-import ActivityList from '../features/activity/ActivityList';
-import ApprovalHistoryList from '../features/approvals/ApprovalHistoryList';
-import MemoryList from '../features/memories/MemoryList';
-import TaskBoardList from '../features/tasks/TaskBoardList';
-import { findBotContext } from '../features/teams/teamUtils';
-import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../app/workPanelNav';
+import { EmptyState, Icons, TabPanel, Tabs } from '../../components/ui';
+import { useTeams } from '../../api/queries';
+import { useSelectedBot } from '../../app/SelectedBotContext';
+import ActivityList from '../activity/ActivityList';
+import ApprovalHistoryList from '../approvals/ApprovalHistoryList';
+import MemoryList from '../memories/MemoryList';
+import TaskBoardList from '../tasks/TaskBoardList';
+import { findBotContext } from '../teams/teamUtils';
+import { takePendingWorkPanelRequest, useWorkPanelRequests, type WorkPanelRequest } from '../../app/workPanelNav';
 
 type TabId = 'tasks' | 'approvals' | 'activity' | 'memory';
 

@@ -8,7 +8,7 @@
 | F1 | 回归 | `./scripts/package-windows.ps1 -Version <候选版本> -MsiVersion <候选 MSI 版本>`，产物在 `.tmp/release-assets` | 脚本自带的检查全部通过；MSI 和 ZIP 载荷一致；ZIP 里有 `cobot-desktop.exe`、`cobot-helper.exe`、`cobot.exe`、`LICENSE`、`THIRD-PARTY-NOTICES.txt` |
 | F2 | 回归 | ZIP 解压到新目录，用里面的 `cobot.exe serve` 在新数据根上启动；再用 `$R/real` 的一份副本启动并跑通一个三环小需求 | 内嵌前端可用；能找到 Codex；头像库下载成功（AV-12） |
 | F4 | 回归 | `scripts/test-msi.ps1 -Path <msi> -Version <v> -MsiVersion <m>`（只读检查，不安装） | 全部检查通过；MSI 载荷与 ZIP 里的三个可执行文件逐字节相同 |
-| F5 | 回归 | **桌面壳原生窗口**：用 ZIP 或安装出来的 `cobot-desktop.exe`，先用空数据根，再用真实已登录 profile 的副本 | 窗口标题 `CoBot`、界面完整渲染（自绘标题栏、团队栏、引导页）；核心版本和 profile 正确；已有团队正确列出；关窗退出码 0，无残留进程。原生窗口里的控件由 WebView2 渲染，写操作统一在核心的 HTTP 界面上做 |
+| F5 | 回归 | **桌面壳原生窗口**：用 ZIP 或安装出来的 `cobot-desktop.exe`，先用空数据根，再用真实已登录 profile 的副本 | 窗口标题 `CoBot`（任务栏、Alt+Tab 里也是）；右上角的按钮叫「退出 CoBot」，和对话框的「关闭」不同名，按名字找控件的工具不会误点退出；界面完整渲染（自绘标题栏、团队栏、引导页）；核心版本和 profile 正确；已有团队正确列出；关窗退出码 0，无残留进程。原生窗口里的控件由 WebView2 渲染，写操作统一在核心的 HTTP 界面上做 |
 | F6 | 回归 | **MSI 安装**：静默安装 `msiexec /i <msi> /qn /l*v <日志>`；再装一次；卸载 `msiexec /x /qn` | 无需提权，装到 `%LOCALAPPDATA%\Programs\CoBot`，恰好 5 个文件，开始菜单有快捷方式；同版本再装走维护模式；卸载后安装目录、快捷方式、注册项和进程全部清掉；全程不碰 `~/.cobot` |
 | F7 | 回归 | **装上真用**：安装候选 MSI 后从安装目录启动，在真实 profile 上走一遍设置页（[设置](settings.md) SE-1），测完还原 | 零控制台错误；改过的设置全部还原 |
 | F8 | 回归 | macOS DMG | 本机是 Windows 时无法测，在记录里写「未测」并沿用维护者此前的测试 |

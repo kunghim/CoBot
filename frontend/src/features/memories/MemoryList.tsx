@@ -1,8 +1,8 @@
 import LoadMore from '../../components/LoadMore';
 // MemoryList is the 记忆 tab: the selected member's working methods and
 // preferences, read-only except deletion (a tombstone; the same fact is
-// never recreated automatically). Storing happens through the member's own
-// MCP tool, so this page never fabricates memories on the member's behalf.
+// never recreated automatically). Nothing adds new ones at the moment: the
+// entries shown here come from earlier builds.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeleteMemory, useMemories } from '../../api/queries';

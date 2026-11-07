@@ -101,8 +101,8 @@ func (b *Bridge) register(server *mcp.Server) {
 	for _, name := range ToolsForRole(os.Getenv(BridgeEnvRole)) {
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        name,
-			Description: toolDescriptions[name],
-			InputSchema: toolSchema(name),
+			Description: toolByName[name].Description,
+			InputSchema: toolByName[name].Schema(),
 		}, func(ctx context.Context, req *mcp.CallToolRequest, _ json.RawMessage) (*mcp.CallToolResult, any, error) {
 			return b.callTool(ctx, req.Params.Name, req.Params.Arguments, req.Params.Meta)
 		})

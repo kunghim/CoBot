@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kunghim/CoBot/internal/auth"
+	"github.com/kunghim/CoBot/internal/domain"
 )
 
 // DefaultURL lists the published releases, newest first. The listing is used
@@ -220,4 +223,17 @@ func sign(n int) int {
 		return -1
 	}
 	return 0
+}
+
+// CheckAs is the user pressing the button, never a background task, and a
+// failure comes back as the result's state so the page can say what happened.
+// A nil checker has nothing to ask.
+func CheckAs(ctx context.Context, principal auth.Principal, checker *Checker, version string) (Result, error) {
+	if principal.Kind != auth.KindUser {
+		return Result{}, domain.Forbidden("error.forbidden.user_only", nil)
+	}
+	if checker == nil {
+		return Result{State: Unreachable, Current: version, CheckedAt: time.Now().UTC()}, nil
+	}
+	return checker.Check(ctx), nil
 }

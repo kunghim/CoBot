@@ -137,7 +137,7 @@ func (a *App) sendFromBot(ctx context.Context, principal auth.Principal, targetB
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+	if err := inboxPostTx(ctx, tx, message); err != nil {
 		if isUniqueViolation(err) {
 			return nil, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": requestID})
 		}
@@ -166,7 +166,7 @@ func (a *App) sendFromBot(ctx context.Context, principal auth.Principal, targetB
 		}
 		chainID = chain.ID
 	}
-	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+	if err := inboxQueueTx(ctx, tx, sqlite.DeliveryRecord{
 		ID: domain.NewID(), MessageID: message.ID, TeamID: source.TeamID,
 		TargetBotID: target.ID, Status: domain.DeliveryQueued, ChainID: chainID,
 		TaskID: taskID, SourceRunID: principal.RunID,
@@ -175,10 +175,8 @@ func (a *App) sendFromBot(ctx context.Context, principal auth.Principal, targetB
 	}
 	// A busy member keeps its working projection: enqueueing must not clear
 	// current_run_id of a run that is still live (review B minor13).
-	if _, ferr := sqlite.FindActiveRun(ctx, tx, target.ID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
-		if err := sqlite.SetBotRunState(ctx, tx, target.ID, domain.BotStatusQueued, ""); err != nil {
-			return nil, err
-		}
+	if err := markQueuedIfIdleTx(ctx, tx, target.ID); err != nil {
+		return nil, err
 	}
 	queued, err := sqlite.CountQueuedDeliveries(ctx, tx, target.ID)
 	if err != nil {

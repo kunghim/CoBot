@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useTeams } from '../../api/queries';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import ConversationView from '../conversations/ConversationView';
+import WorkPanel from './WorkPanel';
 import CreateTeamDialog from '../teams/CreateTeamDialog';
 import Avatar from '../avatars/Avatar';
 import { findBotContext } from '../teams/teamUtils';
@@ -31,7 +32,7 @@ export default function HomePage() {
   const context = botId && teams.data ? findBotContext(teams.data.items, botId) : null;
 
   if (botId && context) {
-    return <ConversationView key={context.bot.id} item={context.item} bot={context.bot} />;
+    return <ConversationView key={context.bot.id} item={context.item} bot={context.bot} infoPanel={<WorkPanel />} />;
   }
 
   const active = (teams.data?.items ?? []).filter((item) => item.team.status !== 'archived');

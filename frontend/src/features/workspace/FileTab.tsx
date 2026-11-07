@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
@@ -7,21 +7,10 @@ import { Alert, Button, CopyButton, EmptyState, IconButton, Icons, Spinner, Spli
 import { apiErrorMessage } from '../../i18n/errors';
 import { scopeKey } from './fileNavigation';
 import FileTree from './FileTree';
-import SourcePreview from './SourcePreview';
-import MarkdownPreview from './MarkdownPreview';
 import type { WorkspaceTab } from './state';
 import { useWorkspaceWatch } from './useWorkspaceWatch';
+import { pickViewer, showsSourceButton } from './viewers';
 import { useWorkspace } from './WorkspaceProvider';
-
-const LatexPreview = lazy(() => import('./LatexPreview'));
-const PPTXPreview = lazy(() => import('./PPTXPreview'));
-const DOCXPreview = lazy(() => import('./DOCXPreview'));
-const WorkbookPreview = lazy(() => import('./WorkbookPreview'));
-const TablePreview = lazy(() => import('./TablePreview'));
-const MediaPreview = lazy(() => import('./MediaPreview'));
-const NotebookPreview = lazy(() => import('./NotebookPreview'));
-const HTMLPreview = lazy(() => import('./HTMLPreview'));
-const PDFPreview = lazy(() => import('./PDFPreview'));
 
 type View = NonNullable<WorkspaceTab['fileView']>;
 export default function FileTab({ tab, scope }: { tab: WorkspaceTab; scope: WorkspaceScope }) {
@@ -106,45 +95,13 @@ function FilePreview({ scope, file, view, onView }: { scope: WorkspaceScope; fil
   const { t } = useTranslation();
   const [source, setSource] = useState(!!view.line);
   useEffect(() => { if (view.line) setSource(true); }, [view.positionId]);
-  const delimited = file.kind === 'spreadsheet' && /\.(csv|tsv)$/i.test(file.name);
-  const canSource = delimited || ['text', 'markdown', 'html', 'svg', 'latex', 'notebook'].includes(file.kind);
   if (file.size > 256 * 1024 * 1024) return <EmptyState title={t('workspace.files.tooLarge')} />;
-  const image = file.kind === 'image' || file.kind === 'svg' && !source;
+  const viewer = pickViewer(file, source);
   return <div className="flex h-full min-h-0 flex-col">
     <div className="flex min-h-8 items-center justify-between border-b border-neutral-200 px-3 text-xs text-neutral-500 dark:border-neutral-800">
       <span>{t('workspace.files.readOnly')} · {new Intl.NumberFormat().format(file.size)} B</span>
-      {(delimited || file.kind === 'svg' || file.kind === 'markdown' || file.kind === 'notebook' || file.kind === 'html') && <Button size="sm" variant="ghost" onClick={() => setSource(!source)}>{t(source ? 'workspace.files.preview' : 'workspace.files.source')}</Button>}
+      {showsSourceButton(file) && <Button size="sm" variant="ghost" onClick={() => setSource(!source)}>{t(source ? 'workspace.files.preview' : 'workspace.files.source')}</Button>}
     </div>
-    <div className="min-h-0 flex-1"><Suspense fallback={<Spinner label={t('common.loading')} />}>{file.kind === 'latex' ? <LatexPreview scope={scope} file={file} view={view} onView={onView} /> : file.kind === 'presentation' ? <PPTXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'document' ? <DOCXPreview key={file.version} scope={scope} file={file} /> : file.kind === 'spreadsheet' && !delimited ? <WorkbookPreview scope={scope} file={file} /> : delimited && !source ? <TablePreview scope={scope} file={file} /> : file.kind === 'pdf' ? <PDFPreview scope={scope} file={file} /> : file.kind === 'html' && !source ? <HTMLPreview scope={scope} file={file} /> : file.kind === 'notebook' && !source ? <NotebookPreview scope={scope} file={file} /> : file.kind === 'audio' || file.kind === 'video' ? <MediaPreview scope={scope} file={file} /> : image ? <ImagePreview scope={scope} file={file} /> : file.kind === 'markdown' && !source ? <MarkdownPreview scope={scope} file={file} /> : canSource ? <SourcePreview scope={scope} file={file} view={view} onView={onView} /> : <EmptyState title={t('workspace.files.unsupported')} />}</Suspense></div>
-  </div>;
-}
-
-function ImagePreview({ scope, file }: { scope: WorkspaceScope; file: WorkspaceFile }) {
-  const { t } = useTranslation();
-  const [url, setURL] = useState('');
-  const [failed, setFailed] = useState(false);
-  const [zoom, setZoom] = useState<number | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const image = useQuery({ queryKey: ['workspace-image', scopeKey(scope), file.path, file.version], queryFn: ({ signal }) => api.workspaceBytes(scope, file.path, signal, undefined, file.version), retry: false, gcTime: 30_000 });
-  useEffect(() => {
-    setFailed(false);
-    if (!image.data) { setURL(''); return; }
-    const url = URL.createObjectURL(image.data); setURL(url);
-    return () => URL.revokeObjectURL(url);
-  }, [image.data]);
-  if (image.isError || failed) return <EmptyState title={t('workspace.files.unreadableImage')} />;
-  if (!url) return <Spinner label={t('common.loading')} />;
-  return <div className="flex h-full min-h-0 flex-col">
-    <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-1 text-xs dark:border-neutral-800">
-      <span>{dimensions.width} × {dimensions.height}</span>
-      <Button size="sm" variant="ghost" onClick={() => setZoom(null)}>{t('workspace.files.fitImage')}</Button>
-      <Button size="sm" variant="ghost" onClick={() => setZoom(1)}>100%</Button>
-      <Button size="sm" variant="ghost" disabled={zoom !== null && zoom <= 0.1} onClick={() => setZoom((value) => Math.max(0.1, (value ?? 1) / 1.25))}>{t('workspace.files.zoomOut')}</Button>
-      <Button size="sm" variant="ghost" disabled={zoom !== null && zoom >= 8} onClick={() => setZoom((value) => Math.min(8, (value ?? 1) * 1.25))}>{t('workspace.files.zoomIn')}</Button>
-      {zoom !== null && <span>{Math.round(zoom * 100)}%</span>}
-    </div>
-    <div className="min-h-0 flex-1 overflow-auto p-4">
-      <img alt={file.name} src={url} onLoad={(event) => setDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} onError={() => setFailed(true)} className={zoom === null ? 'mx-auto max-h-full max-w-full object-contain' : 'max-w-none'} style={zoom === null ? undefined : { width: dimensions.width * zoom, height: dimensions.height * zoom }} />
-    </div>
+    <div className="min-h-0 flex-1"><Suspense fallback={<Spinner label={t('common.loading')} />}>{viewer ? <viewer.component key={viewer.perVersion ? file.version : undefined} scope={scope} file={file} view={view} onView={onView} /> : <EmptyState title={t('workspace.files.unsupported')} />}</Suspense></div>
   </div>;
 }

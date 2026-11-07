@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Settings, SettingsPatch } from '../../api/types';
 import '../../i18n';
-import { DefaultModelCard } from './SettingsSections';
+import { DefaultModelCard } from './DefaultModelCard';
 
 // The shape the settings page hands down: which field changed, the new
 // value for it, and a way back when the server refuses the change.

@@ -158,7 +158,7 @@ func (a *App) PersistChainAction(ctx context.Context, tx *sql.Tx, action ChainGa
 	case ChainActionNone:
 		return nil, nil
 	case ChainActionSweepStopped:
-		if _, err := sqlite.CancelChainDeliveries(ctx, tx, delivery.ChainID); err != nil {
+		if _, err := inboxCancelChainTx(ctx, tx, delivery.ChainID); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -315,7 +315,7 @@ func (a *App) applyChainDecisionLocked(ctx context.Context, tx *sql.Tx, approval
 		if err := stoppedRouteNoticeLocked(ctx, tx, delivery, binding.BotID); err != nil {
 			return effect, err
 		}
-		if _, err := sqlite.CancelChainDeliveries(ctx, tx, chain.ID); err != nil {
+		if _, err := inboxCancelChainTx(ctx, tx, chain.ID); err != nil {
 			return effect, err
 		}
 		var err error
@@ -392,7 +392,7 @@ func stoppedRouteNoticeLocked(ctx context.Context, tx *sql.Tx, delivery sqlite.D
 	if err != nil {
 		return err
 	}
-	return sqlite.InsertMessage(ctx, tx, domain.Message{
+	return inboxPostTx(ctx, tx, domain.Message{
 		ID: domain.NewID(), TeamID: req.TeamID, BotID: botID,
 		Kind: domain.MessageKindSystem, Blocks: blocks, RunID: card.ID,
 		CreatedAt: time.Now().UTC(),

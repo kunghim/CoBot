@@ -8,7 +8,7 @@ import { useApprovals, useTeams } from '../../api/queries';
 import type { Approval, Bot } from '../../api/types';
 import { useSelectedBot } from '../../app/SelectedBotContext';
 import LoadMore from '../../components/LoadMore';
-import { displayCommand } from '../conversations/steps';
+import { displayCommand } from '../../components/content/displayCommand';
 import NativeApprovalBody from './NativeApprovalBody';
 import { parseNativeRequest } from './nativeRequest';
 import { approvalSummaryText, optionFallbackText, optionLabelKeys } from './pager';

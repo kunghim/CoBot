@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
+    "check:imports": "node scripts/check-imports.mjs",
     "gallery": "node scripts/build-gallery.mjs",
     "generate:api": "openapi-typescript ../api/openapi.yaml -o src/api/generated/schema.ts"
   },
@@ -37,6 +38,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "dependency-cruiser": "18.7.2",
     "jsdom": "^26.0.0",
     "openapi-typescript": "7.13.0",
     "tailwindcss": "^4.0.6",

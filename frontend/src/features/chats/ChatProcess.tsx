@@ -25,7 +25,7 @@ function processOf(run: ChatRun): ProcessRun {
       teamId: '',
       botId: '',
       seq: step.seq ?? index,
-      kind: step.kind as RunStep['kind'],
+      kind: step.kind,
       status: step.status as RunStep['status'],
       detail: (step.detail ?? {}) as RunStep['detail'],
       startedAt: run.startedAt,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/kunghim/CoBot/internal/auth"
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
@@ -116,8 +117,84 @@ func (a *App) resumeAfterNativeReply(ctx context.Context, approval domain.Approv
 	if err := sqlite.UpdateRunStatus(ctx, tx, run.ID, domain.RunRunning, run.ProviderTurnID, run.EngineEpoch, "", false); err != nil {
 		return
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, run.BotID, domain.BotStatusWorking, run.ID); err != nil {
+	if err := setMemberStateTx(ctx, tx, run.BotID, domain.BotStatusWorking, run.ID); err != nil {
 		return
 	}
 	_ = tx.Commit()
+}
+
+func approvalSummary(req engine.ApprovalRequest) string {
+	// The complete requested operation is needed for a meaningful decision.
+	// Keep only relevant public fields; never persist the transport envelope.
+	if req.Method == "mcpServer/elicitation/request" {
+		// What the MCP server asks, verbatim: its words, and the form or the
+		// address it wants acted on.
+		var payload struct {
+			ServerName      string          `json:"serverName"`
+			Message         string          `json:"message"`
+			Mode            string          `json:"mode"`
+			RequestedSchema json.RawMessage `json:"requestedSchema"`
+			URL             string          `json:"url"`
+		}
+		if json.Unmarshal(req.RawParams, &payload) == nil {
+			details := map[string]any{"server": payload.ServerName, "mode": payload.Mode, "message": payload.Message}
+			if len(payload.RequestedSchema) > 0 && string(payload.RequestedSchema) != "null" {
+				details["requestedSchema"] = payload.RequestedSchema
+			}
+			if payload.URL != "" {
+				details["url"] = payload.URL
+			}
+			value, _ := json.MarshalIndent(details, "", "  ")
+			return string(value)
+		}
+	}
+	details := map[string]any{}
+	if req.Command != "" {
+		details["command"] = req.Command
+	}
+	if req.Cwd != "" {
+		details["cwd"] = req.Cwd
+	}
+	if len(req.Paths) > 0 {
+		details["paths"] = req.Paths
+	}
+	if len(req.Changes) > 0 {
+		details["changes"] = req.Changes
+	}
+	if len(req.Permissions) > 0 {
+		details["permissions"] = req.Permissions
+	}
+	if req.Network {
+		details["network"] = true
+	}
+	if len(details) == 0 {
+		return req.Method
+	}
+	value, _ := json.MarshalIndent(details, "", "  ")
+	return string(value)
+}
+
+// nativeToolOptions are the choices Codex itself offers. "For this session"
+// lasts for the member's engine session: Codex keeps the grant until its
+// thread is restarted, and nothing in CoBot can widen it further.
+func nativeToolOptions(method string) []domain.ApprovalOption {
+	if method == "mcpServer/elicitation/request" {
+		return []domain.ApprovalOption{
+			{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.elicit_submit"},
+			{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.elicit_decline"},
+		}
+	}
+	if method == "item/permissions/requestApproval" {
+		return []domain.ApprovalOption{
+			{ID: domain.DecisionGrantTurn, MessageKey: "approval.option.grant_turn"},
+			{ID: domain.DecisionGrantSession, MessageKey: "approval.option.grant_session"},
+			{ID: "deny", MessageKey: "approval.option.permissions.deny"},
+		}
+	}
+	return []domain.ApprovalOption{
+		{ID: domain.DecisionAcceptEngine, MessageKey: "approval.option.allow_once"},
+		{ID: domain.DecisionAcceptSession, MessageKey: "approval.option.allow_session"},
+		{ID: domain.DecisionDeclineEngine, MessageKey: "approval.option.decline"},
+		{ID: domain.DecisionCancelEngine, MessageKey: "approval.option.decline_stop"},
+	}
 }

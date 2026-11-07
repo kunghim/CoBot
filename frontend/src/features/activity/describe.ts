@@ -2,7 +2,7 @@
 // links to. Pure, so every event type is covered by tests.
 import type { ActivityItem } from '../../api/types';
 import { parseNativeRequest } from '../approvals/nativeRequest';
-import { displayCommand } from '../conversations/steps';
+import { displayCommand } from '../../components/content/displayCommand';
 
 interface ActivityLine {
   text: string;

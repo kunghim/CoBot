@@ -72,10 +72,7 @@ func (s *Scheduler) claimBatchLocked(ctx context.Context, tx *sql.Tx, botID stri
 				return nil, err
 			}
 		}
-		if err := sqlite.SetMessageDeliveryStatus(ctx, tx, message.ID, domain.DeliveryDispatching); err != nil {
-			return nil, err
-		}
-		if err := sqlite.ClaimDeliveryRun(ctx, tx, record.ID, runID); err != nil {
+		if err := inboxClaimTx(ctx, tx, record.ID, message.ID, runID); err != nil {
 			return nil, err
 		}
 		batch = append(batch, message)

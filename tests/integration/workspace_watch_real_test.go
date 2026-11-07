@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kunghim/CoBot/internal/engine"
 	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/platform"
 )
@@ -37,7 +38,7 @@ func TestRealWorkspaceWatchHTTPControl(t *testing.T) {
 	h := newM2Harness(t)
 	team, _ := h.createTeam(t, nil)
 	starts := 0
-	h.app.ControlFactory = func(ctx context.Context, cwd string) (*codex.Server, error) {
+	h.app.ControlFactory = func(ctx context.Context, cwd string) (engine.Control, error) {
 		starts++
 		return codex.Start(ctx, codex.ServerOptions{Binary: binary, Cwd: cwd, Env: codex.EngineEnv(h.app.Paths, nil), Client: codex.ClientInfo{Name: "cobot-filesystem-http", Version: "test"}})
 	}

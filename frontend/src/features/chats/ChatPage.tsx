@@ -11,7 +11,7 @@ import { ShellToggle } from '../../app/shell';
 import { useNativeTitle } from '../../app/WindowChrome';
 import { readLocal, writeLocal } from '../../app/mode';
 import { apiErrorMessage } from '../../i18n/errors';
-import Markdown from '../conversations/Markdown';
+import Markdown from '../../components/content/Markdown';
 import MessageEditBox from '../conversations/MessageEditBox';
 import ElicitationBody, { parseElicitation } from '../approvals/ElicitationBody';
 import ResourceStrip from '../conversations/ResourceStrip';

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/engine"
 )
 
 // configServer is a stand-in for the engine's configuration surface. It
@@ -146,7 +147,7 @@ func TestBindProviderRefusesAProviderTheEngineCannotSpeak(t *testing.T) {
 	if !strings.Contains(err.Error(), "no longer supported") {
 		t.Fatalf("the engine's own explanation was lost: %v", err)
 	}
-	if !IsConfigValidationError(err) {
+	if _, rejected := engine.RejectedConfig(err); !rejected {
 		t.Fatal("a rejected configuration was not recognised as one")
 	}
 }

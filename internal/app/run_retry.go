@@ -93,10 +93,7 @@ func (a *App) RetryRun(ctx context.Context, principal auth.Principal, runID stri
 				continue
 			}
 		}
-		if err := sqlite.SetDeliveryStatus(ctx, tx, c.id, domain.DeliveryQueued); err != nil {
-			return nil, err
-		}
-		if err := sqlite.SetMessageDeliveryStatus(ctx, tx, c.messageID, domain.DeliveryQueued); err != nil {
+		if err := inboxRequeueTx(ctx, tx, c.id, c.messageID); err != nil {
 			return nil, err
 		}
 		requeued++
@@ -104,7 +101,7 @@ func (a *App) RetryRun(ctx context.Context, principal auth.Principal, runID stri
 	if requeued == 0 {
 		return nil, domain.Conflict("error.run.nothing_to_retry", nil)
 	}
-	if err := sqlite.SetBotRunState(ctx, tx, run.BotID, domain.BotStatusQueued, ""); err != nil {
+	if err := setMemberStateTx(ctx, tx, run.BotID, domain.BotStatusQueued, ""); err != nil {
 		return nil, err
 	}
 	result := map[string]any{"runId": run.ID, "requeued": requeued}

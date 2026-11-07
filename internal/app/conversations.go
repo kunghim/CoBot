@@ -111,7 +111,7 @@ func (a *App) enqueueUserMessage(ctx context.Context, principal auth.Principal, 
 		return SendMessageResult{}, err
 	}
 	defer tx.Rollback()
-	if err := sqlite.InsertMessage(ctx, tx, message); err != nil {
+	if err := inboxPostTx(ctx, tx, message); err != nil {
 		if isUniqueViolation(err) {
 			return SendMessageResult{}, domain.IdempotencyConflict("error.message.request_reused", map[string]any{"requestId": requestID})
 		}
@@ -123,7 +123,7 @@ func (a *App) enqueueUserMessage(ctx context.Context, principal auth.Principal, 
 	if err != nil {
 		return SendMessageResult{}, err
 	}
-	if err := sqlite.InsertDeliveryRow(ctx, tx, sqlite.DeliveryRecord{
+	if err := inboxQueueTx(ctx, tx, sqlite.DeliveryRecord{
 		ID: deliveryID, MessageID: message.ID, TeamID: team.ID,
 		TargetBotID: bot.ID, Status: domain.DeliveryQueued, ChainID: chain.ID,
 	}); err != nil {
@@ -131,10 +131,8 @@ func (a *App) enqueueUserMessage(ctx context.Context, principal auth.Principal, 
 	}
 	// Enqueueing a user message never clears a live run's projection
 	// (review B minor13).
-	if _, ferr := sqlite.FindActiveRun(ctx, tx, bot.ID); ferr != nil && errors.Is(ferr, sqlite.ErrNotFound) {
-		if err := sqlite.SetBotRunState(ctx, tx, bot.ID, domain.BotStatusQueued, ""); err != nil {
-			return SendMessageResult{}, err
-		}
+	if err := markQueuedIfIdleTx(ctx, tx, bot.ID); err != nil {
+		return SendMessageResult{}, err
 	}
 	queued, err := sqlite.CountQueuedDeliveries(ctx, tx, bot.ID)
 	if err != nil {
@@ -201,14 +199,14 @@ func (a *App) CancelQueuedMessage(ctx context.Context, principal auth.Principal,
 	for _, delivery := range deliveries {
 		switch delivery.Status {
 		case domain.DeliveryQueued:
-			if err := sqlite.SetDeliveryStatus(ctx, tx, delivery.ID, domain.DeliveryCancelled); err != nil {
+			if err := inboxCancelDeliveryTx(ctx, tx, delivery.ID); err != nil {
 				return domain.Message{}, err
 			}
 		case domain.DeliveryDispatching, domain.DeliveryAccepted:
 			return domain.Message{}, domain.Conflict("error.message.already_dispatched", map[string]any{"status": delivery.Status})
 		}
 	}
-	if err := sqlite.SetMessageDeliveryStatus(ctx, tx, messageID, domain.DeliveryCancelled); err != nil {
+	if err := inboxCancelMessageTx(ctx, tx, messageID); err != nil {
 		return domain.Message{}, err
 	}
 	updated, err := sqlite.GetMessage(ctx, tx, messageID)

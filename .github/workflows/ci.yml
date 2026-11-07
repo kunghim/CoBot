@@ -85,12 +85,61 @@ jobs:
           go build ./...
       - name: Go tests (unit + integration, temp data roots only)
         run: go test ./internal/... ./tests/...
-      - name: Frontend typecheck and unit tests
+      - name: Frontend typecheck, import rules and unit tests
         run: |
           npm run typecheck --prefix frontend
+          npm run check:imports --prefix frontend
           npm test --prefix frontend
       - name: Rebuild with embedded assets
         run: go build ./...
+
+  go-race:
+    name: Go race detector (ubuntu)
+    needs: repository-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Frontend build (embedded assets, required before go build)
+        run: npm run build --prefix frontend
+      - name: Go tests with the race detector
+        run: go test -race ./internal/... ./tests/...
+
+  go-windows:
+    name: Go tests (windows)
+    needs: repository-policy
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Frontend build (embedded assets, required before go build)
+        run: npm run build --prefix frontend
+      - name: Go tests (unit + integration, temp data roots only)
+        run: go test ./internal/... ./tests/...
 
   desktop-static:
     name: desktop shell static compile (windows)

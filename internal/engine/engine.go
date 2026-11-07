@@ -29,9 +29,15 @@ type ThreadSpec struct {
 	// ModelProvider names the provider this thread runs with. Empty leaves
 	// the engine on its own account. The engine refuses an id it does not
 	// know, so an id is only sent for a provider that is configured.
-	ModelProvider         string         // optional provider id
-	DeveloperInstructions string         // role + collaboration instructions
-	Config                map[string]any // thread-scoped config overrides
+	ModelProvider         string // optional provider id
+	DeveloperInstructions string // role + collaboration instructions
+	// ContextWindow is the model's window, for a model the engine cannot know
+	// it of; zero leaves it to the engine.
+	ContextWindow int
+	// DisableWebSearch turns off the search tool the engine offers by default.
+	DisableWebSearch bool
+	// ToolBridge offers CoBot's collaboration tools; nil offers none.
+	ToolBridge *ToolBridge
 }
 
 // TurnOptions are per-turn overrides. Permission (read_only | default |
@@ -175,6 +181,16 @@ const (
 	// summary because it neared the model's context window.
 	StepCompaction = "compaction"
 )
+
+// IsWorkStep says whether a step is the member doing something, as against
+// thinking, reporting or saying something.
+func IsWorkStep(kind string) bool {
+	switch kind {
+	case StepCommand, StepFileChange, StepTool, StepWebSearch, StepAgent:
+		return true
+	}
+	return false
+}
 
 // Step statuses.
 const (

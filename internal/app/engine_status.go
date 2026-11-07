@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/kunghim/CoBot/internal/engine"
-	"github.com/kunghim/CoBot/internal/engine/codex"
 	"github.com/kunghim/CoBot/internal/hookrun"
 	"github.com/kunghim/CoBot/internal/roles"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
@@ -24,7 +23,7 @@ import (
 // shares the environment's private CODEX_HOME so every team reuses one login.
 type controlServer struct {
 	mu         sync.Mutex
-	server     *codex.Server
+	server     engine.Control
 	cwd        string
 	enginePath string
 }
@@ -50,7 +49,11 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		info.ErrorKey = "error.engine.settings_unreadable"
 		return info
 	}
-	binary, err := codex.Locate(settings.EnginePath)
+	var binary string
+	err = errors.New("no engine installation")
+	if a.Install != nil {
+		binary, err = a.Install.Locate(settings.EnginePath)
+	}
 	if err != nil {
 		info.Status = "not_configured"
 		info.ErrorKey = "error.engine.not_found"
@@ -62,7 +65,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 	}
 	info.BinaryPath = binary
 	versionCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	version, err := codex.ProbeVersion(versionCtx, binary)
+	version, err := a.Install.ProbeVersion(versionCtx, binary)
 	cancel()
 	if err != nil {
 		info.Status = "error"
@@ -71,7 +74,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 		return info
 	}
 	info.Version = version
-	probe := codex.Probe(ctx, binary, version)
+	probe := a.Install.Probe(ctx, binary, version)
 	info.Protocol = probe.Protocol
 	info.Capabilities = probe.Capabilities
 
@@ -105,7 +108,7 @@ func (a *App) EngineStatus(ctx context.Context) EngineStatusInfo {
 // CoBot's private CODEX_HOME, so asking the user to review it in a terminal
 // adds no safety. Trust is recorded only after the hooks file is verified as
 // exactly CoBot's; an edited file or a project hook is never trusted here.
-func (a *App) nativeHookState(ctx context.Context, server *codex.Server) string {
+func (a *App) nativeHookState(ctx context.Context, server engine.Control) string {
 	hookCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	command, err := hookrun.NativeCommand(a.MCPBinary, a.Paths.Root)
@@ -234,7 +237,7 @@ func parseAccount(raw json.RawMessage) accountInfo {
 }
 
 // control lazily starts the account/model app-server for this profile.
-func (a *App) control(ctx context.Context) (*codex.Server, error) {
+func (a *App) control(ctx context.Context) (engine.Control, error) {
 	a.engineControlMu.Lock()
 	defer a.engineControlMu.Unlock()
 	settings, err := a.GetSettings(ctx)
@@ -352,7 +355,7 @@ func (a *App) EngineLogout(ctx context.Context) error {
 	}
 	logoutCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	if err := server.Call(logoutCtx, "account/logout", map[string]any{}, nil); err != nil {
+	if err := server.AccountLogout(logoutCtx); err != nil {
 		return err
 	}
 	a.invalidateEngineStatus()
@@ -468,4 +471,13 @@ func (a *App) RoleScenarios() []map[string]any {
 		})
 	}
 	return out
+}
+
+// EngineStatusInvalidated drops the cached engine projection (login changes).
+func (a *App) EngineStatusInvalidated() { a.invalidateEngineStatus() }
+
+func (a *App) invalidateEngineStatus() {
+	a.engineStatusMu.Lock()
+	a.engineStatusCache = nil
+	a.engineStatusMu.Unlock()
 }

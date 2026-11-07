@@ -3,7 +3,8 @@
 # wails build, require a Mac, signing or WebView2 — those are explicit
 # desktop checks and are reported separately when untested.
 param(
-    [switch]$Desktop  # additionally compile the desktop shell with its tag
+    [switch]$Desktop,  # additionally compile the desktop shell with its tag
+    [switch]$Race      # additionally rerun the Go tests with the race detector (needs a C compiler)
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -59,6 +60,8 @@ if ($LASTEXITCODE -ne 0) { throw "go test failed" }
 Write-Host "==> frontend typecheck + unit tests"
 npm run typecheck --prefix frontend
 if ($LASTEXITCODE -ne 0) { throw "frontend typecheck failed" }
+npm run check:imports --prefix frontend
+if ($LASTEXITCODE -ne 0) { throw "frontend import rules failed" }
 npm test --prefix frontend
 if ($LASTEXITCODE -ne 0) { throw "frontend tests failed" }
 
@@ -71,6 +74,12 @@ if ($Desktop) {
     New-Item -ItemType Directory -Force -Path ".tmp/bin" | Out-Null
     go build -tags desktop -o .tmp/bin/check-cobot-desktop.exe ./cmd/cobot-desktop
     if ($LASTEXITCODE -ne 0) { throw "desktop build failed" }
+}
+
+if ($Race) {
+    Write-Host "==> go test -race"
+    go test -race ./internal/... ./tests/...
+    if ($LASTEXITCODE -ne 0) { throw "go test -race failed" }
 }
 
 Write-Host "==> check passed"

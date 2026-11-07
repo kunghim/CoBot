@@ -1,5 +1,5 @@
 import { fromMarkdown } from 'mdast-util-from-markdown';
-import { linkTarget } from './links';
+import { linkTarget } from '../../components/content/links';
 
 export type ReplyResource = { kind: 'file' | 'site'; target: string };
 type Node = { type: string; children?: Node[]; url?: string; identifier?: string; value?: string };

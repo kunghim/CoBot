@@ -14,6 +14,16 @@ import (
 	"testing"
 )
 
+// fileURLPath is an absolute path as a file URL writes it: a Windows path needs
+// its own leading slash (file:///C:/...), or the drive would read as the host.
+func fileURLPath(path string) string {
+	slashed := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashed, "/") {
+		return "/" + slashed
+	}
+	return slashed
+}
+
 func fixture(t *testing.T, root, name, content string) string {
 	t.Helper()
 	p := filepath.Join(root, name)
@@ -24,12 +34,6 @@ func fixture(t *testing.T, root, name, content string) string {
 		t.Fatal(err)
 	}
 	return p
-}
-
-// fileURL is the standard file URL for an absolute path: three slashes before
-// a Windows drive ("file:///C:/x"), as on Unix ("file:///tmp/x").
-func fileURL(path string) string {
-	return "file:///" + strings.TrimPrefix(filepath.ToSlash(path), "/")
 }
 
 func TestLiteralProbeUsesTheWorkspaceBoundary(t *testing.T) {
@@ -79,7 +83,7 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 	}
 	for _, name := range names {
 		absolute := fixture(t, root, name, "literal file")
-		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String(), (&url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(filepath.ToSlash(absolute), "/")}).String()} {
+		for _, target := range []string{name, name + ":3:2", (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String(), (&url.URL{Scheme: "file", Path: fileURLPath(absolute)}).String()} {
 			file, err := Open(root, target)
 			if err != nil {
 				t.Fatal(target, err)
@@ -112,7 +116,7 @@ func TestLiteralWhitespaceFilenameWinsOverPastedPathCleanup(t *testing.T) {
 func TestOpenPositionsAndCanonicalPaths(t *testing.T) {
 	root := t.TempDir()
 	path := fixture(t, root, "src/hello world.go", "package hello\n")
-	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + filepath.ToSlash(path) + "#L4-L7", fileURL(path) + "#L4-L7"} {
+	for _, target := range []string{"src/hello world.go", path, "src/hello%20world.go:12:3", "file://" + filepath.ToSlash(path) + "#L4-L7", "file://" + fileURLPath(path) + "#L4-L7"} {
 		f, err := Open(root, target)
 		if err != nil {
 			t.Fatal(target, err)

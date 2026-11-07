@@ -104,7 +104,7 @@ func (a *App) ChangeChatNavigation(ctx context.Context, p auth.Principal, in Cha
 			return out, domain.Conflict("error.chat.section_missing", nil)
 		}
 		out.Sections = append(out.Sections[:at], out.Sections[at+1:]...)
-		if _, err = tx.ExecContext(ctx, `UPDATE chats SET data=json_set(data,'$.sectionId','','$.revision',json_extract(data,'$.revision')+1) WHERE json_extract(data,'$.sectionId')=?`, in.ID); err != nil {
+		if err = sqlite.ClearChatSection(ctx, tx, in.ID); err != nil {
 			return out, err
 		}
 	case "reorder":
@@ -315,7 +315,7 @@ func (a *App) archiveChat(ctx context.Context, p auth.Principal, id, action stri
 		return c, e
 	}
 	raw, _ := json.Marshal(c)
-	if _, e = tx.ExecContext(endCtx, `UPDATE idempotency SET response=? WHERE scope=? AND principal=? AND key=? AND request_hash=?`, string(raw), "resource."+p.Write.Scope, writePrincipal(p), p.Write.Key, p.Write.ArgsHash); e != nil {
+	if _, e = sqlite.UpdateIdempotencyResponse(endCtx, tx, "resource."+p.Write.Scope, writePrincipal(p), p.Write.Key, p.Write.ArgsHash, string(raw)); e != nil {
 		return c, e
 	}
 	if e = tx.Commit(); e != nil {

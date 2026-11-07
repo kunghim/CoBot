@@ -118,8 +118,12 @@ func main() {
 			bridge.SetContext(ctx)
 			// The window title is drawn next to the traffic lights whenever
 			// the titlebar shows (mac fullscreen hover); keep it empty except
-			// when the frontend names the conversation in fullscreen.
-			wailsruntime.WindowSetTitle(ctx, "")
+			// when the frontend names the conversation in fullscreen. Other
+			// platforms draw no title on the window but name it in the
+			// taskbar and the window switcher, so they keep "CoBot".
+			if runtime.GOOS == "darwin" {
+				wailsruntime.WindowSetTitle(ctx, "")
+			}
 			if err := bridge.StartCore(ctx, *dataRoot); err != nil {
 				wailsruntime.MessageDialog(ctx, messageDialogError(err))
 				wailsruntime.Quit(ctx)
