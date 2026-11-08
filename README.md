@@ -1,316 +1,142 @@
 # CoBot
 
-**Agents do the work. CoBot runs the team.**
+**An AI team workspace for turning your goals into practical results.**
 
 English · [简体中文](README.zh-CN.md)
 
-> **Status: early preview.** Windows beta downloads are available. The macOS ARM64 desktop
-> package has passed a local native smoke test with real Codex. See [Status](#status).
+CoBot is designed for people who have something they want to make, even if they do not write code. Start a conversation to explore an idea, or give an AI team a goal and work through a plan, implementation, checks and final acceptance. Websites and small software tools are the current team scenario; the longer-term direction includes other kinds of work.
 
-CoBot is a local-first app where AI agents work together as a team. The *Co* stands for
-**cooperation**: CoBot doesn't try to be a smarter agent. It is the team structure around your
-agents. It handles roles, tasks, messages and approvals, and external agents
-(currently [Codex](https://github.com/openai/codex)) do the actual work: reading code,
-running commands, editing files.
+[Download](#quick-start) · [How it works](#how-it-works) · [Contribute](#development)
 
-Coding is the first use case, and CoBot is built with CoBot: its own agent team has already
-planned, implemented, reviewed and delivered real changes to this repository.
-
-<!-- TODO: screenshot or short GIF — team list, a member conversation, an approval card -->
-
-## Why CoBot
-
-A single coding agent works well. Several of them on the same project quickly turn into a mess:
-
-- Nobody knows who is doing what, and two agents edit the same thing.
-- "Done" means "the model said it's done".
-- Agents wake each other up in endless loops and burn your budget.
-- When something crashes, you can't tell what actually ran.
-
-CoBot handles this the way a well-run team does: a project manager who writes the requirement
-and plans the route, members who pass the work along that route, handoffs that are written down
-with what actually ran, reviews and tests that can send work back, and a human who signs off on
-what matters.
+> **Early-stage software.** The current published release is [v0.0.1](https://github.com/kunghim/CoBot/releases/tag/v0.0.1). This README describes the `dev` source; use the release notes for the exact package requirements and changes. A published version number does not establish that every platform, model or task has been tested.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    U([You]) -->|goal| L[Project manager]
-    L -->|start_requirement: document + route| C[(CoBot core<br/>requirements · cards · approvals)]
-    C -->|hands each stage's card on| M1[Member bot] & M2[Member bot]
-    M1 & M2 -->|handoff: done / back / escalate| C
-    C -->|escalations · acceptance report| L
-    C -->|confirmations · acceptance · approvals · questions| U
-    M1 & M2 -. execute in team directory .-> E[[Codex]]
-```
+**Start with a chat.** Ask a question or work through an idea without creating a team or selecting a project folder. Conversations have their own history, model, reasoning and permission controls.
 
-1. **Create a team** on a working directory. A project manager and members with built-in roles
-   (product manager, full-stack engineer, QA engineer, reviewer) get their own agent sessions.
-   You can add or remove members later from the team's settings.
-2. **Give the project manager a goal.** Once the need is clear it writes a requirement document and
-   picks this requirement's route from the full process (requirements review, product design, test
-   cases, implementation, testing, code review…), and you confirm both.
-3. **Members pass the work along the route.** Each stage is a card handed to its owner; the owner
-   hands it off with `handoff`, and CoBot moves it to the next stage, so no model decides who is next.
-   Reviews and tests can send work back to the stage that produced it; past the limit, or when
-   stuck, the card goes to the project manager.
-4. **You stay in charge.** Confirmations, the final acceptance, native command and file approvals and
-   questions from agents all come to you, and you can cancel a requirement at any time.
+**Use a team for a project.** Tell the project manager what you want to achieve and who will use it. The team proposes a requirement and a sequence of work for you to confirm. Members carry out implementation, testing and review; checks can send work back for revision. You handle necessary choices and accept the result.
 
-## Features
+For example:
 
-- **Role-based collaboration.** The project manager has `start_requirement`, `handoff`,
-  `view_tasks`, `send_message` and `ask_user`; members have `handoff`, `view_tasks`,
-  `send_message` and `ask_user` (only for what only you can decide). `send_message` leaves a note
-  and wakes nobody: work moves only on cards. The host binds each call to the member's identity, so
-  a model can't act as someone else, and a sub-agent can't hand off a card, start a requirement or
-  ask you.
-- **Relay and acceptance.** Each card opens with the requirement, the route and where it stands,
-  then the requirement document and earlier handoffs; a review card also carries its checklist. On
-  handoff CoBot attaches the commands, exit codes and changed files the engine reported. Reviews and
-  tests can send work back (rerun the route, or straight back to the reviewer); past the limit (3
-  by default, adjustable in settings) the project manager decides. Optional improvements pass with
-  suggestions, collected for the final report. The route ends with the project manager's acceptance
-  report, which becomes your acceptance card. CoBot moves the cards itself; the model never drives
-  the state machine.
-- **Human in the loop.** Native Codex approvals show the full command or diff, with Codex's
-  own choices: allow, allow for this session, decline, or decline and stop (requests for extra
-  access: allow for this turn or this session, or deny). Each team has a permission mode
-  (read only, default, full access). Agents can ask you questions and are woken when you
-  answer. A message you send while a member is working goes into its running turn, or is
-  queued if the turn has already ended.
-- **Runaway control.** Each collaboration chain may wake members a limited number of times
-  (10 by default). Past the limit the chain waits for you: Continue grants a fresh budget of
-  the same size, Stop ends it. An optional daily token budget, per team or per member and
-  adjustable for each, pauses new turns and starts again the next day.
-- **Visible work.** Each turn's steps, tool calls and file changes show in the conversation.
-  Session stats under the composer show turns, model and tool time, tokens and cache, context
-  in use and account limits. Each team chooses the reasoning effort from the levels the model
-  offers. Codex sub-agents a member starts work inside that member's run, with their steps,
-  approvals and usage attributed to it.
-- **Memory (read-only for now).** Memories that members saved in earlier builds can be viewed
-  and deleted, and are handed to new threads; models can no longer save new ones. Memory will
-  be reworked later.
-- **Honest recovery.** After a restart, CoBot reconciles what really happened. If an
-  execution's outcome is unknown, CoBot locks it and shows a recovery card. It never
-  guesses and silently reruns.
-- **Local-first.** CoBot is a single executable that binds to loopback only. Your data stays
-  in `~/.cobot`. Agents run in a private Codex environment with its own login, separate from
-  your everyday Codex setup. No cloud service: CoBot never sends your data anywhere. The only
-  thing it downloads itself is the public avatar catalog from this repository (`assets/avatars`),
-  at startup and when you check for updates in Settings. A browser sign-in lasts 30 days, is
-  renewed while in use and survives restarts.
-- **Web UI and desktop shell.** Both run on one shared core. The UI is available in English
-  and Chinese.
+> I want a small tool for entering and finding customer information. First help me clarify what it should do and how I can check the result.
 
-CoBot doesn't run shell commands, manage Git or reimplement an agent loop. That stays with
-the agent you already trust.
+This is a starting request, not a verified customer case. Agree on a small scope and try it with fictional data. Acceptance should include actual operations and expected results, not just a statement that the work is finished.
 
-## Status
+## What you can do
 
-| Platform | Status |
-| --- | --- |
-| Windows 10/11 x64, local Web | **Ready to try.** Verified with real Codex end to end |
-| Windows standalone server build | Builds and runs |
-| Windows desktop shell (Wails/WebView2) | **Beta downloads available.** Desktop startup and installer lifecycle checked in Windows Sandbox; see the release notes for limitations |
-| macOS ARM64 desktop | Local app smoke test passed on macOS 26.6.2 with Codex 0.146.0: sign-in, messages, task handoff/delivery/acceptance, file tools, command approval/rejection and restart. DMG mount, Finder copy to Applications, launch after eject and team persistence also passed. Downloaded-package first launch and notarized distribution remain unverified |
-| macOS Intel (x86_64) desktop | Not included in the planned beta release. Cross-built shell/helper, UI startup, native directory dialog, team creation/restart and shared-core tests passed under Rosetta on Apple Silicon. Physical Intel Mac and Intel Codex end-to-end use remain unverified |
-| Linux (local Web) | Shared-core build, integration and browser tests run in Ubuntu CI with a fake engine; real Codex use and end-user installation are not yet verified |
+- **Chat and return to your work.** Stream replies, stop a turn, rename conversations and adjust model, reasoning and permissions for subsequent messages. Search titles and message content across chats and team-member conversations. Pin chats, organize them into sections, and archive or restore chats and teams.
+- **Follow a team's progress.** Confirm requirements, follow recorded handoffs and ask for changes. Questions, approvals and acceptance cards appear above the conversation input. A team can request an additional role member, subject to your confirmation. Stages within a requirement currently run in sequence.
+- **Inspect the results beside the conversation.** The workspace includes a browser, a read-only file tree, file previews and recorded changes. View common documents, spreadsheets, presentations, PDFs, images and text; rendering depends on the format. Historical changes are separate from the current file on disk. Files and change summaries can also appear below a completed reply.
+- **Try a runnable delivery.** When the team's acceptance report includes a preview command and address, the acceptance card shows the command and offers **Start and open**. You choose whether to run it in the team folder, open its page in the built-in browser, and stop the preview. This is a local preview, not automatic hosting or deployment.
+- **Resume an existing folder.** **Open team** finds its active team, offers to restore an archived one, or prepares a new team. A folder marked by another environment can be adopted after explicit confirmation; adoption does not import its old conversations.
+- **Choose model services.** Use a ChatGPT account or configure OpenAI Responses-compatible providers. Members can use different models or follow the default. The bundled, updatable model catalog supplies model limits and reasoning controls; advanced settings allow supported adjustments. A connectivity check alone does not establish that a model can complete a team workflow.
+- **Keep decisions and usage visible.** Review command/file approvals, see model usage, and set collaboration limits and daily token budgets. Execution records help inspect what happened; testing and AI review do not guarantee correctness.
 
-With real Codex on Windows we verified: sign-in, multi-member parallel work, task handoffs and
-questions, native file approvals and rejections, collaboration limits, reconnecting after a
-dropped connection, graceful shutdown, crash recovery and upgrades.
-The headline test was two consecutive rounds of **CoBot developing CoBot**. In each round
-the project manager planned the work, a member implemented it, a separate member reviewed it, and a
-human approved the exact candidate commit. The second round ran on the upgraded build that
-included the first round's change.
-
-Since then the collaboration model was simplified: role-based tools, one-step delivery and
-review, no model risk checks, and no recruitment or merge approval cards. A multi-member run
-with real Codex verified the new flow, including native approvals, session stats and Codex
-sub-agents.
-
-Tested does not mean every edge case is covered. The maintainers track the 94 first-release
-acceptance items and record which parts were verified automatically, with a real model, or
-not yet.
+CoBot currently uses the **Codex engine bundled with the ChatGPT desktop app**, in a separate environment with its own sign-in. Standalone Codex CLI installations are not used. CoBot manages conversations and collaboration; the engine performs model and tool execution.
 
 ## Quick start
 
 ### Desktop downloads
 
-[**v0.1.0-beta.2 — downloads and release notes**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.2)
+[**v0.0.1 — release notes, downloads and checksums**](https://github.com/kunghim/CoBot/releases/tag/v0.0.1)
 
-| Download | How to use |
+| Package | Start |
 | --- | --- |
-| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.msi) | Install for your current user, then open **CoBot** from the Start menu |
-| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | Extract all files into one folder and open **cobot-desktop.exe**; keep both helper executables beside it |
-| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | Copy **CoBot.app** to Applications, eject the image, then open the installed app (Codex CLI 0.146.0 or newer) |
+| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-windows-x64.msi) | Install for the current user, then open CoBot from the Start menu |
+| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-windows-x64.zip) | Extract all files and open `cobot-desktop.exe`; keep `cobot-helper.exe` and `cobot.exe` beside it |
+| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-macos-arm64.dmg) | Copy `CoBot.app` to Applications, eject the image, then open the installed app |
 
-The published beta.2 downloads above predate desktop-only engine discovery. The two Windows downloads contain the same application files. For those downloads, on Windows you need **Windows 10/11 x64**, an existing
-**WebView2 Runtime**, and the official **Codex CLI on `PATH`**, with an eligible
-account and network access to Codex services. Codex is not bundled; a copy that only ships inside
-the Codex desktop app is not found. Members can run on the official ChatGPT account or on API-key
-providers that speak the OpenAI Responses API.
-You do not need Go or Node to use these downloads.
+**Before starting:** install the [ChatGPT desktop app](https://learn.chatgpt.com/docs/app) separately. CoBot discovers its bundled Codex engine on supported macOS app and Windows Store layouts. It keeps its own login and configuration. Windows requires Windows 10/11 x64 and an existing WebView2 Runtime. Go, Node.js and a standalone Codex CLI are not needed to use these downloads.
 
-The packages are unsigned (macOS has an ad-hoc signature, not notarized). Optional `.sha256` checksum files are on the release page.
-GitHub's **Source code** archives are for building, not ready-to-run applications.
-After opening CoBot, sign in or add a provider under **Settings → Model providers**, then create a team.
-CoBot uses a private Codex environment with its own login.
+The packages have no release signing or notarization; macOS uses an ad-hoc signature. See the release notes for first-launch instructions and the adjacent `.sha256` files. GitHub's **Source code** archives are for building, not ready-to-run applications.
 
-Updates are manual: close CoBot before installing a newer MSI, or extract a complete newer ZIP
-into a new folder. Both editions store settings and team data in `%USERPROFILE%\.cobot`, separate
-from program files. Uninstalling the MSI or deleting an extracted ZIP folder retains that data.
+1. Open CoBot. In **Settings → Model providers**, sign in for CoBot or configure a compatible service, then choose a default model. The model service may require a subscription or API payment.
+2. Start with **Chat**, or switch to **Team**, create a team in a folder and describe your goal to the project manager.
+3. For a team task, confirm the proposed requirement, inspect the result and request changes as needed. If a preview is offered, review its command before starting it.
 
-### Build from source
+The interface initially opens in Chinese. For English, select **设置 → 通用 → 语言 → English**. If the engine is not found, check the desktop app installation and the status shown in Settings; installing a standalone CLI is not a substitute. Ask in [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a) with the CoBot version, OS and a sanitized error message.
 
-The commands below build the **local Web** version. The published beta provides
-Windows x64 and Apple Silicon downloads; a macOS desktop package can also be built locally as described below.
+### Data and updates
 
-**Build prerequisites:** Git, [Go](https://go.dev/dl/) compatible with `go.mod`
-(minimum 1.25.12), and [Node.js 24](https://nodejs.org/en/download) with npm 11+.
-For agent work, install the [ChatGPT desktop app](https://learn.chatgpt.com/docs/app).
-Current source builds use only its bundled Codex engine, with a separate CoBot login
-and private environment; standalone CLI installations are not used. Automatic
-discovery supports macOS apps and Windows Store packages; Linux desktop layouts
-are not yet supported. Go and Node are build tools. Local-first does not mean
-offline model execution.
+CoBot runs locally and listens only on loopback. Release packages normally store settings, sign-in and work history under `~/.cobot`, separately from application files. Model requests send relevant content to the selected service; local operation does not mean offline AI or that all data stays on the computer.
 
-#### Windows (PowerShell)
+Updates are manual: close CoBot before installing a new MSI or replacing the complete ZIP/app bundle. Preserve the data directory; uninstalling or removing application files retains it. Read [upgrade and rollback notes](docs/reference/upgrading.md) before changing versions. Deleting a chat keeps its generated files.
 
-```powershell
-git clone https://github.com/kunghim/CoBot.git
-cd CoBot
-npm ci --prefix frontend
-powershell -NoProfile -File scripts/build.ps1 -Target server
-.\.tmp\dist\cobot.exe serve
-```
+## Status
 
-#### macOS (Bash)
+| Platform | Current scope |
+| --- | --- |
+| Windows x64 | MSI and ZIP published; requires WebView2 and supported desktop-engine installation |
+| macOS Apple Silicon | ARM64 DMG published; not Developer ID signed or notarized |
+| macOS Intel | No published package; experimental source builds do not establish native support |
+| Linux | Shared-core CI coverage; desktop-engine discovery is not supported, so CI is not evidence of end-user readiness |
 
-```bash
-git clone https://github.com/kunghim/CoBot.git
-cd CoBot
-npm ci --prefix frontend
-./scripts/build.sh --target server
-./.tmp/dist/cobot serve
-```
-
-For the macOS desktop package, also provide Wails CLI v2.15.0 and the Apple
-command-line build tools, then run
-`./scripts/build.sh --target desktop --version 0.1.0-beta.2-dev --arch arm64`.
-This writes `.tmp/dist/CoBot-0.1.0-beta.2-dev-macos-arm64.dmg`, a companion ZIP,
-and SHA-256 files. Open the DMG, copy `CoBot.app` to its Applications shortcut,
-then eject the image and open CoBot from Applications. The DMG is the planned
-macOS beta download; it is not published yet.
-Use `--arch arm64` for Apple Silicon or `--arch amd64` for an experimental Intel
-build; filenames include the selected architecture, and both shell and helper target it.
-Intel builds can be smoke-tested through an existing Rosetta installation on
-Apple Silicon, which does not replace testing on a physical Intel Mac.
-When using the ZIP, extract and keep the entire `CoBot.app` bundle together. It uses the production
-profile by default. For an isolated trial, launch its executable with an explicit
-`--data-root <empty-directory>`; the temporary root still uses production semantics.
-The bundle has an ad-hoc signature for local testing, without Developer ID signing
-or notarization. Local DMG installation and restart passed, but Gatekeeper assessment
-rejects this build; browser-download first launch and the manual approval flow
-have not been accepted.
-
-The macOS Codex 0.146.0 smoke test uses an isolated data root and real model turns;
-it is not the full Windows acceptance suite. Current source builds discover the
-ChatGPT desktop app independently of the terminal `PATH`. Codex inherits
-static macOS system proxies when no proxy environment variable was supplied; this
-does not change system settings or evaluate automatic proxy (PAC) scripts.
-
-Run these commands in a terminal on the same computer as your browser and team
-files. This starts the local Web app, not the desktop shell or a remote server.
-The build writes `.tmp/dist/cobot.exe` on Windows or `.tmp/dist/cobot` on macOS,
-with a `.sha256` checksum. It does not install CoBot on `PATH`; use the full
-relative path shown above. Keep the terminal open while using CoBot.
-
-Your default browser opens CoBot, already signed in. Behind the scenes it uses a one-time
-startup link (valid 60 seconds, also printed in the terminal; `--no-open` only prints it).
-This authorizes the local CoBot page; it does not sign you in to Codex. Treat
-startup links like passwords. If the browser does not open, use the printed link.
-If the link expires, rerun the same executable with `serve` in another terminal:
-it opens a fresh link to the existing instance, without starting a second one.
-
-The interface initially opens in Chinese. To switch to English, open
-**设置 (Settings) → 通用 (General) → 语言 (Language)** and select **English**.
-This preference is saved for subsequent visits; agent replies are not translated.
-
-1. **Settings:** sign in to Codex. CoBot uses its own private Codex environment, so you sign
-   in once inside CoBot; the login is kept across restarts. Then pick a default model.
-   CoBot finds Codex and authorizes its safety hook by itself at startup; Settings shows
-   both, with a button to authorize again if that failed.
-2. **New team:** choose a working directory and the members you want.
-3. **Message the project manager** with a small, checkable goal. For example: "Inspect this
-   project and propose three improvements. Do not edit files yet." Agent replies
-   follow the conversation and role instructions, not the interface language.
-
-Closing the browser leaves the service running. To stop it, press **Ctrl+C in
-the terminal that started it** and wait for shutdown to finish.
-
-The commands above use the default **development** profile (`~/.cobot-dev`).
-For everyday use, stop that instance and run
-`.\.tmp\dist\cobot.exe serve --profile production` on Windows or
-`./.tmp/dist/cobot serve --profile production` on macOS. The production profile
-uses `~/.cobot` and has separate settings, Codex login and teams; your preview
-setup does not transfer automatically. `~` means your home directory. For an
-isolated trial, add `--data-root <absolute-path-to-an-empty-directory>`.
-
-If Settings cannot find Codex, check `codex --version` in the terminal used to
-launch CoBot. After installing or updating Codex, reopen that terminal, restart
-CoBot with the same profile and data root, and retry the check in Settings.
-Do not attach startup links or raw trace recordings to a help request;
-[Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a) accepts English
-and Chinese.
+Release automation checks builds and package integrity. Interactive installation, real model behavior and platform-specific use require separate validation; see the [release notes](https://github.com/kunghim/CoBot/releases/tag/v0.0.1). Custom roles and writable memory are not yet available. Detailed behavior and current boundaries are in the [product overview](docs/product/overview.md) and [decisions](docs/product/decisions.md), currently in Chinese.
 
 ## Development
 
-```bash
-./scripts/dev.sh      # Go core + Vite with auto-authorization   (Windows: scripts/dev.ps1)
-./scripts/check.sh    # gofmt, contract drift, frontend + Go tests (Windows: scripts/check.ps1)
+Help make AI work accessible to people who do not program. Real task examples, usability feedback, domain knowledge, design, documentation, translations and engineering fixes all contribute. Start with [CONTRIBUTING.md](CONTRIBUTING.md); substantial features should be discussed before implementation. English and Chinese issues and PRs are welcome. Core engineering documents are currently in Chinese.
+
+For repository changes, branch from `dev`, keep the change focused and target `dev` in your PR. Include checks actually run and their limits. Private notes and AI coding tools are not prerequisites.
+
+<details>
+<summary>Build current source and run checks</summary>
+
+### Build from source
+
+Build tools: Git, Go compatible with [go.mod](go.mod) (**1.26.0+**), Node.js 24 and npm 11+. Agent execution also requires the supported ChatGPT desktop engine and model-service access described above.
+
+**Windows — PowerShell**
+
+```powershell
+git clone --branch dev https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+powershell -NoProfile -File scripts/build.ps1 -Target server
+$trialRoot = Join-Path (Get-Location).Path (".tmp\test-runs\readme-" + [guid]::NewGuid().ToString("N"))
+.\.tmp\dist\cobot.exe serve --data-root $trialRoot
 ```
 
-`cobot trace on|off|status|view` records every raw exchange under `<data root>/traces/` for
-debugging. Recordings are unredacted and can contain prompts, code and credentials: never
-commit or share them.
+**macOS — Bash**
 
-Stack: Go · React + TypeScript + Vite · TanStack Query · Tailwind CSS · SQLite (modernc) +
-goose · Wails v2 · HTTP JSON + SSE · MCP Go SDK. The API contract lives in `api/openapi.yaml`,
-and Go and TypeScript types are generated from it.
+```bash
+git clone --branch dev https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+./scripts/build.sh --target server
+mkdir -p .tmp/test-runs
+trial_root="$(mktemp -d "$(pwd)/.tmp/test-runs/readme.XXXXXX")"
+./.tmp/dist/cobot serve --data-root "$trial_root"
+```
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests in
-English or Chinese are welcome. For security reports, see [SECURITY.md](SECURITY.md).
+These commands build the local Web app. Keep its terminal open and press **Ctrl+C** there to stop it; closing the browser does not stop the service. If the browser does not open, use the startup link printed in the terminal and keep it private. Reuse the same `--data-root` to return to this trial. Without an explicit root, development uses `~/.cobot-dev` and production uses `~/.cobot`.
 
-Engineering rules and commands are indexed in [docs/](docs/README.md) (in Chinese).
-Coding agents start from [AGENTS.md](AGENTS.md). See [dependencies and notices](docs/reference/dependencies.md)
-for third-party sources and [upgrading](docs/reference/upgrading.md) for installation, migration and rollback limits.
+For desktop builds, use the `desktop` target in [build.ps1](scripts/build.ps1) or [build.sh](scripts/build.sh), with the platform's Wails/native build tools. Older packaging and native-test details remain available as a [versioned reference](https://github.com/kunghim/CoBot/blob/727ea51/README.md#build-from-source); its historical requirements do not override the current build scripts or release notes.
+
+For documentation changes:
+
+```bash
+node scripts/check-docs.mjs
+node scripts/check-public-files.mjs
+```
+
+For code changes, run `./scripts/check.sh` or `./scripts/check.ps1`; see the [verification workflow](docs/workflows/verify.md) for checks appropriate to the change. Automated tests, real-model checks and native-platform validation should be reported separately.
+
+</details>
 
 ## Community
 
-English and Chinese are welcome. One thread is enough; you do not need to
-translate your report or join a separate chat group to participate.
+- [Report a bug or propose a change](https://github.com/kunghim/CoBot/issues/new/choose).
+- [Ask about setup or usage](https://github.com/kunghim/CoBot/discussions/categories/q-a).
+- [Share a workflow or result](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell).
+- [Read announcements](https://github.com/kunghim/CoBot/discussions/categories/announcements).
 
-- [Report a bug or request a feature](https://github.com/kunghim/CoBot/issues/new/choose).
-- [Ask a setup or usage question](https://github.com/kunghim/CoBot/discussions/categories/q-a).
-- [Share something you built](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell).
-- [Read maintainer announcements](https://github.com/kunghim/CoBot/discussions/categories/announcements).
-- [Contribute](CONTRIBUTING.md): start from `dev` and open your PR against `dev`.
+For vulnerabilities, follow [SECURITY.md](SECURITY.md). Follow the [Code of conduct](CODE_OF_CONDUCT.md). Share only minimal, sanitized evidence; do not publish credentials, startup links or raw traces. Maintainer replies are best effort, with no fixed deadline.
 
-For vulnerabilities, use [SECURITY.md](SECURITY.md). Please follow the
-[Code of conduct](CODE_OF_CONDUCT.md) and remove private data from shared examples.
+## Direction
 
-## Roadmap
-
-These are directions we intend to explore, not commitments:
-
-- Verified desktop builds for Windows and macOS
-- More agent engines beyond Codex
-- Teams for non-coding work: office tasks, learning, writing and creative projects
+CoBot starts with software needs for people who do not code. Future work can extend to other scenarios and reusable working methods, with tools, deliverables and checks designed for each. These are development directions, not a delivery schedule. The engine integration remains extensible; there is currently no plan to add Claude Code.
 
 ## License
 
-Copyright 2026 CoBot contributors. Licensed under the [Apache License 2.0](LICENSE).
-Third-party dependencies retain their respective licenses.
+Licensed under the [Apache License 2.0](LICENSE). Third-party dependencies retain their licenses; see [dependencies and notices](docs/reference/dependencies.md).
