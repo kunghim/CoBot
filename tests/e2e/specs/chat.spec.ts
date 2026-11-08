@@ -195,7 +195,7 @@ test('desktop draws column heads and protects native controls from mode double c
   await page.screenshot({ path: join(process.env.COBOT_E2E_ROOT!, 'native-work-layout.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('radio', { name: '团队', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '关闭', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '退出 CoBot', exact: true })).toBeVisible();
   expect(await page.locator('body').evaluate((element) => element.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

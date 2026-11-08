@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | 提交 | `git add <具体路径>`，`git commit` | 本任务写过的笔记有改动时：`git -C <主目录>/.local add <这些文件>`，`git -C <主目录>/.local commit` |
 | 拉取 | `git pull` | `git -C <主目录>/.local pull --ff-only` |
-| 推送 | `git push` | 已有上游分支时 `git -C <主目录>/.local push`；第一次 `git -C <主目录>/.local push -u origin HEAD:notes`。还没设远端时按 [文档流程](docs.md#私人资料local) 设置；远端是上游 `kunghim/CoBot` 就停下告诉用户 |
+| 推送 | `git push` | 已有上游分支时 `git -C <主目录>/.local push`；第一次 `git -C <主目录>/.local push -u origin HEAD:<分支>`，单独的笔记仓库用 `main`，fork 用 `notes`（见 [文档流程](docs.md#私人资料local)）。还没设远端时按文档流程设置；远端是上游 `kunghim/CoBot` 就停下告诉用户 |
 | 开 PR | 按 CONTRIBUTING | 不涉及：笔记永远不进 PR |
 
 - 笔记拉取不能快进（两台电脑各自改过）时，停下告诉用户，不自动合并或覆盖。
