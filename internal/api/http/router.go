@@ -47,8 +47,6 @@ type Server struct {
 // Handler builds the full HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexProject)
-	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/latex", s.handleWorkspaceLatexCompile)
 	mux.HandleFunc("POST /api/v1/workspaces/{scope}/{id}/watch", s.handleWorkspaceWatch)
 	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/entries", s.handleWorkspaceEntries)
 	mux.HandleFunc("GET /api/v1/workspaces/{scope}/{id}/changes", s.handleWorkspaceChangeRuns)

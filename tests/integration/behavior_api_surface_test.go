@@ -129,17 +129,8 @@ func TestTeamLifeOverHTTP(t *testing.T) {
 	}
 	h.expectAPI(t, http.StatusOK, http.MethodPost, "/api/v1/teams/open", map[string]any{"path": fresh})
 
-	// Latex is not installed in this harness, and the answer says so.
-	if err := os.WriteFile(filepath.Join(directory, "main.tex"), []byte(`\documentclass{article}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	status, _ := h.callAPI(t, http.MethodPost, "/api/v1/workspaces/team/"+id+"/latex", map[string]any{"requestId": domain.NewID(), "main": "main.tex"})
-	if status == http.StatusOK {
-		t.Fatal("compiled without a compiler")
-	}
-
 	// There is no browser here, and the picture stream refuses a missing tab.
-	status, _ = h.callAPI(t, http.MethodGet, path+"/browser/stream?tabId=missing", nil)
+	status, _ := h.callAPI(t, http.MethodGet, path+"/browser/stream?tabId=missing", nil)
 	if status == http.StatusOK {
 		t.Fatal("streamed a tab that does not exist")
 	}

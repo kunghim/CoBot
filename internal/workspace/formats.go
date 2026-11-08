@@ -38,7 +38,6 @@ var formats = []Format{
 	{Kind: "spreadsheet", Extensions: []string{".xlsx", ".xlsm", ".csv", ".tsv"}},
 	{Kind: "presentation", Extensions: []string{".pptx"}},
 	{Kind: "notebook", Extensions: []string{".ipynb"}, ContentType: plainText},
-	{Kind: "latex", Extensions: []string{".tex"}, ContentType: plainText},
 	{Kind: "binary", Extensions: []string{".doc", ".xls", ".ppt", ".rtf", ".pages", ".numbers", ".key", ".odt", ".ods", ".odp", ".tif", ".tiff"}},
 }
 

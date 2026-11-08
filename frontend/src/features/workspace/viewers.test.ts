@@ -20,7 +20,7 @@ const matrix: [string, string, string, string, boolean][] = [
   ['spreadsheet', 'A.CSV', 'table', 'source', true],
   ['presentation', 'a.pptx', 'presentation', 'presentation', false],
   ['notebook', 'a.ipynb', 'notebook', 'source', true],
-  ['latex', 'a.tex', 'latex', 'latex', false],
+  ['text', 'a.tex', 'source', 'source', false],
   ['binary', 'a.bin', 'none', 'none', false],
   ['blocked', 'a.env', 'none', 'none', false],
   ['directory', 'a', 'none', 'none', false],

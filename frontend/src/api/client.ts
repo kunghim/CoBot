@@ -124,7 +124,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   if (token) headers.Authorization = 'Bearer ' + token;
   else headers['X-CSRF-Token'] = csrfToken();
   // Only durable business writes are safe to retry after a lost response.
-  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/') && !path.endsWith('/latex');
+  const retryable = !path.startsWith('/api/v1/auth/') && !path.startsWith('/api/v1/session/');
   let resp: Response;
   try { resp = await fetch(apiUrl(path), { method, headers, credentials: token ? 'omit' : 'include', body: payload, signal }); }
   catch (error) {
@@ -160,8 +160,6 @@ export const api = {
   workspaceChangeRuns: (scope: import('./types').WorkspaceScope, botId = '', cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeRunsPage>('GET', workspaceBase(scope) + '/changes' + pageQuery({ botId: botId || undefined, cursor: cursor || undefined }), undefined, signal),
   workspaceChangeFiles: (scope: import('./types').WorkspaceScope, runId: string, cursor = '', signal?: AbortSignal) => request<import('./types').WorkspaceChangeFilesPage>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + pageQuery({ cursor: cursor || undefined }), undefined, signal),
   workspaceChangeDiff: (scope: import('./types').WorkspaceScope, runId: string, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceChangeDiff>('GET', workspaceBase(scope) + '/changes/' + encodeURIComponent(runId) + '/file' + pageQuery({ path }), undefined, signal),
-  workspaceLatex: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceLatexProject>('GET', workspaceBase(scope) + '/latex' + pageQuery({ path }), undefined, signal),
-  compileWorkspaceLatex: (scope: import('./types').WorkspaceScope, main: string, signal: AbortSignal) => request<import('./types').WorkspaceLatexResult>('POST', workspaceBase(scope) + '/latex', { main }, signal),
   workspaceFile: (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal) => request<import('./types').WorkspaceFile>('GET', workspaceBase(scope) + '/file' + pageQuery({ path }), undefined, signal),
   workspaceEntries: (scope: import('./types').WorkspaceScope, path = '', cursor = '', includeHidden = false, signal?: AbortSignal) => request<import('./types').WorkspaceDirectory>('GET', workspaceBase(scope) + '/entries' + pageQuery({ path, cursor, includeHidden: includeHidden ? 'true' : undefined }), undefined, signal),
   workspaceBytes: async (scope: import('./types').WorkspaceScope, path: string, signal?: AbortSignal, range?: string, version?: string): Promise<Blob> => {

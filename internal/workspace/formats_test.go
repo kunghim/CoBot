@@ -63,7 +63,7 @@ func TestKindsAndContentTypes(t *testing.T) {
 		{"a.csv", "spreadsheet", binaryContentType},
 		{"a.pptx", "presentation", binaryContentType},
 		{"a.ipynb", "notebook", "text/plain; charset=utf-8"},
-		{"a.tex", "latex", "text/plain; charset=utf-8"},
+		{"a.tex", "text", "text/plain; charset=utf-8"},
 		{"a.doc", "binary", binaryContentType},
 		{"a.go", "text", "text/plain; charset=utf-8"},
 	} {
