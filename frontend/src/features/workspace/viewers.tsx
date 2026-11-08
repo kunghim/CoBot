@@ -5,7 +5,6 @@ import MarkdownPreview from './MarkdownPreview';
 import SourcePreview from './SourcePreview';
 import type { WorkspaceTab } from './state';
 
-const LatexPreview = lazy(() => import('./LatexPreview'));
 const PPTXPreview = lazy(() => import('./PPTXPreview'));
 const DOCXPreview = lazy(() => import('./DOCXPreview'));
 const WorkbookPreview = lazy(() => import('./WorkbookPreview'));
@@ -55,7 +54,6 @@ export const viewers: Record<WorkspaceFile['kind'], FileViewer[]> = {
   ],
   presentation: [{ id: 'presentation', component: PPTXPreview, perVersion: true }],
   notebook: [{ id: 'notebook', component: NotebookPreview, applies: asPreview }, source],
-  latex: [{ id: 'latex', component: LatexPreview }],
   binary: [],
   blocked: [],
 };

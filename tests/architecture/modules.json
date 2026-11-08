@@ -19,7 +19,7 @@
     "avatars": { "layer": "business", "files": ["avatars.go"] },
     "browser": { "layer": "business", "files": ["browser.go", "browser_panel.go"] },
     "preview": { "layer": "business", "files": ["preview.go"] },
-    "workspace": { "layer": "business", "files": ["workspace_changes.go", "workspace_files.go", "workspace_latex.go", "workspace_watch.go", "open_path.go"] },
+    "workspace": { "layer": "business", "files": ["workspace_changes.go", "workspace_files.go", "workspace_watch.go", "open_path.go"] },
     "updates": { "layer": "business", "files": ["update_check.go"] },
     "records": { "layer": "business", "files": ["activity.go", "pages.go", "search.go", "stats.go"] }
   }
