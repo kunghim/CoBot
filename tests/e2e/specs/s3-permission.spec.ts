@@ -22,8 +22,14 @@ async function openNewTeam(page: Page, name: string, teamDir: string) {
 async function openLeader(page: Page, name: string) {
   const toggle = page.getByRole('button', { name: new RegExp(name) }).first();
   await expect(toggle).toBeVisible({ timeout: 15000 });
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await page.locator('li').filter({ has: toggle }).first().getByRole('button', { name: /项目经理/ }).first().click();
+  const leader = page.locator('li').filter({ has: toggle }).first().getByRole('button', { name: /项目经理/ }).first();
+  // The team may still expand on its own after it is drawn; a click read
+  // against an older state would collapse it, so retry until it is open.
+  await expect(async () => {
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await expect(leader).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+  await leader.click();
 }
 
 // The composer's permission switch belongs to the team: it starts at the
