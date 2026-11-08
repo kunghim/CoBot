@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/workspace"
@@ -125,25 +124,29 @@ func TestWorkspaceFilesAreScopedAndContentSupportsRanges(t *testing.T) {
 
 func TestChatWorkspaceFilesCannotReadATeam(t *testing.T) {
 	h := newM2Harness(t)
-	attachChats(t, h, nil)
+	made := attachChats(t, h, nil)
 	team, _ := h.createTeam(t, nil)
 	sent, err := h.app.SendChat(context.Background(), h.user, "", app.ChatSendInput{RequestID: "workspace-create", Text: "create"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The chat's folder is made when its first turn starts, a moment after the
-	// send returns.
-	waitUntil(t, 5*time.Second, "the chat's folder", func() bool {
-		_, err := os.Stat(sent.Chat.Workspace)
-		return err == nil
-	})
+	// The runner creates the chat workspace just before it starts the engine.
+	chatCreated(t, made)
 	teamPath := filepath.Join(team.Directory, "team-only.txt")
 	os.WriteFile(teamPath, []byte("team"), 0600)
 	status, body := h.userGet(t, "/api/v1/workspaces/chat/"+sent.Chat.ID+"/file?path="+url.QueryEscape(teamPath))
 	if status != 403 {
 		t.Fatalf("cross-scope: %d %+v", status, body)
 	}
-	os.WriteFile(filepath.Join(sent.Chat.Workspace, "chat-only.txt"), []byte("chat"), 0600)
+	// On Windows this is "file://C:/...": the drive letter is a path, not a
+	// host, and the path is still outside the chat workspace.
+	status, body = h.userGet(t, "/api/v1/workspaces/chat/"+sent.Chat.ID+"/file?path="+url.QueryEscape("file://"+filepath.ToSlash(teamPath)))
+	if status != 403 {
+		t.Fatalf("cross-scope file URL: %d %+v", status, body)
+	}
+	if err := os.WriteFile(filepath.Join(sent.Chat.Workspace, "chat-only.txt"), []byte("chat"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	status, body = h.userGet(t, "/api/v1/workspaces/chat/"+sent.Chat.ID+"/file?path=chat-only.txt")
 	if status != 200 {
 		t.Fatalf("chat file: %d %+v", status, body)
