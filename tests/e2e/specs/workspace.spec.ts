@@ -167,8 +167,10 @@ test('file tree reads, navigates, restores and adapts to a narrow workspace', as
   await page.getByRole('checkbox', { name: '显示隐藏文件' }).check();
   await expect(tree.getByRole('treeitem', { name: '.hidden', exact: true })).toBeVisible();
   await page.reload();
+  // The reload restores the selected member, and its team expands on its
+  // own once the list has loaded; clicking it here could collapse it again.
   const team = page.getByRole('button', { name: /文件工作区团队/ }).first();
-  if ((await team.getAttribute('aria-expanded')) !== 'true') await team.click();
+  await expect(team).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
   await page.getByRole('button', { name: /项目经理/ }).filter({ visible: true }).first().click();
   await expect(files.getByText('const secondFile = 2;', { exact: true })).toBeVisible();
   await expect(tree.getByRole('treeitem', { name: 'b.ts', exact: true })).toBeVisible();
