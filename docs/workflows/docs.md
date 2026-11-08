@@ -46,25 +46,36 @@ git rev-parse --path-format=absolute --git-common-dir   # 输出 <主目录>/.gi
 在 worktree 里写这个路径时，你用来开发的编码工具（Codex、Claude Code 等）可能会请求批准，同意即可；
 不要为了绕过批准去改沙箱。嫌每次批准麻烦，可以自行把 `<主目录>/.local` 加为工具的可写目录，这是可选的。
 
-### 它是一个独立的 Git 仓库，默认存在自己 fork 的 `notes` 分支
+### 它是一个独立的 Git 仓库，只有一个分支
 
-`.local/` 自己是一个 Git 仓库，和 CoBot 代码没有共同历史；主仓库忽略 `.local/`，所以笔记不会进入代码提交，
-也无法从 `notes` 分支向上游开 PR（两边历史无关，CI 也会拒绝 `notes` 分支的 PR）。共建者不需要另建仓库。
+`.local/` 自己是一个 Git 仓库，和 CoBot 代码没有共同历史；主仓库忽略 `.local/`，所以笔记不会进入代码提交，也开不了 PR。
+它只用来在多台设备之间同步笔记：**只有一个分支，不建其他分支，也不建 worktree**。CoBot 的所有分支和 worktree 都读写主目录这一份，
+所以在任何分支上都能读到全部笔记。
 
-**智能体第一次需要写笔记时自动建立**，不用问用户：
+这个分支叫什么取决于远端：
 
-1. `git init <主目录>/.local`，写入下面目录结构里的 `README.md` 和 `archive/README.md`，提交一次。
-2. 设置远端：主仓库 `origin` 指向自己的 fork 时（不是 `kunghim/CoBot`），把同一个地址设为笔记的 `origin`：
-   `git -C <主目录>/.local remote add origin <主仓库 origin 的地址>`。
-   主仓库 `origin` 就是 `kunghim/CoBot`（维护者），或者用户想用单独的私有仓库时，不自动设置，推送前请用户给出地址。
-   **只在这一次**提醒用户：公开仓库的 fork 不能改成私有，`notes` 分支谁都能看到；想保密就另建一个私有仓库，给出地址后换成它。
-   笔记已经有远端（建过了）就不再提醒。
-3. 推送随代码一起（见 [交付与同步流程](deliver.md)）。第一次推送用 `git -C <主目录>/.local push -u origin HEAD:notes`，
-   之后的拉取、推送都对应 fork 上的 `notes` 分支。
+| 笔记远端 | 分支 |
+| --- | --- |
+| 单独的笔记仓库（可以是私有仓库；维护者用 `kunghim/CoBot-Notes`） | 该仓库的 `main` |
+| 自己的 CoBot fork（共建者不另建仓库时的默认） | `notes`：fork 的 `main` 是代码，不能共用 |
 
-换电脑：`git clone -b notes <自己 fork 的地址> <主目录>/.local`。
+**智能体第一次需要写笔记、而 `<主目录>/.local` 不存在时自动准备**：
+
+1. 确定远端：主仓库 `origin` 指向自己的 fork 时（不是 `kunghim/CoBot`），用同一个地址，不用问用户；
+   主仓库 `origin` 就是 `kunghim/CoBot`（维护者），或者用户想用单独的笔记仓库时，请用户给出地址，拿到之前不建立。
+2. **远端上已经有这个分支就 clone，不要 init**（另一台设备建过笔记时就是这样）：
+   笔记仓库用 `git clone <地址> <主目录>/.local`，fork 用 `git clone -b notes <地址> <主目录>/.local`。
+   在已有笔记的远端旁边另 init 一份，会得到两份没有共同历史的笔记，只能事后手工合并。
+3. 远端还没有这个分支（第一次用）时才 `git init <主目录>/.local`：写入下面目录结构里的 `README.md` 和 `archive/README.md`，
+   提交一次，`git -C <主目录>/.local remote add origin <地址>`。远端是 fork 时**只在这一次**提醒用户：
+   公开仓库的 fork 不能改成私有，`notes` 分支谁都能看到；想保密就另建一个私有仓库，给出地址后换成它。
+4. 推送随代码一起（见 [交付与同步流程](deliver.md)）。第一次推送用 `git -C <主目录>/.local push -u origin HEAD:<分支>`，
+   分支按上表取；之后的拉取、推送都对应这一个分支。
+
+换电脑：按第 2 步 clone。
 
 - 远端**永远不能是上游 `kunghim/CoBot`**；发现远端是它，停下告诉用户。
+- 远端出现第二个分支，或本地分支和远端分支没有共同历史时，停下告诉用户，不另开分支，也不自动合并。
 - 笔记里不写密钥和账号。
 
 ### 并行会话
