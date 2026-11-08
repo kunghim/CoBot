@@ -193,6 +193,9 @@ func (c Core) FinishIntent(ctx context.Context, p auth.Principal, value any) err
 // deleting un-imported evidence.
 func (c Core) Record(ctx context.Context, ev domain.Event) error {
 	stored, err := c.Insert(ctx, ev)
+	if errors.Is(err, sqlite.ErrTeamGone) {
+		return nil // the team was deleted meanwhile; there is nobody to tell
+	}
 	if err != nil {
 		return err
 	}
