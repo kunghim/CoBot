@@ -2,7 +2,8 @@
 # Runs the default Web/shared-core checks: formatting, contract generation
 # drift, frontend typecheck/tests/build, Go build and tests. Does not call
 # wails build or require native desktop toolchains.
-# Usage: scripts/check.sh [--desktop]
+# Usage: scripts/check.sh [--desktop] [--race]
+# --race reruns the Go tests with the race detector, which needs a C compiler.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -49,15 +50,24 @@ go test ./internal/... ./tests/...
 
 echo "==> frontend typecheck + unit tests"
 npm run typecheck --prefix frontend
+npm run check:imports --prefix frontend
 npm test --prefix frontend
 
 echo "==> go build with embedded assets"
 go build ./...
 
-if [ "${1:-}" = "--desktop" ]; then
-  echo "==> desktop shell compile (tags=desktop)"
-  mkdir -p .tmp/bin
-  go build -tags desktop -o .tmp/bin/check-cobot-desktop ./cmd/cobot-desktop
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --desktop)
+      echo "==> desktop shell compile (tags=desktop)"
+      mkdir -p .tmp/bin
+      go build -tags desktop -o .tmp/bin/check-cobot-desktop ./cmd/cobot-desktop
+      ;;
+    --race)
+      echo "==> go test -race"
+      go test -race ./internal/... ./tests/...
+      ;;
+  esac
+done
 
 echo "==> check passed"

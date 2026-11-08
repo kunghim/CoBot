@@ -1,0 +1,238 @@
+[
+  {
+    "rule": "layer",
+    "file": "internal/app/app.go",
+    "func": "Snapshot",
+    "target": "engine-control.EngineStatusCached"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/app.go",
+    "func": "Snapshot",
+    "target": "teams.listTeamsOn"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/app.go",
+    "func": "UpdateSettings",
+    "target": "budget.ResumeBudgetPausedBots"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/app.go",
+    "func": "UpdateSettings",
+    "target": "models.syncEngineProvider"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approval_control.go",
+    "func": "decideControlApproval",
+    "target": "turns.applyVerifiedRecoveryDecisionLocked"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approval_control.go",
+    "func": "decideControlApproval",
+    "target": "turns.finishRecoveryDecision"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approval_control.go",
+    "func": "decideControlApproval",
+    "target": "turns.verifyRecoveryTurn"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approval_native.go",
+    "func": "decideNativeApproval",
+    "target": "turns.runtime"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approvals.go",
+    "func": "ApprovalHistory",
+    "target": "records.ListPage"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approvals.go",
+    "func": "DecideApproval",
+    "target": "budget.decideBudgetApproval"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/approvals.go",
+    "func": "PendingApprovals",
+    "target": "turns.projectRecoveryOptions"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/chains.go",
+    "func": "finishChainDecision",
+    "target": "turns.InterruptRun"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/chains.go",
+    "func": "finishChainDecision",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/chains.go",
+    "func": "stoppedRouteNoticeLocked",
+    "target": "relay.memberNames"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/chains.go",
+    "func": "stoppedRouteNoticeLocked",
+    "target": "relay.stageLabel"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/collaboration.go",
+    "func": "sendFromBot",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/conversations.go",
+    "func": "enqueueUserMessage",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/conversations.go",
+    "func": "enqueueUserMessage",
+    "target": "turns.trySteer"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/effects.go",
+    "func": "publish",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/engine_catalog.go",
+    "func": "ApplyEngineCatalog",
+    "target": "turns.RestartStaleEngines"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/engine_catalog.go",
+    "func": "engineCatalogState",
+    "target": "turns.StaleEngines"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/message_edit.go",
+    "func": "EditMessage",
+    "target": "turns.EnsureTeamServer"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/message_edit.go",
+    "func": "EditMessage",
+    "target": "turns.runtime"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/open_path.go",
+    "func": "WarmTeam",
+    "target": "turns.Warm"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/pages.go",
+    "func": "ListPage",
+    "target": "turns.projectRecoveryOptionsOn"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/questions.go",
+    "func": "CancelQuestion",
+    "target": "relay.summarizeLine"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/questions.go",
+    "func": "wakeQuestionWork",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/relay.go",
+    "func": "CancelRequirement",
+    "target": "turns.steerNoteToRunningTurn"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/relay.go",
+    "func": "interruptCancelledWork",
+    "target": "turns.InterruptRun"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/run_retry.go",
+    "func": "RetryRun",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/team_lifecycle.go",
+    "func": "deleteMemberThreads",
+    "target": "turns.DeleteThreads"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/team_lifecycle.go",
+    "func": "releaseTeamRuntime",
+    "target": "turns.StopTeam"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/teams.go",
+    "func": "checkTeamDirectory",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/tool_run.go",
+    "func": "ValidateNativeToolSource",
+    "target": "turns.RootThread"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/tool_run.go",
+    "func": "validateToolRunOn",
+    "target": "turns.EngineEpochOfTeam"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/usage.go",
+    "func": "ResumeBudgetPausedBots",
+    "target": "turns.Wake"
+  },
+  {
+    "rule": "layer",
+    "file": "internal/app/usage.go",
+    "func": "ingestTokenUsage",
+    "target": "turns.RootThread"
+  },
+  {
+    "rule": "nested-begin-write",
+    "file": "internal/app/chats.go",
+    "func": "ChangeChat",
+    "target": "archiveChat",
+    "reason": "Hands over to archiveChat before taking its own write lock."
+  },
+  {
+    "rule": "nested-begin-write",
+    "file": "internal/app/teams.go",
+    "func": "AdoptTeam",
+    "target": "CreateTeam",
+    "reason": "Clears the write scope first, so CreateTeam does not take the lock."
+  }
+]

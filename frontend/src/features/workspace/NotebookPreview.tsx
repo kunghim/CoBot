@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 import type { WorkspaceFile, WorkspaceScope } from '../../api/types';
 import { Button, EmptyState, Spinner } from '../../components/ui';
 import { apiErrorMessage } from '../../i18n/errors';
-import Markdown from '../conversations/Markdown';
+import Markdown from '../../components/content/Markdown';
 import { scopeKey } from './fileNavigation';
 import { inertHTML, MAX_NOTEBOOK_BYTES, parseNotebook, type NotebookCell } from './notebook';
 

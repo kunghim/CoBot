@@ -69,16 +69,30 @@ func (a *App) DecideApproval(ctx context.Context, principal auth.Principal, appr
 	if err != nil {
 		return domain.Approval{}, sqlite.NormalizeError(err)
 	}
-	switch card.Type {
-	case domain.ApprovalNativeTool:
-		return a.decideNativeApproval(ctx, principal, approvalID, optionID, comment, expectedRevision, content)
-	case domain.ApprovalChain, domain.ApprovalRecovery:
-		return a.decideControlApproval(ctx, principal, card, optionID, comment, expectedRevision)
-	case domain.ApprovalBudget:
-		return a.decideBudgetApproval(ctx, principal, card, optionID, comment, expectedRevision)
-	default:
+	decide, ok := approvalDeciders[card.Type]
+	if !ok {
 		return domain.Approval{}, domain.Conflict("error.approval.option_unavailable", nil)
 	}
+	return decide(a, ctx, principal, card, optionID, comment, expectedRevision, content)
+}
+
+// approvalDecider takes the user's decision on one type of card.
+type approvalDecider func(a *App, ctx context.Context, p auth.Principal, card domain.Approval, optionID, comment string, expected int64, content map[string]any) (domain.Approval, error)
+
+func decideControlCard(a *App, ctx context.Context, p auth.Principal, card domain.Approval, optionID, comment string, expected int64, _ map[string]any) (domain.Approval, error) {
+	return a.decideControlApproval(ctx, p, card, optionID, comment, expected)
+}
+
+// approvalDeciders has a row for every type of card the interface lists.
+var approvalDeciders = map[string]approvalDecider{
+	domain.ApprovalNativeTool: func(a *App, ctx context.Context, p auth.Principal, card domain.Approval, optionID, comment string, expected int64, content map[string]any) (domain.Approval, error) {
+		return a.decideNativeApproval(ctx, p, card.ID, optionID, comment, expected, content)
+	},
+	domain.ApprovalChain:    decideControlCard,
+	domain.ApprovalRecovery: decideControlCard,
+	domain.ApprovalBudget: func(a *App, ctx context.Context, p auth.Principal, card domain.Approval, optionID, comment string, expected int64, _ map[string]any) (domain.Approval, error) {
+		return a.decideBudgetApproval(ctx, p, card, optionID, comment, expected)
+	},
 }
 
 func (a *App) publishApprovalUpdated(ctx context.Context, approval domain.Approval) {

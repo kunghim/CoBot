@@ -1,4 +1,4 @@
-package app
+package avatarservice
 
 import (
 	"bytes"
@@ -26,9 +26,9 @@ const (
 	avatarUploadGrace = 10 * time.Minute
 )
 
-// SaveAvatarUpload stores a local picture for use as an avatar and returns
+// SaveUpload stores a local picture for use as an avatar and returns
 // its file name. The picture stays in this profile's data root.
-func (a *App) SaveAvatarUpload(ctx context.Context, principal auth.Principal, data []byte) (string, error) {
+func (s Service) SaveUpload(ctx context.Context, principal auth.Principal, data []byte) (string, error) {
 	if principal.Kind != auth.KindUser {
 		return "", domain.Forbidden("error.forbidden.user_only", nil)
 	}
@@ -44,7 +44,7 @@ func (a *App) SaveAvatarUpload(ctx context.Context, principal auth.Principal, da
 	}
 	sum := sha256.Sum256(data)
 	name := hex.EncodeToString(sum[:]) + ".png"
-	dir := a.Paths.AvatarUploadsDir()
+	dir := s.Paths.AvatarUploadsDir()
 	target := filepath.Join(dir, name)
 	if _, err := os.Stat(target); err == nil {
 		// The same picture again: refresh its age so cleanup spares it.
@@ -75,15 +75,15 @@ func (a *App) SaveAvatarUpload(ctx context.Context, principal auth.Principal, da
 	return name, nil
 }
 
-// AvatarUploadPath returns where a stored picture is, for serving it.
-func (a *App) AvatarUploadPath(principal auth.Principal, name string) (string, error) {
+// UploadPath returns where a stored picture is, for serving it.
+func (s Service) UploadPath(principal auth.Principal, name string) (string, error) {
 	if principal.Kind != auth.KindUser {
 		return "", domain.Forbidden("error.forbidden.user_only", nil)
 	}
 	if !domain.UploadFileName.MatchString(name) {
 		return "", domain.NotFound("error.not_found", nil)
 	}
-	path := filepath.Join(a.Paths.AvatarUploadsDir(), name)
+	path := filepath.Join(s.Paths.AvatarUploadsDir(), name)
 	if _, err := os.Stat(path); err != nil {
 		return "", domain.NotFound("error.not_found", nil)
 	}
@@ -91,7 +91,7 @@ func (a *App) AvatarUploadPath(principal auth.Principal, name string) (string, e
 }
 
 // requireUploadExists rejects a reference to a picture that is not stored.
-func (a *App) requireUploadExists(ref *domain.AvatarRef) error {
+func (s Service) requireUploadExists(ref *domain.AvatarRef) error {
 	if ref == nil || ref.Kind != domain.AvatarKindUpload {
 		return nil
 	}
@@ -100,24 +100,24 @@ func (a *App) requireUploadExists(ref *domain.AvatarRef) error {
 	if !domain.UploadFileName.MatchString(ref.File) || filepath.Base(ref.File) != ref.File {
 		return domain.InvalidRequest("error.avatar.upload_missing", nil)
 	}
-	if _, err := os.Stat(filepath.Join(a.Paths.AvatarUploadsDir(), filepath.Base(ref.File))); err != nil {
+	if _, err := os.Stat(filepath.Join(s.Paths.AvatarUploadsDir(), filepath.Base(ref.File))); err != nil {
 		return domain.InvalidRequest("error.avatar.upload_missing", nil)
 	}
 	return nil
 }
 
-// CleanAvatarUploads removes stored pictures no member or role uses any
+// CleanUploads removes stored pictures no member or role uses any
 // more. It runs once as the core starts; recent files are spared.
-func (a *App) CleanAvatarUploads(ctx context.Context) {
-	dir := a.Paths.AvatarUploadsDir()
+func (s Service) CleanUploads(ctx context.Context) {
+	dir := s.Paths.AvatarUploadsDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
-	used, err := a.usedUploads(ctx)
+	used, err := s.usedUploads(ctx)
 	if err != nil {
-		if a.Logger != nil {
-			a.Logger.Warn("avatar pictures not cleaned", "error", err)
+		if s.Logger != nil {
+			s.Logger.Warn("avatar pictures not cleaned", "error", err)
 		}
 		return
 	}
@@ -138,7 +138,7 @@ func (a *App) CleanAvatarUploads(ctx context.Context) {
 	}
 }
 
-func (a *App) usedUploads(ctx context.Context) (map[string]bool, error) {
+func (s Service) usedUploads(ctx context.Context) (map[string]bool, error) {
 	used := map[string]bool{}
 	note := func(stored string) {
 		if ref := domain.DecodeAvatar(stored); ref != nil && ref.Kind == domain.AvatarKindUpload {
@@ -146,7 +146,7 @@ func (a *App) usedUploads(ctx context.Context) (map[string]bool, error) {
 		}
 	}
 	// Deleted members keep their history; their pictures stay too.
-	rows, err := a.DB.QueryContext(ctx, `SELECT avatar FROM bots WHERE avatar != ''`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT avatar FROM bots WHERE avatar != ''`)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (a *App) usedUploads(ctx context.Context) (map[string]bool, error) {
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	roles, err := sqlite.RoleAvatars(ctx, a.DB)
+	roles, err := sqlite.RoleAvatars(ctx, s.DB)
 	if err != nil {
 		return nil, err
 	}

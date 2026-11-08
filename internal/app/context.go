@@ -65,6 +65,47 @@ func (a *App) rosterText(ctx context.Context, teamID string) string {
 	return b.String()
 }
 
+// recruitableText lists the library roles the team does not have yet, with
+// the id request_member takes. Without it the project manager has to guess
+// an id from the role's name, and guesses wrong.
+func (a *App) recruitableText(ctx context.Context, teamID string) string {
+	var b strings.Builder
+	for _, role := range a.recruitableRoles(ctx, teamID) {
+		fmt.Fprintf(&b, "- %s（roleId=%s）\n", role.Name, role.ID)
+	}
+	return b.String()
+}
+
+// recruitableSection heads the list, or says there is nothing left to ask for.
+func recruitableSection(list string) string {
+	if list == "" {
+		return "可招募的角色：没有了，角色库里的角色团队都已经有。\n"
+	}
+	return "可招募的角色（request_member 的 roleIds 填这里的 roleId）：\n" + list
+}
+
+// recruitableRoles are the library roles other than the leader that no
+// member of the team holds.
+func (a *App) recruitableRoles(ctx context.Context, teamID string) []roles.Role {
+	all, err := roles.Defaults()
+	if err != nil {
+		return nil
+	}
+	present := map[string]bool{}
+	if members, err := sqlite.ListBots(ctx, a.DB, teamID); err == nil {
+		for _, m := range members {
+			present[m.RoleID] = true
+		}
+	}
+	out := make([]roles.Role, 0, len(all))
+	for _, role := range all {
+		if role.ID != roles.LeaderRoleID && !present[role.ID] {
+			out = append(out, role)
+		}
+	}
+	return out
+}
+
 func (a *App) memoriesText(ctx context.Context, teamID, botID string) string {
 	var b strings.Builder
 	for _, m := range a.memoriesForContext(ctx, teamID, botID).Items {
@@ -112,6 +153,7 @@ func toolGuide(role string, codeMode bool) string {
 	b.WriteString("- send_message({targetBotIds, text})：给同事留言，只用于反馈和告知，对方不会被唤醒；不要用它派活、催人或代替交接。\n")
 	if role == "leader" {
 		b.WriteString("- ask_user({question, options?})：向用户提问，然后结束这一轮，用户回答后你会被唤醒。\n")
+		b.WriteString("- request_member({roleIds, reason})：申请招募团队还没有的角色，roleIds 填「可招募的角色」里列出的 roleId，然后结束这一轮，等用户决定。\n")
 	} else {
 		b.WriteString("- ask_user({question, options?})：只用于只有用户能决定的问题，然后结束这一轮，用户的回答会送回给你。需求范围的变化不要用它，用 handoff 上报项目经理。\n")
 	}
@@ -179,6 +221,9 @@ func (a *App) threadInstructions(ctx context.Context, team domain.Team, bot doma
 	fmt.Fprintf(&b, "你的名字：%s（角色：%s）\n", bot.Name, role.Name)
 	b.WriteString("成员：\n")
 	b.WriteString(roster)
+	if place == "leader" {
+		b.WriteString(recruitableSection(a.recruitableText(ctx, team.ID)))
+	}
 	b.WriteString("和用户交流使用用户的语言。\n")
 	if memories != "" {
 		b.WriteString("\n# 你的记忆（工作方法与偏好）\n")
@@ -197,6 +242,9 @@ func (a *App) turnContext(ctx context.Context, bot domain.Bot, runID string, see
 	if roster := a.rosterText(ctx, bot.TeamID); digestOf(roster) != seen.Roster {
 		b.WriteString("# 团队成员有变化，当前成员：\n")
 		b.WriteString(roster)
+		if bot.IsLeader {
+			b.WriteString(recruitableSection(a.recruitableText(ctx, bot.TeamID)))
+		}
 		next.Roster = digestOf(roster)
 	}
 	if cards := a.ownCardsText(ctx, bot.TeamID, bot.ID); digestOf(cards) != seen.Tasks {
@@ -262,4 +310,14 @@ func (a *App) unseenNotes(ctx context.Context, bot domain.Bot, runID string) str
 		fmt.Fprintf(&b, "- 来自%s：%s\n", name, message.RenderText())
 	}
 	return b.String()
+}
+
+// bridgeRole is the tool set a member's bridge offers: "leader" for the
+// team's leader, "member" for everyone else. A reviewer is a member like
+// any other: what it reviews comes to it on cards.
+func bridgeRole(team domain.Team, bot domain.Bot) string {
+	if bot.IsLeader || team.LeaderID == bot.ID {
+		return "leader"
+	}
+	return "member"
 }

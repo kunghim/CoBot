@@ -309,7 +309,7 @@ func (a *App) ChangeChat(ctx context.Context, p auth.Principal, id, action strin
 	}
 	defer tx.Rollback()
 	if action == "delete" {
-		_, err = tx.ExecContext(ctx, `DELETE FROM chats WHERE id=?`, id)
+		err = sqlite.DeleteChat(ctx, tx, id)
 	} else {
 		err = sqlite.SaveChat(ctx, tx, c, false)
 	}

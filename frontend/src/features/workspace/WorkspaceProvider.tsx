@@ -3,9 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { WorkspaceScope } from '../../api/types';
 import { useWorkPanelRequests } from '../../app/workPanelNav';
+import { ContentActionsContext, type ContentActions } from '../../components/content/ContentActions';
 import { listenForChanges } from './changeNavigation';
 import { CHANGES_TAB_ID } from './state';
-import { listenForFiles } from './fileNavigation';
+import { listenForFiles, openWorkspaceFile } from './fileNavigation';
 import { initialWorkspaceState, loadWorkspace, saveWorkspace, workspaceKey, workspaceReducer, type WorkspaceAction, type WorkspaceState, type WorkspaceTab } from './state';
 
 interface WorkspaceContext {
@@ -92,7 +93,11 @@ export function WorkspaceProvider({ teamId = null, chatId = null, botId = null, 
     setWidth: (width) => dispatch({ type: 'setWidth', width }),
     cardOpen, setCardOpen,
   }), [teamId, botId, scope, state, dispatch, cardOpen]);
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  const contentActions = useMemo<ContentActions>(() => ({
+    openFile: openWorkspaceFile,
+    showBrowserTab: (tab) => dispatch({ type: 'openTab', tab: { id: `browser:${tab.id}`, kind: 'browser', title: tab.title, ref: tab.id }, focus: true }),
+  }), [dispatch]);
+  return <WorkspaceContext.Provider value={value}><ContentActionsContext.Provider value={contentActions}>{children}</ContentActionsContext.Provider></WorkspaceContext.Provider>;
 }
 
 export function useWorkspace(): WorkspaceContext {

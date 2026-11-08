@@ -1907,7 +1907,7 @@ export interface components {
         };
         ProviderModel: {
             id: string;
-            /** @description The user's own name for the model */
+            /** @description The user's own name for the model, shown in its place. */
             displayName?: string;
             contextWindow?: number;
             maxOutput?: number;
@@ -1929,7 +1929,7 @@ export interface components {
             name?: string;
             alias?: string;
             displayName: string;
-            /** @description In use. The user's own number when it is below the limit */
+            /** @description In use. The user's own number when it is below the limit, else the catalog's. */
             contextWindow: number;
             maxOutput: number;
             /** @description The most the catalog says the model reads; 0 when it does not know the model. */
@@ -2015,7 +2015,7 @@ export interface components {
         };
         ProviderProbeResult: {
             ok: boolean;
-            /** @description Stable machine code */
+            /** @description Stable machine code, e.g. quota or auth_invalid. */
             code?: string;
             message?: string;
         };
@@ -2067,7 +2067,7 @@ export interface components {
             /** @enum {string} */
             mode?: "rerun" | "return_to_me";
             suggestions?: string;
-            /** @description With a runnable result */
+            /** @description With a runnable result, the command that starts it in the team directory; the acceptance card offers to run it. */
             previewCommand?: string;
             /** @description The address to open once the preview answers. */
             previewUrl?: string;
@@ -2144,7 +2144,7 @@ export interface components {
             teamId: string;
             botId: string;
             /**
-             * @description document is a relay-posted document (the requirement to confirm
+             * @description document is a relay-posted document (the requirement to confirm, the acceptance report), rendered as its own card.
              * @enum {string}
              */
             kind: "user" | "assistant" | "collaboration" | "system" | "document";
@@ -2213,7 +2213,7 @@ export interface components {
         AnswerQuestionRequest: {
             /** Format: uuid */
             requestId: string;
-            /** @description The answer; for a confirmation or acceptance */
+            /** @description The answer; for a confirmation or acceptance, the requested changes (required with revise); for a recruitment request, an optional comment carried to the project manager. */
             answerText: string;
             /**
              * @description Required for a confirmation or acceptance question (accept, revise), or a recruitment request (approve, reject); refused for any other kind.
@@ -2232,7 +2232,7 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             /** @enum {string} */
-            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "browser";
+            tool: "view_tasks" | "start_requirement" | "handoff" | "send_message" | "ask_user" | "request_member" | "browser";
             arguments?: {
                 [key: string]: unknown;
             };
@@ -2256,6 +2256,12 @@ export interface components {
                 params?: {
                     [key: string]: unknown;
                 };
+            };
+        };
+        ActivityItem: components["schemas"]["Event"] & {
+            /** @description Best effort; a record deleted since reads as the bare event. */
+            detail?: {
+                [key: string]: unknown;
             };
         };
         Envelope: {
@@ -2289,6 +2295,8 @@ export interface components {
             loggedIn: boolean;
             capabilities?: string[];
             errorKey?: string;
+            /** Format: date-time */
+            checkedAt?: string;
         };
         Status: {
             sessionCookieName: string;
@@ -2524,7 +2532,7 @@ export interface components {
             text: string;
             /** Format: date-time */
             createdAt: string;
-            /** @description Who sent it */
+            /** @description Who sent it, when it came from another member or the user dispatched the card; absent for the member's own exchange with the user. */
             senderBotId?: string;
         };
         TeamWithBots: {
@@ -2742,6 +2750,24 @@ export interface components {
         };
     };
     responses: {
+        /** @description A member's tool call refused before it ran; the code comes from the tool's own vocabulary */
+        ToolTransportError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    error: {
+                        code: string;
+                        messageKey: string;
+                        params?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                    requestId: string;
+                };
+            };
+        };
         /** @description Structured error */
         Error: {
             headers: {
@@ -3262,17 +3288,16 @@ export interface operations {
     deleteChat: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                "If-Match": number;
+            };
             path: {
                 chatId: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatActionInput"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Success */
             200: {
@@ -3620,7 +3645,8 @@ export interface operations {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             roleId: string;
-                            avatar?: components["schemas"]["AvatarRef"];
+                            /** @description The avatar now set; null when it follows the default again. */
+                            avatar?: components["schemas"]["AvatarRef"] | null;
                         };
                     };
                 };
@@ -3643,7 +3669,7 @@ export interface operations {
                     requestId: string;
                     /**
                      * Format: byte
-                     * @description Base64 PNG
+                     * @description Base64 PNG, at most 512 KB
                      */
                     data: string;
                 };
@@ -4553,6 +4579,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: {
                                 id?: string;
                                 nameKey?: string;
@@ -4598,6 +4626,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["TeamWithBots"][];
                         };
                     };
@@ -5006,7 +5036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             /** @description A Chromium-based browser is installed on this computer. */
                             available: boolean;
@@ -5018,7 +5048,7 @@ export interface operations {
                                  * @enum {string}
                                  */
                                 owner: "member" | "user";
-                                /** @description The bot id */
+                                /** @description The bot id, present for a member's tab only. */
                                 memberId?: string;
                                 url: string;
                                 title: string;
@@ -5059,7 +5089,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             tab: {
                                 id: string;
@@ -5068,6 +5098,8 @@ export interface operations {
                                 memberId?: string;
                                 url: string;
                                 title: string;
+                                /** @description A member's call is working in this tab. */
+                                busy?: boolean;
                                 viewport?: components["schemas"]["BrowserViewport"];
                             };
                         };
@@ -5098,7 +5130,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             ok: boolean;
                         };
@@ -5142,7 +5174,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
+                    "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             /** @description The window size now applied; null after clear. */
                             viewport: components["schemas"]["BrowserViewport"] | null;
@@ -5531,6 +5563,10 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description How many approvals are pending; absent from the history view. */
+                            total?: number;
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Approval"][];
                         };
                     };
@@ -5723,6 +5759,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Question"][];
                         };
                     };
@@ -5847,6 +5885,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Message"][];
                         };
                     };
@@ -5879,7 +5919,9 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
-                            items?: components["schemas"]["Event"][];
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
+                            items?: components["schemas"]["ActivityItem"][];
                         };
                     };
                 };
@@ -5911,6 +5953,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
+                            /** @description Empty on the last page. */
+                            nextCursor?: string;
                             items?: components["schemas"]["Memory"][];
                         };
                     };
@@ -6022,7 +6066,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: uuid */
-                    requestId: string;
+                    requestId?: string;
                     path: string;
                 };
             };
@@ -6037,9 +6081,10 @@ export interface operations {
                     "application/json": components["schemas"]["Envelope"] & {
                         data?: {
                             canonical?: string;
+                            /** @description The form folders are compared by. */
+                            key?: string;
                             ok?: boolean;
                             duplicate?: boolean;
-                            nested?: boolean;
                             /** @description Another team (possibly in another CoBot instance) still claims the folder through its marker; creation refuses it. */
                             claimed?: boolean;
                             teamId?: string;
@@ -6271,7 +6316,7 @@ export interface operations {
     searchConversations: {
         parameters: {
             query: {
-                /** @description Plain text matched against chat titles */
+                /** @description Plain text matched against chat titles, chat message text, and team member message text. */
                 q: string;
             };
             header?: never;
@@ -6318,8 +6363,8 @@ export interface operations {
                     };
                 };
             };
-            401: components["responses"]["Error"];
-            503: components["responses"]["Error"];
+            401: components["responses"]["ToolTransportError"];
+            503: components["responses"]["ToolTransportError"];
         };
     };
 }

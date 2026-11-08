@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
@@ -59,10 +58,6 @@ func (d *Dispatcher) ResolveToken(token string) (auth.Principal, auth.BotBinding
 // dispatchTimeout bounds every bridge-driven call so a stuck application call
 // can never hang the engine's tool loop.
 const dispatchTimeout = 30 * time.Second
-
-// browserTimeout fits inside the bridge's 60 seconds: a page may take a while,
-// and the browser's own budget (50s) ends the call first.
-const browserTimeout = 55 * time.Second
 
 // ToolCall is one MCP tool invocation arriving from the bridge.
 type ToolCall struct {
@@ -183,179 +178,23 @@ func canonicalArgsHash(raw json.RawMessage) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// callToolOnce is the routing switch itself (pre-idempotency behavior).
+// callToolOnce routes one call through the table (pre-idempotency behavior).
 func (d *Dispatcher) callToolOnce(ctx context.Context, principal auth.Principal, call ToolCall) ToolResult {
+	tool := toolByName[call.Name]
 	timeout := dispatchTimeout
-	if call.Name == "browser" {
-		timeout = browserTimeout
+	if tool != nil && tool.Timeout > 0 {
+		timeout = tool.Timeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if principal.SubAgent && handoffOnly[call.Name] {
-		return rejected("forbidden", "error.tool.subagent_forbidden", map[string]any{"tool": call.Name})
-	}
-	switch call.Name {
-	case "view_tasks":
-		var args struct {
-			RequirementID string `json:"requirementId"`
-			CardID        string `json:"cardId"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		data, err := d.app.ViewTasks(ctx, principal, args.RequirementID, args.CardID)
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusOK, Data: data}
-
-	case "start_requirement":
-		var args struct {
-			Title     string         `json:"title"`
-			Document  string         `json:"document"`
-			Stages    []domain.Stage `json:"stages"`
-			RequestID string         `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		req, err := d.app.StartRequirement(ctx, principal, app.StartRequirementInput{Title: args.Title, Document: args.Document, Stages: args.Stages})
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"requirementId": req.ID,
-			"note": "已提交，系统会把需求文档和链路交给用户确认。现在结束这一轮。"}}
-
-	case "handoff":
-		var args struct {
-			CardID       string   `json:"cardId"`
-			Outcome      string   `json:"outcome"`
-			Summary      string   `json:"summary"`
-			ArtifactRefs []string `json:"artifactRefs"`
-			Preview      *struct {
-				Command string `json:"command"`
-				URL     string `json:"url"`
-			} `json:"preview"`
-			Mode        string `json:"mode"`
-			Suggestions string `json:"suggestions"`
-			Document    string `json:"document"`
-			RequestID   string `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		card, err := d.app.Handoff(ctx, principal, app.HandoffInput{
-			CardID: args.CardID, Outcome: args.Outcome, Summary: args.Summary, ArtifactRefs: args.ArtifactRefs,
-			PreviewCommand: previewCommand(args.Preview), PreviewURL: previewURL(args.Preview),
-			Mode: args.Mode, Suggestions: args.Suggestions, Document: args.Document,
-		})
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"cardId": card.ID, "status": card.Status,
-			"note": "已交接，系统会按链路继续。这张卡片处理完了；手上没有别的卡片就结束这一轮。"}}
-
-	case "send_message":
-		var args struct {
-			TargetBotID  string   `json:"targetBotId"`
-			TargetBotIDs []string `json:"targetBotIds"`
-			Text         string   `json:"text"`
-			RequestID    string   `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		targets := uniqueTargets(args.TargetBotID, args.TargetBotIDs)
-		if len(targets) == 0 {
-			return rejected("invalid_request", "error.message.target_required", nil)
-		}
-		if len(targets) == 1 {
-			result, err := d.app.NotifyFromBot(ctx, principal, targets[0], args.Text, "", args.RequestID)
-			if err != nil {
-				return errorResult(err)
-			}
-			return ToolResult{Status: StatusAccepted, Data: result}
-		}
-		// One message per recipient, each its own idempotent write so a
-		// retried broadcast neither duplicates nor drops a recipient.
-		results := make([]map[string]any, 0, len(targets))
-		for _, target := range targets {
-			result, err := d.app.NotifyFromBot(ctx, perRecipient(principal, target), target, args.Text, "", recipientKey(args.RequestID, target))
-			if err != nil {
-				return errorResult(err)
-			}
-			result["targetBotId"] = target
-			results = append(results, result)
-		}
-		return ToolResult{Status: StatusAccepted, Data: map[string]any{"status": "notified", "recipients": results}}
-
-	case "ask_user":
-		var args struct {
-			Question  string   `json:"question"`
-			Options   []string `json:"options"`
-			RequestID string   `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		question, err := d.app.AskUser(ctx, principal, app.AskUserInput{Question: args.Question, Options: args.Options})
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID}}
-
-	case "request_member":
-		var args struct {
-			RoleIDs   []string `json:"roleIds"`
-			Reason    string   `json:"reason"`
-			RequestID string   `json:"idempotencyKey"`
-		}
-		if err := decodeArgs(call.Arguments, &args); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		if args.RequestID == "" {
-			return rejected("invalid_request", "error.idempotency.required", nil)
-		}
-		question, err := d.app.RequestMember(ctx, principal, app.RequestMemberInput{RoleIDs: args.RoleIDs, Reason: args.Reason})
-		if err != nil {
-			return errorResult(err)
-		}
-		return ToolResult{Status: StatusWaiting, Data: map[string]any{"questionId": question.ID, "roleIds": question.RoleIDs}}
-
-	case "browser":
-		var req browser.Request
-		if err := decodeArgs(call.Arguments, &req); err != nil {
-			return rejected("invalid_request", "error.invalid_json", nil)
-		}
-		result, err := d.app.UseBrowser(ctx, principal, req)
-		if err != nil {
-			return errorResult(err)
-		}
-		// The member reads this back as JSON; round-trip it into the wire map.
-		raw, err := json.Marshal(result)
-		if err != nil {
-			return errorResult(err)
-		}
-		data := map[string]any{}
-		_ = json.Unmarshal(raw, &data)
-		return ToolResult{Status: StatusOK, Data: data}
-
-	default:
+	if tool == nil {
 		return rejected("invalid_request", "error.tool.unknown", map[string]any{"tool": call.Name})
 	}
+	if principal.SubAgent && !tool.SubAgentOK {
+		return rejected("forbidden", "error.tool.subagent_forbidden", map[string]any{"tool": call.Name})
+	}
+	return tool.Call(ctx, d, principal, call.Arguments)
 }
 
 func rejected(code, messageKey string, params map[string]any) ToolResult {
@@ -365,65 +204,4 @@ func rejected(code, messageKey string, params map[string]any) ToolResult {
 func errorResult(err error) ToolResult {
 	te := withHint(toolError(err))
 	return ToolResult{Status: te.Status, Error: te}
-}
-
-// uniqueTargets is the send_message recipient list: targetBotIds, or the
-// single legacy targetBotId, without repeats.
-func uniqueTargets(single string, many []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, id := range append([]string{single}, many...) {
-		id = strings.TrimSpace(id)
-		if id == "" || seen[id] {
-			continue
-		}
-		seen[id] = true
-		out = append(out, id)
-	}
-	return out
-}
-
-// recipientKey derives one recipient's idempotency key from the broadcast's.
-func recipientKey(key, target string) string {
-	if len(key) > 100 {
-		key = key[:100]
-	}
-	suffix := target
-	if len(suffix) > 12 {
-		suffix = suffix[:12]
-	}
-	return key + "/" + suffix
-}
-
-// perRecipient gives each recipient's write its own idempotency identity.
-func perRecipient(p auth.Principal, target string) auth.Principal {
-	if p.Write == nil {
-		return p
-	}
-	write := *p.Write
-	write.Key = recipientKey(write.Key, target)
-	p.Write = &write
-	return p
-}
-
-// previewCommand keeps the run instruction the member gave, or empty when
-// the handoff carried no preview at all.
-func previewCommand(p *struct {
-	Command string `json:"command"`
-	URL     string `json:"url"`
-}) string {
-	if p == nil {
-		return ""
-	}
-	return strings.TrimSpace(p.Command)
-}
-
-func previewURL(p *struct {
-	Command string `json:"command"`
-	URL     string `json:"url"`
-}) string {
-	if p == nil {
-		return ""
-	}
-	return strings.TrimSpace(p.URL)
 }

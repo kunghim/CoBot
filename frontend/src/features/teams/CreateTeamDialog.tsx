@@ -3,7 +3,7 @@
 // system's folder chooser (through the desktop bridge, or the local core in
 // the browser); a path can still be typed or pasted. The chosen directory is
 // checked at once with the same rules creation uses; a folder another team
-// claims cannot be used. Backend validation errors (duplicate/nested
+// claims cannot be used. Backend validation errors (a duplicate
 // directory, member limit, unknown role...) surface through their messageKey
 // with params.
 import { useEffect, useRef, useState } from 'react';
@@ -79,7 +79,7 @@ export default function CreateTeamDialog({
     : library.filter((role) => role.id !== 'leader');
   const canSubmit = name.trim() !== '' && directory.trim() !== '' && verdict?.ok !== false && !create.isPending;
 
-  // The check uses the same rules creation uses, so a duplicate, nested or
+  // The check uses the same rules creation uses, so a duplicate or
   // foreign-marked directory shows before submit, not only as a late error.
   const checkDirectory = (path: string) => {
     const trimmed = path.trim();
@@ -117,7 +117,6 @@ export default function CreateTeamDialog({
     if (result.ok) return t('team.directoryOk', { path: result.canonical });
     if (result.duplicate && result.archived) return t('team.directoryArchived', { teamName });
     if (result.duplicate) return t('team.directoryDuplicate', { teamName });
-    if (result.nested) return t('team.directoryNested', { teamName });
     if (result.claimed) return teamName ? t('team.directoryClaimed', { teamName }) : t('team.directoryClaimedUnknown');
     return t('status.error');
   };

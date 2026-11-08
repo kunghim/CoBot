@@ -4,11 +4,14 @@
 
 - CoBot 只管理自己的私有 Codex 环境（数据根下的 `CODEX_HOME`）。启动引擎时不继承用户已有的 `CODEX_HOME` 或供应商密钥，
   不读写用户日常的 Codex 状态。
+- 引擎启动时固定带 `-c features.apps=false`。Codex 默认开启这个功能：登录 ChatGPT 后，每个线程都能用到这个账号接入的应用，
+  包括 Codex 自带的搜索。不关掉的话，成员能碰到用户的邮箱、云盘，给模型关了联网搜索也拦不住它搜索。
 - 只运行 ChatGPT 桌面端内置的 Codex，不从 PATH、standalone、npm、Cargo 或 Homebrew 回退。macOS 按应用包身份发现，Windows 按已安装 Store 包元数据发现；其他平台暂不自动发现。手动路径也必须属于桌面端应用包，符号链接解析后仍须在包内。找不到时提示安装或更新桌面端，不自动安装、不改用户的 shell 或 PATH。
 - Windows 桌面端仍使用 `OpenAI.Codex` 包身份，见[官方部署文档](https://learn.chatgpt.com/docs/enterprise/windows-deployment)；应用显示名称与安装包身份不能混用。
 - 协议有变化时先运行 `cobot trace protocol`，对照 `internal/engine/codex/protocol_baseline.json`（已处理的方法见 `handled.go`），
   确认差异后再改适配代码；更新基线用 `cobot trace protocol --write-baseline <文件>`。
 - 需要看真实流量时用 `cobot trace on|view|off --data-root <路径>`。录制未脱敏，留在数据根，不提交、不贴进 Issue/PR。
+- Codex 只在默认供应商（顶层 `model_provider`）和线程的供应商一致时才接受开始一轮、转向和恢复线程。这几个调用都走 `asThreadProvider`：调用期间切到线程的供应商，结束后切回引擎自己的账号。假引擎测不到这一点，改这里要跑 `COBOT_R_SMOKE=1 go test ./internal/engine/codex/`。
 - Codex 客户端的读循环同时负责接收回应，不在读循环里同步处理需要回应的请求。
 - 原生 hook 只注册在私有环境的 `PreToolUse`，匹配 `Bash|apply_patch`；只自动信任 CoBot 自己生成且内容逐字匹配的定义，
   不为通过测试放宽沙箱、审批或 hook 信任。授权被拒绝时的手动审查见 [hook 排障](../reference/hook-review.md)。

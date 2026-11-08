@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kunghim/CoBot/internal/app"
 	"github.com/kunghim/CoBot/internal/workspace"
@@ -130,6 +131,12 @@ func TestChatWorkspaceFilesCannotReadATeam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The chat's folder is made when its first turn starts, a moment after the
+	// send returns.
+	waitUntil(t, 5*time.Second, "the chat's folder", func() bool {
+		_, err := os.Stat(sent.Chat.Workspace)
+		return err == nil
+	})
 	teamPath := filepath.Join(team.Directory, "team-only.txt")
 	os.WriteFile(teamPath, []byte("team"), 0600)
 	status, body := h.userGet(t, "/api/v1/workspaces/chat/"+sent.Chat.ID+"/file?path="+url.QueryEscape(teamPath))

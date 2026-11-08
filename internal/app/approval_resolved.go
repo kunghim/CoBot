@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kunghim/CoBot/internal/domain"
+	"github.com/kunghim/CoBot/internal/store/sqlite"
 )
 
 // settleEngineRequest closes an approval card Codex no longer waits for: the
@@ -16,13 +17,11 @@ func (a *App) settleEngineRequest(ctx context.Context, teamID, epoch string, req
 	if len(requestID) == 0 {
 		return
 	}
-	result, err := a.DB.ExecContext(ctx, `UPDATE approvals SET request_state = ?, revision = revision + 1
-		WHERE team_id = ? AND engine_epoch = ? AND engine_request_id = ? AND request_state = ?`,
-		domain.ApprovalStateInvalidated, teamID, epoch, string(requestID), domain.ApprovalStatePending)
+	changed, err := sqlite.InvalidatePendingEngineRequest(ctx, a.DB, teamID, epoch, string(requestID))
 	if err != nil {
 		return
 	}
-	if changed, _ := result.RowsAffected(); changed > 0 {
+	if changed > 0 {
 		a.recordEvent(ctx, domain.Event{Type: domain.EventApprovalUpdated, TeamID: teamID})
 		a.Hub.Publish()
 	}

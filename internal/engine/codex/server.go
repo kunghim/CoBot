@@ -60,8 +60,10 @@ type Server struct {
 	// started with; empty when it knows only the engine's own models.
 	catalog string
 
-	loaded map[string]bool   // threads this app-server has loaded
-	phases map[string]string // agent message item -> phase, while it streams
+	loaded map[string]bool // threads this app-server has loaded
+	// providers maps a thread to the provider the engine said it runs with.
+	providers map[string]string
+	phases    map[string]string // agent message item -> phase, while it streams
 	// parents maps a sub-agent thread to the thread that spawned it.
 	parents map[string]string
 
@@ -111,6 +113,14 @@ var recordingLogFilter = []string{
 	"codex_core_plugins=warn",
 }
 
+// engineOverrides are settings every CoBot engine runs with.
+//
+// features.apps: with a ChatGPT sign-in, Codex hands every thread the apps
+// connected to that account (codex_apps), its own web search among them. A
+// member would then reach the user's mail or drive, and turning web search
+// off for a model would not stop it searching.
+var engineOverrides = []string{"-c", "features.apps=false"}
+
 // Start spawns the app-server, performs the handshake and returns a ready
 // server. The process cwd is the team directory by design: workspace-write
 // covers the startup cwd, so the boundary is set here, not per request.
@@ -124,7 +134,8 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	args := append([]string{"app-server", "--stdio"}, opts.ExtraArgs...)
+	args := append([]string{"app-server", "--stdio"}, engineOverrides...)
+	args = append(args, opts.ExtraArgs...)
 	args = append(args, opts.Catalog.CatalogArgs()...)
 	cmd := exec.Command(opts.Binary, args...)
 	cmd.WaitDelay = 2 * time.Second
@@ -615,7 +626,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		Model:                 spec.Model,
 		ModelProvider:         spec.ModelProvider,
 		DeveloperInstructions: spec.DeveloperInstructions,
-		Config:                spec.Config,
+		Config:                ThreadConfigOf(spec),
 	}, &res)
 	if err != nil {
 		return engine.ThreadInfo{}, fmt.Errorf("thread/start: %w", err)
@@ -624,28 +635,31 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		return engine.ThreadInfo{}, errors.New("thread/start returned no thread id")
 	}
 	s.setLoaded(res.Thread.ID, true)
+	s.setThreadProvider(res.Thread.ID, res.ModelProvider)
 	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
 }
 
 // ResumeThread reattaches a previously created thread.
 //
 // It reports the model and the provider the thread runs with, as the engine
-// answered it: the engine ignores a provider for a thread that is already
-// loaded here, and a record CoBot kept itself cannot say which of the two
-// happened.
+// answered it. A thread stays with the provider it started on: the engine
+// refuses to load it for another.
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
 	res := ThreadResumeResult{}
-	if err := s.client.Call(ctx, "thread/resume", ThreadResumeParams{
-		ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
-		ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-		Model: spec.Model, ModelProvider: spec.ModelProvider,
-		DeveloperInstructions: spec.DeveloperInstructions, Config: spec.Config,
-		ExcludeTurns: true,
-	}, &res); err != nil {
+	if err := s.asThreadProvider(ctx, spec.ModelProvider, func() error {
+		return s.client.Call(ctx, "thread/resume", ThreadResumeParams{
+			ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
+			ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
+			Model: spec.Model, ModelProvider: spec.ModelProvider,
+			DeveloperInstructions: spec.DeveloperInstructions, Config: ThreadConfigOf(spec),
+			ExcludeTurns: true,
+		}, &res)
+	}); err != nil {
 		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)
+	s.setThreadProvider(threadID, res.ModelProvider)
 	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
 }
 
@@ -662,10 +676,6 @@ func (s *Server) ThreadPath(ctx context.Context, threadID string) (string, error
 }
 
 // ArchiveThread sets a thread aside in the engine.
-//
-// This is how a thread lets go of the provider it was started with: the
-// engine ignores a provider for a thread it already holds, so a thread that
-// has to run with another one is archived and then loaded again.
 func (s *Server) ArchiveThread(ctx context.Context, threadID string) error {
 	if err := s.client.Call(ctx, "thread/archive", map[string]any{"threadId": threadID}, nil); err != nil {
 		return fmt.Errorf("thread/archive: %w", err)
@@ -845,7 +855,9 @@ func (s *Server) StartTurn(ctx context.Context, threadID, text string, opts engi
 	if policy, ok := permissionPolicies[opts.Permission]; ok {
 		params.ApprovalPolicy, params.SandboxPolicy = policy.approval, policy.sandboxPolicy()
 	}
-	err := s.client.Call(ctx, "turn/start", params, &res)
+	err := s.asThreadProvider(ctx, s.threadProvider(threadID), func() error {
+		return s.client.Call(ctx, "turn/start", params, &res)
+	})
 	if err != nil {
 		var refused *RPCError
 		if errors.As(err, &refused) {
@@ -871,10 +883,12 @@ func (s *Server) SteerTurn(ctx context.Context, threadID, turnID, text string) e
 	if threadID == "" || turnID == "" {
 		return errors.New("steer requires thread and turn identity")
 	}
-	if err := s.client.Call(ctx, "turn/steer", map[string]any{
-		"threadId": threadID, "expectedTurnId": turnID,
-		"input": []UserInput{{Type: "text", Text: text}},
-	}, nil); err != nil {
+	if err := s.asThreadProvider(ctx, s.threadProvider(threadID), func() error {
+		return s.client.Call(ctx, "turn/steer", map[string]any{
+			"threadId": threadID, "expectedTurnId": turnID,
+			"input": []UserInput{{Type: "text", Text: text}},
+		}, nil)
+	}); err != nil {
 		return fmt.Errorf("turn/steer: %w", err)
 	}
 	return nil
@@ -1157,8 +1171,13 @@ func (s *Server) Ping(ctx context.Context) error {
 	}
 }
 
+// AccountLogout ends the engine's session for this profile.
+func (s *Server) AccountLogout(ctx context.Context) error {
+	return s.Call(ctx, "account/logout", map[string]any{}, nil)
+}
+
 // Call exposes a generic RPC for protocol surfaces CoBot does not wrap yet
-// (for example account/logout).
+// (protocol checks and tests).
 func (s *Server) Call(ctx context.Context, method string, params any, out any) error {
 	return s.client.Call(ctx, method, params, out)
 }

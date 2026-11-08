@@ -91,7 +91,7 @@ func TestIdleTeamEngineStopsAndComesBack(t *testing.T) {
 	}
 	f.finish(captain, turn, "好")
 	waitUntil(t, 10*time.Second, "idle engine stopped", func() bool {
-		return h.app.EngineEpochOfTeam(team.ID) == "" && first.ShutdownCalls > 0
+		return h.app.EngineEpochOfTeam(team.ID) == "" && first.ShutdownCalls() > 0
 	})
 
 	if _, err := h.app.SendMessage(ctx, h.user, app.SendMessageInput{BotID: captain.ID, Text: "第二轮"}); err != nil {

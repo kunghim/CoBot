@@ -18,7 +18,7 @@ import { useState } from 'react';
 import '../i18n';
 import { ConversationHead, SidebarHead, BrandMark, RailItem, ChatComposer, List, Card, EmptyState, Icons, Menu, IconButton, TextInput } from '../components/ui';
 import ArchiveTypeControl from '../features/settings/ArchiveTypeControl';
-import Markdown from '../features/conversations/Markdown';
+import Markdown from '../components/content/Markdown';
 import ChatProcess from '../features/chats/ChatProcess';
 import ChatWelcome from '../features/chats/ChatWelcome';
 import { Chapter, Demo, Doc } from './parts';

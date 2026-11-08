@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx, Icons, interactive } from '../../components/ui';
-import Markdown from './Markdown';
+import Markdown from '../../components/content/Markdown';
 
 /** Splits a document into its first heading and the body under it. */
 function splitDocument(text: string): { title: string; body: string } {

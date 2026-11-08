@@ -4,7 +4,7 @@
 // opens files inside the team folder; web links open in a new tab; any other
 // scheme is dropped.
 import { memo, useState, type ReactNode, isValidElement } from 'react';
-import { CopyButton, useToast } from '../../components/ui';
+import { CopyButton, useToast } from '../ui';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -13,11 +13,10 @@ import { api } from '../../api/client';
 import { useOpenBrowserTab } from '../../api/queries';
 import { apiErrorMessage } from '../../i18n/errors';
 import { openExternal } from '../../platform/native-bridge';
-import { useWorkspace } from '../workspace/WorkspaceProvider';
 import { linkTarget } from './links';
-import { openWorkspaceFile } from '../workspace/fileNavigation';
-import { relativeFile } from '../workspace/relativeFile';
-import LocalImage from '../workspace/LocalImage';
+import { useContentActions } from './ContentActions';
+import { relativeFile } from './relativeFile';
+import LocalImage from './LocalImage';
 
 function Markdown({ text, teamId, chatId, basePath = '', imageSources }: { text: string; teamId?: string; chatId?: string; basePath?: string; imageSources?: Record<string, string> }) {
   const components: Components = {
@@ -64,7 +63,7 @@ export default memo(Markdown);
 function WebLink({ href, teamId, children }: { href: string; teamId?: string; children: ReactNode }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const workspace = useWorkspace();
+  const { showBrowserTab } = useContentActions();
   const openOwn = useOpenBrowserTab(teamId ?? '');
   let host = href;
   try {
@@ -73,13 +72,13 @@ function WebLink({ href, teamId, children }: { href: string; teamId?: string; ch
     // Keep the raw text; the address bar navigates it all the same.
   }
   const openHere = () => {
-    if (!teamId) {
+    if (!teamId || !showBrowserTab) {
       window.open(href, '_blank', 'noopener,noreferrer');
       return;
     }
     openOwn.mutate(href, {
       onSuccess: ({ tab }) => {
-        workspace.openTab({ id: `browser:${tab.id}`, kind: 'browser', title: tab.title || host, ref: tab.id }, true);
+        showBrowserTab({ id: tab.id, title: tab.title || host });
       },
       onError: (error) => toast.show({ tone: 'warning', title: t('conversation.webLink.openFailed'), description: apiErrorMessage(t, error) }),
     });
@@ -112,6 +111,7 @@ function WebLink({ href, teamId, children }: { href: string; teamId?: string; ch
 
 export function MarkdownLink({ href, teamId, chatId, children }: { href: string; teamId?: string; chatId?: string; children: ReactNode }) {
   const { t } = useTranslation();
+  const { openFile } = useContentActions();
   const [error, setError] = useState('');
   const target = linkTarget(href);
   if (target.kind === 'web') {
@@ -126,7 +126,7 @@ export function MarkdownLink({ href, teamId, chatId, children }: { href: string;
   const open = (reveal: boolean) => {
     setError('');
     const scope = chatId ? { kind: 'chat' as const, id: chatId } : teamId ? { kind: 'team' as const, id: teamId } : null;
-    const opening = !scope ? Promise.reject(new Error('No workspace')) : !reveal ? openWorkspaceFile(scope, target.path) : scope.kind === 'chat' ? api.openChatPath(scope.id, target.path, true) : api.openTeamPath(scope.id, target.path, true);
+    const opening = !scope ? Promise.reject(new Error('No workspace')) : !reveal ? openFile(scope, target.path) : scope.kind === 'chat' ? api.openChatPath(scope.id, target.path, true) : api.openTeamPath(scope.id, target.path, true);
     opening.catch((err) => setError(apiErrorMessage(t, err)));
   };
   return (

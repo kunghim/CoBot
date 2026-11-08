@@ -1,4 +1,4 @@
-import { linkTarget } from '../conversations/links';
+import { linkTarget } from './links';
 
 export function relativeFile(currentFile: string, target: string): string {
   if (!currentFile || linkTarget(target).kind !== 'local' || /^(?:\/|file:|[a-z]:[\\/])/i.test(target)) return target;

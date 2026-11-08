@@ -23,6 +23,7 @@ import (
 	"github.com/kunghim/CoBot/internal/platform"
 	"github.com/kunghim/CoBot/internal/secrets"
 	"github.com/kunghim/CoBot/internal/store/sqlite"
+	"github.com/kunghim/CoBot/tests/contract"
 )
 
 // The provider surface over HTTP.
@@ -118,7 +119,7 @@ func TestProviderSurfaceSpeaksTheClientsRequest(t *testing.T) {
 		CollaborationTokens: tokens,
 		Dispatcher:          collaboration.NewDispatcher(a, tokens),
 	}
-	server := httptest.NewServer(apiServer.Handler())
+	server := httptest.NewServer(contract.Wrap(apiServer.Handler()))
 	t.Cleanup(server.Close)
 
 	tok, err := bearer.Issue(auth.LocalUserID)

@@ -6,9 +6,8 @@ import (
 )
 
 // Memory is one stored working method or preference, owned by exactly one
-// member of exactly one team. It never holds task evidence, secrets or
-// large source excerpts; the write path enforces size and refuses
-// secret-shaped bodies.
+// member of exactly one team. Models have no tool to add one: the rows come
+// from earlier builds.
 type Memory struct {
 	ID           string    `json:"id"`
 	TeamID       string    `json:"teamId"`
@@ -25,11 +24,6 @@ type Memory struct {
 // stays in the table purely so the dedupe key blocks re-creation.
 func (m Memory) IsLive() bool { return m.DeletedAt == "" }
 
-// MemoryLimitMaxBody is the per-memory size cap. Larger bodies are refused
-// rather than truncated silently: a half-remembered method is worse than
-// none.
-const MemoryLimitMaxBody = 2000
-
 // MemorySearchMaxItems and MemorySearchMaxChars bound one retrieval so the
 // caller's context stays bounded regardless of how much is stored.
 const (
@@ -45,5 +39,5 @@ func NormalizeMemoryBody(body string) string {
 	return strings.Join(fields, " ")
 }
 
-// EventMemoryChanged is published when a memory is stored or tombstoned.
+// EventMemoryChanged is published when a memory is tombstoned.
 const EventMemoryChanged = "memory.changed"

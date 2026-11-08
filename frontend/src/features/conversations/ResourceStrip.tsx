@@ -8,7 +8,7 @@ import { apiErrorMessage } from '../../i18n/errors';
 import { ChangeStats } from '../workspace/ChangesTab';
 import { openWorkspaceChanges } from '../workspace/changeNavigation';
 import { openWorkspaceFile, scopeKey } from '../workspace/fileNavigation';
-import { MarkdownLink } from './Markdown';
+import { MarkdownLink } from '../../components/content/Markdown';
 import { changedPaths, replyResources, resourcePathKey } from './resources';
 import { currentFiles, resourceFiles, type ResourceFile } from './resourceFiles';
 

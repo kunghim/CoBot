@@ -268,7 +268,7 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	// and every HTTP exchange. It records nothing until switched on.
 	trace := wiretrace.New(paths.Root, "core")
 	application.Trace = trace
-	application.ClientCatalogs = &codex.CatalogBuilder{Home: paths.CodexHome()}
+	application.Install = codex.Installation{Paths: paths, Catalogs: &codex.CatalogBuilder{Home: paths.CodexHome()}}
 	// withCatalog: a team's engine knows the third-party models' context
 	// windows; the profile-wide control engine keeps the engine's own model
 	// list, which it refreshes, and which the account's model picker shows.
@@ -290,11 +290,12 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 		}
 		var clientCatalog codex.ClientCatalog
 		if withCatalog {
-			var catalogErr error
-			if clientCatalog, catalogErr = application.EngineCatalog(startCtx); catalogErr != nil {
+			catalog, catalogErr := application.EngineCatalog(startCtx)
+			if catalogErr != nil {
 				// Without it the models keep the engine's fallback window.
 				logger.Warn("model catalog for the engine not used", "error", catalogErr)
-				clientCatalog = codex.ClientCatalog{}
+			} else {
+				clientCatalog = codex.ClientCatalog(catalog)
 			}
 		}
 		return codex.Start(startCtx, codex.ServerOptions{
@@ -325,8 +326,8 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	application.Chats = app.NewChatRunner(application, func(spec app.ServerSpec) (engine.Server, error) {
 		return newServer(spec.Context, spec.Cwd, spec.Callbacks, true)
 	})
-	application.ControlFactory = func(startCtx context.Context, cwd string) (*codex.Server, error) {
-		return newServer(startCtx, cwd, engine.Callbacks{
+	application.ControlFactory = func(startCtx context.Context, cwd string) (engine.Control, error) {
+		server, err := newServer(startCtx, cwd, engine.Callbacks{
 			OnNotification: func(n engine.Notification) {
 				if n.Method == "account/login/completed" {
 					go application.EngineLoginCompleted(n.Raw)
@@ -336,6 +337,10 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 				}
 			},
 		}, false)
+		if err != nil {
+			return nil, err
+		}
+		return server, nil
 	}
 	startupComplete := false
 	defer func() {
