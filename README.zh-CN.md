@@ -1,254 +1,142 @@
 # CoBot
 
-**Agent 干活，CoBot 带队。**
+**AI 团队工作台，让需求逐步成为用得上的成果。**
 
 [English](README.md) · 简体中文
 
-> **状态：早期预览。** Windows 已提供 beta 下载；macOS ARM64 桌面包已通过使用真实 Codex 的本机原生冒烟测试。
-> 详见[当前状态](#当前状态)。
+CoBot 面向有想法、有实际需求，即使不会编程也希望动手实现的人。你可以先通过聊天梳理想法，也可以把目标交给 AI 团队，共同确认方案、推进实现、检查和修改，最后验收成果。网站和小型软件工具是当前团队场景，长期将逐步拓展更多工作。
 
-CoBot 是一个本地运行的应用，让多个 AI Agent 像团队一样协作。名字里的 **Co 是“合作”**：
-CoBot 不想当一个更聪明的 Agent，而是 Agent 周围的团队组织。它管角色、任务、沟通和审批；
-读代码、跑命令、改文件这些具体工作，交给外部 Agent（目前是 [Codex](https://github.com/openai/codex)）。
+[下载与开始](#快速开始) · [工作方式](#工作方式) · [参与共建](#参与开发)
 
-首个场景是编程，而且 CoBot 就是用 CoBot 开发的：它自己的 Agent 团队已经为本仓库规划、实现、
-审查并交付了真实改动。
-
-<!-- TODO：截图或短动图——团队列表、成员会话、审批卡片 -->
-
-## 为什么需要 CoBot
-
-一个编程 Agent 很好用。几个 Agent 同时做一个项目，很快就乱了：
-
-- 谁在做什么说不清，两个 Agent 改同一处；
-- “做完了”只是模型自己说做完了；
-- Agent 之间互相唤醒、停不下来，额度烧光；
-- 出了崩溃，搞不清到底执行了什么。
-
-CoBot 用一个靠谱团队的方式解决这些问题：项目经理写需求、排流程，成员按确认过的链路接力，每一环交接都写清楚、
-附上实际执行记录，评审和测试能把问题退回，关键决定由人拍板。
+> **项目处于早期阶段。** 当前公开版本是 [v0.0.1](https://github.com/kunghim/CoBot/releases/tag/v0.0.1)。本文介绍 `dev` 源码，具体安装包的条件与变化以对应发布说明为准。发布版本号不代表所有平台、模型和任务均已验证。
 
 ## 工作方式
 
-```mermaid
-flowchart LR
-    U([你]) -->|目标| L[项目经理]
-    L -->|start_requirement：需求文档 + 链路| C[(CoBot 核心<br/>需求 · 卡片 · 审批)]
-    C -->|按链路送出卡片| M1[成员] & M2[成员]
-    M1 & M2 -->|handoff：完成 / 退回 / 上报| C
-    C -->|上报 · 验收汇报卡| L
-    C -->|确认卡 · 验收卡 · 审批 · 提问| U
-    M1 & M2 -. 在团队目录中执行 .-> E[[Codex]]
-```
+**先从聊天开始。** 不需要先建团队或选择项目目录，就能提问、讨论想法。聊天有独立历史，可选择模型、思考方式和权限。
 
-1. **建团队**：选一个工作目录，生成项目经理和内置角色成员（产品经理、全栈工程师、测试工程师、评审员），
-   每个成员有自己的 Agent 会话。之后可以在团队设置里增删成员。
-2. **给项目经理一个目标**：项目经理和你沟通清楚后，写成需求文档，并按需求规模从完整流程里挑出这次的链路
-   （需求评审、产品设计、测试用例、实现、测试、代码评审……），交给你确认。
-3. **成员按链路接力**：每一环是一张卡片，送到负责人手上；做完用 `handoff` 交接，CoBot 按链路交给下一环，
-   不靠模型决定交给谁。评审和测试可以退回给产出的那一环，超过上限或遇到阻塞就上报项目经理。
-4. **你始终掌控**：确认卡、最终验收卡、原生命令/文件审批、Agent 的提问都会交给你处理，你也可以随时取消一个需求。
+**需要做项目时，再交给团队。** 告诉项目经理你想解决什么问题、成果给谁使用。团队整理需求和工作步骤，交给你确认；成员接力实现、测试和评审，检查发现的问题可以退回修改。你处理必要的选择，并最终验收成果。
 
-## 功能
+例如，你可以这样提出第一个需求：
 
-- **按角色协作**：项目经理有 `start_requirement`、`handoff`、`view_tasks`、`send_message`、`ask_user`；
-  成员有 `handoff`、`view_tasks`、`send_message`、`ask_user`（只用于只有你能决定的问题）。
-  `send_message` 只留言、不唤醒对方，业务只走卡片。每次调用的身份由宿主绑定，模型无法冒充其他成员；
-  子智能体不能交接卡片、提交需求或向你提问。
-- **接力与验收**：每张卡片开头写着需求、链路和当前位置，附上需求文档和前面各环的交接；评审卡还附有对应的检查清单。
-  交接时 CoBot 自动附上这一轮实际执行的命令、退出码和改动的文件。评审和测试可以退回（“重走”或“只回我”），
-  退回次数超过上限（默认 3 次，可在设置中调整）后交给项目经理处理；只有可选改进时“带建议通过”，建议汇总到最终汇报。
-  链路最后一环是项目经理的验收汇报，汇报会变成给你的验收卡。卡片状态由 CoBot 自己推进，模型不用操作状态机。
-- **人在回路中**：Codex 原生审批显示完整命令或 diff，选项与 Codex 一致：允许、本会话内允许、拒绝、
-  拒绝并停止（申请额外权限时为：本轮允许、本会话内允许、拒绝）。每个团队可选权限模式（只读、默认、完全访问）。
-  Agent 可以向你提问，你回答后它会被唤醒。成员工作时你发的消息会并入它正在进行的这一轮；
-  这一轮已结束则排队等待。
-- **防失控**：每条协作链唤醒成员的次数有上限（默认 10 次）。超过上限后协作链等你决定：继续会再给一份
-  同样大小的额度，停止则结束这条链。可选的每日 token 预算（按团队或按成员，且各自可调）会暂停新的轮次，隔天自动恢复。
-- **工作过程可见**：每一轮的步骤、工具调用和文件改动都显示在会话里；输入框下的会话统计显示轮数、
-  模型与工具用时、token 与缓存、上下文占用和账号额度。每个团队可从模型提供的档位中选择思考强度。
-  成员启动的 Codex 子智能体在该成员的运行内工作，步骤、审批和用量都归属这名成员。
-- **记忆（目前只读）**：早期版本里成员保存的记忆可以查看、删除，并会带进新会话；模型已不能再写入新记忆。
-  记忆功能之后会重新设计。
-- **诚实的恢复**：重启后核对真实发生了什么。执行结果不确定时，CoBot 会锁定并给出恢复卡，
-  绝不猜测、偷偷重跑。
-- **本地优先**：单个可执行文件，只监听本机回环地址，数据留在 `~/.cobot`。Agent 运行在私有 Codex 环境里，
-  使用独立登录，和你日常的 Codex 互不影响。没有云服务，CoBot 不会把你的数据发到任何地方；它自己只会
-  从本仓库下载公开的头像库（`assets/avatars`），时机是启动时和你在设置里点“检查更新”时。
-  浏览器登录有效期 30 天，使用中自动续期，重启后仍然有效。
-- **Web 界面与桌面壳**：两者共用一个核心。界面支持中文和英文。
+> 我想做一个能录入和查询客户信息的小工具。先帮我问清需要哪些功能，再说明怎样检查是否完成。
 
-CoBot 不执行 shell 命令、不管理 Git，也不重写 Agent 循环。这些仍由你信任的 Agent 去做。
+这是需求示例，不是已经验证的客户案例。先约定小范围，用虚构数据试用；验收应包含实际操作和预期结果，不能只看一句“已经完成”。
 
-## 当前状态
+## 当前可以做什么
 
-| 平台 | 状态 |
-| --- | --- |
-| Windows 10/11 x64 · 本机 Web | **可以试用**，已用真实 Codex 端到端验证 |
-| Windows 独立服务构建 | 可构建、可运行 |
-| Windows 桌面壳（Wails/WebView2） | **已提供测试版下载**；已在 Windows 沙盒检查桌面启动与安装生命周期，验证限制见发布说明 |
-| macOS ARM64 桌面 | 本机应用已在 macOS 26.6.2、Codex 0.146.0 上通过冒烟测试：登录、消息、任务交接/交付/验收、文件工具、命令审批允许/拒绝及重启。DMG 挂载、Finder 复制到应用程序、弹出映像后启动及团队数据恢复也已通过。下载后首次打开与公证发行尚未验证 |
-| macOS Intel（x86_64）桌面 | 暂不纳入 beta 发布。已交叉构建主程序和助手；在 Apple Silicon 的 Rosetta 下通过界面启动、原生目录对话框、创建团队/重启及共享核心测试。Intel 真机及 Intel Codex 端到端使用尚未验证 |
-| Linux（本机 Web） | Ubuntu CI 覆盖共享核心构建、集成和浏览器测试，使用假引擎；真实 Codex 使用和用户安装尚未验证 |
+- **聊天与整理历史。** 流式查看回复、停止当前轮次、重命名，并为后续消息调整模型、思考方式和权限。搜索聊天及团队成员会话的标题和消息内容；置顶聊天、归入分区，归档或恢复聊天与团队。
+- **跟进团队工作。** 确认需求、查看交接记录、提出修改。提问、审批和验收卡显示在会话输入框上方。缺少角色时，团队可申请增加成员，由你确认。一条需求内的环节目前按顺序推进。
+- **在会话旁查看成果。** 工作区提供浏览器、只读文件树、文件预览与变更记录，可查看常见文档、表格、演示文稿、PDF、图片和文本，具体呈现依格式而异。历史变更与当前磁盘文件分开显示；回复结束后也可从资源条进入文件和变更摘要。
+- **试运行可启动的交付。** 验收汇报包含预览命令和访问地址时，验收卡会显示命令并提供“启动并打开”。你决定是否在团队目录运行，在内置浏览器查看，并可停止预览。这是本地试运行，不是自动托管或部署。
+- **继续已有目录的工作。** “打开团队”可跳转到活跃团队、确认恢复已归档团队，或准备新建。目录留有其他环境的团队标记时，可显式确认接管；接管不会导入原对话。
+- **选择模型服务。** 使用 ChatGPT 账号，或配置兼容 OpenAI Responses 的供应商。成员可各选模型，也可跟随默认设置；随程序附带、可更新的模型目录提供参数和思考方式，高级设置支持相应调整。连通检查成功不代表模型已通过完整团队工作流验证。
+- **掌握决定与用量。** 查看命令、文件审批与模型用量，设置协作轮次限制和每日 token 预算。执行记录帮助核对实际过程，测试和 AI 评审仍不能保证结果正确。
 
-在 Windows 上用真实 Codex 验证过的内容：登录、多成员并行、任务交接与提问、原生文件审批与拒绝、
-协作限轮、断线重连、正常退出、崩溃恢复和升级。
-最关键的一项是连续两轮 **用 CoBot 开发 CoBot**：每一轮都由项目经理规划、一名成员实现、另一名成员独立审查，
-再由人批准确切的候选提交；第二轮运行在已经包含第一轮改动的升级版本上。
-
-此后协作方式做了精简：按角色提供工具、一步交付与验收、去掉模型风险评估，也去掉了招募和合并审批卡。
-新流程已用真实 Codex 跑过一次多成员场景，覆盖原生审批、会话统计和 Codex 子智能体。
-
-验证过不代表覆盖了所有边界情况。维护者对首版 94 个验收项逐项记录了哪些经过自动化验证、哪些用真实模型验证、哪些尚未验证。
+当前只使用 **ChatGPT 桌面端内置的 Codex 引擎**，CoBot 有独立环境与登录，不使用单独安装的 Codex CLI。CoBot 组织会话与协作，模型和工具的执行由引擎负责。
 
 ## 快速开始
 
 ### 桌面版下载
 
-[**v0.1.0-beta.2 — 下载与发布说明**](https://github.com/kunghim/CoBot/releases/tag/v0.1.0-beta.2)
+[**v0.0.1 — 发布说明、下载与校验文件**](https://github.com/kunghim/CoBot/releases/tag/v0.0.1)
 
-| 下载 | 使用方法 |
+| 安装包 | 启动方式 |
 | --- | --- |
-| [Windows x64 MSI 安装包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.msi) | 安装到当前用户，从开始菜单打开 **CoBot** |
-| [Windows x64 ZIP 压缩包](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-windows-x64.zip) | 将所有文件解压到同一文件夹，打开 **cobot-desktop.exe**，保留旁边的两个助手程序 |
-| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.1.0-beta.2/CoBot-0.1.0-beta.2-macos-arm64.dmg) | 将 **CoBot.app** 复制到「应用程序」，弹出映像后打开（需要 Codex CLI 0.146.0 或更新版本） |
+| [Windows x64 MSI](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-windows-x64.msi) | 为当前用户安装，从开始菜单打开 CoBot |
+| [Windows x64 ZIP](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-windows-x64.zip) | 完整解压后打开 `cobot-desktop.exe`，保留同目录的 `cobot-helper.exe` 与 `cobot.exe` |
+| [macOS Apple Silicon DMG](https://github.com/kunghim/CoBot/releases/download/v0.0.1/CoBot-0.0.1-macos-arm64.dmg) | 将 `CoBot.app` 复制到「应用程序」，弹出映像后打开已安装的应用 |
 
-上述已发布的 beta.2 下载尚未采用“只使用桌面端引擎”的新规则。两种 Windows 下载包含相同的程序文件，这些旧版在 Windows 需要 **Windows 10/11 x64**、已有的 **WebView2 Runtime**，
-以及已在 `PATH` 上安装的官方 **Codex CLI**，具备可用账号和访问 Codex 服务的网络。
-安装包不包含 Codex；只随 Codex 桌面版附带的引擎找不到。成员可以使用官方 ChatGPT 账号，
-也可以使用兼容 OpenAI Responses 接口的 API 供应商。
-使用上述下载包无需安装 Go 或 Node。
+**开始前：** 另行安装 [ChatGPT 桌面端](https://learn.chatgpt.com/docs/app)。CoBot 自动发现受支持的 macOS 应用和 Windows Store 包内的 Codex，引擎登录与配置独立。Windows 需 Windows 10/11 x64 与已有 WebView2 Runtime。使用这些下载包不需要 Go、Node.js 或单独安装 Codex CLI。
 
-程序包尚未签名（macOS 只有临时签名，未公证），发布页面附有可选的 `.sha256` 校验文件。
-GitHub 自动提供的 **Source code** 是源码，不是可直接运行的程序。
-打开 CoBot 后，在 **设置 → 模型供应商** 登录或添加供应商，再创建团队。
-CoBot 使用自己的私有 Codex 环境，需要独立登录。
+安装包没有发行签名或公证，macOS 使用临时签名；首次打开说明及相邻的 `.sha256` 校验文件见发布页。GitHub 的 **Source code** 压缩包用于构建，不能直接运行。
 
-暂不支持自动更新：更新时先关闭 CoBot，再安装新版 MSI，或将完整新版 ZIP 解压到新文件夹。
-两种版本的配置与团队数据均保存在 `%USERPROFILE%\.cobot`，与程序目录分开。
-卸载 MSI 或删除 ZIP 解压目录会保留这些数据。
+1. 打开 CoBot，在**设置 → 模型供应商**中为 CoBot 登录或配置兼容服务，选择默认模型。模型服务可能需要订阅或 API 费用。
+2. 从**聊天**开始，或切换到**团队**，在一个目录中新建团队，向项目经理说明目标。
+3. 团队任务中，确认提出的需求，检查结果并提出修改。出现预览入口时，先查看命令再决定启动。
 
-### 从源码构建
+界面初始为中文，可通过**设置 → 通用 → 语言**切换 English。找不到引擎时，检查桌面端安装和设置页状态，单独安装 CLI 不能替代。求助可到 [Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)，提供 CoBot 版本、系统和脱敏错误信息。
 
-以下命令构建**本机 Web 版**。已发布的 beta 提供 Windows x64 和 Apple Silicon 下载；macOS 桌面包也可按下文在本机构建。
+### 数据与更新
 
-**构建前置条件**：Git、符合 `go.mod` 要求的 [Go](https://go.dev/dl/)（最低 1.25.12），
-以及 [Node.js 24](https://nodejs.org/en/download) 和 npm 11+。
-让 Agent 工作还需安装 [ChatGPT 桌面端](https://learn.chatgpt.com/docs/app)。
-当前源码只使用该应用内置的 Codex，账号在 CoBot 的私有环境中独立登录，不使用独立安装的 CLI。
-macOS 应用包与 Windows Store 包可自动发现；暂不支持 Linux 桌面安装布局。
-Go、Node 用于构建。本地优先不等于模型调用离线。
+CoBot 本地运行，只监听回环地址。发行包通常将设置、登录和工作记录保存在 `~/.cobot`，与程序文件分开。模型请求会将相关内容发送到所选服务，本地运行不等于离线 AI，也不等于数据全部留在电脑。
 
-#### Windows（PowerShell）
+当前手动更新：关闭 CoBot 后安装新版 MSI，或完整替换 ZIP／应用包。保留数据目录，卸载或删除程序文件不会移除这些数据。切换版本前阅读[升级与回滚说明](docs/reference/upgrading.md)。删除聊天也会保留生成文件。
 
-```powershell
-git clone https://github.com/kunghim/CoBot.git
-cd CoBot
-npm ci --prefix frontend
-powershell -NoProfile -File scripts/build.ps1 -Target server
-.\.tmp\dist\cobot.exe serve
-```
+## 当前状态
 
-#### macOS（Bash）
+| 平台 | 当前范围 |
+| --- | --- |
+| Windows x64 | 已发布 MSI 与 ZIP；需要 WebView2 及受支持的桌面引擎安装 |
+| macOS Apple Silicon | 已发布 ARM64 DMG；未进行 Developer ID 签名和公证 |
+| macOS Intel | 没有公开安装包；实验性源码构建不等于原生支持已验证 |
+| Linux | 有共享核心 CI 覆盖；暂不支持桌面引擎自动发现，不能据 CI 判断终端用户可用 |
 
-```bash
-git clone https://github.com/kunghim/CoBot.git
-cd CoBot
-npm ci --prefix frontend
-./scripts/build.sh --target server
-./.tmp/dist/cobot serve
-```
-
-构建 macOS 桌面包还需 Wails CLI v2.15.0 和 Apple 命令行构建工具，然后运行
-`./scripts/build.sh --target desktop --version 0.1.0-beta.2-dev --arch arm64`。
-产物为 `.tmp/dist/CoBot-0.1.0-beta.2-dev-macos-arm64.dmg`，另附 ZIP 和 SHA-256 校验文件。
-打开 DMG，将 `CoBot.app` 复制到其中的 Applications 入口，再弹出映像，从「应用程序」打开 CoBot。
-计划以 DMG 提供 macOS beta 下载，目前尚未发布。
-可用 `--arch arm64` 指定 Apple Silicon，或用 `--arch amd64` 构建实验性的 Intel 包；
-文件名包含目标架构，主程序与助手保持一致。
-Apple Silicon 可通过已安装的 Rosetta 做 Intel 包冒烟测试，但不能代替 Intel 真机验收。
-使用 ZIP 时，解压后保持整个 `CoBot.app` 完整。桌面包默认使用 production profile；隔离试用时，
-为包内可执行文件传入 `--data-root <空目录>`，该临时目录仍按 production 规则运行。
-包使用本地 ad-hoc 签名，没有 Developer ID 签名或公证；本机 DMG 安装和重启已通过，
-但 Gatekeeper 评估会拒绝该包，浏览器下载后的首次打开及手动允许流程尚未验收。
-
-macOS 的 Codex 0.146.0 冒烟测试使用隔离数据目录和真实模型，不代表已完成 Windows 全部验收项。
-当前源码直接发现 ChatGPT 桌面端，图形启动不依赖终端 `PATH`。
-未显式提供代理环境变量时，Codex 会继承 macOS 的静态系统代理；不会修改系统设置，也不会执行自动代理（PAC）脚本。
-
-请在浏览器和团队文件所在的同一台电脑运行这些命令。这启动的是本机 Web 应用，
-不是桌面壳或远程服务器。Windows 产物为 `.tmp/dist/cobot.exe`，macOS 为 `.tmp/dist/cobot`，
-旁边附有 `.sha256` 校验和。脚本不会将 CoBot 加入 `PATH`，请使用上面的完整相对路径。
-使用期间保持启动终端开启。
-
-默认浏览器会自动打开并登录本机 CoBot 页面，这不等于已登录 Codex。一次性启动链接
-仅在 60 秒内、单次有效，终端里也会打印；加 `--no-open` 则只打印不打开。
-浏览器未打开时可使用终端链接；链接过期后，在另一个终端用相同路径再次运行 `serve`，
-会为原实例打开新链接，不会启动第二个实例。启动链接要像密码一样对待。
-
-界面初始为中文，可在 **设置 → 通用 → 语言** 切换 English，偏好会保存。然后：
-
-1. **设置**：登录 Codex。CoBot 使用自己的私有 Codex 环境，需要在 CoBot 里登录一次，重启后仍然有效。
-   然后选择默认模型。CoBot 启动时会自动找到 Codex 并授权它的安全钩子；设置页会展示这两项状态，
-   授权失败时可以点按钮重新授权。
-2. **新建团队**：选择工作目录和需要的成员。
-3. **给项目经理发消息**，先给一个小而可检查的目标，例如：“查看这个项目并提出三项改进建议，
-   暂时不要修改文件。”模型回复取决于对话和角色指令，不由界面语言自动翻译。
-
-关闭浏览器不会停止服务。退出时，在启动服务的终端按 **Ctrl+C**，等待正常关闭完成。
-
-上述命令默认使用 **development** profile（`~/.cobot-dev`）。日常使用时，先停止试用实例，
-再在 Windows 运行 `.\.tmp\dist\cobot.exe serve --profile production`，
-或在 macOS 运行 `./.tmp/dist/cobot serve --profile production`。
-production 数据位于 `~/.cobot`，设置、Codex 登录和团队均独立，试用配置不会自动转移。
-`~` 表示用户主目录；隔离试用可加 `--data-root <空目录的绝对路径>`。
-
-设置页找不到 Codex 时，在启动 CoBot 的终端检查 `codex --version`。
-安装或更新 Codex 后，重新打开终端，以相同 profile 和数据根重启 CoBot，再从设置页重试检查。
-求助时不要附带启动链接或原始 trace；[Q&A](https://github.com/kunghim/CoBot/discussions/categories/q-a)
-接受中文和英文。
+发布自动化检查构建与包的完整性，交互安装、真实模型行为和具体平台使用需要另行验证，见[发布说明](https://github.com/kunghim/CoBot/releases/tag/v0.0.1)。自定义角色和记忆写入尚未开放。详细行为与边界见[产品现状](docs/product/overview.md)和[决定索引](docs/product/decisions.md)。
 
 ## 参与开发
 
-```bash
-./scripts/dev.sh      # Go 核心 + Vite，自动授权               （Windows：scripts/dev.ps1）
-./scripts/check.sh    # 格式、契约漂移、前端与 Go 测试         （Windows：scripts/check.ps1）
+欢迎一起让不会编程的人也能获得 AI 完成工作的能力。真实需求示例、试用反馈、领域经验、设计、文档、翻译和工程修复都能帮助项目向前推进。先读 [CONTRIBUTING.md](CONTRIBUTING.md)，较大的功能先讨论再实现。欢迎中文或英文的 Issue 和 PR，核心工程文档目前以中文为主。
+
+修改仓库时从 `dev` 建主题分支，每个 PR 聚焦一项改动，目标为 `dev`，说明实际检查与限制。参与不要求私人笔记或 AI 编码工具。
+
+<details>
+<summary>构建当前源码与运行检查</summary>
+
+### 从源码构建
+
+构建工具：Git、符合 [go.mod](go.mod) 的 Go（**1.26.0+**）、Node.js 24 与 npm 11+。执行智能体任务还需要上文所述的受支持 ChatGPT 桌面引擎与模型服务访问条件。
+
+**Windows — PowerShell**
+
+```powershell
+git clone --branch dev https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+powershell -NoProfile -File scripts/build.ps1 -Target server
+$trialRoot = Join-Path (Get-Location).Path (".tmp\test-runs\readme-" + [guid]::NewGuid().ToString("N"))
+.\.tmp\dist\cobot.exe serve --data-root $trialRoot
 ```
 
-`cobot trace on|off|status|view` 会把所有原始交互录制到 `<数据根>/traces/`，用于排查问题。
-录制内容未脱敏，可能包含提示词、代码和凭据，绝不要提交或分享。
+**macOS — Bash**
 
-技术栈：Go · React + TypeScript + Vite · TanStack Query · Tailwind CSS · SQLite（modernc）+ goose ·
-Wails v2 · HTTP JSON + SSE · MCP Go SDK。接口契约在 `api/openapi.yaml`，Go 和 TypeScript 类型均由它生成。
+```bash
+git clone --branch dev https://github.com/kunghim/CoBot.git
+cd CoBot
+npm ci --prefix frontend
+./scripts/build.sh --target server
+mkdir -p .tmp/test-runs
+trial_root="$(mktemp -d "$(pwd)/.tmp/test-runs/readme.XXXXXX")"
+./.tmp/dist/cobot serve --data-root "$trial_root"
+```
 
-请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎使用中文或英文提交 Issue 和 PR；
-安全问题请参阅 [SECURITY.md](SECURITY.md)。
+以上构建本机 Web 应用。使用时保持启动终端开启，在该终端按 **Ctrl+C** 停止；关闭浏览器不会停止服务。浏览器未打开时使用终端打印的启动链接，不要分享。再次进入本次试用时，沿用相同 `--data-root`。未显式指定时，开发环境使用 `~/.cobot-dev`，正式环境使用 `~/.cobot`。
 
-工程规范与命令见[文档索引](docs/README.md)，编码智能体从 [AGENTS.md](AGENTS.md) 进入。
-第三方来源见[依赖说明](docs/reference/dependencies.md)，安装、迁移影响与回滚限制见[升级说明](docs/reference/upgrading.md)。
+桌面构建使用 [build.ps1](scripts/build.ps1) 或 [build.sh](scripts/build.sh) 的 `desktop` 目标，并准备相应 Wails 和原生构建工具。旧打包与原生验证细节保留在[固定版本参考](https://github.com/kunghim/CoBot/blob/727ea51/README.zh-CN.md#从源码构建)，其中历史条件不能替代当前脚本或发布说明。
+
+只改文档时：
+
+```bash
+node scripts/check-docs.mjs
+node scripts/check-public-files.mjs
+```
+
+代码改动运行 `./scripts/check.sh` 或 `./scripts/check.ps1`；按改动选择检查的规则见[验证流程](docs/workflows/verify.md)。自动化、真实模型和原生平台验证分别报告。
+
+</details>
 
 ## 社区参与
 
-欢迎使用中文或英文，一份反馈即可，无需重复提交翻译，也无需加入额外聊天群。
-
-- [报告 Bug 或提出功能建议](https://github.com/kunghim/CoBot/issues/new/choose)。
-- [安装和使用提问](https://github.com/kunghim/CoBot/discussions/categories/q-a)。
-- [展示你用 CoBot 完成的成果](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)。
+- [报告问题或提出建议](https://github.com/kunghim/CoBot/issues/new/choose)。
+- [安装与使用提问](https://github.com/kunghim/CoBot/discussions/categories/q-a)。
+- [分享工作方式和成果](https://github.com/kunghim/CoBot/discussions/categories/show-and-tell)。
 - [查看维护者公告](https://github.com/kunghim/CoBot/discussions/categories/announcements)。
-- [参与贡献](CONTRIBUTING.md)：从 `dev` 开始，向 `dev` 提交 PR。
 
-安全漏洞请按 [安全政策](SECURITY.md) 私密报告。参与时请遵守
-[社区行为准则](CODE_OF_CONDUCT.md)，分享示例前先移除私人资料。
+安全漏洞按[安全政策](SECURITY.md)报告，参与时遵守[社区行为准则](CODE_OF_CONDUCT.md)。只分享最小、脱敏的证据，不公开凭据、启动链接和原始 trace。维护者尽力回复，不承诺固定时限。
 
-## 路线图
+## 发展方向
 
-以下是打算探索的方向，不是承诺：
-
-- 经过验证的 Windows / macOS 桌面版
-- Codex 之外的更多 Agent 引擎
-- 面向非编程工作的团队：办公、学习、写作与创作
+CoBot 从不会编程者的软件需求开始，未来逐步拓展其他场景与可复用工作方法，为每种工作分别设计工具、交付物和检查方式。这是发展方向，不是交付时间表。引擎接入保持可扩展，当前没有增加 Claude Code 的计划。
 
 ## 许可证
 
-版权所有 2026 CoBot contributors，使用 [Apache License 2.0](LICENSE) 许可。
-第三方依赖保留各自的许可证。
+按 [Apache License 2.0](LICENSE) 许可。第三方依赖保留各自许可证，详见[依赖与声明](docs/reference/dependencies.md)。
