@@ -2,6 +2,8 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -9,9 +11,11 @@ import (
 // opens one by default and falls back to HTTPS only after the handshake has
 // timed out, which on some networks costs minutes at the start of every
 // connection. The built-in provider cannot be changed ("Built-in providers
-// cannot be overridden"), so an engine started HTTP-only runs the official
+// cannot be overridden"), so an engine started HTTP-only starts the official
 // threads on this provider instead: the same endpoint and login, with
-// WebSockets off. Verified against Codex 0.167 (#93).
+// WebSockets off. A thread stays on the provider it started on (the engine
+// refuses to resume it on the other), so the transport applies to threads
+// started after the change. Verified against Codex 0.167 (#93).
 const httpProvider = "cobot-openai-http"
 
 // httpProviderTable is the configuration of httpProvider.
@@ -65,4 +69,28 @@ func (s *Server) bindHTTPProvider(ctx context.Context) error {
 		return fmt.Errorf("engine did not accept the HTTP-only provider")
 	}
 	return nil
+}
+
+// officialMismatch reads the engine's refusal to resume a thread on another
+// provider ("This chat uses openai, but your current provider is …"). When
+// the thread is the official account's under its other transport, it returns
+// the provider the thread is on.
+func officialMismatch(err error) (string, bool) {
+	var rpcErr *RPCError
+	if !errors.As(err, &rpcErr) || len(rpcErr.Data) == 0 {
+		return "", false
+	}
+	var data struct {
+		Type          string `json:"type"`
+		ModelProvider string `json:"modelProvider"`
+		Current       string `json:"currentModelProvider"`
+	}
+	if json.Unmarshal(rpcErr.Data, &data) != nil || data.Type != "modelProviderMismatch" {
+		return "", false
+	}
+	official := func(id string) bool { return id == builtinProvider || id == httpProvider }
+	if !official(data.ModelProvider) || !official(data.Current) || data.ModelProvider == data.Current {
+		return "", false
+	}
+	return data.ModelProvider, true
 }

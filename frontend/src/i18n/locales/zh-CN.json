@@ -1204,7 +1204,7 @@
     "engineTransport": "ChatGPT 账号的连接",
     "engineTransportAuto": "自动（先试 WebSocket）",
     "engineTransportHttp": "只用 HTTP",
-    "engineTransportApply": "空闲的对话和团队在下一轮开始时生效；正在运行的，在这一轮结束后的下一轮生效。已有对话会接着原来的记录继续。"
+    "engineTransportApply": "只对切换之后新开的对话和成员线程生效。已有的对话和成员线程会保持原来的连接方式，接着原来的记录继续。"
   },
   "auth": {
     "authorizing": "正在授权…",

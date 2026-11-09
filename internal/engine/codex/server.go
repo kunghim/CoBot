@@ -660,16 +660,25 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
 	res := ThreadResumeResult{}
-	provider := s.engineProvider(spec.ModelProvider)
-	if err := s.asThreadProvider(ctx, provider, func() error {
-		return s.client.Call(ctx, "thread/resume", ThreadResumeParams{
-			ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
-			ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-			Model: spec.Model, ModelProvider: provider,
-			DeveloperInstructions: spec.DeveloperInstructions, Config: ThreadConfigOf(spec),
-			ExcludeTurns: true,
-		}, &res)
-	}); err != nil {
+	resume := func(provider string) error {
+		return s.asThreadProvider(ctx, provider, func() error {
+			return s.client.Call(ctx, "thread/resume", ThreadResumeParams{
+				ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
+				ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
+				Model: spec.Model, ModelProvider: provider,
+				DeveloperInstructions: spec.DeveloperInstructions, Config: ThreadConfigOf(spec),
+				ExcludeTurns: true,
+			}, &res)
+		})
+	}
+	err := resume(s.engineProvider(spec.ModelProvider))
+	// The official account has two engine providers (see httpProvider), and a
+	// thread keeps the one it started on: one started before the user changed
+	// the transport resumes on its own, so the conversation goes on.
+	if pinned, ok := officialMismatch(err); ok {
+		err = resume(pinned)
+	}
+	if err != nil {
 		return engine.ThreadInfo{}, fmt.Errorf("thread/resume: %w", err)
 	}
 	s.setLoaded(threadID, true)

@@ -1214,7 +1214,7 @@
     "engineTransport": "ChatGPT account connection",
     "engineTransportAuto": "Automatic (WebSocket first)",
     "engineTransportHttp": "HTTP only",
-    "engineTransportApply": "Idle chats and teams use it from their next turn; one that is running uses it from the turn after the current one. Existing conversations carry on with their history."
+    "engineTransportApply": "It applies to chats and member threads started after the change. Existing ones keep the connection they started with and carry on with their history."
   },
   "auth": {
     "authorizing": "Authorizing…",

@@ -47,21 +47,54 @@ func TestAnHTTPOnlyEngineRunsTheOfficialAccountWithoutWebSockets(t *testing.T) {
 	}
 }
 
-// A thread started on the official account before the switch resumes on
-// httpProvider in an HTTP-only engine, and is still reported as the
-// official account's.
-func TestAnHTTPOnlyEngineResumesAnOfficialThread(t *testing.T) {
+// A thread keeps the provider it started on. One started on the official
+// account before the switch still resumes in an HTTP-only engine (on its own
+// provider, after the engine names it), and one started HTTP-only resumes in
+// an engine started the default way; both are the official account's.
+func TestAnOfficialThreadResumesOnTheTransportItStartedOn(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		httpOnly bool
+		on       string
+		want     []string
+	}{
+		{"old thread, HTTP-only engine", true, builtinProvider, []string{
+			"default=" + httpProvider, "resume on " + httpProvider, "default=openai", "resume on openai"}},
+		{"HTTP-only thread, default engine", false, httpProvider, []string{
+			"resume on openai", "default=" + httpProvider, "resume on " + httpProvider, "default=openai"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server, fake := startStrictEngine(t)
+			server.httpOnly = tc.httpOnly
+			fake.pinned = true
+			fake.threads["old"] = tc.on
+			ctx := context.Background()
+			resumed, err := server.ResumeThread(ctx, "old", engine.ThreadSpec{Model: "m", ModelProvider: builtinProvider})
+			if err != nil {
+				t.Fatalf("resume: %v", err)
+			}
+			if resumed.ModelProvider != builtinProvider {
+				t.Fatalf("resumed on %q, want the official account", resumed.ModelProvider)
+			}
+			if !slices.Equal(fake.log, tc.want) {
+				t.Fatalf("log = %q, want %q", fake.log, tc.want)
+			}
+			fake.log = nil
+			if _, err := server.StartTurn(ctx, "old", "hello", engine.TurnOptions{Model: "m"}); err != nil {
+				t.Fatalf("turn on the resumed thread: %v", err)
+			}
+		})
+	}
+}
+
+// A refusal for another vendor's provider is not retried.
+func TestAResumeRefusedForAnotherProviderIsNotRetried(t *testing.T) {
 	server, fake := startStrictEngine(t)
 	server.httpOnly = true
-	resumed, err := server.ResumeThread(context.Background(), "thread-openai", engine.ThreadSpec{Model: "m", ModelProvider: builtinProvider})
-	if err != nil {
-		t.Fatalf("resume: %v", err)
-	}
-	if resumed.ModelProvider != builtinProvider {
-		t.Fatalf("resumed on %q, want the official account", resumed.ModelProvider)
-	}
-	if want := []string{"default=" + httpProvider, "resume on " + httpProvider, "default=openai"}; !slices.Equal(fake.log, want) {
-		t.Fatalf("log = %q", fake.log)
+	fake.pinned = true
+	fake.threads["gw-thread"] = "gw"
+	if _, err := server.ResumeThread(context.Background(), "gw-thread", engine.ThreadSpec{Model: "m", ModelProvider: builtinProvider}); err == nil {
+		t.Fatal("a thread of another provider was resumed as the official account's")
 	}
 }
 
