@@ -433,3 +433,46 @@ func hasMessageText(messages []domain.Message, text string) bool {
 	}
 	return false
 }
+
+// The member opens the line the card arrived on and reads the card itself:
+// the exchange it opens (the collaboration page the web UI asks for) holds
+// the card's message with its text, from the project manager's side too.
+func TestCardAfterUserConfirmIsReadableInTheExchange(t *testing.T) {
+	h := newM2Harness(t)
+	team, bots := h.createTeam(t, []string{"fullstack-engineer"})
+	pm, dev := bots[0], bots[1]
+	d := relayDriver{t: t, h: h, team: team}
+	req := d.start(pm, []domain.Stage{
+		{Kind: domain.StageConfirm},
+		{Name: "实现", Kind: domain.StageImplement, OwnerID: dev.ID},
+		{Kind: domain.StageAccept},
+	})
+	d.confirm(req)
+	card := d.open(req)
+
+	for _, side := range [][2]string{{dev.ID, pm.ID}, {pm.ID, dev.ID}} {
+		path := "/api/v1/bots/" + side[0] + "/collaboration?teamId=" + team.ID + "&peerBotId=" + side[1]
+		status, body := h.userGet(t, path)
+		if status != 200 {
+			t.Fatalf("%s: %d %+v", path, status, body)
+		}
+		data, _ := body["data"].(map[string]any)
+		items, _ := data["items"].([]any)
+		var text string
+		for _, item := range items {
+			message, _ := item.(map[string]any)
+			if message["runId"] != card.ID {
+				continue
+			}
+			blocks, _ := message["blocks"].([]any)
+			for _, block := range blocks {
+				if b, _ := block.(map[string]any); b["type"] == "text" {
+					text, _ = b["text"].(string)
+				}
+			}
+		}
+		if text == "" || !strings.Contains(text, card.Title) || !strings.Contains(text, req.Title) {
+			t.Fatalf("%s: card %q (%s) not readable in the exchange; text %q, page %+v", path, card.Title, card.ID, text, body)
+		}
+	}
+}
