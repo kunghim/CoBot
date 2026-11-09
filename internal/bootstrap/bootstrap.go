@@ -293,6 +293,9 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 			}
 		}
 		return codex.Start(startCtx, codex.ServerOptions{
+			// The account's own control engine keeps the default transport:
+			// it lists models and signs in, and runs no thread.
+			HTTPOnly:  withCatalog && settings.HTTPOnly(),
 			Catalog:   clientCatalog,
 			Binary:    binary,
 			Cwd:       cwd,

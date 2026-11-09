@@ -21,6 +21,9 @@ type strictEngine struct {
 	threads   map[string]string
 	log       []string
 	refuseKey bool
+	// pinned plays a thread kept on the provider it started on: resuming it
+	// on another is refused the way the engine does, naming both.
+	pinned bool
 }
 
 func (e *strictEngine) answer(method string, params map[string]any) map[string]any {
@@ -41,6 +44,11 @@ func (e *strictEngine) answer(method string, params map[string]any) map[string]a
 		return map[string]any{"result": map[string]any{"thread": map[string]any{"id": id}, "modelProvider": e.threads[id]}}
 	case "thread/resume":
 		e.log = append(e.log, "resume on "+e.current)
+		id := params["threadId"].(string)
+		if on, known := e.threads[id]; e.pinned && known && on != params["modelProvider"].(string) {
+			return map[string]any{"error": map[string]any{"code": -32600, "message": "This chat uses " + on,
+				"data": map[string]any{"type": "modelProviderMismatch", "modelProvider": on, "currentModelProvider": e.current}}}
+		}
 		if params["modelProvider"].(string) != e.current {
 			return refusal
 		}

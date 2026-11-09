@@ -4710,6 +4710,10 @@ components:
           type: string
           enum: [always, smart, never]
           description: When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
+        engineTransport:
+          type: string
+          enum: [auto, http]
+          description: How the engine reaches the official account. auto lets Codex try a WebSocket first and fall back to HTTPS; http never opens a WebSocket. A running engine keeps its transport until it next starts.
     SettingsPatch:
       type: object
       properties:
@@ -4725,6 +4729,7 @@ components:
         budgetTokens: { type: integer, format: int64 }
         enginePath: { type: string }
         modelSwitchPrompt: { type: string, enum: [always, smart, never] }
+        engineTransport: { type: string, enum: [auto, http] }
     Snapshot:
       type: object
       required: [seq, instanceId, settings, teams, engine]
