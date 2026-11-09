@@ -2424,6 +2424,11 @@ export interface components {
              * @enum {string}
              */
             modelSwitchPrompt?: "always" | "smart" | "never";
+            /**
+             * @description How the engine reaches the official account. auto lets Codex try a WebSocket first and fall back to HTTPS; http never opens a WebSocket. A running engine keeps its transport until it next starts.
+             * @enum {string}
+             */
+            engineTransport?: "auto" | "http";
         };
         SettingsPatch: {
             /** @enum {string} */
@@ -2445,6 +2450,8 @@ export interface components {
             enginePath?: string;
             /** @enum {string} */
             modelSwitchPrompt?: "always" | "smart" | "never";
+            /** @enum {string} */
+            engineTransport?: "auto" | "http";
         };
         Snapshot: {
             /** Format: int64 */

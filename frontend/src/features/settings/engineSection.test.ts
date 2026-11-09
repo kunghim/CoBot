@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n';
 import { EngineSection } from './SettingsSections';
+import type { Settings } from '../../api/types';
 
 const state = vi.hoisted(() => ({ loggedIn: false, status: 'ready' }));
 
@@ -44,7 +45,9 @@ describe('the engine section', () => {
     host.remove();
   });
 
-  const render = () => act(() => root.render(h(EngineSection, {})));
+  const save = vi.fn();
+  const settings = { engineTransport: 'auto' } as Settings;
+  const render = (value: Settings = settings) => act(() => root.render(h(EngineSection, { settings: value, save })));
   const buttons = () => [...host.querySelectorAll('button')].map((button) => button.textContent);
 
   it('reads ready when the engine is ready, signed in or not', () => {
@@ -59,6 +62,23 @@ describe('the engine section', () => {
     expect(buttons()).not.toContain(i18n.t('engine.login'));
     expect(buttons()).not.toContain(i18n.t('engine.logout'));
     expect(host.textContent).toContain(i18n.t('settings.engineAccountHint'));
+  });
+
+  it('saves HTTP only as the ChatGPT account connection', () => {
+    save.mockClear();
+    render();
+    const select = host.querySelector<HTMLButtonElement>('[role="combobox"]')!;
+    expect(select.textContent).toContain(i18n.t('settings.engineTransportAuto'));
+    act(() => select.click());
+    const http = [...host.querySelectorAll<HTMLLIElement>('[role="option"]')].find((option) => option.textContent?.includes(i18n.t('settings.engineTransportHttp')))!;
+    act(() => http.click());
+    expect(save).toHaveBeenCalledWith('engineTransport', { engineTransport: 'http' });
+  });
+
+  it('shows the saved connection', () => {
+    render({ engineTransport: 'http' } as Settings);
+    expect(host.textContent).toContain(i18n.t('settings.engineTransportHttp'));
+    expect(host.textContent).toContain(i18n.t('settings.engineTransportApply'));
   });
 
   it('offers a recheck when the engine is not ready', () => {

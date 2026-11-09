@@ -18,6 +18,9 @@ import (
 type Server struct {
 	mu sync.Mutex
 
+	// HTTPOnlyMode is what HTTPOnly reports.
+	HTTPOnlyMode bool
+
 	epoch     string
 	threadSeq int
 	turnSeq   int
@@ -161,6 +164,20 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	s.ThreadProviders = append(s.ThreadProviders, spec.ModelProvider)
 	s.ThreadConfigs = append(s.ThreadConfigs, codex.ThreadConfigOf(spec))
 	return engine.ThreadInfo{ThreadID: id, Cwd: spec.Cwd, Model: answeredModel(spec.Model), ModelProvider: answeredProvider(spec.ModelProvider), Path: TranscriptPath(id)}, nil
+}
+
+// HTTPOnly says how the engine was started; a test sets HTTPOnlyMode in the
+// factory, before the scheduler or chat runner holds the server.
+func (s *Server) HTTPOnly() bool { return s.HTTPOnlyMode }
+
+// Know plays threads another engine process started: the real engine keeps
+// threads on disk, so a new process can resume them.
+func (s *Server) Know(threadIDs ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range threadIDs {
+		s.threads[id] = true
+	}
 }
 
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {

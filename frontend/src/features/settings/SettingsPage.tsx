@@ -69,7 +69,7 @@ export default function SettingsPage() {
       general: <GeneralSection {...props} />,
       appearance: <AppearanceSection {...props} />,
       roles: <RolesSection />,
-      engine: <EngineSection />,
+      engine: <EngineSection settings={settings.data} save={save} />,
       providers: <ProviderSection settings={settings.data} save={save} errors={errors} />,
       collaboration: <CollaborationSection {...props} />,
       archived: <ArchivedSection />,

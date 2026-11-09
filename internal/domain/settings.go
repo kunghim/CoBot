@@ -55,7 +55,23 @@ type Settings struct {
 	// carry the teammates on the old provider along: always, never, or
 	// only when a member on that provider last failed.
 	ModelSwitchPrompt string `json:"modelSwitchPrompt"`
+	// EngineTransport is how the engine reaches the official account:
+	// auto (Codex tries a WebSocket first, then HTTPS) or http (never a
+	// WebSocket). It takes effect when an engine next starts.
+	EngineTransport string `json:"engineTransport"`
 }
+
+// Engine transports for the official account.
+const (
+	EngineTransportAuto = "auto"
+	EngineTransportHTTP = "http"
+)
+
+// EngineTransports lists the accepted values in their UI order.
+var EngineTransports = []string{EngineTransportAuto, EngineTransportHTTP}
+
+// HTTPOnly reports whether the engine must not open a WebSocket.
+func (s Settings) HTTPOnly() bool { return s.EngineTransport == EngineTransportHTTP }
 
 // Model switch prompt modes.
 const (
@@ -80,6 +96,7 @@ func DefaultSettings() Settings {
 		Theme:             "classic",
 		BudgetScope:       BudgetScopeNone,
 		ModelSwitchPrompt: ModelSwitchAlways,
+		EngineTransport:   EngineTransportAuto,
 	}
 }
 
@@ -100,6 +117,9 @@ func (s Settings) Validate() error {
 	}
 	if !oneOf(ModelSwitchPromptModes, prompt) {
 		return InvalidRequest("error.settings.unsupported_model_switch_prompt", map[string]any{"modelSwitchPrompt": s.ModelSwitchPrompt})
+	}
+	if !oneOf(EngineTransports, s.EngineTransport) {
+		return InvalidRequest("error.settings.unsupported_engine_transport", map[string]any{"engineTransport": s.EngineTransport})
 	}
 	if s.MemberLimit < 1 || s.MemberLimit > 20 {
 		return InvalidRequest("error.settings.member_limit_range", map[string]any{"min": 1, "max": 20})
@@ -154,6 +174,7 @@ type SettingsPatch struct {
 	BudgetTokens      *int64  `json:"budgetTokens"`
 	EnginePath        *string `json:"enginePath"`
 	ModelSwitchPrompt *string `json:"modelSwitchPrompt"`
+	EngineTransport   *string `json:"engineTransport"`
 }
 
 // Apply returns the settings value after the patch, without persisting.
@@ -194,6 +215,9 @@ func (s Settings) Apply(p SettingsPatch) Settings {
 	}
 	if p.ModelSwitchPrompt != nil {
 		out.ModelSwitchPrompt = strings.TrimSpace(*p.ModelSwitchPrompt)
+	}
+	if p.EngineTransport != nil {
+		out.EngineTransport = strings.TrimSpace(*p.EngineTransport)
 	}
 	return out
 }

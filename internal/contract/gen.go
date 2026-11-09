@@ -386,6 +386,12 @@ const (
 	SettingsColorModeSystem SettingsColorMode = "system"
 )
 
+// Defines values for SettingsEngineTransport.
+const (
+	SettingsEngineTransportAuto SettingsEngineTransport = "auto"
+	SettingsEngineTransportHttp SettingsEngineTransport = "http"
+)
+
 // Defines values for SettingsLanguage.
 const (
 	SettingsLanguageEn   SettingsLanguage = "en"
@@ -419,6 +425,12 @@ const (
 	SettingsPatchColorModeDark   SettingsPatchColorMode = "dark"
 	SettingsPatchColorModeLight  SettingsPatchColorMode = "light"
 	SettingsPatchColorModeSystem SettingsPatchColorMode = "system"
+)
+
+// Defines values for SettingsPatchEngineTransport.
+const (
+	SettingsPatchEngineTransportAuto SettingsPatchEngineTransport = "auto"
+	SettingsPatchEngineTransportHttp SettingsPatchEngineTransport = "http"
 )
 
 // Defines values for SettingsPatchLanguage.
@@ -1655,10 +1667,13 @@ type Settings struct {
 	DefaultModel string              `json:"defaultModel"`
 
 	// DefaultProvider The model provider the profile runs with; empty means the engine's own.
-	DefaultProvider *string          `json:"defaultProvider,omitempty"`
-	EnginePath      string           `json:"enginePath"`
-	Language        SettingsLanguage `json:"language"`
-	MemberLimit     int              `json:"memberLimit"`
+	DefaultProvider *string `json:"defaultProvider,omitempty"`
+	EnginePath      string  `json:"enginePath"`
+
+	// EngineTransport How the engine reaches the official account. auto lets Codex try a WebSocket first and fall back to HTTPS; http never opens a WebSocket. A running engine keeps its transport until it next starts.
+	EngineTransport *SettingsEngineTransport `json:"engineTransport,omitempty"`
+	Language        SettingsLanguage         `json:"language"`
+	MemberLimit     int                      `json:"memberLimit"`
 
 	// ModelSwitchPrompt When switching a member's model offers to carry the teammates on the old provider along; smart asks only when a member on that provider last failed.
 	ModelSwitchPrompt *SettingsModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
@@ -1672,6 +1687,9 @@ type SettingsBudgetScope string
 
 // SettingsColorMode defines model for Settings.ColorMode.
 type SettingsColorMode string
+
+// SettingsEngineTransport How the engine reaches the official account. auto lets Codex try a WebSocket first and fall back to HTTPS; http never opens a WebSocket. A running engine keeps its transport until it next starts.
+type SettingsEngineTransport string
 
 // SettingsLanguage defines model for Settings.Language.
 type SettingsLanguage string
@@ -1693,6 +1711,7 @@ type SettingsPatch struct {
 	// DefaultProvider The model provider to run with; must name a configured provider.
 	DefaultProvider   *string                         `json:"defaultProvider,omitempty"`
 	EnginePath        *string                         `json:"enginePath,omitempty"`
+	EngineTransport   *SettingsPatchEngineTransport   `json:"engineTransport,omitempty"`
 	Language          *SettingsPatchLanguage          `json:"language,omitempty"`
 	MemberLimit       *int                            `json:"memberLimit,omitempty"`
 	ModelSwitchPrompt *SettingsPatchModelSwitchPrompt `json:"modelSwitchPrompt,omitempty"`
@@ -1705,6 +1724,9 @@ type SettingsPatchBudgetScope string
 
 // SettingsPatchColorMode defines model for SettingsPatch.ColorMode.
 type SettingsPatchColorMode string
+
+// SettingsPatchEngineTransport defines model for SettingsPatch.EngineTransport.
+type SettingsPatchEngineTransport string
 
 // SettingsPatchLanguage defines model for SettingsPatch.Language.
 type SettingsPatchLanguage string

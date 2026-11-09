@@ -1198,7 +1198,13 @@
     "modelSwitchNever": "不提示",
     "defaultModelInfo": "可选任何已启用供应商的模型；之后新增供应商不会改变这里。",
     "budgetInfo": "团队和成员可以在「团队 → 每日预算」里各自调整。",
-    "engineAccountInfo": "ChatGPT 账号在「模型供应商」分区登录；不绑定到引擎。"
+    "engineAccountInfo": "ChatGPT 账号在「模型供应商」分区登录；不绑定到引擎。",
+    "engineTransportTitle": "连接方式",
+    "engineTransportHint": "Codex 默认先用 WebSocket 连接 ChatGPT 账号，连不上时要等几次重连超时才改用 HTTP。如果每轮开头常显示「正在重新连接」，选「只用 HTTP」。只影响 ChatGPT 账号，不影响其他供应商。",
+    "engineTransport": "ChatGPT 账号的连接",
+    "engineTransportAuto": "自动（先试 WebSocket）",
+    "engineTransportHttp": "只用 HTTP",
+    "engineTransportApply": "空闲的对话和团队在下一轮开始时生效；正在运行的，在这一轮结束后的下一轮生效。已有对话会接着原来的记录继续。"
   },
   "auth": {
     "authorizing": "正在授权…",
@@ -1244,6 +1250,7 @@
     "error.settings.unsupported_language": "不支持的语言",
     "error.settings.unsupported_color_mode": "不支持的明暗模式",
     "error.settings.unsupported_theme": "不支持的主题",
+    "error.settings.unsupported_engine_transport": "不支持的连接方式",
     "error.provider.bind_failed": "引擎没有接受这个供应商，请稍后再试",
     "error.provider.chatgpt_without_credential": "ChatGPT 账号登录不使用密钥",
     "error.provider.credential_required": "请填写密钥",

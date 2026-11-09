@@ -229,7 +229,7 @@ function AvatarCatalogCard() {
  * hand. It drives the official Codex login flow, polling every 3s for up to
  * 2 minutes.
  */
-export function EngineSection() {
+export function EngineSection({ settings, save }: Pick<SectionProps, 'settings' | 'save'>) {
   const { t } = useTranslation();
   const engine = useEngine();
   const check = useEngineCheck();
@@ -284,6 +284,22 @@ export function EngineSection() {
               </Button>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card title={t('settings.engineTransportTitle')} description={t('settings.engineTransportHint')}>
+        <div className="max-w-md space-y-2">
+          <Field label={t('settings.engineTransport')}>
+            <Select
+              value={settings.engineTransport || 'auto'}
+              options={[
+                { value: 'auto', label: t('settings.engineTransportAuto') },
+                { value: 'http', label: t('settings.engineTransportHttp') },
+              ]}
+              onChange={(next) => save('engineTransport', { engineTransport: next as Settings['engineTransport'] })}
+            />
+          </Field>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('settings.engineTransportApply')}</p>
         </div>
       </Card>
 

@@ -1208,7 +1208,13 @@
     "modelSwitchNever": "Never ask",
     "defaultModelInfo": "Any enabled provider’s models can be chosen; adding providers never moves this.",
     "budgetInfo": "Teams and members adjust their own under “Team → daily budget”.",
-    "engineAccountInfo": "The ChatGPT account signs in under “Model providers”; the engine binds to no account."
+    "engineAccountInfo": "The ChatGPT account signs in under “Model providers”; the engine binds to no account.",
+    "engineTransportTitle": "Connection",
+    "engineTransportHint": "Codex reaches the ChatGPT account over a WebSocket first, and when that fails it waits through several reconnect timeouts before using HTTP. If turns often start with “Reconnecting”, choose “HTTP only”. Only the ChatGPT account is affected, not other providers.",
+    "engineTransport": "ChatGPT account connection",
+    "engineTransportAuto": "Automatic (WebSocket first)",
+    "engineTransportHttp": "HTTP only",
+    "engineTransportApply": "Idle chats and teams use it from their next turn; one that is running uses it from the turn after the current one. Existing conversations carry on with their history."
   },
   "auth": {
     "authorizing": "Authorizing…",
@@ -1254,6 +1260,7 @@
     "error.settings.unsupported_language": "Unsupported language",
     "error.settings.unsupported_color_mode": "Unsupported color mode",
     "error.settings.unsupported_theme": "Unsupported theme",
+    "error.settings.unsupported_engine_transport": "Unsupported connection",
     "error.provider.bind_failed": "The engine did not take this provider; try again shortly",
     "error.provider.chatgpt_without_credential": "A ChatGPT sign-in does not use a key",
     "error.provider.credential_required": "Enter a key",

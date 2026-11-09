@@ -35,6 +35,9 @@ type ServerOptions struct {
 	// Trace records the raw stdin, stdout and stderr while a developer
 	// recording is on; nil records nothing.
 	Trace *wiretrace.Recorder
+	// HTTPOnly runs the official account without WebSockets (see
+	// httpProvider) for the life of the process.
+	HTTPOnly bool
 }
 
 // Server is the Codex implementation of engine.Server.
@@ -59,6 +62,8 @@ type Server struct {
 	// catalog is the fingerprint of the model catalog this process was
 	// started with; empty when it knows only the engine's own models.
 	catalog string
+	// httpOnly runs the official account on httpProvider (see transport.go).
+	httpOnly bool
 
 	loaded map[string]bool // threads this app-server has loaded
 	// providers maps a thread to the provider the engine said it runs with.
@@ -190,6 +195,7 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		fileItems: map[nativeItemKey][]engine.FileChange{},
 		callbacks: opts.Callbacks,
 		catalog:   opts.Catalog.Fingerprint,
+		httpOnly:  opts.HTTPOnly,
 	}
 	s.trace, s.tracePeer, s.traceStderr = opts.Trace, peer, stderrLines
 	s.client = NewClient(stdin, stdout, ClientHooks{
@@ -216,7 +222,14 @@ func Start(ctx context.Context, opts ServerOptions) (*Server, error) {
 		s.waitProcess()
 		return nil, fmt.Errorf("codex initialized notify: %w", err)
 	}
-	s.logger.Info("codex app-server ready", "epoch", s.epoch, "cwd", opts.Cwd)
+	if s.httpOnly {
+		if err := s.bindHTTPProvider(handshakeCtx); err != nil {
+			s.kill()
+			s.waitProcess()
+			return nil, err
+		}
+	}
+	s.logger.Info("codex app-server ready", "epoch", s.epoch, "cwd", opts.Cwd, "httpOnly", s.httpOnly)
 	return s, nil
 }
 
@@ -624,7 +637,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 		ApprovalPolicy:        spec.ApprovalPolicy,
 		ApprovalsReviewer:     spec.ApprovalsReviewer,
 		Model:                 spec.Model,
-		ModelProvider:         spec.ModelProvider,
+		ModelProvider:         s.engineProvider(spec.ModelProvider),
 		DeveloperInstructions: spec.DeveloperInstructions,
 		Config:                ThreadConfigOf(spec),
 	}, &res)
@@ -636,7 +649,7 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 	}
 	s.setLoaded(res.Thread.ID, true)
 	s.setThreadProvider(res.Thread.ID, res.ModelProvider)
-	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
+	return engine.ThreadInfo{ThreadID: res.Thread.ID, Cwd: res.Cwd, Model: res.Model, ModelProvider: productProvider(res.ModelProvider), Path: res.Thread.Path}, nil
 }
 
 // ResumeThread reattaches a previously created thread.
@@ -647,11 +660,12 @@ func (s *Server) StartThread(ctx context.Context, spec engine.ThreadSpec) (engin
 func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.ThreadSpec) (engine.ThreadInfo, error) {
 	spec = applyPermission(spec)
 	res := ThreadResumeResult{}
-	if err := s.asThreadProvider(ctx, spec.ModelProvider, func() error {
+	provider := s.engineProvider(spec.ModelProvider)
+	if err := s.asThreadProvider(ctx, provider, func() error {
 		return s.client.Call(ctx, "thread/resume", ThreadResumeParams{
 			ThreadID: threadID, Cwd: spec.Cwd, Sandbox: spec.Sandbox,
 			ApprovalPolicy: spec.ApprovalPolicy, ApprovalsReviewer: spec.ApprovalsReviewer,
-			Model: spec.Model, ModelProvider: spec.ModelProvider,
+			Model: spec.Model, ModelProvider: provider,
 			DeveloperInstructions: spec.DeveloperInstructions, Config: ThreadConfigOf(spec),
 			ExcludeTurns: true,
 		}, &res)
@@ -660,7 +674,7 @@ func (s *Server) ResumeThread(ctx context.Context, threadID string, spec engine.
 	}
 	s.setLoaded(threadID, true)
 	s.setThreadProvider(threadID, res.ModelProvider)
-	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: res.ModelProvider, Path: res.Thread.Path}, nil
+	return engine.ThreadInfo{ThreadID: threadID, Model: res.Model, ModelProvider: productProvider(res.ModelProvider), Path: res.Thread.Path}, nil
 }
 
 // ThreadPath is the file the engine keeps a thread's full record in, for a

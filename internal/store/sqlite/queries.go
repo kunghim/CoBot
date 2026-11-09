@@ -53,11 +53,11 @@ type Queryer interface {
 
 // ---- settings ----
 
-const settingsColumns = `revision, language, color_mode, theme, default_model, default_provider, member_limit, chain_limit, review_reject_limit, budget_scope, budget_tokens, engine_path, model_switch_prompt`
+const settingsColumns = `revision, language, color_mode, theme, default_model, default_provider, member_limit, chain_limit, review_reject_limit, budget_scope, budget_tokens, engine_path, model_switch_prompt, engine_transport`
 
 func scanSettings(row *sql.Row) (domain.Settings, error) {
 	var s domain.Settings
-	err := row.Scan(&s.Revision, &s.Language, &s.ColorMode, &s.Theme, &s.DefaultModel, &s.DefaultProvider, &s.MemberLimit, &s.ChainLimit, &s.ReviewRejectLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath, &s.ModelSwitchPrompt)
+	err := row.Scan(&s.Revision, &s.Language, &s.ColorMode, &s.Theme, &s.DefaultModel, &s.DefaultProvider, &s.MemberLimit, &s.ChainLimit, &s.ReviewRejectLimit, &s.BudgetScope, &s.BudgetTokens, &s.EnginePath, &s.ModelSwitchPrompt, &s.EngineTransport)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Settings{}, ErrNotFound
 	}
@@ -111,11 +111,11 @@ func UpdateSettingsTx(ctx context.Context, tx *sql.Tx, patch domain.SettingsPatc
 			revision = revision + 1,
 			language = ?, color_mode = ?, theme = ?, default_model = ?, default_provider = ?,
 			member_limit = ?, chain_limit = ?, review_reject_limit = ?,
-			budget_scope = ?, budget_tokens = ?, engine_path = ?, model_switch_prompt = ?, updated_at = ?
+			budget_scope = ?, budget_tokens = ?, engine_path = ?, model_switch_prompt = ?, engine_transport = ?, updated_at = ?
 		WHERE id = 1`,
 		next.Language, next.ColorMode, next.Theme, next.DefaultModel, next.DefaultProvider,
 		next.MemberLimit, next.ChainLimit, next.ReviewRejectLimit,
-		next.BudgetScope, next.BudgetTokens, next.EnginePath, next.ModelSwitchPrompt, now)
+		next.BudgetScope, next.BudgetTokens, next.EnginePath, next.ModelSwitchPrompt, next.EngineTransport, now)
 	if err != nil {
 		return domain.Settings{}, fmt.Errorf("update settings: %w", err)
 	}

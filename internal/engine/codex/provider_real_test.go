@@ -295,3 +295,47 @@ func TestRealEngineServesThreadsOnTwoProviders(t *testing.T) {
 	}
 	t.Fatal("the thread never reached the provider it was moved to")
 }
+
+// An engine started HTTP-only registers the official account's HTTP provider,
+// and the engine accepts it: the table it reads back keeps WebSockets off and
+// the official login (#93).
+func TestRealEngineAcceptsTheHTTPOnlyProvider(t *testing.T) {
+	if os.Getenv("COBOT_R_SMOKE") != "1" {
+		t.Skip("set COBOT_R_SMOKE=1 to run the real engine transport check")
+	}
+	paths := realProviderHome(t, map[string]*gateway{})
+	binary, err := Locate("")
+	if err != nil {
+		t.Fatalf("locate codex: %v", err)
+	}
+	work := filepath.Join(t.TempDir(), "work")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	server, err := Start(context.Background(), ServerOptions{
+		Binary: binary, Cwd: work, Env: realEngineEnv(paths, nil), HTTPOnly: true,
+		Client: ClientInfo{Name: "cobot-check", Title: "CoBot transport check", Version: "test"},
+	})
+	if err != nil {
+		t.Fatalf("start an HTTP-only app-server: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	})
+	cfg, err := server.readConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	table, _ := configModelProviders(cfg)[httpProvider].(map[string]any)
+	if table == nil {
+		t.Fatalf("no %s table in %v", httpProvider, configModelProviders(cfg))
+	}
+	if table["supports_websockets"] != false || table["requires_openai_auth"] != true {
+		t.Fatalf("%s = %v, want WebSockets off and the official login", httpProvider, table)
+	}
+	if cfg["model_provider"] != nil && cfg["model_provider"] != builtinProvider {
+		t.Fatalf("the default provider moved to %v", cfg["model_provider"])
+	}
+}

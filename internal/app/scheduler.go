@@ -820,10 +820,22 @@ func (s *Scheduler) EnsureTeamServer(ctx context.Context, teamID, cwd string) (e
 	s.mu.Lock()
 	if rt, ok := s.teams[teamID]; ok {
 		s.mu.Unlock()
-		rt.touch()
-		return rt.server, nil
+		if !s.app.engineTransportStale(ctx, rt.server) {
+			rt.touch()
+			return rt.server, nil
+		}
+		// The user changed how the engine connects: an engine with nothing
+		// running starts again with it, and the members' threads resume on
+		// it. One with a turn running keeps going and is asked again later.
+		runs, err := sqlite.ListActiveRunsByTeam(ctx, s.app.DB, teamID)
+		if err != nil || len(runs) > 0 {
+			rt.touch()
+			return rt.server, nil
+		}
+		s.retire(ctx, teamID, rt, "engine transport changed")
+	} else {
+		s.mu.Unlock()
 	}
-	s.mu.Unlock()
 
 	rt := &teamRuntime{cwd: cwd, buffer: map[string]*runBuffer{}}
 	rt.touch()
@@ -923,13 +935,20 @@ func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64)
 		lock.Unlock()
 		return
 	}
+	s.retire(ctx, teamID, rt, "idle for "+s.IdleEngineTimeout.String())
+	lock.Unlock()
+}
+
+// retire takes a team's engine out of service and shuts it down in the
+// background; the caller holds the team lock and has checked that nothing
+// runs on it.
+func (s *Scheduler) retire(ctx context.Context, teamID string, rt *teamRuntime, reason string) {
 	s.mu.Lock()
 	if s.teams[teamID] == rt {
 		delete(s.teams, teamID)
 	}
 	s.mu.Unlock()
-	lock.Unlock()
-	s.logger.Info("idle team engine stopped", "teamId", teamID, "idleFor", s.IdleEngineTimeout.String())
+	s.logger.Info("team engine stopped", "teamId", teamID, "reason", reason)
 	// The shutdown waits for the process; off the lease loop, so leases keep
 	// their 2-second refresh. Stop joins it like any worker.
 	s.workers.Add(1)
@@ -938,7 +957,7 @@ func (s *Scheduler) stopIfIdle(ctx context.Context, teamID string, cutoff int64)
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
 		if err := rt.server.Shutdown(shutdownCtx); err != nil {
-			s.logger.Warn("idle team engine shutdown", "teamId", teamID, "error", err)
+			s.logger.Warn("team engine shutdown", "teamId", teamID, "error", err)
 		}
 	}()
 }

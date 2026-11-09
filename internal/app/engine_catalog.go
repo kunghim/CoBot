@@ -117,3 +117,21 @@ func (a *App) ApplyEngineCatalog(ctx context.Context, principal auth.Principal) 
 	stopped, busy := a.Scheduler.RestartStaleEngines(ctx, catalog.Fingerprint)
 	return ApplyEngineCatalogResult{Restarted: stopped, Busy: busy}, nil
 }
+
+// transportCarrier is an engine that knows whether it was started HTTP-only.
+type transportCarrier interface{ HTTPOnly() bool }
+
+// engineTransportStale reports whether an engine runs the official account
+// another way than the settings now ask for. An engine that cannot say, or a
+// profile whose settings cannot be read, is left alone.
+func (a *App) engineTransportStale(ctx context.Context, server engine.Server) bool {
+	carrier, ok := server.(transportCarrier)
+	if !ok {
+		return false
+	}
+	settings, err := a.GetSettings(ctx)
+	if err != nil {
+		return false
+	}
+	return carrier.HTTPOnly() != settings.HTTPOnly()
+}

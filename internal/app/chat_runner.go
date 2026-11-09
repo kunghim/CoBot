@@ -211,7 +211,13 @@ func (r *ChatRunner) ensure(chat domain.Chat) (*chatRuntime, error) {
 	m.Lock()
 	defer m.Unlock()
 	if rt := r.runtime(chat.ID); rt != nil && rt.server != nil {
-		return rt, nil
+		// An engine started before the user changed how it connects is let go
+		// between turns (ensure runs before a turn is claimed), so the chat's
+		// thread resumes on one started the new way.
+		if domain.ChatRunActive(rt.run.Status) || !r.a.engineTransportStale(r.ctx, rt.server) {
+			return rt, nil
+		}
+		r.discard(chat.ID)
 	}
 	if err := os.MkdirAll(chat.Workspace, 0700); err != nil {
 		return nil, err
